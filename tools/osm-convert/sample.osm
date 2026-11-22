@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 변환기 시험용 가상 데이터: 기울어진 큰길 하나, 소이 하나, 건물 넷(그중 경찰서 하나) -->
+<osm version="0.6">
+  <bounds minlat="13.7360" minlon="100.5590" maxlat="13.7390" maxlon="100.5640"/>
+  <node id="1" lat="13.7380" lon="100.5592"/>
+  <node id="2" lat="13.7370" lon="100.5638"/>
+  <node id="3" lat="13.7375" lon="100.5615"/>
+  <node id="4" lat="13.7362" lon="100.5612"/>
+  <node id="10" lat="13.73835" lon="100.5600"/><node id="11" lat="13.73835" lon="100.5606"/><node id="12" lat="13.73860" lon="100.5606"/><node id="13" lat="13.73860" lon="100.5600"/>
+  <node id="20" lat="13.73815" lon="100.5620"/><node id="21" lat="13.73815" lon="100.5626"/><node id="22" lat="13.73845" lon="100.5626"/><node id="23" lat="13.73845" lon="100.5620"/>
+  <node id="30" lat="13.73790" lon="100.5628"/><node id="31" lat="13.73790" lon="100.5634"/><node id="32" lat="13.73820" lon="100.5634"/><node id="33" lat="13.73820" lon="100.5628"/>
+  <node id="40" lat="13.73640" lon="100.5595"/><node id="41" lat="13.73640" lon="100.5603"/><node id="42" lat="13.73670" lon="100.5603"/><node id="43" lat="13.73670" lon="100.5595"/>
+  <node id="90" lat="13.73850" lon="100.5603"><tag k="shop" v="convenience"/></node>
+  <way id="100"><nd ref="1"/><nd ref="2"/><tag k="highway" v="primary"/><tag k="name" v="Sukhumvit Road"/></way>
+  <way id="101"><nd ref="3"/><nd ref="4"/><tag k="highway" v="residential"/></way>
+  <way id="200"><nd ref="10"/><nd ref="11"/><nd ref="12"/><nd ref="13"/><nd ref="10"/><tag k="building" v="yes"/><tag k="building:levels" v="4"/></way>
+  <way id="201"><nd ref="20"/><nd ref="21"/><nd ref="22"/><nd ref="23"/><nd ref="20"/><tag k="building" v="yes"/><tag k="amenity" v="pharmacy"/></way>
+  <way id="202"><nd ref="30"/><nd ref="31"/><nd ref="32"/><nd ref="33"/><nd ref="30"/><tag k="building" v="yes"/><tag k="amenity" v="police"/><tag k="name" v="Police Station"/></way>
+  <way id="203"><nd ref="40"/><nd ref="41"/><nd ref="42"/><nd ref="43"/><nd ref="40"/><tag k="building" v="apartments"/><tag k="building:levels" v="12"/></way>
+</osm>
