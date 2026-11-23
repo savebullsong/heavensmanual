@@ -1,4 +1,4 @@
-// Heaven's Manual — 1단계: 우주새 상점(첫 장면) → 앵무새의 환생 → 수쿰빗 거리
+// Heaven's Manual — 1단계: 우주새 상점(첫 장면, 무작위 처음 모습) → "나는 누구였지" → 이번 생의 모습 → 수쿰빗 거리
 import { Application } from 'pixi.js';
 import './style.css';
 import { WorldScene } from './world.ts';
@@ -8,13 +8,28 @@ import { openLookPanel, lookPanelInsets } from './lookpanel.ts';
 import { ITEMS, itemIcon, effectText, priceText, type ItemDef, type ItemCat } from './items.ts';
 import { preloadPortrait } from './portraits.ts';
 import { sukhumvitTestZone, decodeZone, type Zone } from './zone.ts';
-import { DEFAULT_LOOK, type Look } from './character.ts';
+import { ARRIVALS, rollArrival, arrivalLook, type Arrival, type Look, type Outfit } from './character.ts';
 import { t, lang, setLang, LANGS, type Lang } from './i18n.ts';
 import { load, save } from './state.ts';
 import { bangkokClock } from './clock.ts';
 
 const state = load();
 if (state.lang) setLang(state.lang);
+// 시험용: ?newlife 는 새 영혼으로 다시 시작, ?form=raincoat 처럼 처음 모습을 고정
+const params = new URLSearchParams(location.search);
+const forced = params.get('form') as Arrival | null;
+if (params.has('newlife') || (forced && ARRIVALS.includes(forced))) {
+  delete state.look;
+  delete state.arrival;
+  state.visits = 0;
+}
+if (!state.look && !state.arrival) {
+  const kind = forced && ARRIVALS.includes(forced) ? forced : rollArrival();
+  state.arrival = { kind, look: arrivalLook(kind) };
+  save(state);
+}
+/** 지금 보이는 몸: 이번 생의 몸이 정해지기 전에는 처음 모습 */
+const bodyLook = (): Look => state.look ?? state.arrival!.look;
 document.documentElement.lang = lang();
 
 const ui = document.getElementById('ui')!;
@@ -40,7 +55,7 @@ async function boot() {
   await app.init({ resizeTo: window, background: '#14110f', antialias: false, autoDensity: true, resolution: Math.min(2, window.devicePixelRatio || 1) });
   document.getElementById('game')!.appendChild(app.canvas);
   ui.hidden = true;
-  shop = new ShopRoom(app, state.look ?? DEFAULT_LOOK, !state.look, shopLabels());
+  shop = new ShopRoom(app, bodyLook(), false, shopLabels());
   shop.onArrive = onShopArrive;
   app.stage.addChild(shop.root);
   preloadPortrait('miss-hwang');
@@ -55,8 +70,7 @@ function enterShop(fromStreet: boolean) {
   talkedThisVisit = false;
   world?.stop();
   if (world) world.root.visible = false;
-  shop.setLook(state.look ?? DEFAULT_LOOK);
-  shop.setGhost(!state.look);
+  shop.setLook(bodyLook());
   shop.enter(fromStreet);
   shop.start();
   renderHud();
@@ -74,11 +88,11 @@ async function enterWorld() {
   ui.textContent = '';
   ui.className = '';
   if (!world) {
-    world = new WorldScene(app, zone, state.look ?? DEFAULT_LOOK, () => enterShop(true));
+    world = new WorldScene(app, zone, bodyLook(), () => enterShop(true));
     app.stage.addChild(world.root);
   }
   world.root.visible = true;
-  world.setLook(state.look ?? DEFAULT_LOOK);
+  world.setLook(bodyLook());
   world.placeAtDoor();
   world.start();
   renderHud();
@@ -109,7 +123,12 @@ async function talkToHwang() {
   shop.lock(true);
   const L = t();
   dlg.open({ name: L.clerk, portrait: 'miss-hwang' });
-  if (!talkedThisVisit) await dlg.say(state.visits === 0 ? L.greetFirst : state.visits === 1 ? L.greetUnlock : L.greetUsual);
+  if (!talkedThisVisit) {
+    if (!state.look) {
+      await dlg.say(L.greetFirst);
+      await dlg.say(L.react[state.arrival!.kind]);
+    } else await dlg.say(L.greetUsual);
+  }
   talkedThisVisit = true;
   for (;;) {
     const picked = await pickItem();
@@ -141,8 +160,7 @@ function endTalk() {
 /** 상품 창을 띄우고, 고른 물건(닫으면 null)을 돌려준다 */
 function pickItem(): Promise<ItemDef | null> {
   const L = t();
-  const unlocked = state.visits >= 1;
-  const cats: ItemCat[] = unlocked ? ['goods', 'weapon', 'armor'] : ['goods'];
+  const cats: ItemCat[] = ['goods', 'weapon', 'armor']; // 무기와 방어구도 처음부터
   let cat: ItemCat = 'goods';
   return new Promise((resolve) => {
     const el = document.createElement('div');
@@ -196,48 +214,53 @@ function pickItem(): Promise<ItemDef | null> {
   });
 }
 
-/** 문으로 나간다. 몸이 없으면(첫 방문·귀신) 앵무새가 말을 하고 현실로 환생시킨다 */
+/** 문으로 나간다. 이번 생의 몸이 아직 없으면 스스로 묻고, 모습·성별·지역을 다시 고른다 */
 async function goOut() {
   if (state.look) { leaveShop(); return; }
   busy = true;
   shop.lock(true);
   const L = t();
-  shop.crest(true);
-  dlg.open({ name: L.parrot, portrait: 'parrot' });
-  await dlg.say(L.parrot1);
-  await dlg.say(L.parrot2);
+  dlg.open({ name: '', monologue: true });
+  await dlg.say(L.whoWasI);
   dlg.close();
-  shop.crest(false);
-  const look = await chooseBody(L.bodyTitle, L.bodyConfirm, state.look ?? DEFAULT_LOOK);
+  const arrival = state.arrival!;
+  // 아이 모습으로 왔어도 거리로 나가는 몸은 어른이다. 광채는 그대로 남는다
+  const start: Look = { ...arrival.look, child: false };
+  const special = arrival.look.outfit && arrival.look.outfit !== 'casual' ? [arrival.look.outfit] : [];
+  const outfits: Outfit[] = ['casual', ...special];
+  start.outfit = arrival.look.outfit ?? 'casual';
+  const { look, region } = await chooseBody(L.bodyTitle, L.bodyConfirm, start, {
+    outfits,
+    regions: [
+      { id: 'bkk', label: L.regions.bkk, ready: true },
+      { id: 'seoul', label: L.regions.seoul, ready: false },
+    ],
+  });
   state.look = look;
+  state.region = region ?? 'bkk';
   save(state);
-  shop.crest(true);
-  dlg.open({ name: t().parrot, portrait: 'parrot' });
-  await dlg.say(t().parrot3);
-  dlg.close();
-  shop.crest(false);
   shop.lock(false);
   busy = false;
   leaveShop();
 }
 
 /** 외형 창: 지금 장면의 캐릭터가 바로 바뀐다 */
-function chooseBody(title: string, confirm: string, initial: Look): Promise<Look> {
+function chooseBody(title: string, confirm: string, initial: Look, extra: { outfits?: Outfit[]; regions?: { id: string; label: string; ready: boolean }[] } = {}): Promise<{ look: Look; region?: string }> {
   return new Promise((resolve) => {
     const ins = lookPanelInsets();
     const target = scene === 'shop' ? shop : world!;
     target.setInsets(ins.right, ins.bottom);
-    if (scene === 'shop') shop.setGhost(false);
     hud.hidden = true;
     openLookPanel(document.body, initial, {
       title,
       confirm,
+      ...extra,
       onChange: (look) => target.setLook(look),
       onTurn: () => (scene === 'shop' ? shop.turn() : world!.turnPlayer()),
-      onDone: (look) => {
+      onDone: (look, region) => {
         target.setInsets(0, 0);
         hud.hidden = false;
-        resolve(look);
+        resolve({ look, region });
       },
     });
   });
@@ -254,19 +277,9 @@ function renderHud() {
       <span class="clock"></span>
       <span>${L.wallet} ฿0</span>
       <span>${L.rank} 1</span>
-      ${scene === 'world' ? `<button class="to-look">${L.editLook}</button>` : ''}
       <select class="lang" aria-label="language">${LANGS.map((l) => `<option value="${l}" ${l === lang() ? 'selected' : ''}>${l === 'ko' ? '한국어' : l === 'th' ? 'ไทย' : 'English'}</option>`).join('')}</select>
     </div>
     ${scene === 'world' && world?.zone.attribution ? '<a class="attrib" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>' : ''}`;
-  const look = hud.querySelector('.to-look') as HTMLButtonElement | null;
-  if (look) look.onclick = async () => {
-    if (busy || !world) return;
-    busy = true;
-    const next = await chooseBody(t().editLook, t().done, state.look ?? DEFAULT_LOOK);
-    state.look = next;
-    save(state);
-    busy = false;
-  };
   (hud.querySelector('.lang') as HTMLSelectElement).onchange = (e) => {
     const l = (e.target as HTMLSelectElement).value as Lang;
     setLang(l);

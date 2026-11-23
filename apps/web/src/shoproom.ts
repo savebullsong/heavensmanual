@@ -1,20 +1,20 @@
 // 우주새 상점 안 — 거리와 같은 축척의 등각 방. 첫 장면이고, 미스 황을 눌러 말을 건다
 import { Application, ColorMatrixFilter, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
-import { characterPixels, parrotPixels, SPRITE_W, SPRITE_H, type Look, type Facing } from './character.ts';
+import { characterPixels, parrotPixels, SPRITE_W, SPRITE_H, FOOT_Y, type Look, type Facing } from './character.ts';
 import { toCanvas } from './raster.ts';
 import { iso } from './gfx.ts';
-import { lookTextures } from './world.ts';
-import { RW, RD, COUNTER, DOOR, ROOM_BOUNDS, drawRoomBackground, drawCounterPieces, drawPerch, drawLamp, nightFactor } from './shopgfx.ts';
+import { lookTextures, auraTextures, makeAuraSprite } from './world.ts';
+import { RW, RD, COUNTER, DOOR, ROOM_BOUNDS, PARROT_PERCH, drawRoomBackground, drawCounterPieces, drawLamp, nightFactor } from './shopgfx.ts';
 import { bangkokClock } from './clock.ts';
 
 export const MISS_HWANG: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 3, top: 0, bottom: 0, outfit: 'apron' };
 
-const HWANG = { x: 6.5, y: 2.2 };
-const PERCH = { x: 8.35, y: 1.6 };
-const TALK_TILE: [number, number] = [6, 4];
-const DOOR_TILE: [number, number] = [0, 5];
-const START_FIRST: [number, number] = [2, 4];
-const START_BACK: [number, number] = [1, 5];
+const HWANG = { x: 4.6, y: 1.55 };
+const TALK_TILE: [number, number] = [4, 3];
+const DOOR_TILE: [number, number] = [0, 6];
+const START_FIRST: [number, number] = [4, 5];
+const START_BACK: [number, number] = [1, 6];
+const SPEED = 2.3;
 
 function tex(c: HTMLCanvasElement): Texture {
   const t = Texture.from(c);
@@ -22,11 +22,12 @@ function tex(c: HTMLCanvasElement): Texture {
   return t;
 }
 
-/** 걸을 수 없는 칸: 진열대 앞줄, 카운터와 그 뒤 */
+/** 걸을 수 없는 칸: 카운터와 그 뒤, 창 아래 의자, 화분, 우산꽂이 */
 function blocked(i: number, j: number) {
   if (i < 0 || j < 0 || i >= RW || j >= RD) return true;
-  if (j === 0 && i <= 4) return true;
-  if (i >= 4 && j <= 3) return true;
+  if (j <= 2) return true;
+  if (i === 0 && (j === 4 || j === 5 || j === 7)) return true;
+  if (i === 8 && j === 4) return true;
   return false;
 }
 
@@ -71,6 +72,7 @@ export class ShopRoom {
   private overlay = new Graphics();
   private bg = new Sprite();
   private glow: Sprite;
+  private glows: Sprite[] = [];
   private player: Sprite;
   private frames: Record<Facing, Texture[]>;
   private hwang: Sprite;
@@ -80,9 +82,12 @@ export class ShopRoom {
   private py = START_FIRST[1] + 0.5;
   private path: [number, number][] = [];
   private facing: Facing = 'front';
+  private side = 1;
   private anim = 0;
   private ghost = false;
   private ghostFilter = new ColorMatrixFilter();
+  private aura = makeAuraSprite();
+  private auraTex: Record<Facing, Texture[]> | null = null;
   private time = 0;
   private crestT = 0;
   private bgMinute = -1;
@@ -114,41 +119,42 @@ export class ShopRoom {
     }
     // 미스 황
     this.hwang = new Sprite(tex(toCanvas(characterPixels(MISS_HWANG, 'front', 0), SPRITE_W, SPRITE_H)));
-    this.hwang.anchor.set(0.5, 137 / 144);
+    this.hwang.anchor.set(0.5, FOOT_Y / SPRITE_H);
     const [hx, hy] = iso(HWANG.x, HWANG.y);
     this.hwang.position.set(hx, hy);
     this.hwang.zIndex = HWANG.x + HWANG.y;
     this.objects.addChild(this.hwang);
-    // 횃대와 앵무새
-    const perch = new Sprite(tex(drawPerch()));
-    perch.anchor.set(0.5, 104 / 112);
-    const [ax, ay] = iso(PERCH.x, PERCH.y);
-    perch.position.set(ax, ay);
-    perch.zIndex = PERCH.x + PERCH.y;
-    this.objects.addChild(perch);
-    this.parrotTex = [tex(toCanvas(parrotPixels(false), 32, 40)), tex(toCanvas(parrotPixels(true), 32, 40))];
+    // 카운터 끝 횃대 위의 앵무새
+    this.parrotTex = [tex(toCanvas(parrotPixels(false), 16, 18)), tex(toCanvas(parrotPixels(true), 16, 18))];
     this.parrot = new Sprite(this.parrotTex[0]);
-    this.parrot.anchor.set(0.5, 32 / 40);
-    this.parrot.position.set(ax + 2, ay - 89);
-    this.parrot.zIndex = PERCH.x + PERCH.y + 0.001;
+    this.parrot.anchor.set(0.5, 16 / 18);
+    const [ax, ay] = iso(PARROT_PERCH.x, PARROT_PERCH.y);
+    this.parrot.position.set(ax + 1, ay - PARROT_PERCH.z);
+    this.parrot.zIndex = PARROT_PERCH.x + PARROT_PERCH.y + 1;
     this.objects.addChild(this.parrot);
-    // 매달린 등과 불빛
-    const lamp = new Sprite(tex(drawLamp()));
-    lamp.anchor.set(0.5, 1);
-    const [lx, ly] = iso(6.6, 2.7);
-    lamp.position.set(lx, ly - 146);
-    this.topLayer.addChild(lamp);
+    // 매달린 등 두 개와 불빛
     this.glow = new Sprite(tex(glowCanvas()));
-    this.glow.anchor.set(0.5);
-    this.glow.position.set(lx, ly - 140);
-    this.glow.blendMode = 'add';
-    this.glow.eventMode = 'none';
-    this.topLayer.addChild(this.glow);
+    for (const [gx2, gy2] of [[2.4, 2.0], [6.6, 2.0]] as const) {
+      const lamp = new Sprite(tex(drawLamp()));
+      lamp.anchor.set(0.5, 1);
+      const [lx, ly] = iso(gx2, gy2);
+      lamp.position.set(lx, ly - 50);
+      this.topLayer.addChild(lamp);
+      const glow = gx2 === 2.4 ? this.glow : new Sprite(this.glow.texture);
+      glow.anchor.set(0.5);
+      glow.position.set(lx, ly - 52);
+      glow.blendMode = 'add';
+      glow.eventMode = 'none';
+      this.topLayer.addChild(glow);
+      this.glows.push(glow);
+    }
     // 플레이어
     this.frames = lookTextures(look);
     this.player = new Sprite(this.frames.front[0]);
-    this.player.anchor.set(0.5, 137 / 144);
+    this.player.anchor.set(0.5, FOOT_Y / SPRITE_H);
+    this.objects.addChild(this.aura);
     this.objects.addChild(this.player);
+    this.setLook(look);
     this.ghostFilter.desaturate();
     this.setGhost(ghost);
     // 이름표
@@ -182,6 +188,8 @@ export class ShopRoom {
 
   setLook(look: Look) {
     this.frames = lookTextures(look);
+    this.auraTex = look.aura ? auraTextures(look) : null;
+    this.aura.visible = !!this.auraTex;
   }
 
   setLabels(labels: ShopLabels) {
@@ -298,10 +306,10 @@ export class ShopRoom {
     this.label.visible = false;
   }
   private labelAnchor(t: ShopTarget): [number, number] {
-    if (t === 'hwang') { const [x, y] = iso(HWANG.x, HWANG.y); return [x, y - 146]; }
-    if (t === 'parrot') { const [x, y] = iso(PERCH.x, PERCH.y); return [x + 2, y - 126]; }
+    if (t === 'hwang') { const [x, y] = iso(HWANG.x, HWANG.y); return [x, y - 48]; }
+    if (t === 'parrot') { const [x, y] = iso(PARROT_PERCH.x, PARROT_PERCH.y); return [x + 1, y - PARROT_PERCH.z - 20]; }
     const [x, y] = iso(0, (DOOR.y0 + DOOR.y1) / 2);
-    return [x, y - DOOR.h - 26];
+    return [x, y - DOOR.h - 12];
   }
 
   private update(dt: number) {
@@ -312,23 +320,32 @@ export class ShopRoom {
       const [ti, tj] = this.path[0];
       const tx = ti + 0.5, ty = tj + 0.5;
       const dx = tx - this.px, dy = ty - this.py, dist = Math.hypot(dx, dy);
-      const sdy = dx + dy;
+      const sdy = dx + dy, sdx = dx - dy;
       if (Math.abs(sdy) > 0.01) this.facing = sdy > 0 ? 'front' : 'back';
-      const step = 3.2 * dt;
+      if (Math.abs(sdx) > 0.01) this.side = sdx > 0 ? 1 : -1;
+      const step = SPEED * dt;
       if (dist <= step) { this.px = tx; this.py = ty; this.path.shift(); } else { this.px += (dx / dist) * step; this.py += (dy / dist) * step; }
       moving = true;
     } else if (this.pending) {
       const t = this.pending;
       this.pending = null;
-      if (t === 'hwang') this.facing = 'back';
+      if (t === 'hwang') { this.facing = 'back'; this.side = 1; }
       this.onArrive(t);
     }
-    this.anim = moving ? this.anim + dt * 7 : 0;
+    this.anim = moving ? this.anim + dt * SPEED * 3.4 : 0;
     this.player.texture = this.frames[this.facing][moving ? Math.floor(this.anim) % 4 : 0];
+    this.player.scale.x = this.side;
     const [sx, sy] = iso(this.px, this.py);
-    const float = this.ghost ? -6 + Math.sin(this.time * 2.2) * 2 : 0;
+    const float = this.ghost ? -3 + Math.sin(this.time * 2.2) : 0;
     this.player.position.set(sx, sy + float);
     this.player.zIndex = this.px + this.py + 0.01;
+    if (this.auraTex) {
+      this.aura.texture = this.auraTex[this.facing][Math.floor(this.time * 9) % 4];
+      this.aura.position.set(sx, sy + float);
+      this.aura.scale.x = this.side;
+      this.aura.zIndex = this.px + this.py + 0.005;
+      this.aura.alpha = 0.75 + Math.sin(this.time * 5.3) * 0.2;
+    }
     // 앵무새: 가끔 머리깃을 세운다
     if (this.crestT > 0) this.crestT -= dt;
     else if (Math.random() < dt * 0.25) this.crestT = 0.6;
@@ -342,12 +359,12 @@ export class ShopRoom {
     const follow = (lo: number, hi: number, p: number, span: number) => (hi - lo <= span ? (lo + hi) / 2 : Math.max(lo + span / 2, Math.min(hi - span / 2, p)));
     const roomCx = (B.x0 + B.x1) / 2;
     // 좁은 화면: 플레이어와 방 가운데의 중간을 본다 (미스 황과 문이 함께 보이도록)
-    const cx = follow(B.x0, B.x1, (sx + roomCx) / 2, vw), cy = follow(B.y0 + 20, B.y1, sy - 50, vh - 20);
-    this.camera.position.set(Math.round(vw / 2 - cx), Math.round(vh / 2 - cy + (vh < 560 ? 10 : 30)));
+    const cx = follow(B.x0, B.x1, (sx + roomCx) / 2, vw), cy = follow(B.y0, B.y1, sy - 20, vh - 40);
+    this.camera.position.set(Math.round(vw / 2 - cx), Math.round(vh / 2 - cy + 16));
     // 밤에는 방이 조금 어둡고 등불이 밝다
     const { h, m } = bangkokClock();
     const nf = nightFactor(h, m);
-    this.glow.alpha = 0.55 + nf * 0.35 + Math.sin(this.time * 3) * 0.03;
+    for (const gl of this.glows) gl.alpha = 0.45 + nf * 0.35 + Math.sin(this.time * 3) * 0.03;
     this.overlay.clear().rect(0, 0, this.app.screen.width, this.app.screen.height).fill({ color: 0x0b0a18, alpha: 0.18 * nf });
     if (m !== this.bgMinute) this.refreshBackground();
   }
@@ -362,7 +379,7 @@ function glowCanvas() {
   const c = document.createElement('canvas');
   c.width = c.height = 300;
   const g = c.getContext('2d')!;
-  const gr = g.createRadialGradient(150, 150, 6, 150, 150, 150);
+  const gr = g.createRadialGradient(150, 150, 4, 150, 150, 150);
   gr.addColorStop(0, 'rgba(255,214,140,0.55)');
   gr.addColorStop(0.4, 'rgba(255,200,120,0.18)');
   gr.addColorStop(1, 'rgba(255,200,120,0)');

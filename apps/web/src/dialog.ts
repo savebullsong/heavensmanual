@@ -4,6 +4,7 @@ import { portraitUrl, type PortraitSlot } from './portraits.ts';
 export interface Speaker {
   name: string;
   portrait?: PortraitSlot; // 주요 인물만
+  monologue?: boolean; // 혼잣말 (이름표 없이 기울인 글씨)
 }
 
 const seg = typeof Intl !== 'undefined' && 'Segmenter' in Intl ? new Intl.Segmenter() : null;
@@ -63,6 +64,7 @@ export class Dialog {
   open(speaker: Speaker) {
     this.el.hidden = false;
     this.nameEl.textContent = speaker.name;
+    this.el.classList.toggle('monologue', !!speaker.monologue);
     const key = `${speaker.name}|${speaker.portrait ?? ''}`;
     if (key === this.speakerKey) return;
     this.speakerKey = key;

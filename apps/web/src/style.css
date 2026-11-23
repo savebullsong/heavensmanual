@@ -23,6 +23,8 @@ button.primary:hover { background: #e0b437; }
 .dlg-portrait.show { opacity: 1; transform: none; }
 .dlg-box { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(96vw, 980px); min-height: 136px; padding: 26px 24px 18px; background: linear-gradient(rgba(24, 17, 12, 0.95), rgba(13, 9, 6, 0.97)); border: 2px solid #8a6a3a; border-radius: 6px; box-shadow: inset 0 0 0 2px #24190f, inset 0 0 0 3px #5a4424, 0 10px 32px rgba(0, 0, 0, 0.55); }
 .dlg-name { position: absolute; top: -16px; left: 18px; background: #c9a23e; color: #1c140d; font-weight: 700; padding: 3px 14px; border: 2px solid #6b4a2c; border-radius: 3px; letter-spacing: 0.04em; font-size: 15px; }
+.dlg-name:empty { display: none; }
+.dlg.monologue .dlg-text { font-style: italic; color: #c9bfa8; }
 .dlg-text { font-size: 18px; line-height: 1.65; min-height: 3.3em; white-space: pre-wrap; }
 .dlg-next { position: absolute; right: 18px; bottom: 10px; color: #e0b437; font-size: 12px; animation: dlg-blink 0.9s steps(2) infinite; }
 @keyframes dlg-blink { 50% { opacity: 0; } }
@@ -50,6 +52,7 @@ button.primary:hover { background: #e0b437; }
 .opt { display: grid; grid-template-columns: 84px 40px 1fr 40px; align-items: center; gap: 6px; }
 .opt-label { color: #b8a888; font-size: 14px; }
 .opt-value { text-align: center; display: flex; justify-content: center; }
+.opt-value.off { color: #8a7a62; font-size: 13px; }
 .swatch { display: inline-block; width: 28px; height: 18px; border: 1px solid #6b4f36; border-radius: 3px; }
 .look-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: auto; padding-top: 12px; }
 

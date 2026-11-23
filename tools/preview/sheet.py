@@ -24,5 +24,5 @@ for ri, row in enumerate(rows):
     for ci, px in enumerate(row):
         paste(px, W, H, ci * (W * s + gap), ri * (H * s + gap))
 for pi, px in enumerate(d["parrot"]):
-    paste(px, 32, 40, cols * (W * s + gap) + 10, pi * 130 + 10)
+    paste(px, d.get("PW", 32), d.get("PH", 40), cols * (W * s + gap) + 10, pi * 90 + 10)
 img.save(sys.argv[2])

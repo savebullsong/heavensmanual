@@ -87,8 +87,14 @@ export function drawGroundChunk(z: Zone, i0: number, j0: number): { canvas: HTML
 }
 
 /** 등각 상자 건물: 지붕 + 왼쪽 면(+j) + 오른쪽 면(+i), 창문과 1층 상점, 간판 */
+/** 사람 키(약 40px)에 맞춰 1층을 높인 건물 높이 */
+export function buildingHeight(h: number) {
+  return Math.max(76, Math.round(h * 1.35 + 26));
+}
+
 export function drawBuilding(b: Building, signText: string, night: boolean) {
-  const { i0, j0, w, d, h } = b;
+  const { i0, j0, w, d } = b;
+  const h = buildingHeight(b.h);
   const minX = (i0 - (j0 + d)) * (TW / 2);
   const topY = (i0 + j0) * (TH / 2);
   const width = (w + d) * (TW / 2);
@@ -120,15 +126,15 @@ export function drawBuilding(b: Building, signText: string, night: boolean) {
   // 창문
   const winLit = night ? '#f2d58a' : '#5f7486';
   const winDark = night ? '#2a2f3a' : '#3f4f5e';
-  const floorH = 18, ground = 34;
-  for (let z = ground + 8; z < h - 10; z += floorH) {
+  const floorH = 24, ground = 62;
+  for (let z = ground + 8; z < h - 12; z += floorH) {
     for (let s = 0.35; s < w - 0.2; s += 0.8) {
       const lit = r() < (night ? 0.55 : 0.0);
-      quad([P(i0 + s, j1, z + 9), P(i0 + s + 0.45, j1, z + 9), P(i0 + s + 0.45, j1, z), P(i0 + s, j1, z)], lit ? winLit : winDark);
+      quad([P(i0 + s, j1, z + 13), P(i0 + s + 0.45, j1, z + 13), P(i0 + s + 0.45, j1, z), P(i0 + s, j1, z)], lit ? winLit : winDark);
     }
     for (let s = 0.35; s < d - 0.2; s += 0.8) {
       const lit = r() < (night ? 0.45 : 0.0);
-      quad([P(i1, j0 + s, z + 9), P(i1, j0 + s + 0.45, z + 9), P(i1, j0 + s + 0.45, z), P(i1, j0 + s, z)], lit ? winLit : '#334150');
+      quad([P(i1, j0 + s, z + 13), P(i1, j0 + s + 0.45, z + 13), P(i1, j0 + s + 0.45, z), P(i1, j0 + s, z)], lit ? winLit : '#334150');
     }
   }
   // 1층 상점 (유리 + 차양 + 간판)
@@ -137,21 +143,23 @@ export function drawBuilding(b: Building, signText: string, night: boolean) {
     const A = (s: number, z: number) => (left ? P(i0 + s, j1, z) : P(i1, j0 + s, z));
     const span = left ? w : d;
     const glass = b.cat === 'ujusae' ? '#2a1a12' : night ? '#e9d7a0' : '#6d8796';
-    quad([A(0.2, 22), A(span - 0.2, 22), A(span - 0.2, 0), A(0.2, 0)], glass);
+    quad([A(0.2, 50), A(span - 0.2, 50), A(span - 0.2, 0), A(0.2, 0)], glass);
+    if (b.cat !== 'ujusae') for (let s = 0.9; s < span - 0.4; s += 0.9) quad([A(s, 50), A(s + 0.05, 50), A(s + 0.05, 0), A(s, 0)], '#2a2f36'); // 유리 칸살
     if (b.cat === 'ujusae') {
       // 낡은 나무 문과 노란 등
-      quad([A(span / 2 - 0.35, 20), A(span / 2 + 0.35, 20), A(span / 2 + 0.35, 0), A(span / 2 - 0.35, 0)], '#6b4429');
-      quad([A(span / 2 - 0.08, 11), A(span / 2 + 0.02, 11), A(span / 2 + 0.02, 9), A(span / 2 - 0.08, 9)], '#e0b437');
+      quad([A(span / 2 - 0.36, 47), A(span / 2 + 0.36, 47), A(span / 2 + 0.36, 0), A(span / 2 - 0.36, 0)], '#6b4429');
+      quad([A(span / 2 - 0.28, 42), A(span / 2 + 0.28, 42), A(span / 2 + 0.28, 30), A(span / 2 - 0.28, 30)], '#e8c97a');
+      quad([A(span / 2 + 0.5, 36), A(span / 2 + 0.62, 36), A(span / 2 + 0.62, 31), A(span / 2 + 0.5, 31)], '#e0b437');
     }
     if (b.cat === 'ujusae') {
       // 우주새는 간판이 없다. 처마 아래 나무 띠만 두른다 (이름은 누르면 보인다)
-      quad([A(0, 30), A(span, 30), A(span, 23), A(0, 23)], '#3a2416');
-      quad([A(0, 30), A(span, 30), A(span, 29), A(0, 29)], '#5a3d26');
+      quad([A(0, 60), A(span, 60), A(span, 51), A(0, 51)], '#3a2416');
+      quad([A(0, 60), A(span, 60), A(span, 59), A(0, 59)], '#5a3d26');
     } else {
       const signCol = SIGN_COLORS[b.cat] ?? '#c7553f';
-      quad([A(0, 33), A(span, 33), A(span, 23), A(0, 23)], signCol);
+      quad([A(0, 63), A(span, 63), A(span, 51), A(0, 51)], signCol);
       // 간판 글씨 (면의 기울기를 따라 기울인다)
-      const [sx, sy] = A(span / 2, 26);
+      const [sx, sy] = A(span / 2, 54);
       g.save();
       g.translate(sx, sy);
       g.transform(1, left ? 0.5 : -0.5, 0, 1, 0, 0);
@@ -218,7 +226,7 @@ export const CAR_COLORS = ['#e46aa6', '#8cc63f', '#e8e6e0', '#1e2228', '#c9c2b4'
 
 /** 대로를 따라 달리는 차 (i 축 방향, 길이 2타일) */
 export function drawCar(color: string, taxi: boolean): { canvas: HTMLCanvasElement; ax: number; ay: number } {
-  const L = 2, Wd = 0.8, hBody = 14, hCab = 11;
+  const L = 2, Wd = 0.8, hBody = 17, hCab = 14;
   const minX = (0 - Wd) * (TW / 2) - 2, topY = 0;
   const c = document.createElement('canvas');
   c.width = (L + Wd) * (TW / 2) + 4; c.height = (L + Wd) * (TH / 2) + hBody + hCab + 4;
@@ -241,8 +249,8 @@ export function drawCar(color: string, taxi: boolean): { canvas: HTMLCanvasEleme
   if (taxi) quad([P(0.9, 0.3, zTop + 4), P(1.15, 0.3, zTop + 4), P(1.15, 0.5, zTop + 4), P(0.9, 0.5, zTop + 4)], '#f2e6a0');
   // 바퀴
   g.fillStyle = '#141414';
-  for (const s of [0.35, 1.6]) { const [x, y] = P(s, Wd, 2); g.fillRect(x - 4, y - 3, 8, 5); }
-  const [hx, hy] = P(L, Wd * 0.75, 8); g.fillStyle = '#f2ead0'; g.fillRect(hx - 2, hy - 1, 3, 2);
+  for (const s of [0.35, 1.6]) { const [x, y] = P(s, Wd, 3); g.fillRect(x - 5, y - 4, 10, 7); g.fillStyle = '#5a5a5a'; g.fillRect(x - 2, y - 2, 4, 3); g.fillStyle = '#141414'; }
+  const [hx, hy] = P(L, Wd * 0.75, 10); g.fillStyle = '#f2ead0'; g.fillRect(hx - 2, hy - 1, 3, 2);
   // 차의 기준점: 차체 바닥 중심 (L/2, Wd/2)
   const [ax, ay] = P(L / 2, Wd / 2, 0);
   return { canvas: c, ax, ay };

@@ -1,6 +1,6 @@
 // 현실 세계 장면 (PixiJS): 실제 지도, 화면 근처만 불러오기, 클릭 이동, 행인, 차량, 방콕 실시간 낮밤
 import { Application, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
-import { characterPixels, SPRITE_W, SPRITE_H, type Look, type Facing } from './character.ts';
+import { characterPixels, auraFrames, SPRITE_W, SPRITE_H, FOOT_Y, AURA_PAD, type Look, type Facing } from './character.ts';
 import { toCanvas } from './raster.ts';
 import { type Zone, type Building, type Lane, findPath, walkable, randomWalkTileNear, tileAt } from './zone.ts';
 import { iso, drawGroundChunk, CHUNK, drawBuilding, drawProp, drawCar, CAR_COLORS, TW, TH } from './gfx.ts';
@@ -20,6 +20,7 @@ interface Walker {
   frames: Record<Facing, Texture[]>;
   sprite: Sprite;
   facing: Facing;
+  side: number; // 1 = 오른쪽을 봄, -1 = 왼쪽 (좌우 뒤집기)
   anim: number;
   wait: number;
   isPlayer: boolean;
@@ -30,6 +31,27 @@ interface Car {
 }
 
 const lookCache = new Map<string, Record<Facing, Texture[]>>();
+const auraCache = new Map<string, Record<Facing, Texture[]>>();
+
+/** 광채 4장면 (앞·뒤) */
+export function auraTextures(look: Look): Record<Facing, Texture[]> {
+  const key = JSON.stringify(look);
+  const hit = auraCache.get(key);
+  if (hit) return hit;
+  const mk = (f: Facing) => auraFrames(characterPixels(look, f, 0)).map((c) => tex(c));
+  const res = { front: mk('front'), back: mk('back') };
+  auraCache.set(key, res);
+  return res;
+}
+
+/** 발 기준점에 맞춘 광채 스프라이트 */
+export function makeAuraSprite(): Sprite {
+  const s = new Sprite();
+  s.anchor.set(0.5, (FOOT_Y + AURA_PAD) / (SPRITE_H + AURA_PAD * 2));
+  s.blendMode = 'add';
+  s.eventMode = 'none';
+  return s;
+}
 export function lookTextures(look: Look): Record<Facing, Texture[]> {
   const key = JSON.stringify(look);
   const hit = lookCache.get(key);
@@ -62,7 +84,10 @@ export class WorldScene {
   private night = -1;
   private wantShop = false;
   private streamT = 0;
-  private marker = new Graphics().ellipse(0, 0, 17, 7).stroke({ color: 0xe0b437, width: 2, alpha: 0.9 });
+  private marker = new Graphics().ellipse(0, 0, 10, 4.5).stroke({ color: 0xe0b437, width: 1.5, alpha: 0.9 });
+  private aura = makeAuraSprite();
+  private auraTex: Record<Facing, Texture[]> | null = null;
+  private time = 0;
   private shopLabel = new Container();
   private shopLabelText = new Text({ text: '', style: { fontFamily: 'system-ui, sans-serif', fontSize: 13, fontWeight: '600', fill: '#fff6d8' } });
   private shopLabelBg = new Graphics();
@@ -199,9 +224,9 @@ export class WorldScene {
   private makeWalker(look: Look, i: number, j: number, isPlayer: boolean): Walker {
     const frames = lookTextures(look);
     const sprite = new Sprite(frames.front[0]);
-    sprite.anchor.set(0.5, 137 / 144);
+    sprite.anchor.set(0.5, FOOT_Y / SPRITE_H);
     this.objects.addChild(sprite);
-    return { x: i + 0.5, y: j + 0.5, path: [], speed: isPlayer ? 3.2 : 1.3 + Math.random() * 0.6, frames, sprite, facing: 'front', anim: 0, wait: Math.random() * 3, isPlayer };
+    return { x: i + 0.5, y: j + 0.5, path: [], speed: isPlayer ? 2.3 : 0.75 + Math.random() * 0.35, frames, sprite, facing: 'front', side: Math.random() < 0.5 ? 1 : -1, anim: 0, wait: Math.random() * 3, isPlayer };
   }
 
   private spawnPlayer(look: Look) {
@@ -209,6 +234,8 @@ export class WorldScene {
     this.player = this.makeWalker(look, i, j, true);
     this.walkers.push(this.player);
     this.objects.addChild(this.marker);
+    this.objects.addChild(this.aura);
+    this.setAura(look);
   }
 
   private randomLook(): Look {
@@ -250,6 +277,12 @@ export class WorldScene {
 
   setLook(look: Look) {
     this.player.frames = lookTextures(look);
+    this.setAura(look);
+  }
+
+  private setAura(look: Look) {
+    this.auraTex = look.aura ? auraTextures(look) : null;
+    this.aura.visible = !!this.auraTex;
   }
 
   /** 외형 창 등으로 화면 일부가 가려지면 남은 곳 가운데에 플레이어를 둔다 */
@@ -338,8 +371,9 @@ export class WorldScene {
     const [ti, tj] = w.path[0];
     const tx = ti + 0.5, ty = tj + 0.5;
     const dx = tx - w.x, dy = ty - w.y, dist = Math.hypot(dx, dy);
-    const sdy = (dx + dy) * (TH / 2);
+    const sdy = (dx + dy) * (TH / 2), sdx = (dx - dy) * (TW / 2);
     if (Math.abs(sdy) > 0.01) w.facing = sdy > 0 ? 'front' : 'back';
+    if (Math.abs(sdx) > 0.01) w.side = sdx > 0 ? 1 : -1;
     const step = w.speed * dt;
     if (dist <= step) { w.x = tx; w.y = ty; w.path.shift(); } else { w.x += (dx / dist) * step; w.y += (dy / dist) * step; }
     return true;
@@ -360,8 +394,9 @@ export class WorldScene {
           }
         }
       }
-      w.anim = moving ? w.anim + dt * 7 : 0;
+      w.anim = moving ? w.anim + dt * w.speed * 3.4 : 0;
       w.sprite.texture = w.frames[w.facing][moving ? Math.floor(w.anim) % 4 : 0];
+      w.sprite.scale.x = w.side;
       const [sx, sy] = iso(w.x, w.y);
       w.sprite.position.set(sx, sy);
       w.sprite.zIndex = w.x + w.y;
@@ -401,7 +436,7 @@ export class WorldScene {
       if (c.bubble) {
         c.bubbleT -= dt;
         const [sx, sy] = iso(c.x, cy);
-        c.bubble.position.set(sx, sy - 44);
+        c.bubble.position.set(sx, sy - 52);
         c.bubble.zIndex = 99999;
         if (c.bubbleT <= 0) { c.bubble.destroy(); c.bubble = undefined; }
       }
@@ -410,8 +445,16 @@ export class WorldScene {
     const [px, py] = iso(p.x, p.y);
     this.marker.position.set(px, py);
     this.marker.zIndex = p.x + p.y - 0.01;
+    this.time += dt;
+    if (this.auraTex) {
+      this.aura.texture = this.auraTex[p.facing][Math.floor(this.time * 9) % 4];
+      this.aura.position.set(px, py);
+      this.aura.scale.x = p.side;
+      this.aura.zIndex = p.x + p.y - 0.005;
+      this.aura.alpha = 0.75 + Math.sin(this.time * 5.3) * 0.2;
+    }
     const vw = this.app.screen.width - this.insets.right, vh = this.app.screen.height - this.insets.bottom;
-    this.camera.position.set(Math.round(vw / 2 - px), Math.round(vh / 2 - py + (this.insets.bottom ? 70 : 60)));
+    this.camera.position.set(Math.round(vw / 2 - px), Math.round(vh / 2 - py + 20));
     this.lights.position.copyFrom(this.camera.position);
     // 우주새 이름표: 누르거나 마우스를 올렸을 때
     if (this.shopLabelT > 0) this.shopLabelT -= dt;
