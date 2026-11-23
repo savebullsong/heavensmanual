@@ -10,6 +10,8 @@ export interface Save {
   lang?: Lang;
   // 이번 생 (죽으면 사라진다)
   wallet?: number;
+  /** 은행 통장: 죽어도 남는다 (영혼이 아니라 계정·기기에 붙음) */
+  bank?: number;
   bag?: Record<string, number>;
   equip?: Partial<Record<Slot, string>>;
   ammo?: number;

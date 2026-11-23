@@ -204,6 +204,11 @@ const dict = {
 // 4차 추가 문구
 const extra = {
   ko: {
+    lowLabel: '건물 낮추기 (1층만 보기)', lowOn: '건물을 1층 높이로 낮췄습니다 · 길이 잘 보입니다', lowOff: '건물을 원래 높이로',
+    pvpSafe: '우주새 앞에서는 사람끼리 싸울 수 없다.',
+    thugTaunt: ['어이, 거기.', '어디 가냐?', '이 골목에서 처음 보는 얼굴인데.', '왜 그렇게 생겼냐?', '뭘 봐?', '여기 우리 구역이야.', '야, 잠깐 얘기 좀 하자.'], thugDemand: ['돈 좀 있냐? 다 내놔.', '지갑 두고 가.', '여기 지나가려면 통행료 내야지.', '얼굴이 왜 그 모양이야?', '가진 거 다 꺼내 봐.', '말로 할 때 내놔라.'], thugGiveUp: ['다음엔 안 봐준다.', '운 좋은 줄 알아.', '어디 두고 보자.'],
+    bankGo: '은행 업무', bankLine: '통장에 넣은 돈은 죽어도 남습니다. 들고 다니는 돈은 죽으면 사라집니다.', bankBook: '통장', bankAmount: '금액을 넣어 주세요', bankAll: '전부', bankIn: '넣기', bankOut: '찾기', bankShort: '통장에 그만큼 없습니다', bankDone: '฿{n} 저금했습니다', bankTook: '฿{n} 찾았습니다', bankNote: '수수료 없음 · 이 기기(가입하면 계정)에 기록됩니다', deathLost: '들고 있던 ฿{n}은 길에 흩어졌다.', deathKept: '통장의 ฿{n}은 남아 있다.', deathNoBank: '통장은 비어 있었다.',
+    bgmLabel: '배경 소리 (음악 → 자연음 → 끄기)', bgmMusic: '배경: 음악 · {t}', bgmNature: '배경: 방콕 자연음', bgmOff: '배경 소리 끔', sfxOn: '효과음 켬', sfxOff: '효과음 끔',
     sound: '효과음 켜기·끄기',
     workingLine: '일하는 중 · {name} · 번 돈 ฿{n}', workOut: '화면을 누르면 일을 그만두고 나옵니다',
     hpWords: ['멀쩡해 보인다.', '조금 다쳤다.', '많이 다쳤다.', '쓰러지기 직전이다.'], miss: '빗나감', healed: '회복',
@@ -226,6 +231,11 @@ const extra = {
     pvpLater: '다른 사람과 싸우려면 서버 판정이 필요해 다음에 열립니다.',
   },
   th: {
+    lowLabel: 'ลดความสูงตึก (เห็นแค่ชั้นล่าง)', lowOn: 'ลดตึกเหลือชั้นล่าง · มองเห็นถนนชัดขึ้น', lowOff: 'ตึกกลับเป็นความสูงเดิม',
+    pvpSafe: 'หน้าร้านนกจักรวาลห้ามต่อสู้กัน',
+    thugTaunt: ['เฮ้ย ตรงนั้นน่ะ', 'จะไปไหนวะ', 'หน้าใหม่ในซอยนี้นี่หว่า', 'ทำไมหน้าตาเป็นงั้นวะ', 'มองอะไร', 'ตรงนี้ถิ่นพวกกู', 'เฮ้ย มาคุยกันหน่อย'], thugDemand: ['มีตังค์ป่ะ เอามาให้หมด', 'ทิ้งกระเป๋าตังค์ไว้', 'จะผ่านซอยนี้ต้องจ่ายค่าผ่านทาง', 'หน้าเป็นอะไรวะ', 'ควักออกมาให้หมด', 'พูดดีๆ ยังไม่ยอมอีก'], thugGiveUp: ['คราวหน้าไม่รอดแน่', 'โชคดีไปนะมึง', 'คอยดูแล้วกัน'],
+    bankGo: 'ทำธุรกรรมธนาคาร', bankLine: 'เงินในบัญชีจะยังอยู่แม้ตาย เงินที่พกติดตัวจะหายไปเมื่อตาย', bankBook: 'บัญชี', bankAmount: 'ใส่จำนวนเงิน', bankAll: 'ทั้งหมด', bankIn: 'ฝาก', bankOut: 'ถอน', bankShort: 'เงินในบัญชีไม่พอ', bankDone: 'ฝาก ฿{n} แล้ว', bankTook: 'ถอน ฿{n} แล้ว', bankNote: 'ไม่มีค่าธรรมเนียม · บันทึกในเครื่องนี้ (หรือบัญชีเมื่อสมัคร)', deathLost: 'เงิน ฿{n} ที่พกไว้กระจายเกลื่อนถนน', deathKept: 'เงิน ฿{n} ในบัญชียังอยู่', deathNoBank: 'บัญชีว่างเปล่า',
+    bgmLabel: 'เสียงพื้นหลัง (เพลง → เสียงธรรมชาติ → ปิด)', bgmMusic: 'พื้นหลัง: เพลง · {t}', bgmNature: 'พื้นหลัง: เสียงธรรมชาติกรุงเทพฯ', bgmOff: 'ปิดเสียงพื้นหลัง', sfxOn: 'เปิดเสียงเอฟเฟกต์', sfxOff: 'ปิดเสียงเอฟเฟกต์',
     sound: 'เปิด/ปิดเสียงเอฟเฟกต์',
     workingLine: 'กำลังทำงาน · {name} · ได้เงิน ฿{n}', workOut: 'แตะหน้าจอเพื่อเลิกงานและออกมา',
     hpWords: ['ดูปกติดี', 'บาดเจ็บเล็กน้อย', 'บาดเจ็บหนัก', 'ใกล้จะล้มแล้ว'], miss: 'พลาด', healed: 'ฟื้นฟู',
@@ -248,6 +258,11 @@ const extra = {
     pvpLater: 'การต่อสู้กับผู้เล่นอื่นต้องตัดสินบนเซิร์ฟเวอร์ จะเปิดในครั้งหน้า',
   },
   en: {
+    lowLabel: 'Lower buildings (ground floor only)', lowOn: 'Buildings lowered to the ground floor · streets are visible', lowOff: 'Buildings back to full height',
+    pvpSafe: 'No fighting between people in front of the Cosmic Bird.',
+    thugTaunt: ['Hey, you there.', 'Where d’you think you’re going?', 'Never seen your face in this soi.', 'Why d’you look like that?', 'What’re you looking at?', 'This is our turf.', 'Oi, let’s have a little chat.'], thugDemand: ['Got money? Hand it all over.', 'Leave the wallet.', 'There’s a toll on this street.', 'What happened to your face?', 'Empty your pockets.', 'Last chance to do this nicely.'], thugGiveUp: ['Next time you won’t be so lucky.', 'Lucky you.', 'We’ll meet again.'],
+    bankGo: 'Banking', bankLine: 'Money in the bank survives death. Cash you carry is lost when you die.', bankBook: 'Bank', bankAmount: 'Enter an amount', bankAll: 'All', bankIn: 'Deposit', bankOut: 'Withdraw', bankShort: 'Not enough in the bank', bankDone: 'Deposited ฿{n}', bankTook: 'Withdrew ฿{n}', bankNote: 'No fees · kept on this device (or your account once you sign up)', deathLost: 'The ฿{n} you carried scattered on the street.', deathKept: '฿{n} remains in the bank.', deathNoBank: 'The bank account was empty.',
+    bgmLabel: 'Background sound (music → nature → off)', bgmMusic: 'Background: music · {t}', bgmNature: 'Background: Bangkok nature', bgmOff: 'Background sound off', sfxOn: 'Sound effects on', sfxOff: 'Sound effects off',
     sound: 'Sound effects on/off',
     workingLine: 'Working · {name} · earned ฿{n}', workOut: 'Tap the screen to stop working and come out',
     hpWords: ['Looks fine.', 'Slightly hurt.', 'Badly hurt.', 'About to collapse.'], miss: 'Miss', healed: 'Healed',

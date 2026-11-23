@@ -221,3 +221,30 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 #hud .snd.off .w { display: none; }
 #hud .snd.off .x { display: inline; }
 @media (max-width: 640px) { #hud .snd { padding: 4px 5px; } }
+#hud .bgm { display: inline-flex; align-items: center; justify-content: center; padding: 3px 6px; color: #e0b437; }
+#hud .bgm .leaf, #hud .bgm .x { display: none; }
+#hud .bgm[data-mode="nature"] { color: #8fd07a; }
+#hud .bgm[data-mode="nature"] .note { display: none; }
+#hud .bgm[data-mode="nature"] .leaf { display: inline; }
+#hud .bgm[data-mode="off"] { color: #8a7a62; }
+#hud .bgm[data-mode="off"] .x { display: inline; }
+@media (max-width: 640px) { #hud .bgm { padding: 4px 5px; } }
+
+/* 은행 */
+.bank-body { padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+.bank-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 15px; padding: 2px 0; border-bottom: 1px dashed #4a3424; }
+.bank-row b { color: #f2d27a; font-variant-numeric: tabular-nums; }
+.bank-body input { padding: 9px 10px; background: #120d0a; color: #eadfc8; border: 1px solid #6b4f36; border-radius: 4px; font-size: 16px; }
+.bank-quick { display: flex; gap: 6px; flex-wrap: wrap; }
+.bank-quick button { flex: 1; padding: 6px 4px; font-size: 13px; }
+.bank-act { display: flex; gap: 8px; }
+.bank-act button { flex: 1; padding: 9px; }
+.bank-note { margin: 0; font-size: 12px; color: #8a7a62; }
+.death .money { color: #d8ccb0; font-size: 14px; }
+
+/* 건물 낮추기 단추 (공격 태세 왼쪽) */
+.stance .st-low { width: 44px; height: 44px; }
+.stance .st-low .short { display: none; }
+.stance.low .st-low { border-color: #8fd07a; background: rgba(30, 60, 30, 0.55); color: #d8f4cc; }
+.stance.low .st-low .tall { display: none; }
+.stance.low .st-low .short { display: inline; }

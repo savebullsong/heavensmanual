@@ -158,7 +158,8 @@ function dotCard(slot: PortraitSlot) {
   file.accept = 'image/png';
   file.hidden = true;
   const pick = h('button', 'primary', 'PNG 올리기');
-  const down = h('button', '', '지금 그림 내려받기');
+  const down = h('button', '', '지금 그림 (1배)');
+  const down2 = h('button', '', '2배 밑그림');
   const reset = h('button', '', '구운 그림으로');
   const save = h('button', 'primary', '저장');
   const cancel = h('button', '', '취소');
@@ -176,7 +177,8 @@ function dotCard(slot: PortraitSlot) {
     g.drawImage(src, 0, 0, w * Z, h0 * Z);
     if (spec?.foot) {
       // 발 기준점 (게임에서 바닥에 닿는 점)
-      const [fx, fy] = spec.foot;
+      const m = w === spec.w * 2 ? 2 : 1;
+      const [fx, fy] = [spec.foot[0] * m + (m - 1) * 0.5, spec.foot[1] * m + (m - 1) * 0.5];
       g.strokeStyle = 'rgba(224,70,58,0.9)'; g.lineWidth = 1;
       g.beginPath(); g.moveTo((fx + 0.5) * Z - 6, (fy + 0.5) * Z); g.lineTo((fx + 0.5) * Z + 6, (fy + 0.5) * Z);
       g.moveTo((fx + 0.5) * Z, (fy + 0.5) * Z - 6); g.lineTo((fx + 0.5) * Z, (fy + 0.5) * Z + 6); g.stroke();
@@ -192,25 +194,33 @@ function dotCard(slot: PortraitSlot) {
   const show = async () => {
     spec = await dotSpec(slot);
     if (!spec) { size.textContent = '구운 그림을 읽지 못했습니다.'; return; }
-    size.innerHTML = `필요한 크기 <b>가로 ${spec.w}px × 세로 ${spec.h}px</b> · 배경 투명 PNG${spec.foot ? `<br>발 기준점: 왼쪽에서 ${spec.foot[0]}px, 위에서 ${spec.foot[1]}px (빨간 십자)` : '<br>그림의 왼쪽 위가 지금 그림과 같은 자리에 놓입니다'}`;
+    size.innerHTML = `필요한 크기 <b>${spec.w}×${spec.h}px</b> 또는 2배 <b>${spec.w * 2}×${spec.h * 2}px</b> · 배경 투명 PNG<br><span class="hint2">2배로 그리면 게임 속 크기는 같고, 휴대폰·고해상도 화면에서 두 배 섬세하게 보입니다</span>${spec.foot ? `<br>발 기준점: 왼쪽에서 ${spec.foot[0]}px, 위에서 ${spec.foot[1]}px (2배면 ${spec.foot[0] * 2}, ${spec.foot[1] * 2}) · 빨간 십자` : '<br>그림의 왼쪽 위가 지금 그림과 같은 자리에 놓입니다'}`;
     const u = overrides[slot];
     current = u ? await asCanvas(u).catch(() => spec!.canvas) : spec.canvas;
     paint(current, current.width, current.height);
     status.textContent = u ? '바꾼 그림을 쓰는 중' : '게임이 구운 그림을 쓰는 중';
     actions.innerHTML = '';
-    actions.append(pick, down);
+    actions.append(pick, down, down2);
     if (u) actions.append(reset);
   };
-  down.onclick = () => {
-    if (!current) return;
-    current.toBlob((b) => {
-      if (!b) return;
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(b);
-      a.download = `${slot}-${current!.width}x${current!.height}.png`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-    }, 'image/png');
+  const save2 = (c: HTMLCanvasElement) => c.toBlob((b) => {
+    if (!b) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = `${slot}-${c.width}x${c.height}.png`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }, 'image/png');
+  // 1배: 지금 게임 그림 그대로 · 2배: 같은 그림을 픽셀째 두 배로 키운 밑그림 (그 위에 섬세하게 손질)
+  down.onclick = () => { if (spec) save2(spec.canvas); };
+  down2.onclick = () => {
+    if (!spec) return;
+    const c = document.createElement('canvas');
+    c.width = spec.w * 2; c.height = spec.h * 2;
+    const g = c.getContext('2d')!;
+    g.imageSmoothingEnabled = false;
+    g.drawImage(spec.canvas, 0, 0, c.width, c.height);
+    save2(c);
   };
   pick.onclick = () => file.click();
   file.onchange = async () => {
@@ -220,13 +230,14 @@ function dotCard(slot: PortraitSlot) {
     if (f.type !== 'image/png') { status.textContent = 'PNG 파일만 올릴 수 있습니다 (투명 배경이 필요해서).'; return; }
     let c: HTMLCanvasElement;
     try { c = await asCanvas(f); } catch { status.textContent = '이 파일은 열 수 없습니다.'; return; }
-    if (c.width !== spec.w || c.height !== spec.h) {
-      status.textContent = `크기가 다릅니다: 올린 그림 ${c.width}×${c.height}px, 필요한 크기 ${spec.w}×${spec.h}px`;
+    const k = c.width === spec.w && c.height === spec.h ? 1 : c.width === spec.w * 2 && c.height === spec.h * 2 ? 2 : 0;
+    if (!k) {
+      status.textContent = `크기가 다릅니다: 올린 그림 ${c.width}×${c.height}px, 필요한 크기 ${spec.w}×${spec.h}px 또는 ${spec.w * 2}×${spec.h * 2}px`;
       return;
     }
     pending = f;
     paint(c, c.width, c.height);
-    status.textContent = `미리보기 · ${c.width}×${c.height}px · 크기 맞음`;
+    status.textContent = `미리보기 · ${c.width}×${c.height}px · 크기 맞음${k === 2 ? ' (2배)' : ''}`;
     actions.innerHTML = '';
     actions.append(save, cancel);
   };

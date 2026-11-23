@@ -3,6 +3,8 @@
 // 소리는 내 캐릭터에서 멀수록 작게, 화면 왼쪽·오른쪽에 따라 좌우로 나뉜다.
 
 export type HitKind = 'fist' | 'blunt' | 'blade' | 'gun';
+/** 맞는 쪽의 몸: 같은 무기라도 대상마다 소리가 다르다 */
+export type Body = 'flesh' | 'thug' | 'suturer' | 'monster' | 'player';
 
 const BLADES = new Set(['knife', 'dagger', 'sword', 'hatchet', 'needle']);
 export function hitKind(weapon: string | null | undefined, ranged = false): HitKind {
@@ -24,6 +26,12 @@ export function setMuted(m: boolean) {
   if (master) master.gain.value = m ? 0 : 0.55;
 }
 
+/** 배경 소리도 같은 AudioContext를 쓴다 (효과음 끄기와는 따로) */
+export function audioContext(): AudioContext | null { return ctx; }
+export function noiseBuffer(): AudioBuffer | null { return noiseBuf; }
+const unlockListeners: (() => void)[] = [];
+export function onUnlock(f: () => void) { unlockListeners.push(f); if (ctx && ctx.state === 'running') f(); }
+
 /** 브라우저는 사용자가 한 번 누른 뒤에야 소리를 허락한다 */
 export function unlockAudio() {
   if (!ctx) {
@@ -41,8 +49,11 @@ export function unlockAudio() {
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
   }
-  if (ctx.state === 'suspended') void ctx.resume();
+  if (ctx.state === 'suspended') void ctx.resume().then(() => unlockListeners.forEach((f) => f()));
+  else if (!unlocked) unlockListeners.forEach((f) => f());
+  unlocked = true;
 }
+let unlocked = false;
 
 interface Spot { pan: number; vol: number }
 /** 화면에서의 위치(내 캐릭터 기준 픽셀)로 좌우·크기를 정한다 */
@@ -98,12 +109,27 @@ export function swing(kind: HitKind, s: Spot) {
   else noise(o, t, 0.18, 'bandpass', jit(1600), jit(4200), 2.2, 0.35, 0.06);
 }
 
-/** 맞는 소리 (치명타는 한 겹 더 묵직하게) */
-export function impact(kind: HitKind, s: Spot, crit = false) {
+/** 짧은 신음 (톱니파 → 모음 공명 두 개) */
+function grunt(o: AudioNode, t: number, f0: number, vowel: [number, number], peak: number, dur = 0.16) {
+  const src = ctx!.createOscillator(); src.type = 'sawtooth';
+  src.frequency.setValueAtTime(f0 * 1.15, t); src.frequency.exponentialRampToValueAtTime(f0 * 0.8, t + dur);
+  const g = ctx!.createGain();
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  for (const [f, q] of [[vowel[0], 5], [vowel[1], 7]]) {
+    const bp = ctx!.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q;
+    src.connect(bp).connect(g);
+  }
+  g.connect(o);
+  src.start(t); src.stop(t + dur + 0.05);
+}
+
+/** 맞는 소리 = 무기 층 + 몸 층. 치명타는 한 겹 더 묵직하게. pitch = 사람마다 다른 높낮이 */
+export function impact(kind: HitKind, s: Spot, crit = false, body: Body = 'flesh', pitch = 1) {
   if (!ready()) return;
   const t = ctx!.currentTime, o = out(s, crit ? 1.25 : 1);
+  // 무기
   if (kind === 'fist') {
-    tone(o, t, 0.13, 'sine', jit(150), 55, 0.9);
+    tone(o, t, 0.13, 'sine', jit(150) * pitch, 55, 0.9);
     noise(o, t, 0.06, 'lowpass', 1400, 400, 0.7, 0.5);
   } else if (kind === 'blunt') {
     tone(o, t, 0.16, 'triangle', jit(210), 70, 0.8);
@@ -113,9 +139,39 @@ export function impact(kind: HitKind, s: Spot, crit = false) {
     noise(o, t, 0.1, 'highpass', jit(3200), 2000, 0.8, 0.55);
     tone(o, t, 0.2, 'sine', jit(2600), 2300, 0.07);
     tone(o, t, 0.16, 'sine', jit(3900), 3500, 0.05);
-    tone(o, t, 0.09, 'sine', jit(130), 60, 0.5);
   } else {
     tone(o, t, 0.1, 'sine', jit(120), 50, 0.6);
+  }
+  // 몸
+  if (body === 'thug') {
+    // 단단한 근육 · 낮고 굵은 신음
+    tone(o, t, 0.15, 'sine', 105 * pitch, 50, 0.85);
+    noise(o, t, 0.05, 'bandpass', 600, 300, 1, 0.4);
+    if (Math.random() < 0.6) grunt(o, t + 0.03, 118 * pitch, [650, 1080], 0.22);
+  } else if (body === 'flesh') {
+    // 행인: 가볍고 높은 비명 섞인 신음
+    tone(o, t, 0.1, 'sine', 170 * pitch, 80, 0.55);
+    if (Math.random() < 0.7) grunt(o, t + 0.02, 190 * pitch, [800, 1300], 0.18, 0.2);
+  } else if (body === 'suturer') {
+    // 두꺼운 코트를 치는 둔탁함 + 몸에 꿰맨 금실·바늘이 울리는 쇳소리
+    noise(o, t, 0.07, 'bandpass', 1700, 900, 1.6, 0.6);
+    tone(o, t, 0.12, 'sine', 90 * pitch, 45, 0.7);
+    tone(o, t + 0.01, 0.35, 'sine', 1420 * pitch, 1400, 0.09);
+    tone(o, t + 0.01, 0.28, 'sine', 2130 * pitch, 2100, 0.06);
+  } else if (body === 'monster') {
+    // 실밥 터진 몸: 젖은 듯 찢기는 소리 + 아주 낮은 울림 + 으르렁
+    noise(o, t, 0.14, 'lowpass', 2400, 300, 0.7, 0.9, 0.002);
+    noise(o, t + 0.03, 0.09, 'bandpass', 3800, 1500, 3, 0.35);
+    tone(o, t, 0.28, 'sine', 62, 32, 1.0);
+    const g = ctx!.createOscillator(); g.type = 'sawtooth'; g.frequency.value = 58 * pitch;
+    const lf = ctx!.createBiquadFilter(); lf.type = 'lowpass'; lf.frequency.value = 420;
+    const gg = ctx!.createGain(); gg.gain.setValueAtTime(0.0001, t); gg.gain.exponentialRampToValueAtTime(0.35, t + 0.04); gg.gain.exponentialRampToValueAtTime(0.0001, t + 0.38);
+    const trem = ctx!.createOscillator(); trem.frequency.value = 23; const tg = ctx!.createGain(); tg.gain.value = 0.15; trem.connect(tg).connect(gg.gain);
+    g.connect(lf).connect(gg).connect(o); g.start(t); g.stop(t + 0.42); trem.start(t); trem.stop(t + 0.42);
+  } else if (body === 'player') {
+    // 내가 맞을 때: 가슴이 울리는 낮은 쿵
+    tone(o, t, 0.2, 'sine', 80, 40, 1.0);
+    noise(o, t, 0.05, 'lowpass', 900, 300, 0.7, 0.4);
   }
   if (crit) { tone(o, t + 0.01, 0.22, 'sine', 90, 38, 0.9); noise(o, t, 0.05, 'highpass', 2500, 1500, 0.7, 0.3); }
 }

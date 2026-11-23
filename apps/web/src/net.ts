@@ -24,7 +24,11 @@ function guestId() {
     return g;
   } catch { return 'g-' + Math.random().toString(36).slice(2, 10); }
 }
+const LOOP = (() => { try { return new URLSearchParams(location.search).has('loopnet'); } catch { return false; } })();
+let loopId = '';
 export function myId() {
+  // 시험용 (?loopnet): 탭마다 다른 사람
+  if (LOOP) return (loopId ||= `loop-${Math.random().toString(36).slice(2, 7)}`);
   return account()?.username ?? guestId();
 }
 
@@ -93,10 +97,48 @@ let timer = 0;
 let lastTrack = 0;
 /** 옷·무기가 바뀌었을 때 바로 알린다 */
 export function nudge() { lastTrack = 0; }
-export function joinZone(zoneId: string, me: () => { info: RemoteInfo; pos: NetPos } | null, onPeer: (id: string, info: RemoteInfo | null, pos: NetPos | null) => void, onLeave: (id: string) => void) {
+/** 사람끼리 싸움 (PvP): 맞은 쪽 기기가 자기 체력을 계산한다 (때린 쪽은 '때렸다'만 알린다) */
+export interface PvpHooks {
+  hit(from: string, dmg: number, crit: boolean, kind: string): void;
+  down(victim: string, by: string, cash: number, wasCriminal: boolean): void;
+}
+let pvp: PvpHooks | null = null;
+export function sendHit(to: string, dmg: number, crit: boolean, kind: string) {
+  channel?.send({ type: 'broadcast', event: 'hit', payload: { from: myId(), to, dmg, crit, kind } });
+}
+export function sendDown(by: string, cash: number, wasCriminal: boolean) {
+  channel?.send({ type: 'broadcast', event: 'down', payload: { id: myId(), by, cash, crim: wasCriminal } });
+}
+/** 시험용 (?loopnet): 같은 브라우저의 탭끼리 BroadcastChannel로 서로 보이고 싸운다 (서버 없이 PvP 확인) */
+function loopChannel(name: string, key: string) {
+  const bc = new BroadcastChannel(`hm-${name}`);
+  const state: Record<string, unknown[]> = {};
+  const subs: { type: string; ev: string; cb: (x: any) => void }[] = [];
+  const fire = (type: string, ev: string, arg: unknown) => subs.filter((x) => x.type === type && x.ev === ev).forEach((x) => x.cb(arg));
+  bc.onmessage = (e) => {
+    const m = e.data;
+    if (m.k === 'track') { const fresh = !state[m.key]; state[m.key] = [m.meta]; fire('presence', 'sync', {}); if (fresh) bc.postMessage({ k: 'track', key, meta: mine }); }
+    else if (m.k === 'leave') { delete state[m.key]; fire('presence', 'leave', { key: m.key }); }
+    else if (m.k === 'b') fire('broadcast', m.event, { payload: m.payload });
+  };
+  let mine: unknown = null;
+  addEventListener('pagehide', () => bc.postMessage({ k: 'leave', key }));
+  const ch = {
+    presenceState: () => state,
+    on(type: string, f: { event: string }, cb: (x: any) => void) { subs.push({ type, ev: f.event, cb }); return ch; },
+    subscribe(cb: (s: string) => void) { setTimeout(() => cb('SUBSCRIBED'), 0); return ch; },
+    track(m: unknown) { mine = m; bc.postMessage({ k: 'track', key, meta: m }); },
+    send(m: { event: string; payload: unknown }) { bc.postMessage({ k: 'b', event: m.event, payload: m.payload }); },
+    close() { bc.postMessage({ k: 'leave', key }); bc.close(); },
+  };
+  return ch;
+}
+
+export function joinZone(zoneId: string, me: () => { info: RemoteInfo; pos: NetPos } | null, onPeer: (id: string, info: RemoteInfo | null, pos: NetPos | null) => void, onLeave: (id: string) => void, hooks?: PvpHooks) {
+  pvp = hooks ?? null;
   leaveZone();
   const id = myId();
-  const ch = sb.channel(`zone:${zoneId}`, { config: { presence: { key: id }, broadcast: { self: false } } });
+  const ch = (LOOP ? loopChannel(`zone:${zoneId}`, id) : sb.channel(`zone:${zoneId}`, { config: { presence: { key: id }, broadcast: { self: false } } })) as ReturnType<typeof sb.channel>;
   channel = ch;
   const fromPresence = () => {
     const st = ch.presenceState() as Record<string, { info: RemoteInfo; pos: NetPos }[]>;
@@ -109,6 +151,14 @@ export function joinZone(zoneId: string, me: () => { info: RemoteInfo; pos: NetP
   ch.on('presence', { event: 'sync' }, fromPresence);
   ch.on('presence', { event: 'leave' }, ({ key }) => { if (key !== id) onLeave(key); });
   ch.on('broadcast', { event: 'p' }, ({ payload }) => { if (payload?.id && payload.id !== id) onPeer(payload.id, null, payload.pos); });
+  ch.on('broadcast', { event: 'hit' }, ({ payload }) => {
+    if (!payload || payload.to !== id || typeof payload.dmg !== 'number') return;
+    pvp?.hit(String(payload.from), Math.max(0, Math.min(400, payload.dmg)), !!payload.crit, String(payload.kind ?? 'fist'));
+  });
+  ch.on('broadcast', { event: 'down' }, ({ payload }) => {
+    if (!payload?.id || payload.id === id) return;
+    pvp?.down(String(payload.id), String(payload.by), Math.max(0, Math.min(100000, Number(payload.cash) || 0)), !!payload.crim);
+  });
   let lastPos = '';
   lastTrack = 0;
   ch.subscribe((status) => {
@@ -128,6 +178,6 @@ export function joinZone(zoneId: string, me: () => { info: RemoteInfo; pos: NetP
 export function leaveZone() {
   if (timer) clearInterval(timer);
   timer = 0;
-  if (channel) sb.removeChannel(channel);
+  if (channel) { if (LOOP) (channel as unknown as { close(): void }).close(); else sb.removeChannel(channel); }
   channel = null;
 }

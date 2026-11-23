@@ -55,10 +55,61 @@ export const ITEMS: ItemDef[] = [
   { key: 'coffee', cat: 'goods', price: 65, heal: 35, store: 'cafe', now: true, name: { ko: '커피', th: 'กาแฟ', en: 'Coffee' } },
   { key: 'thaitea', cat: 'goods', price: 45, heal: 30, store: 'cafe', now: true, name: { ko: '타이 밀크티', th: 'ชาไทย', en: 'Thai milk tea' } },
   { key: 'cake', cat: 'goods', price: 80, heal: 60, store: 'cafe', now: true, name: { ko: '케이크', th: 'เค้ก', en: 'Cake' } },
+  // 음식점마다 실제 업종(지도의 cuisine)에 맞는 메뉴
+  ...([
+    ['pizza', 120, 140, '피자 한 조각', 'พิซซ่าหนึ่งชิ้น', 'Pizza slice'], ['pasta', 220, 190, '파스타', 'พาสต้า', 'Pasta'],
+    ['burger', 180, 170, '햄버거', 'แฮมเบอร์เกอร์', 'Burger'], ['fries', 80, 70, '감자튀김', 'เฟรนช์ฟรายส์', 'Fries'],
+    ['steak', 390, 260, '스테이크', 'สเต๊ก', 'Steak'], ['pancake', 150, 120, '팬케이크', 'แพนเค้ก', 'Pancakes'],
+    ['eggtoast', 140, 130, '달걀 토스트', 'ไข่กับขนมปังปิ้ง', 'Eggs on toast'], ['sandwich', 120, 120, '샌드위치', 'แซนด์วิช', 'Sandwich'],
+    ['ramen', 250, 200, '라멘', 'ราเมน', 'Ramen'], ['sushi', 300, 180, '초밥', 'ซูชิ', 'Sushi'], ['matcha', 90, 40, '말차', 'มัทฉะ', 'Matcha'],
+    ['bibimbap', 220, 200, '비빔밥', 'บิบิมบับ', 'Bibimbap'], ['kimchistew', 200, 190, '김치찌개', 'ซุปกิมจิ', 'Kimchi stew'], ['tteok', 150, 140, '떡볶이', 'ต็อกบกกี', 'Tteokbokki'],
+    ['curry', 220, 200, '카레와 난', 'แกงกับแป้งนาน', 'Curry & naan'], ['biryani', 250, 210, '비리야니', 'ข้าวหมกบริยานี', 'Biryani'], ['lassi', 90, 50, '라씨', 'ลัสซี่', 'Lassi'],
+    ['friedrice', 70, 140, '볶음밥', 'ข้าวผัด', 'Fried rice'], ['dimsum', 150, 130, '딤섬', 'ติ่มซำ', 'Dim sum'],
+    ['pho', 150, 160, '쌀국수(퍼)', 'เฝอ', 'Pho'], ['banhmi', 120, 120, '반미', 'บั๋นหมี่', 'Bánh mì'],
+    ['taco', 150, 140, '타코', 'ทาโก้', 'Tacos'], ['burrito', 220, 190, '부리토', 'เบอร์ริโต', 'Burrito'],
+    ['kebab', 150, 160, '케밥', 'เคบับ', 'Kebab'], ['hummus', 180, 140, '후무스와 빵', 'ฮัมมัสกับขนมปัง', 'Hummus & bread'],
+    ['friedchicken', 120, 160, '프라이드치킨', 'ไก่ทอด', 'Fried chicken'], ['tomyum', 150, 170, '똠얌꿍', 'ต้มยำกุ้ง', 'Tom yum goong'],
+    ['grilledfish', 250, 200, '생선구이', 'ปลาเผา', 'Grilled fish'], ['somtam', 50, 100, '쏨땀', 'ส้มตำ', 'Papaya salad'], ['bamee', 50, 120, '바미 (달걀국수)', 'บะหมี่', 'Egg noodles'],
+  ] as [string, number, number, string, string, string][]).map(([key, price, heal, ko, th, en]): ItemDef => ({ key, cat: 'goods', price, heal, store: 'food', now: true, name: { ko, th, en } })),
+  ...([
+    ['croissant', 90, 60, '크루아상', 'ครัวซองต์', 'Croissant'], ['donut', 45, 45, '도넛', 'โดนัท', 'Donut'],
+    ['icecream', 80, 50, '아이스크림', 'ไอศกรีม', 'Ice cream'], ['bubbletea', 60, 40, '버블티', 'ชานมไข่มุก', 'Bubble tea'],
+  ] as [string, number, number, string, string, string][]).map(([key, price, heal, ko, th, en]): ItemDef => ({ key, cat: 'goods', price, heal, store: 'cafe', now: true, name: { ko, th, en } })),
 ];
 
 // 숫자는 보여 주지 않는다 (체력 막대로만 짐작). 효과는 말로
 /** 거리 가게 진열 (우주새 물건도 가게 가격으로 판다) */
+/** 음식점·카페 메뉴: 지도의 cuisine(없으면 이름)으로 고른다. 모르면 태국 음식 / 커피 */
+const M = (...xs: [string, number][]) => xs.map(([key, price]) => ({ key, price }));
+export const MENUS: Record<string, { key: string; price: number }[]> = {
+  thai: M(['padthai', 60], ['khaoman', 50], ['somtam', 50], ['tomyum', 150], ['thaitea', 40], ['water', 10]),
+  noodle: M(['noodlesoup', 50], ['bamee', 50], ['khaoman', 50], ['water', 10]),
+  seafood: M(['tomyum', 150], ['grilledfish', 250], ['somtam', 50], ['water', 10]),
+  italian: M(['pizza', 120], ['pasta', 220], ['cola', 35], ['water', 15]),
+  burger: M(['burger', 180], ['fries', 80], ['cola', 35], ['water', 15]),
+  steak: M(['steak', 390], ['fries', 80], ['cola', 35], ['water', 15]),
+  brunch: M(['pancake', 150], ['eggtoast', 140], ['coffee', 80], ['water', 15]),
+  sandwich: M(['sandwich', 120], ['coffee', 70], ['water', 15]),
+  japanese: M(['ramen', 250], ['sushi', 300], ['matcha', 90], ['water', 15]),
+  korean: M(['bibimbap', 220], ['kimchistew', 200], ['tteok', 150], ['water', 15]),
+  indian: M(['curry', 220], ['biryani', 250], ['lassi', 90], ['water', 15]),
+  chinese: M(['friedrice', 70], ['dimsum', 150], ['water', 10]),
+  vietnamese: M(['pho', 150], ['banhmi', 120], ['water', 15]),
+  mexican: M(['taco', 150], ['burrito', 220], ['cola', 35], ['water', 15]),
+  middle_eastern: M(['kebab', 150], ['hummus', 180], ['water', 15]),
+  chicken: M(['friedchicken', 120], ['fries', 80], ['cola', 35]),
+  coffee: M(['coffee', 65], ['thaitea', 45], ['cake', 80], ['water', 10]),
+  bakery: M(['croissant', 90], ['cake', 80], ['coffee', 65]),
+  donut: M(['donut', 45], ['coffee', 65]),
+  icecream: M(['icecream', 80], ['water', 10]),
+  tea: M(['bubbletea', 60], ['thaitea', 45], ['matcha', 90]),
+};
+export function menuFor(kind: 'mart' | 'pharmacy' | 'food' | 'cafe', cuisine?: string) {
+  if (kind === 'food') return MENUS[cuisine ?? ''] ?? MENUS.thai;
+  if (kind === 'cafe') return MENUS[cuisine ?? ''] ?? MENUS.coffee;
+  return STORES[kind];
+}
+
 export const STORES: Record<'mart' | 'pharmacy' | 'food' | 'cafe', { key: string; price: number }[]> = {
   mart: [{ key: 'water', price: 10 }, { key: 'cola', price: 17 }, { key: 'noodle', price: 15 }, { key: 'ricebox', price: 39 }, { key: 'chips', price: 30 }, { key: 'choco', price: 35 }, { key: 'plaster', price: 25 }],
   pharmacy: [{ key: 'painkiller', price: 30 }, { key: 'bandage', price: 45 }, { key: 'saline', price: 20 }, { key: 'firstaid', price: 250 }, { key: 'water', price: 10 }],
@@ -260,6 +311,69 @@ export function itemIcon(key: string): HTMLCanvasElement {
       P([[4, 20], [16, 12], [28, 20], [16, 26]], '#f4e6d0'); P([[4, 20], [16, 26], [16, 29], [4, 23]], '#d9a87a'); P([[16, 26], [28, 20], [28, 23], [16, 29]], '#c9905a');
       E(16, 16, 2, 2, '#c9302a');
       break;
+    // ── 음식점 메뉴 (접시·그릇·컵 틀에 색만 바꾼다)
+    case 'pizza':
+      P([[6, 9], [27, 9], [16, 29]], '#e8b85a'); R(6, 7, 21, 3, '#c9883a'); E(12, 13, 2, 2, '#b8302a'); E(19, 14, 2, 2, '#b8302a'); E(16, 20, 2, 2, '#b8302a'); R(14, 11, 2, 1, '#4a8a3a');
+      break;
+    case 'burger':
+      E(16, 11, 11, 6, '#d99a4a'); R(5, 14, 22, 3, '#5a9a3a'); R(5, 17, 22, 4, '#6a3a22'); R(6, 21, 20, 2, '#e8c84a'); E(16, 25, 11, 3, '#c9883a'); R(10, 8, 1, 1, '#f6e6b0'); R(17, 7, 1, 1, '#f6e6b0');
+      break;
+    case 'fries':
+      for (let k = 0; k < 6; k++) R(9 + k * 2.5, 5 + (k % 3) * 2, 2, 12, '#f2cf5a');
+      P([[7, 14], [25, 14], [23, 29], [9, 29]], '#c9302a'); R(12, 19, 8, 4, '#f4f0e6');
+      break;
+    case 'sandwich': case 'banhmi':
+      if (key === 'banhmi') { E(16, 17, 13, 6, '#d9a04a'); R(5, 16, 22, 2, '#5a9a3a'); R(6, 18, 20, 1, '#c94a3a'); }
+      else { P([[4, 22], [16, 8], [28, 22]], '#ecd9a8'); R(6, 20, 20, 2, '#5a9a3a'); R(6, 22, 20, 2, '#e8a0a0'); P([[4, 24], [28, 24], [28, 27], [4, 27]], '#ecd9a8'); }
+      break;
+    case 'taco': case 'burrito': case 'kebab':
+      if (key === 'taco') { E(16, 20, 12, 9, '#e8c070'); E(16, 22, 9, 6, '#7a3a22'); R(9, 15, 14, 2, '#5a9a3a'); R(11, 14, 3, 1, '#c94a3a'); R(18, 14, 3, 1, '#f4e06a'); R(4, 22, 24, 7, 'rgba(0,0,0,0)'); }
+      else { Ln(8, 26, 24, 8, 9, key === 'kebab' ? '#e8d6a8' : '#e8d2a0'); Ln(22, 10, 26, 6, 5, key === 'kebab' ? '#a0522a' : '#7a5a2a'); R(20, 9, 3, 2, '#5a9a3a'); }
+      break;
+    case 'sushi':
+      for (const [x, y] of [[9, 17], [17, 13], [23, 19]] as [number, number][]) { E(x, y + 3, 5, 3, '#f4f0e6'); E(x, y, 5, 3, '#e8744a'); R(x - 1, y - 1, 2, 5, '#1c2a1c'); }
+      break;
+    case 'croissant':
+      E(16, 18, 12, 7, '#d99a3a'); for (let k = -2; k <= 2; k++) R(16 + k * 4, 12, 1, 12, '#b8742a'); E(16, 16, 9, 4, '#e8b45a');
+      break;
+    case 'donut':
+      E(16, 17, 12, 10, '#d9a050'); E(16, 15, 11, 8, '#e88aa8'); E(16, 16, 4, 3, 'rgba(0,0,0,0)'); g.clearRect(13, 14, 7, 5);
+      for (const [x, y] of [[10, 12], [20, 11], [22, 18], [9, 19]] as [number, number][]) R(x, y, 2, 1, '#f4f0a0');
+      break;
+    case 'icecream':
+      P([[10, 16], [22, 16], [16, 30]], '#d9a05a'); E(16, 12, 7, 6, '#f4e6e0'); E(12, 15, 4, 3, '#f4e6e0'); E(20, 15, 4, 3, '#f4e6e0'); E(16, 8, 3, 2, '#e88aa8');
+      break;
+    case 'lassi': case 'matcha': case 'bubbletea':
+      P([[9, 7], [23, 7], [21, 28], [11, 28]], key === 'lassi' ? '#f6eed8' : key === 'matcha' ? '#8ab85a' : '#c9a07a'); R(8, 5, 16, 3, '#f4f0e6');
+      if (key === 'bubbletea') { for (const [x, y] of [[13, 25], [17, 24], [19, 26], [15, 22]] as [number, number][]) E(x, y, 1.5, 1.5, '#2a1a12'); R(15, 1, 2, 5, '#e88aa8'); }
+      break;
+    case 'steak': case 'grilledfish': case 'eggtoast': case 'pancake': case 'hummus': case 'curry': case 'dimsum': case 'friedchicken': {
+      E(16, 20, 14, 8, '#efe9dc'); E(16, 19, 11, 6, '#f8f4ea');
+      if (key === 'steak') { E(15, 18, 8, 4, '#7a3a22'); R(10, 17, 9, 1, '#5a2a18'); R(22, 17, 3, 2, '#5a9a3a'); }
+      if (key === 'grilledfish') { E(15, 18, 9, 3, '#a87a4a'); P([[23, 18], [28, 15], [28, 21]], '#a87a4a'); R(9, 17, 1, 1, '#1c1410'); }
+      if (key === 'eggtoast') { R(8, 15, 9, 7, '#d9a04a'); E(21, 18, 5, 3.5, '#fbfaf4'); E(21, 18, 2, 2, '#f2c22a'); }
+      if (key === 'pancake') { E(16, 19, 9, 3, '#d99a4a'); E(16, 17, 9, 3, '#e8b45a'); E(16, 15, 9, 3, '#e8b45a'); R(14, 12, 4, 2, '#fbf0c0'); }
+      if (key === 'hummus') { E(13, 18, 6, 4, '#e8d6a0'); E(13, 18, 2, 1, '#c9a03a'); E(22, 17, 5, 3, '#e8c88a'); }
+      if (key === 'curry') { E(12, 19, 6, 4, '#c97a2a'); E(21, 17, 6, 3, '#f0dca8'); R(18, 16, 1, 1, '#b8883a'); R(23, 17, 1, 1, '#b8883a'); }
+      if (key === 'dimsum') { for (const [x, y] of [[11, 18], [17, 16], [21, 20]] as [number, number][]) { E(x, y, 4, 3, '#f4eedc'); R(x, y - 3, 1, 2, '#e0d6c0'); } }
+      if (key === 'friedchicken') { E(13, 18, 5, 4, '#c97a2a'); E(20, 17, 5, 4, '#b8682a'); R(23, 13, 2, 4, '#f4eedc'); }
+      break;
+    }
+    case 'pasta': case 'ramen': case 'pho': case 'bamee': case 'tomyum': case 'kimchistew': case 'tteok': case 'bibimbap': case 'biryani': case 'friedrice': case 'somtam': {
+      const broth: Record<string, string> = { pasta: '#f2d88a', ramen: '#d9a86a', pho: '#e8d2a0', bamee: '#e8c070', tomyum: '#e8743a', kimchistew: '#c9402a', tteok: '#d9402a', bibimbap: '#f4f0e6', biryani: '#e8b85a', friedrice: '#e8c070', somtam: '#d9e2a0' };
+      E(16, 20, 13, 7, key === 'bibimbap' || key === 'kimchistew' ? '#3a2a22' : '#efe9dc'); E(16, 19, 10, 5, broth[key]);
+      if (key === 'pasta' || key === 'ramen' || key === 'pho' || key === 'bamee') for (let k = 0; k < 4; k++) R(10 + k * 3, 17, 1, 4, '#fbf0c0');
+      if (key === 'pasta') E(16, 18, 4, 2, '#c94a3a');
+      if (key === 'ramen') { E(20, 17, 2.5, 2, '#fbfaf4'); E(20, 17, 1, 1, '#f2b22a'); R(11, 16, 3, 2, '#5a9a4a'); }
+      if (key === 'pho') { R(18, 16, 4, 2, '#8a4a3a'); R(11, 16, 3, 1, '#5a9a4a'); }
+      if (key === 'tomyum') { E(13, 18, 2, 1.5, '#f2a07a'); E(19, 19, 2, 1.5, '#f2a07a'); R(16, 16, 3, 1, '#5a9a4a'); }
+      if (key === 'kimchistew') { R(12, 17, 3, 2, '#f4f0e6'); R(18, 18, 3, 2, '#f4f0e6'); }
+      if (key === 'tteok') for (let k = 0; k < 4; k++) R(10 + k * 3, 17 + (k % 2), 2, 3, '#f4e6d8');
+      if (key === 'bibimbap') { R(10, 16, 4, 3, '#5a9a3a'); R(14, 18, 4, 2, '#e8743a'); R(18, 16, 4, 3, '#7a3a22'); E(16, 18, 2, 1.5, '#f2c22a'); }
+      if (key === 'biryani' || key === 'friedrice') { for (let k = 0; k < 6; k++) R(9 + k * 3, 17 + (k % 2), 1, 1, key === 'biryani' ? '#c9702a' : '#5a9a4a'); }
+      if (key === 'somtam') { for (let k = 0; k < 5; k++) R(10 + k * 3, 17, 2, 1, '#f2a03a'); E(20, 19, 1.5, 1.5, '#c9302a'); }
+      break;
+    }
     case 'boots':
       P([[6, 6], [16, 6], [17, 19], [28, 21], [29, 27], [5, 27]], '#5a3a22'); R(5, 27, 25, 3, '#1c1410');
       E(25, 23, 4, 3, '#7c8492'); R(7, 6, 9, 2, '#3a2416');

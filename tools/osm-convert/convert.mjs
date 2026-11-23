@@ -187,10 +187,30 @@ const DETAIL = (t) => {
   return null;
 };
 const BRAND_WORDS = /7-?eleven|seven eleven|familymart|lawson|tops|foodland|villa market|big ?c|lotus|starbucks|amazon|coffee world|mcdonald|kfc|burger king|subway|pizza company|swensen|dairy queen|boots|watsons|uniqlo|zara|h&m|central|robinson|emporium|terminal 21|bangkok bank|kasikorn|krungsri|siam commercial|krung thai|uob|citibank|ttb|tmb|gsb|superrich|ธนาคาร|เซเว่น|แฟมิลี่มาร์ท|สตาร์บัคส์|คาเฟ่ อเมซอน|ท็อปเจริญ/i;
+// 음식점·카페의 메뉴 묶음 (cuisine 태그 → 없으면 이름으로 짐작). 게임에서 파는 음식이 달라진다
+const CUISINE = [
+  ['italian', /pizza|italian|pasta|pizzeria/], ['burger', /burger|american|diner|fish_and_chips/], ['steak', /steak|grill|barbecue|bbq/],
+  ['brunch', /breakfast|brunch|pancake|western|international|european|french|german|swiss|swedish|australian|british/], ['sandwich', /sandwich|deli|bagel/],
+  ['japanese', /japanese|sushi|ramen|izakaya|yakiniku|udon|tonkatsu|yakitori/], ['korean', /korean|kimchi/], ['indian', /indian|curry|tandoor|nepal|pakistan/],
+  ['chinese', /chinese|dim ?sum|cantonese|szechuan|sichuan|hot_?pot/], ['vietnamese', /vietnam|pho\b|banh/], ['mexican', /mexican|taco|burrito|tex/],
+  ['middle_eastern', /arab|lebanese|middle_eastern|turkish|kebab|shawarma|falafel|persian|egypt|israeli|mediterranean/],
+  ['chicken', /chicken|wings/], ['seafood', /seafood|fish/], ['noodle', /noodle|ก๋วยเตี๋ยว|บะหมี่/], ['thai', /thai|regional|asian|isan|isaan|som_?tam|savory_pancakes|ไทย|ข้าว|ส้มตำ/],
+  ['icecream', /ice_?cream|gelato/], ['donut', /donut|doughnut/], ['bakery', /cake|bakery|pastry|patisserie|croissant/], ['tea', /bubble|tea\b|milk_?tea/], ['coffee', /coffee|cafe|café|espresso/],
+];
+const cuisineOf = (t, d) => {
+  if (!['restaurant', 'fast_food', 'food_court', 'cafe', 'bakery', 'ice_cream', 'coffee', 'tea'].includes(d)) return null;
+  const tag = (t.cuisine || '').toLowerCase().replace(/ /g, '_');
+  for (const [k, re] of CUISINE) if (tag && re.test(tag)) return k;
+  const name = `${t.name || ''} ${t['name:en'] || ''}`.toLowerCase();
+  for (const [k, re] of CUISINE) if (re.test(name)) return k;
+  return null;
+};
 const poiOf = (t) => {
   const d = DETAIL(t);
   if (!d) return null;
   const p = { t: d };
+  const c = cuisineOf(t, d);
+  if (c) p.c = c;
   const brand = !!t.brand || !!t['brand:wikidata'] || BRAND_WORDS.test(t.name || '') || BRAND_WORDS.test(t['name:en'] || '');
   if (brand) p.b = 1;
   else if (t.name) {

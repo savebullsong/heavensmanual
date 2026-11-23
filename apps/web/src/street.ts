@@ -82,8 +82,8 @@ export function upperFloors(b: Building) {
   const lv = Math.max(1, Math.round((b.h - 16) / 15));
   return Math.max(0, Math.min(8, lv - 1));
 }
-export function buildingTop(b: Building) {
-  return GPX + upperFloors(b) * UPX + PPX;
+export function buildingTop(b: Building, low = false) {
+  return GPX + (low ? 0 : upperFloors(b)) * UPX + PPX;
 }
 
 function groundKind(b: Building, face: Face, k: number, n: number, onSign: boolean, r: () => number): string {
@@ -111,10 +111,11 @@ function upperKind(b: Building, k: number, f: number, colRand: number): string {
 }
 
 /** 건물 한 채를 조각으로 조립해 캔버스 한 장에 그린다 (gfx.drawBuilding 과 같은 꼴) */
-export function drawBuildingKit(b: Building, signText: string, night: boolean) {
+/** low = '건물 낮추기': 1층(간판 있는 층)과 옥상 난간만 그려 거리가 보이게 */
+export function drawBuildingKit(b: Building, signText: string, night: boolean, low = false) {
   const { i0, j0, w, d } = b;
   const i1 = i0 + w, j1 = j0 + d;
-  const nU = upperFloors(b);
+  const nU = low ? 0 : upperFloors(b);
   const roofZ = GPX + nU * UPX;
   const top = roofZ + PPX;
   const r = rng(hash(i0, j0) + 17);

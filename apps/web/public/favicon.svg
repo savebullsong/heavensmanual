@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="7.7 -42.5 87.1 87.1">
+<g transform="rotate(-38)">
+<g fill="#f6d33c" stroke="#ffffff" stroke-width="3.4" stroke-linejoin="round">
+<rect x="-2" y="-6.0" width="44.0" height="12" rx="6.0" transform="translate(56.0 6.0) rotate(35.0)"/>
+<rect x="-2" y="-6.0" width="41.2" height="12" rx="6.0" transform="translate(42.6 6.2) rotate(47.0)"/>
+<rect x="-2" y="-6.0" width="38.4" height="12" rx="6.0" transform="translate(31.1 8.2) rotate(59.0)"/>
+<rect x="-2" y="-6.0" width="35.6" height="12" rx="6.0" transform="translate(21.5 12.0) rotate(71.0)"/>
+<rect x="-2" y="-6.0" width="32.8" height="12" rx="6.0" transform="translate(14.0 17.6) rotate(83.0)"/>
+<rect x="-2" y="-6.0" width="30.0" height="12" rx="6.0" transform="translate(8.3 25.1) rotate(95.0)"/>
+</g>
+<g fill="#f8dc58" stroke="#ffffff" stroke-width="3" stroke-linejoin="round">
+<rect x="-2" y="-5.5" width="22.0" height="11" rx="5.5" transform="translate(41.2 8.3) rotate(50.0)"/>
+<rect x="-2" y="-5.5" width="20.5" height="11" rx="5.5" transform="translate(30.5 10.4) rotate(60.5)"/>
+<rect x="-2" y="-5.5" width="19.0" height="11" rx="5.5" transform="translate(21.5 14.0) rotate(71.0)"/>
+<rect x="-2" y="-5.5" width="17.5" height="11" rx="5.5" transform="translate(14.3 19.3) rotate(81.5)"/>
+<rect x="-2" y="-5.5" width="16.0" height="11" rx="5.5" transform="translate(8.8 26.2) rotate(92.0)"/>
+</g>
+<path d="M6 30 Q16 4 56 6" fill="none" stroke="#ffffff" stroke-width="15" stroke-linecap="round"/>
+<path d="M6 30 Q16 4 56 6" fill="none" stroke="#f6d33c" stroke-width="8.4" stroke-linecap="round"/>
+</g>
+</svg>

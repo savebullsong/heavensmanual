@@ -8,7 +8,7 @@ import { iso, TW, TH, drawBuilding, drawGroundChunk, buildingHeight } from './gf
 import { drawBuildingKit, drawGroundKit, buildingTop, carSprite, propSprite, CAR_MODELS, CHUNK, kitOk } from './street.ts';
 import { t, lang } from './i18n.ts';
 import { bangkokClock, nightFactor } from './clock.ts';
-import { buildingName, buildingSub, interactive, canWork, storeOf, type StoreKind } from './names.ts';
+import { buildingName, buildingSub, interactive, canWork, hasBank, cuisineOf, storeOf, type StoreKind } from './names.ts';
 import * as sfx from './sfx.ts';
 import { carHit, isDanger, DANGER_SPEED, critChance, CRIT_MULTIPLIER, regenPerMinute, OUT_OF_COMBAT_S, dodgeChance, maxHp as maxHpFor, newStats, type DeedKey, type Stats } from '../../../packages/shared/src/rules.ts';
 
@@ -21,7 +21,7 @@ function tex(c: HTMLCanvasElement): Texture {
 export type NpcKind = 'passer' | 'thug' | 'suturer';
 export type Stance = 'talk' | 'hostile' | 'all';
 export interface RemoteInfo { name: string; look: Look; weapon: string | null; armor: string[]; member: boolean }
-export interface NetPos { x: number; y: number; d: Dir; m: 0 | 1; a?: Anim }
+export interface NetPos { x: number; y: number; d: Dir; m: 0 | 1; a?: Anim; h?: number; c?: 1; k?: 1 }
 interface Walker {
   x: number; y: number; // 연속 격자 좌표 (타일 중심 = i + 0.5)
   path: [number, number][];
@@ -50,6 +50,12 @@ interface Walker {
   firstBy: Walker | null; // 이 싸움을 먼저 건 쪽
   flee: number;
   hurtT: number;
+  flashT?: number; // 맞는 순간 하얗게 번쩍
+  kb?: { dx: number; dy: number; t: number }; // 밀려나기
+  voice?: number; // 사람마다 다른 목소리·타격음 높낮이
+  stalk?: number; // 불량배: 시비 걸며 다가오는 중 (초)
+  aggroCool?: number;
+  lingerT?: number; // 싸우다 나간 사람의 몸이 남아 있는 시간
   barT: number;
   repathT: number;
   home: [number, number];
@@ -75,10 +81,20 @@ export interface WorldHooks {
   say(name: string, text: string): void;
   work(state: { name: string; earned: number } | null): void;
   useAmmo(): boolean;
-  store(kind: StoreKind, name: string): void;
-  person(id: string, info: RemoteInfo, x: number, y: number): void;
+  store(kind: StoreKind, name: string, cuisine?: string): void;
+  /** 걸어서 자리를 뜨면 가게·은행 창을 닫는다 */
+  away(): void;
+  person(id: string, info: RemoteInfo, x: number, y: number, attack: () => void): void;
   /** 누른 건물·가까이 온 가게의 이름을 화면 위쪽에 잠깐 보여 준다 */
   place(name: string, sub: string): void;
+  /** 은행 창구 */
+  bank(name: string): void;
+  /** 다른 사람을 때렸다 (맞은 사람 기기로 알린다) */
+  pvpHit(to: string, dmg: number, crit: boolean, kind: string): void;
+  /** 다른 사람에게 쓰러졌다 (때린 사람에게 알린다: 떨어뜨린 돈, 내가 범죄 표시였는지) */
+  pvpDown(by: string, cash: number, wasCriminal: boolean): void;
+  /** 지금 들고 있는 돈 (쓰러질 때 떨어뜨림) */
+  cash(): number;
 }
 export interface Gear { atk: number; def: number; ranged: boolean; weapon: string | null; armor: string[] }
 
@@ -89,7 +105,7 @@ export const PLAYER_MAX_HP = 1000;
 /** 방콕 최저임금 하루 ฿400 (8시간) */
 export const WAGE_PER_HOUR = 400 / 8;
 const WAGE_PER_SEC = WAGE_PER_HOUR / 3600;
-const ATK_INTERVAL = 0.9;
+const ATK_INTERVAL = 0.62; // 6차: 더 빠르게
 const MELEE = 1.25;
 const RANGED = 5;
 
@@ -131,6 +147,11 @@ export class WorldScene {
   private time = 0;
   // 누른 자리 표시: 이동 = 바닥 파동, 공격 = 대상 발밑 붉은 표적, 상호작용 = 출입·말풍선 아이콘
   private fxLayer = new Graphics();
+  private sparkG = new Graphics();
+  private sparks: { x: number; y: number; vx: number; vy: number; t: number; col: number }[] = [];
+  private hitStop = 0;
+  private shakeT = 0;
+  private shakeA = 0;
   private ripple: { x: number; y: number; t: number } | null = null;
   private mark: { w: Walker; t: number } | null = null;
   private door = new Graphics();
@@ -160,7 +181,12 @@ export class WorldScene {
   private working: { k: number; name: string; earned: number; spot: [number, number]; on: boolean } | null = null;
   private workTick = 0;
   private pending: { kind: 'talk' | 'look'; w: Walker } | null = null;
-  private tick = (tk: { deltaMS: number }) => this.update(Math.min(0.05, tk.deltaMS / 1000));
+  private tick = (tk: { deltaMS: number }) => {
+    let dt = Math.min(0.05, tk.deltaMS / 1000);
+    // 히트스톱: 맞는 순간 세상이 아주 잠깐 멈칫한다
+    if (this.hitStop > 0) { this.hitStop -= dt; dt *= 0.04; }
+    this.update(dt, Math.min(0.05, tk.deltaMS / 1000));
+  };
 
   constructor(private app: Application, readonly zone: Zone, look: Look, private onEnterShop: () => void, private hooks: WorldHooks, hp = PLAYER_MAX_HP) {
     this.objects.sortableChildren = true;
@@ -209,7 +235,9 @@ export class WorldScene {
     this.door.visible = false;
     this.talkIcon.zIndex = 1e6 - 3;
     this.talkIcon.visible = false;
-    this.objects.addChild(this.label, this.bars, this.door, this.talkIcon);
+    this.sparkG.zIndex = 1e6 - 2;
+    this.sparkG.eventMode = 'none';
+    this.objects.addChild(this.label, this.bars, this.door, this.talkIcon, this.sparkG);
     this.update(0);
     this.stream(true);
   }
@@ -338,7 +366,7 @@ export class WorldScene {
    * 건물 한 장에 순서 하나만 주면 넓은 건물 뒤를 걷는 사람이 지붕 위에 그려진다
    */
   private makeBuilding(b: Building): BView {
-    const d = kitOk ? drawBuildingKit(b, this.nameOf(b), this.night === 1) : drawBuilding(b, this.nameOf(b), this.night === 1);
+    const d = kitOk ? drawBuildingKit(b, this.nameOf(b), this.night === 1, this.low) : drawBuilding(b, this.nameOf(b), this.night === 1);
     const base = tex(d.canvas);
     const i1 = b.i0 + b.w, j1 = b.j0 + b.d;
     const cornerX = (i1 - j1) * (TW / 2);
@@ -354,7 +382,7 @@ export class WorldScene {
       this.objects.addChild(s);
       parts.push(s);
     }
-    const top = kitOk ? buildingTop(b) : buildingHeight(b.h);
+    const top = kitOk ? buildingTop(b, this.low) : buildingHeight(b.h);
     const [lx] = iso(b.i0 + b.w / 2, b.j0 + b.d / 2);
     const id = d.canvas.getContext('2d')!.getImageData(0, 0, W, H).data;
     const alpha = new Uint8Array(W * H);
@@ -365,6 +393,16 @@ export class WorldScene {
   private dropBuilding(v: BView) {
     for (const s of v.parts) s.destroy({ texture: true });
     v.base.destroy(true);
+  }
+
+  /** 건물 낮추기: 모든 건물을 1층 높이로 (도심에서 길이 안 보일 때) */
+  low = (() => { try { return localStorage.getItem('heavensmanual.lowb') === '1'; } catch { return false; } })();
+  setLowBuildings(v: boolean) {
+    if (v === this.low) return;
+    this.low = v;
+    try { localStorage.setItem('heavensmanual.lowb', v ? '1' : '0'); } catch { /* 그만 */ }
+    this.clearBuildings();
+    this.stream(true);
   }
 
   private clearBuildings() {
@@ -513,7 +551,13 @@ export class WorldScene {
   /** 실시간: 내 위치 (다른 사람에게 보낼 것) */
   netPos(): NetPos {
     const p = this.player;
-    return { x: Math.round(p.x * 100) / 100, y: Math.round(p.y * 100) / 100, d: p.dir, m: p.path.length ? 1 : 0, a: p.act && p.act.anim !== 'fall' ? p.act.anim : undefined };
+    return {
+      x: Math.round(p.x * 100) / 100, y: Math.round(p.y * 100) / 100, d: p.dir, m: p.path.length ? 1 : 0,
+      a: p.act && p.act.anim !== 'fall' ? p.act.anim : undefined,
+      h: Math.round((p.hp / p.maxHp) * 100) / 100,
+      c: this.criminalT > 0 ? 1 : undefined,
+      k: this.dead ? 1 : undefined,
+    };
   }
   /** 실시간: 다른 사람 나타남·움직임 */
   upsertRemote(id: string, info: RemoteInfo | null, pos: NetPos | null) {
@@ -528,14 +572,69 @@ export class WorldScene {
     if (info && JSON.stringify(info) !== JSON.stringify(r.rinfo)) { r.rinfo = info; this.dress(r, info.look, info.weapon, info.armor); }
     if (pos) {
       if (pos.a && pos.a !== r.rpos?.a) r.act = { anim: pos.a, t: 0 };
+      if (pos.h !== undefined && pos.h < (r.rpos?.h ?? 1)) r.barT = 5;
       r.rpos = pos;
+      r.hp = pos.h ?? 1;
+      r.maxHp = 1;
+      r.down = pos.k ? 999 : 0;
+      r.lingerT = undefined;
       if (Math.hypot(pos.x - r.x, pos.y - r.y) > 6) { r.x = pos.x; r.y = pos.y; }
     }
   }
+
+  // ───────────────────────── 사람끼리 싸움 (PvP) ─────────────────────────
+  /** 우주새 문 근처는 싸울 수 없다 (다시 태어나는 자리) */
+  private safeAt(x: number, y: number) {
+    return Math.hypot(x - (this.zone.door.i + 0.5), y - (this.zone.door.j + 0.5)) < 5;
+  }
+  /** 최근 60초 안에 나를 먼저 때린 사람 */
+  private attackedBy = new Map<string, number>();
+  private recentAttacker(id?: string) {
+    return !!id && (this.attackedBy.get(id) ?? -1e9) > this.time - 60;
+  }
+  /** 내가 먼저 때린 사람 (그 사람에게는 이미 선공 악행을 받았다) */
+  private struckFirst = new Set<string>();
+  /** 다른 사람이 나를 때렸다 */
+  pvpHit(fromId: string, dmg: number, crit: boolean, kind: string) {
+    const p = this.player;
+    if (this.dead || this.safeAt(p.x, p.y)) return;
+    const from = this.walkers.find((w) => w.rid === fromId);
+    if (!this.struckFirst.has(fromId)) this.attackedBy.set(fromId, this.time);
+    this.lastHitBy = fromId;
+    dmg = Math.max(1, Math.round(dmg) - this.gear.def);
+    if (from) {
+      this.hit(from, p, dmg, crit, (['fist', 'blunt', 'blade', 'gun'].includes(kind) ? kind : 'fist') as sfx.HitKind);
+      // 공격 태세가 '적대'나 '모두'면 바로 반격
+      if (!p.target && this.stance !== 'talk' && !this.working?.on) p.target = from;
+    } else {
+      p.hp -= dmg;
+      p.hurtT = 0.18;
+      this.combatT = 0;
+      this.hooks.hp(Math.max(0, p.hp), p.maxHp);
+      if (p.hp <= 0) this.die('beaten');
+    }
+  }
+  /** 누군가 다른 사람에게 쓰러졌다 (나에게 쓰러졌으면 돈이 떨어지고 행위가 기록된다) */
+  pvpDown(victimId: string, byId: string, cash: number, wasCriminal: boolean) {
+    const v = this.walkers.find((w) => w.rid === victimId);
+    if (v) { v.down = 999; v.act = { anim: 'fall', t: 0 }; sfx.thud(this.spotOf(v)); }
+    if (byId !== this.myNetId) return;
+    if (this.player.target === v) this.player.target = null;
+    if (wasCriminal) this.hooks.deed('criminalUserDown');
+    else if (this.recentAttacker(victimId) && !this.struckFirst.has(victimId)) this.hooks.deed('counterWin');
+    else this.hooks.deed('murder');
+    if (cash > 0 && v) this.dropCoin(v.x, v.y, cash, !wasCriminal && this.struckFirst.has(victimId));
+  }
+  myNetId = '';
+  private lastHitBy: string | null = null;
   removeRemote(id: string) {
     const k = this.walkers.findIndex((w) => w.rid === id);
     if (k < 0) return;
-    this.walkers[k].sprite.destroy();
+    const r = this.walkers[k];
+    // 싸우다 나가면 몸이 30초 남는다 (그동안 맞으면 쓰러진다 — 지금은 이 기기 안에서만)
+    const fighting = this.recentAttacker(id) || this.struckFirst.has(id) || this.player.target === r || r.rpos?.c;
+    if (fighting && r.down <= 0 && !r.lingerT) { r.lingerT = 30; r.rpos = undefined; r.path = []; return; }
+    r.sprite.destroy();
     this.walkers.splice(k, 1);
   }
   /** 먹거나 붕대를 감아 체력을 채운다 */
@@ -660,13 +759,15 @@ export class WorldScene {
     // 1) 사람: 메뉴 (컨트롤·시프트를 누르고 누르면 바로 공격 = 강제 공격)
     const w = this.walkerAt(gx, gy);
     if (w && w.kind === 'remote' && w.rid && w.rinfo) {
+      const hostile = this.recentAttacker(w.rid) || !!w.rpos?.c;
+      if (w.down <= 0 && (force || this.stance === 'all' || (this.stance === 'hostile' && hostile))) { this.attack(w); return; }
       const [sx, sy] = iso(w.x, w.y);
-      this.hooks.person(w.rid, w.rinfo, sx + this.camera.x, sy - 44 + this.camera.y);
+      this.hooks.person(w.rid, w.rinfo, sx + this.camera.x, sy - 44 + this.camera.y, () => this.attack(w));
       return;
     }
     if (w && w.down <= 0) {
       // 공격 태세: 적대 대상만 / 모두
-      const hostile = w.kind === 'thug' || w.kind === 'suturer' || w.target === this.player;
+      const hostile = w.kind === 'thug' || w.kind === 'suturer' || w.target === this.player || (w.kind === 'remote' && (this.recentAttacker(w.rid) || !!w.rpos?.c));
       if (force || this.stance === 'all' || (this.stance === 'hostile' && hostile)) { this.attack(w); return; }
       this.showLabel({ kind: 'w', w }, 2);
       const [sx, sy] = iso(w.x, w.y);
@@ -685,7 +786,9 @@ export class WorldScene {
     if (c) { this.cancelActs(); this.walkTo(Math.floor(c.x), Math.floor(c.y)); this.rippleAt(Math.floor(c.x), Math.floor(c.y)); return; }
     // 4) 건물: 메뉴 없이 이동만. 이름 있는 건물이면 위쪽에 이름이 잠깐 뜬다.
     //    손가락 아래 벽 밑동(앞쪽 보도)으로 걸어간다. 가게 문 근처면 문 앞으로 맞춰 준다 → 도착하면 출입 아이콘
-    const kb = this.buildingAt(gx, gy);
+    let kb = this.buildingAt(gx, gy);
+    // 비쳐 보이는(앞을 가리는) 건물은 누를 수 없다: 그 너머의 땅을 누른 것
+    if (kb !== null && this.bViews.get(kb)?.parts.some((s) => s.alpha < 1)) kb = null;
     if (kb !== null) {
       const b = this.zone.buildings[kb];
       const { wx } = this.toWorld(gx, gy);
@@ -760,6 +863,7 @@ export class WorldScene {
     const opts: { label: string; act: () => void }[] = [];
     const store = storeOf(b);
     if (store) opts.push({ label: L.enter, act: () => this.goStore(k, store) });
+    if (hasBank(b)) opts.push({ label: L.bankGo, act: () => this.goStore(k, 'bank') });
     if (canWork(b)) opts.push({ label: L.act.work.replace('{n}', String(WAGE_PER_HOUR)), act: () => this.goWork(k) });
     if (opts.length === 1) { opts[0].act(); return; }
     if (!opts.length) return;
@@ -773,6 +877,7 @@ export class WorldScene {
   }
 
   private cancelActs() {
+    this.hooks.away();
     this.player.target = null;
     this.pending = null;
     this.wantShop = false;
@@ -825,7 +930,7 @@ export class WorldScene {
   }
 
   /** 가게에 들어가 물건을 산다 */
-  private goStore(k: number, kind: StoreKind) {
+  private goStore(k: number, kind: StoreKind | 'bank') {
     const b = this.zone.buildings[k];
     const spot = this.frontOf(b);
     if (!spot) return;
@@ -833,7 +938,7 @@ export class WorldScene {
     this.walkTo(spot[0], spot[1]);
     this.storeWant = { k, kind, spot };
   }
-  private storeWant: { k: number; kind: StoreKind; spot: [number, number] } | null = null;
+  private storeWant: { k: number; kind: StoreKind | 'bank'; spot: [number, number] } | null = null;
 
   /** 간판 면 앞 (사람이 설 수 있는 칸) */
   private frontOf(b: Building): [number, number] | null {
@@ -843,6 +948,8 @@ export class WorldScene {
 
   /** 공격 시작 (행인은 강제 공격) */
   private attack(w: Walker) {
+    if (w.kind === 'remote' && (this.safeAt(w.x, w.y) || this.safeAt(this.player.x, this.player.y))) { this.hooks.say('', t().pvpSafe); return; }
+    if (w.down > 0) return;
     this.cancelActs();
     this.mark = { w, t: 0 };
     this.player.target = w;
@@ -870,7 +977,29 @@ export class WorldScene {
   private hit(from: Walker, to: Walker, dmg: number, crit = false, kind?: sfx.HitKind) {
     if (to.down > 0 || this.dead) return;
     if (to.isPlayer && Math.random() * 100 < dodgeChance(this.stats.agi)) { this.float(to, t().miss, '#d8e8ff'); return; }
-    if (kind) sfx.impact(kind, this.spotOf(to), crit);
+    if (to.isPlayer) this.lastHitBy = from.kind === 'remote' ? (from.rid ?? null) : null;
+    if (kind) sfx.impact(kind, this.spotOf(to), crit, this.bodyOf(to), (to.voice ??= 0.85 + Math.random() * 0.3));
+    this.impactFx(from, to, crit, kind);
+    // 다른 사람(실시간): 체력은 그 사람 기기가 계산한다. 몸만 남은 사람은 여기서 계산
+    if (to.kind === 'remote' && to.rid && !to.lingerT) {
+      if (from.isPlayer) {
+        if (!to.rpos?.c && !this.recentAttacker(to.rid) && !this.struckFirst.has(to.rid)) {
+          this.struckFirst.add(to.rid);
+          this.hooks.deed('firstStrike');
+          this.criminalT = 180;
+        }
+        this.combatT = 0;
+        to.barT = 5;
+        this.hooks.pvpHit(to.rid, dmg, crit, kind ?? 'fist');
+      }
+      return;
+    }
+    if (to.kind === 'remote' && to.lingerT) {
+      to.hp -= dmg / 600;
+      to.barT = 5;
+      if (to.hp <= 0) { to.down = 999; to.act = { anim: 'fall', t: 0 }; sfx.thud(this.spotOf(to)); if (from.isPlayer) { this.player.target = null; this.hooks.deed(to.rpos?.c ? 'criminalUserDown' : 'murder'); } }
+      return;
+    }
     to.hp -= dmg;
     to.hurtT = 0.18;
     if (!to.act || to.act.anim === 'hit') { to.act = { anim: 'hit', t: 0 }; to.pend = null; }
@@ -901,6 +1030,35 @@ export class WorldScene {
       if (Math.random() < 0.6) this.bubble(to, t().help);
     } else if (!to.target) to.target = from;
     if (to.hp <= 0) this.knockDown(to, from);
+  }
+
+  /** 맞은 몸의 재질 → 타격음이 달라진다 */
+  private bodyOf(w: Walker): sfx.Body {
+    if (w.kind === 'suturer') return w.monster ? 'monster' : 'suturer';
+    if (w.kind === 'thug') return 'thug';
+    if (w.isPlayer || w.kind === 'remote') return 'player';
+    return 'flesh';
+  }
+
+  /** 타격감: 멈칫(히트스톱) · 화면 흔들림 · 번쩍 · 밀려남 · 불꽃 */
+  private impactFx(from: Walker, to: Walker, crit: boolean, kind?: sfx.HitKind) {
+    const mine = from.isPlayer || to.isPlayer;
+    if (mine) {
+      this.hitStop = Math.max(this.hitStop, crit ? 0.11 : 0.065);
+      this.shakeT = Math.max(this.shakeT, crit ? 0.22 : to.isPlayer ? 0.16 : 0.1);
+      this.shakeA = Math.max(this.shakeA, crit ? 5 : to.isPlayer ? 3.5 : 2.5);
+    }
+    to.flashT = 0.07;
+    const dx = to.x - from.x, dy = to.y - from.y, d = Math.hypot(dx, dy) || 1;
+    const push = (crit ? 0.42 : kind === 'blunt' ? 0.3 : 0.2) * (to.kind === 'suturer' && !to.monster ? 0.5 : 1);
+    to.kb = { dx: (dx / d) * push, dy: (dy / d) * push, t: 0.12 };
+    const [ax, ay] = iso(from.x, from.y), [bx, by] = iso(to.x, to.y);
+    const sx = ax + (bx - ax) * 0.7, sy = ay + (by - ay) * 0.7 - 24;
+    const n = crit ? 11 : 7;
+    for (let k = 0; k < n; k++) {
+      const a = Math.random() * Math.PI * 2, v = (crit ? 90 : 60) * (0.5 + Math.random());
+      this.sparks.push({ x: sx, y: sy, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.7 - 20, t: 0.16 + Math.random() * 0.1, col: crit ? 0xffd27a : kind === 'blade' ? 0xeaf4ff : 0xfff1c4 });
+    }
   }
 
   private knockDown(w: Walker, by: Walker) {
@@ -938,6 +1096,7 @@ export class WorldScene {
 
   private die(cause: 'car' | 'beaten') {
     sfx.thud(sfx.spot(0, 0));
+    if (cause === 'beaten' && this.lastHitBy && this.combatT < 3) this.hooks.pvpDown(this.lastHitBy, Math.floor(this.hooks.cash()), this.criminalT > 0);
     if (this.dead) return;
     this.dead = true;
     const p = this.player;
@@ -1070,7 +1229,7 @@ export class WorldScene {
       if (crit) dmg *= CRIT_MULTIPLIER;
       this.startAttack(w, tg, dmg, crit);
     } else {
-      w.atkT = w.kind === 'suturer' ? (w.monster ? 0.85 : 1.0) : 1.1;
+      w.atkT = w.kind === 'suturer' ? (w.monster ? 0.68 : 0.8) : 0.85;
       const base = w.kind === 'suturer' ? rand(10, 18) * (w.monster ? 1.6 : 1) : rand(4, 9) + (w.weapon ? 3 : 0);
       const dmg = Math.max(1, Math.round(base) - (tg.isPlayer ? this.gear.def : 0));
       this.startAttack(w, tg, dmg);
@@ -1120,14 +1279,16 @@ export class WorldScene {
     if (w.flee > 0) speed = 1.9;
     if (w.isPlayer && isDanger(w.hp, w.maxHp)) speed *= DANGER_SPEED;
     if (w.kind === 'thug' && w.target) speed = 1.7;
+    else if (w.kind === 'thug' && w.stalk) speed = 1.3;
     const step = speed * dt;
     if (dist <= step) { w.x = tx; w.y = ty; w.path.shift(); } else { w.x += (dx / dist) * step; w.y += (dy / dist) * step; }
     return true;
   }
 
   // ───────────────────────── 매 장면 ─────────────────────────
-  private update(dt: number) {
+  private update(dt: number, realDt = dt) {
     const p = this.player;
+    this.drawSparks(realDt);
     this.time += dt;
     if (this.stun > 0) { this.stun -= dt; p.path = []; }
     const clk = bangkokClock();
@@ -1143,7 +1304,17 @@ export class WorldScene {
       else if (s.flee <= 0) s.flee = 6;
     }
     for (const w of [...this.walkers]) {
-      if (w.kind === 'remote') { this.moveRemote(w, dt); continue; }
+      if (w.kind === 'remote') {
+        if (w.lingerT !== undefined) {
+          // 싸우다 나간 사람의 몸: 30초 뒤 사라진다
+          w.lingerT -= dt;
+          this.pose(w, false, dt);
+          if (w.lingerT <= 0) { w.sprite.destroy(); this.walkers.splice(this.walkers.indexOf(w), 1); }
+          continue;
+        }
+        this.moveRemote(w, dt);
+        continue;
+      }
       if (w.down > 0) {
         if (!w.isPlayer) {
           w.down -= dt;
@@ -1159,7 +1330,15 @@ export class WorldScene {
       const [sx, sy] = iso(w.x, w.y);
       w.sprite.position.set(sx, sy);
       w.sprite.zIndex = w.down > 0 ? w.x + w.y - 0.3 : w.x + w.y;
-      if (w.hurtT > 0) { w.hurtT -= dt; w.sprite.tint = 0xff7a6a; } else w.sprite.tint = 0xffffff;
+      if (w.flashT && w.flashT > 0) { w.flashT -= dt; w.sprite.tint = 0xffffff; if (w.sprite.blendMode !== 'add') w.sprite.blendMode = 'add'; }
+      else { if (w.sprite.blendMode !== 'normal') w.sprite.blendMode = 'normal'; if (w.hurtT > 0) { w.hurtT -= dt; w.sprite.tint = 0xff7a6a; } else w.sprite.tint = 0xffffff; }
+      if (w.kb) {
+        const k = Math.min(1, dt / w.kb.t);
+        const nx = w.x + w.kb.dx * k, ny = w.y + w.kb.dy * k;
+        if (walkable(this.zone, Math.floor(nx), Math.floor(ny))) { w.x = nx; w.y = ny; }
+        w.kb.dx *= 1 - k; w.kb.dy *= 1 - k; w.kb.t -= dt;
+        if (w.kb.t <= 0) w.kb = undefined;
+      }
       if (w.barT > 0) w.barT -= dt;
       if (w.bubble) {
         w.bubbleT -= dt;
@@ -1192,7 +1371,8 @@ export class WorldScene {
     if (this.storeWant && !p.path.length && Math.floor(p.x) === this.storeWant.spot[0] && Math.floor(p.y) === this.storeWant.spot[1]) {
       const sw = this.storeWant;
       this.storeWant = null;
-      this.hooks.store(sw.kind, this.nameOf(this.zone.buildings[sw.k]));
+      if (sw.kind === 'bank') this.hooks.bank(this.nameOf(this.zone.buildings[sw.k]));
+      else this.hooks.store(sw.kind, this.nameOf(this.zone.buildings[sw.k]), cuisineOf(this.zone.buildings[sw.k]));
     }
     // 돈 줍기
     for (let k = this.coins.length - 1; k >= 0; k--) {
@@ -1240,6 +1420,13 @@ export class WorldScene {
       this.bars.rect(sx - 11, sy - 49, 22, 4).fill({ color: 0x140e0a, alpha: 0.85 });
       this.bars.rect(sx - 10, sy - 48, 20 * r, 2).fill(r > 0.25 ? (w.isPlayer ? 0x6fd06a : 0xd9534f) : 0xff3b30);
     }
+    // 다른 사람 중 먼저 공격한(범죄 표시) 사람: 머리 위 붉은 표시
+    for (const w of this.walkers) {
+      if (w.kind !== 'remote' || w.down > 0 || !(w.rpos?.c || w.lingerT)) continue;
+      const [sx, sy] = iso(w.x, w.y);
+      const col = w.lingerT ? 0x9a9a9a : 0xe0463a;
+      this.bars.poly([sx - 4, sy - 56, sx + 4, sy - 56, sx, sy - 51]).fill(col).stroke({ color: 0x140e0a, width: 1 });
+    }
     // 플레이어 표시: 발밑 고리와 머리 위 화살 (먼저 공격했으면 붉게)
     const [px, py] = iso(p.x, p.y);
     const col = this.criminalT > 0 ? 0xe0463a : 0xe0b437;
@@ -1261,7 +1448,14 @@ export class WorldScene {
       this.aura.visible = !this.dead && !inside;
     }
     const vw = this.app.screen.width - this.insets.right, vh = this.app.screen.height - this.insets.bottom;
-    this.camera.position.set(Math.round(vw / 2 - px), Math.round(vh / 2 - py + 20));
+    let shx = 0, shy = 0;
+    if (this.shakeT > 0) {
+      this.shakeT -= realDt;
+      const a = this.shakeA * Math.max(0, this.shakeT) / 0.2;
+      shx = (Math.random() * 2 - 1) * a; shy = (Math.random() * 2 - 1) * a * 0.7;
+      if (this.shakeT <= 0) this.shakeA = 0;
+    }
+    this.camera.position.set(Math.round(vw / 2 - px + shx), Math.round(vh / 2 - py + 20 + shy));
     this.lights.position.copyFrom(this.camera.position);
     // 이름표: 사람만 (건물 이름은 화면 위쪽에 잠깐)
     if (this.labelT > 0) this.labelT -= dt;
@@ -1295,13 +1489,40 @@ export class WorldScene {
       }
       return;
     }
-    // 불량배: 가까이 오면 덤빈다 (밤에는 더 멀리서)
-    if (w.kind === 'thug' && !w.target && !this.dead) {
-      const reach = nf > 0.5 ? 4.5 : 3.2;
-      if (Math.hypot(p.x - w.x, p.y - w.y) < reach && Math.random() < dt * 0.8) {
-        w.target = p;
-        w.firstBy ??= w;
-        this.bubble(w, t().thugShout);
+    // 불량배: 눈에 띄면 시비를 걸며 다가오고, 코앞에서 돈을 요구하며 덤빈다 (밤에는 더 멀리서 알아본다)
+    if (w.kind === 'thug' && !w.target && !this.dead && w.down <= 0) {
+      const L = t();
+      const pick = (a: string[]) => a[Math.floor(Math.random() * a.length)];
+      const d = Math.hypot(p.x - w.x, p.y - w.y);
+      const notice = nf > 0.5 ? 8.5 : 6;
+      w.aggroCool = Math.max(0, (w.aggroCool ?? 0) - dt);
+      const hidden = !!this.working?.on;
+      if (w.stalk) {
+        w.stalk += dt;
+        if (hidden || d > notice + 5 || Math.hypot(w.x - w.home[0], w.y - w.home[1]) > 14) {
+          if (!hidden) this.bubble(w, pick(L.thugGiveUp));
+          w.stalk = 0; w.aggroCool = 20; w.path = [];
+        } else if (d < 1.8 && w.stalk > 0.7) {
+          w.stalk = 0;
+          w.path = [];
+          w.target = p;
+          w.firstBy ??= w;
+          this.bubble(w, pick(L.thugDemand));
+        } else {
+          w.repathT -= dt;
+          if (w.repathT <= 0 || !w.path.length) {
+            w.repathT = 0.4;
+            const path = findPath(this.zone, Math.floor(w.x), Math.floor(w.y), Math.floor(p.x), Math.floor(p.y));
+            if (path) w.path = path.length > 1 ? path.slice(0, -1) : path;
+          }
+        }
+        return;
+      }
+      if (!w.aggroCool && !hidden && d < notice && Math.random() < dt * 1.6) {
+        w.stalk = 0.01;
+        w.repathT = 0;
+        this.bubble(w, pick(L.thugTaunt));
+        return;
       }
     }
     if (w.target || moving) return;
@@ -1409,6 +1630,20 @@ export class WorldScene {
     }
   }
 
+  /** 타격 불꽃 */
+  private drawSparks(dt: number) {
+    const g = this.sparkG;
+    g.clear();
+    for (let k = this.sparks.length - 1; k >= 0; k--) {
+      const s = this.sparks[k];
+      s.t -= dt;
+      if (s.t <= 0) { this.sparks.splice(k, 1); continue; }
+      const x0 = s.x, y0 = s.y;
+      s.x += s.vx * dt; s.y += s.vy * dt; s.vy += 260 * dt;
+      g.moveTo(x0, y0).lineTo(s.x, s.y).stroke({ color: s.col, width: 2, alpha: Math.min(1, s.t * 7) });
+    }
+  }
+
   /** 바닥 파동(이동)과 붉은 표적(공격) */
   private drawFx(dt: number) {
     const g = this.fxLayer;
@@ -1448,7 +1683,7 @@ export class WorldScene {
       if (dd < fd) { fd = dd; found = -1; }
       for (const k of this.bViews.keys()) {
         const b = this.zone.buildings[k];
-        if (b.cat === 'ujusae' || !interactive(b) || (!storeOf(b) && !canWork(b))) continue;
+        if (b.cat === 'ujusae' || !interactive(b) || (!storeOf(b) && !canWork(b) && !hasBank(b))) continue;
         const f = this.frontCached(k);
         if (!f) continue;
         const d = Math.hypot(f[0] + 0.5 - p.x, f[1] + 0.5 - p.y);
@@ -1539,9 +1774,17 @@ export class WorldScene {
       if (v.x > x1 || v.x + v.w < x0 || v.y > y1 || v.y + v.h < y0) continue;
       if (v.parts.some((s) => hit(s, s.width, s.height, 0, 0) && this.opaqueAt(v, px - v.x, py - 26 - v.y))) for (const s of v.parts) now.add(s);
     }
+    // 내 둘레의 길을 가리는 앞쪽 건물도 비친다 (도심에서 길을 눌러 움직일 수 있게)
+    const X0 = px - 130, X1 = px + 130, Y0 = py - 120, Y1 = py + 90;
+    for (const v of this.bViews.values()) {
+      if (v.x > X1 || v.x + v.w < X0 || v.y > Y1 || v.y + v.h < Y0) continue;
+      if (!v.parts.some((s) => s.zIndex > depth + 1)) continue;
+      // 건물 바닥 앞 모서리가 내 발보다 화면 아래쪽(가까운 쪽)이고, 지붕이 내 둘레를 덮을 때만
+      if (v.parts.some((s) => s.zIndex > depth + 1 && s.x < X1 && s.x + s.width > X0 && s.y < Y1 && s.y + s.height > Y0 && this.opaqueAt(v, Math.min(Math.max(px, s.x + 2), s.x + s.width - 2) - v.x, py - 30 - v.y))) for (const s of v.parts) now.add(s);
+    }
     for (const t of this.tall) if (t.z > depth && t.x0 < x1 && t.x1 > x0 && t.y0 < y1 && t.y1 > y0) now.add(t.o);
     for (const s of this.faded) if (!now.has(s) && !s.destroyed) s.alpha = 1;
-    for (const s of now) s.alpha = 0.3;
+    for (const s of now) s.alpha = 0.28;
     this.faded = now;
   }
 

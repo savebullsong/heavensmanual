@@ -3,7 +3,10 @@
 import type { Building } from './zone.ts';
 import type { Lang } from './i18n.ts';
 
-export interface Poi { t: string; n?: string; nth?: string; nen?: string; nko?: string; b?: 1 }
+export interface Poi { t: string; n?: string; nth?: string; nen?: string; nko?: string; b?: 1
+  /** 음식점·카페 메뉴 묶음 (지도의 cuisine) */
+  c?: string;
+}
 type B = Building & { pois?: Poi[] };
 
 // 업종 [한국어, 태국어, 영어]
@@ -83,6 +86,19 @@ const NO_WORK = new Set(['place_of_worship', 'school', 'kindergarten', 'library'
 export function canWork(b: Building) {
   const p = mainPoi(b);
   return !!p && !NO_WORK.has(p.t) && !!b.sign;
+}
+
+/** 그 가게의 메뉴 묶음 (먹을 것을 파는 첫 가게의 cuisine) */
+export function cuisineOf(b: Building): string | undefined {
+  const k = storeOf(b);
+  if (k !== 'food' && k !== 'cafe') return undefined;
+  const FOOD = ['restaurant', 'fast_food', 'food_court', 'marketplace'], CAFE = ['cafe', 'bakery', 'coffee', 'tea', 'ice_cream'];
+  return ((b as B).pois ?? []).find((p) => (k === 'food' ? FOOD : CAFE).includes(p.t))?.c;
+}
+
+/** 은행이 들어 있는 건물 (저금·찾기) */
+export function hasBank(b: Building) {
+  return ((b as B).pois ?? []).some((p) => p.t === 'bank');
 }
 
 /** 물건을 살 수 있는 가게 */

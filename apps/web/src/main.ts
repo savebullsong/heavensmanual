@@ -6,7 +6,7 @@ import { WorldScene, type WorldHooks, type Stance, type RemoteInfo } from './wor
 import { ShopRoom, type ShopTarget } from './shoproom.ts';
 import { Dialog } from './dialog.ts';
 import { openLookPanel, lookPanelInsets } from './lookpanel.ts';
-import { ITEMS, STORES, itemIcon, effectText, priceText, type ItemDef, type ItemCat } from './items.ts';
+import { ITEMS, STORES, menuFor, itemIcon, effectText, priceText, type ItemDef, type ItemCat } from './items.ts';
 import * as net from './net.ts';
 import { preloadPortrait } from './portraits.ts';
 import { sukhumvitTestZone, decodeZone, type Zone } from './zone.ts';
@@ -16,6 +16,7 @@ import { t, lang, setLang, LANGS, type Lang } from './i18n.ts';
 import { load, save, type Slot } from './state.ts';
 import { bangkokClock } from './clock.ts';
 import { unlockAudio, isMuted, setMuted } from './sfx.ts';
+import { bgmMode, cycleBgm, setIndoor, MUSIC, type BgmMode } from './bgm.ts';
 import { applyDeed, addSoulExp, judge, isDanger, DEED_TABLE, newStats, soulExpToNext, maxHp as maxHpFor, POINTS_PER_RANK, STAT_KEYS, STAT_MAX, type DeedKey, type StatKey } from '../../../packages/shared/src/rules.ts';
 
 const state = load();
@@ -85,6 +86,8 @@ async function boot() {
 // ───────────────────────── 장면 전환 ─────────────────────────
 function enterShop(fromStreet: boolean) {
   scene = 'shop';
+  document.querySelector('.store-panel')?.remove(); // 거리 가게·은행 창은 두고 오지 않는다
+  setIndoor(true);
   talkedThisVisit = false;
   closeMenus();
   world?.stop();
@@ -100,6 +103,7 @@ function enterShop(fromStreet: boolean) {
 async function enterWorld() {
   shop.stop();
   scene = 'world';
+  setIndoor(false);
   hud.hidden = true;
   ui.hidden = false;
   ui.className = 'scene loading';
@@ -122,7 +126,11 @@ async function enterWorld() {
   renderHud();
   showStance(true);
   const w = world;
-  net.joinZone(w.zone.id, () => (scene === 'world' && world ? { info: myInfo(), pos: world.netPos() } : null), (id, info, pos) => w.upsertRemote(id, info, pos), (id) => w.removeRemote(id));
+  w.myNetId = net.myId();
+  net.joinZone(w.zone.id, () => (scene === 'world' && world ? { info: myInfo(), pos: world.netPos() } : null), (id, info, pos) => w.upsertRemote(id, info, pos), (id) => w.removeRemote(id), {
+    hit: (from, dmg, crit, kind) => w.pvpHit(from, dmg, crit, kind),
+    down: (victim, by, cash, crim) => w.pvpDown(victim, by, cash, crim),
+  });
 }
 
 function leaveShop() {
@@ -159,14 +167,29 @@ const hooks: WorldHooks = {
     if (el) { el.textContent = workLine; el.setAttribute('title', st ? t().workOut : ''); }
     hud.querySelector('.hud-left')?.classList.toggle('working', !!st);
   },
-  store(kind, name) {
-    openStore(kind, name);
+  store(kind, name, cuisine) {
+    openStore(kind, name, cuisine);
   },
-  person(id, info, x, y) {
-    personMenu(id, info, x, y);
+  away() {
+    document.querySelector('.store-panel')?.remove();
+  },
+  person(id, info, x, y, attack) {
+    personMenu(id, info, x, y, attack);
+  },
+  pvpHit(to, dmg, crit, kind) {
+    net.sendHit(to, dmg, crit, kind);
+  },
+  pvpDown(by, cash, wasCriminal) {
+    net.sendDown(by, cash, wasCriminal);
+  },
+  cash() {
+    return state.wallet ?? 0;
   },
   place(name, sub) {
     showPlace(name, sub);
+  },
+  bank(name) {
+    openBank(name);
   },
   useAmmo() {
     if ((state.ammo ?? 0) <= 0) { toast(t().noAmmo); return false; }
@@ -519,7 +542,9 @@ function showDeath(cause: 'car' | 'beaten') {
   const verdict = j.world === 'heaven' ? L.judgeHeaven : j.world === 'hell' ? L.judgeHell.replace('{n}', String(j.floor)) : L.judgeGhost;
   const el = document.createElement('div');
   el.className = 'death';
-  el.innerHTML = `<div class="death-box"><h1></h1><p class="cause"></p><p class="karma"></p><p class="verdict"></p><p class="closed"></p><button class="primary"></button></div>`;
+  el.innerHTML = `<div class="death-box"><h1></h1><p class="cause"></p><p class="karma"></p><p class="money"></p><p class="verdict"></p><p class="closed"></p><button class="primary"></button></div>`;
+  const lost = Math.floor(state.wallet ?? 0), kept = Math.floor(state.bank ?? 0);
+  el.querySelector('.money')!.textContent = (lost > 0 ? L.deathLost.replace('{n}', lost.toLocaleString('en-US')) + ' ' : '') + (kept > 0 ? L.deathKept.replace('{n}', kept.toLocaleString('en-US')) : lost > 0 ? L.deathNoBank : '');
   el.querySelector('h1')!.textContent = L.deathTitle;
   el.querySelector('.cause')!.textContent = cause === 'car' ? L.deathCar : L.deathBeaten;
   el.querySelector('.karma')!.textContent = L.karma.replace('{g}', String(d.good)).replace('{e}', String(d.evil));
@@ -555,13 +580,21 @@ function renderHud() {
       <span class="wallet"></span>
       <button class="to-soul">${L.rank} ${state.soul?.rank ?? 1}</button>
       <button class="to-bag">${L.bag}</button>
+      <button class="bgm" data-mode="${bgmMode()}" aria-label="${L.bgmLabel}" title="${L.bgmLabel}">${BGM_SVG}</button>
       <button class="snd${isMuted() ? ' off' : ''}" aria-label="${L.sound}" title="${L.sound}">${SND_SVG}</button>
       <select class="lang" aria-label="language">${LANGS.map((l) => `<option value="${l}" ${l === lang() ? 'selected' : ''}>${langName(l)}</option>`).join('')}</select>
     </div></div>
     ${scene === 'world' && world?.zone.attribution ? '<a class="attrib" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>' : ''}`;
   (hud.querySelector('.to-bag') as HTMLButtonElement).onclick = toggleBag;
   const snd = hud.querySelector('.snd') as HTMLButtonElement;
-  snd.onclick = () => { unlockAudio(); setMuted(!isMuted()); snd.classList.toggle('off', isMuted()); };
+  snd.onclick = () => { unlockAudio(); setMuted(!isMuted()); snd.classList.toggle('off', isMuted()); toast(isMuted() ? L.sfxOff : L.sfxOn); };
+  const bg = hud.querySelector('.bgm') as HTMLButtonElement;
+  bg.onclick = () => {
+    unlockAudio();
+    const m: BgmMode = cycleBgm();
+    bg.dataset.mode = m;
+    toast(m === 'music' ? L.bgmMusic.replace('{t}', MUSIC.title) : m === 'nature' ? L.bgmNature : L.bgmOff);
+  };
   (hud.querySelector('.to-soul') as HTMLButtonElement).onclick = toggleSoul;
   const lb = hud.querySelector('.live') as HTMLButtonElement | null;
   if (lb) lb.onclick = () => openSignup('signup');
@@ -579,6 +612,8 @@ function renderHud() {
 }
 
 let hudNarrow = false;
+// 배경 소리 단추: 음표(음악) · 잎(자연음) · 빗금(끔)
+const BGM_SVG = '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><g class="note"><path d="M8 4.5l7-1.6v9.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><ellipse cx="6" cy="14.6" rx="2.6" ry="2" fill="currentColor"/><ellipse cx="13" cy="12.6" rx="2.6" ry="2" fill="currentColor"/><path d="M8 4.5v10" stroke="currentColor" stroke-width="1.6"/></g><g class="leaf"><path d="M4 16C4 8 9 4 16.5 3.5 16 11 12 16 4 16z" fill="currentColor" opacity=".9"/><path d="M4.5 15.5L12 8" stroke="#140e0a" stroke-width="1.2" stroke-linecap="round"/></g><path class="x" d="M3.5 3.5l13 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const SND_SVG = '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M3 7.5h3.2L10.5 4v12L6.2 12.5H3z" fill="currentColor"/><path class="w" d="M13 6.5c1.6 1.9 1.6 5.1 0 7M15.4 4.4c2.8 3.1 2.8 8.1 0 11.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path class="x" d="M13.2 7.6l4.6 4.8M17.8 7.6l-4.6 4.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
 document.addEventListener('pointerdown', unlockAudio, true);
 // 길게 누르기 = 이동이라, 게임 화면에서는 길게 눌러도 메뉴가 뜨지 않게
@@ -707,7 +742,7 @@ function renderAccountBox(box: Element) {
 }
 
 // ───────────────────────── 거리 가게 (편의점·약국·식당·카페) ─────────────────────────
-function openStore(kind: 'mart' | 'pharmacy' | 'food' | 'cafe', name: string) {
+function openStore(kind: 'mart' | 'pharmacy' | 'food' | 'cafe', name: string, cuisine?: string) {
   closeMenus();
   document.querySelector('.store-panel')?.remove();
   const L = t();
@@ -720,7 +755,7 @@ function openStore(kind: 'mart' | 'pharmacy' | 'food' | 'cafe', name: string) {
   const list = el.querySelector('.menu-list')!;
   const draw = () => {
     list.innerHTML = '';
-    for (const { key, price } of STORES[kind]) {
+    for (const { key, price } of menuFor(kind, cuisine)) {
       const it = itemByKey(key);
       const poor = (state.wallet ?? 0) < price;
       const row = itemRow(it, priceText(price), () => {
@@ -751,14 +786,78 @@ function openStore(kind: 'mart' | 'pharmacy' | 'food' | 'cafe', name: string) {
   el.style.top = `${Math.round(hudBottom + 6)}px`;
 }
 
+// ───────────────────────── 은행: 통장 돈은 죽어도 남는다 ─────────────────────────
+function openBank(name: string) {
+  closeMenus();
+  document.querySelector('.store-panel')?.remove();
+  const L = t();
+  const el = document.createElement('div');
+  el.className = 'store-panel shop-menu bank-panel';
+  el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close">✕</button></div>
+    <p class="store-line"></p>
+    <div class="bank-body">
+      <div class="bank-row"><span>${L.wallet}</span><b class="b-wallet"></b></div>
+      <div class="bank-row"><span>${L.bankBook}</span><b class="b-bank"></b></div>
+      <input class="b-amt" type="number" inputmode="numeric" min="1" step="1" placeholder="${L.bankAmount}">
+      <div class="bank-quick"></div>
+      <div class="bank-act"><button class="primary b-in">${L.bankIn}</button><button class="primary b-out">${L.bankOut}</button></div>
+      <p class="bank-note">${L.bankNote}</p>
+    </div>`;
+  el.querySelector('.menu-head b')!.textContent = name;
+  el.querySelector('.store-line')!.textContent = L.bankLine;
+  (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
+  const amt = el.querySelector('.b-amt') as HTMLInputElement;
+  const draw = () => {
+    el.querySelector('.b-wallet')!.textContent = `฿${Math.floor(state.wallet ?? 0).toLocaleString('en-US')}`;
+    el.querySelector('.b-bank')!.textContent = `฿${Math.floor(state.bank ?? 0).toLocaleString('en-US')}`;
+  };
+  const quick = el.querySelector('.bank-quick')!;
+  for (const n of [100, 500, 1000]) {
+    const b = document.createElement('button');
+    b.textContent = `฿${n.toLocaleString('en-US')}`;
+    b.onclick = () => { amt.value = String(n); };
+    quick.appendChild(b);
+  }
+  const all = document.createElement('button');
+  all.textContent = L.bankAll;
+  all.onclick = () => { amt.value = String(Math.floor(state.wallet ?? 0)); };
+  quick.appendChild(all);
+  const move = (dir: 1 | -1) => {
+    const n = Math.floor(Number(amt.value));
+    if (!n || n <= 0) { toast(L.bankAmount); return; }
+    if (dir === 1 && n > Math.floor(state.wallet ?? 0)) { toast(L.noMoney); return; }
+    if (dir === -1 && n > Math.floor(state.bank ?? 0)) { toast(L.bankShort); return; }
+    state.wallet = (state.wallet ?? 0) - dir * n;
+    state.bank = (state.bank ?? 0) + dir * n;
+    save(state);
+    updateHud();
+    draw();
+    toast((dir === 1 ? L.bankDone : L.bankTook).replace('{n}', n.toLocaleString('en-US')), 'good');
+  };
+  (el.querySelector('.b-in') as HTMLButtonElement).onclick = () => move(1);
+  (el.querySelector('.b-out') as HTMLButtonElement).onclick = () => move(-1);
+  draw();
+  document.body.appendChild(el);
+  const hudBottom = document.getElementById('hud')?.getBoundingClientRect().bottom ?? 56;
+  el.style.top = `${Math.round(hudBottom + 6)}px`;
+}
+
 // ───────────────────────── 공격 태세 (오른쪽 아래) ─────────────────────────
 let stance: Stance = 'talk';
+const LOW_SVG = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><g class="tall"><rect x="4" y="3" width="8" height="18" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="9" width="7" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 7h2M7 11h2M7 15h2M16 13h1M16 17h1" stroke="currentColor" stroke-width="1.6"/></g><g class="short"><rect x="3" y="14" width="18" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 17.5h2M11 17.5h2M15 17.5h2" stroke="currentColor" stroke-width="1.6"/><path d="M12 3v7M9 7.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></g></svg>';
 const stanceBox = document.createElement('div');
 stanceBox.className = 'stance';
-stanceBox.innerHTML = `<button class="st-hand" aria-label="interact">✋</button><button class="st-sword" aria-label="attack stance"><span class="sw">⚔</span><small></small></button>`;
+stanceBox.innerHTML = `<button class="st-low" aria-label="lower buildings">${LOW_SVG}</button><button class="st-hand" aria-label="interact">✋</button><button class="st-sword" aria-label="attack stance"><span class="sw">⚔</span><small></small></button>`;
 document.body.appendChild(stanceBox);
 stanceBox.hidden = true;
 (stanceBox.querySelector('.st-hand') as HTMLButtonElement).onclick = () => setStance('talk');
+// 건물 낮추기 (1층만 보이게) — 도심에서 길이 가려 움직이기 힘들 때
+(stanceBox.querySelector('.st-low') as HTMLButtonElement).onclick = () => {
+  if (!world) return;
+  world.setLowBuildings(!world.low);
+  stanceBox.classList.toggle('low', world.low);
+  toast(world.low ? t().lowOn : t().lowOff);
+};
 (stanceBox.querySelector('.st-sword') as HTMLButtonElement).onclick = () => setStance(stance === 'hostile' ? 'all' : 'hostile');
 function setStance(s: Stance) {
   stance = s;
@@ -770,16 +869,18 @@ function setStance(s: Stance) {
 }
 function showStance(on: boolean) {
   stanceBox.hidden = !on;
+  stanceBox.classList.toggle('low', !!world?.low);
+  (stanceBox.querySelector('.st-low') as HTMLElement).title = t().lowLabel;
   setStance(stance);
 }
 
 // ───────────────────────── 다른 사람 (실시간) ─────────────────────────
-function personMenu(id: string, info: RemoteInfo, x: number, y: number) {
+function personMenu(id: string, info: RemoteInfo, x: number, y: number, attack: () => void) {
   const L = t();
   const name = info.member ? info.name : L.guestName;
   const opts: { label: string; danger?: boolean; act: () => void }[] = [];
   if (info.member) opts.push({ label: L.viewProfile, act: () => showProfile(info.name) });
-  opts.push({ label: L.act.attack, act: () => toast(L.pvpLater) });
+  opts.push({ label: L.act.force, danger: true, act: attack });
   if (info.member && net.account()) opts.push({ label: L.report, danger: true, act: () => reportMenu(info.name, x, y) });
   opts.push({ label: L.act.close, act: () => undefined });
   openTargetMenu(name, L.playerSub, opts, x, y);

@@ -36,7 +36,7 @@ const PER_BUILD = new Set(['jacket', 'vest', 'workpants']);
 const COSTUMES = new Set(['raincoat', 'patient', 'parrot']);
 
 /** 동작 속도 (초당 장면 수)와 맞히는 장면 */
-export const ANIM_FPS: Record<Anim, number> = { idle: 1, walk: 9, hit: 11, fall: 10, punch: 15, swing: 14, shoot: 12 };
+export const ANIM_FPS: Record<Anim, number> = { idle: 1, walk: 9, hit: 16, fall: 11, punch: 22, swing: 21, shoot: 16 };
 export const IMPACT: Partial<Record<Anim, number>> = { punch: 2, swing: 3, shoot: 1 };
 
 /** 칸 좌표로 움직이는 방향(di, dj) → 바라보는 쪽.

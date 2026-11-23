@@ -145,7 +145,10 @@ export class ShopRoom {
       const tx = await loadPixel(u);
       if (!tx) return;
       this.hwang.texture = tx;
-      if (tx.width === f.w && tx.height === f.h) this.hwang.anchor.set(f.ax, f.ay); else this.hwang.anchor.set(0.5, 1);
+      // 같은 크기 또는 2배(더 섬세한 그림): 2배면 반으로 줄여 같은 크기로 보인다 (고해상도 화면에서 두 배 선명)
+      const k = tx.width === f.w * 2 && tx.height === f.h * 2 ? 2 : 1;
+      this.hwang.scale.set(1 / k);
+      if (tx.width === f.w * k && tx.height === f.h * k) this.hwang.anchor.set(f.ax, f.ay); else this.hwang.anchor.set(0.5, 1);
     });
     const [hx, hy] = iso(HWANG.x, HWANG.y);
     this.hwang.position.set(hx, hy);
@@ -440,7 +443,9 @@ export class ShopRoom {
     if (this.kit) {
       // 관리자 그림은 구운 그림과 크기가 같아 같은 자리(왼쪽 위 기준)에 둔다
       const pp = this.kit.parrot[ci];
-      this.parrot.texture = this.customParrot?.[ci] ?? pp.tex;
+      const ct = this.customParrot?.[ci];
+      this.parrot.texture = ct ?? pp.tex;
+      this.parrot.scale.set(ct && ct.width >= pp.w * 2 ? 0.5 : 1);
       this.parrot.position.set(pp.x, pp.y);
     } else this.parrot.texture = this.customParrot?.[ci] ?? this.parrotTex[ci];
     // 이름표

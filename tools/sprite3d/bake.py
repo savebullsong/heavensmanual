@@ -14,8 +14,10 @@ import rig, body, poses
 
 job = json.loads(sys.argv[1]); OUT = sys.argv[2]; os.makedirs(OUT, exist_ok=True)
 TMP = f'/tmp/bake_{os.getpid()}'; os.makedirs(TMP, exist_ok=True)
-CELL_W, CELL_H, FOOT = 96, 100, (48, 82)
-MPP = .034; SS = 2; SAMPLES = int(job.get('samples', 10))
+# scale = 2 이면 같은 크기의 인물을 픽셀 두 배로 (더 섬세한 도트, 화면에서는 반으로 줄여 같은 크기)
+SCALE = int(job.get('scale', 1))
+CELL_W, CELL_H, FOOT = 96 * SCALE, 100 * SCALE, (48 * SCALE, 82 * SCALE)
+MPP = .034 / SCALE; SS = 2; SAMPLES = int(job.get('samples', 10))
 # 화면 기준 방향 → 인형이 도는 각도. 대각선 넷(se·sw·ne·nw)은 모든 동작, 상하좌우 넷(s·e·n·w)은 서기·걷기만
 DIRS = {'se': 90, 'sw': 0, 'ne': 180, 'nw': 270, 's': 45, 'e': 135, 'n': 225, 'w': 315}
 LREF = float(job.get('lref', .80))
