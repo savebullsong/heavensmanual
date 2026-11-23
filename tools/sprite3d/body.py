@@ -45,19 +45,26 @@ TORSO = {
 BODY = {'x': dict(h=1.28, shoulder=.22, hipw=.105, arm=1.4, leg=1.12),   # 변신한 봉합자 (몸집이 크다)
         'm': dict(h=1.0, shoulder=.19, hipw=.095, arm=1.15, leg=1.0),
         'f': dict(h=.94, shoulder=.165, hipw=.092, arm=1.0, leg=.94),
-        'c': dict(h=.68, shoulder=.17, hipw=.09, arm=1.05, leg=1.0)}
+        'c': dict(h=.68, shoulder=.17, hipw=.09, arm=1.05, leg=1.0),
+        # 지옥 괴물 (2단계): 망자 · 프렛 · 야크
+        'a': dict(h=.97, shoulder=.175, hipw=.088, arm=.9, leg=.88),
+        'p': dict(h=1.36, shoulder=.15, hipw=.08, arm=1.05, leg=.9, neck=.13),
+        'y': dict(h=1.26, shoulder=.25, hipw=.12, arm=1.55, leg=1.3)}
+MONSTER_BW = {'x': None, 'a': .8, 'p': .68, 'y': 1.32}
+MONSTER_HK = {'x': 1.0, 'a': 1.05, 'p': .86, 'y': 1.12}
 BUILD = [.9, 1.0, 1.14]   # 마름 · 보통 · 건장 (뼈 위치는 같고 굵기만 다르다 → 머리·무기 층을 함께 쓴다)
 
 class Doll:
     def __init__(self, sex, build=1, child=False, monster=False):
-        key = 'x' if monster else 'c' if child else sex
+        self.mkey = (monster if isinstance(monster, str) else 'x') if monster else None
+        key = self.mkey or ('c' if child else sex)
         self.sex = sex; self.child = child; self.p = p = BODY[key]; self.s = s = p['h']
-        self.bw = BUILD[build]
+        self.bw = MONSTER_BW.get(self.mkey) or BUILD[build]
         self.bones = skeleton(p)
         self.arm = make_armature(self.bones)
         self.groups = {}   # 이름 → [객체]
         self.torso_key = 'f' if (sex == 'f' and not child) else 'm'
-        self.hk = 1.30 if child else 1.0 if monster else 1.12   # 머리 크기 (아이는 더 크게)
+        self.hk = 1.30 if child else MONSTER_HK[self.mkey] if monster else 1.12   # 머리 크기 (아이는 더 크게)
         self.monster = monster
 
     def V(self, x, y, z): return Vector((x, y, z)) * self.s
@@ -124,7 +131,7 @@ class Doll:
             blob(P, (wr + hd) / 2 + Vector((0, -.008, .01)), (.026 * am, .032 * am, .05 * am), skin, None, segs=10, rings=7)
             ob = finish(P); bind(ob, self.arm, rigid(f'hand.{k}')); self.add(group, ob)
 
-    def legs(self, group, mat, shoe_mat, bare_below=None, boot=False):
+    def legs(self, group, mat, shoe_mat, bare_below=None, boot=False, foot=1.0):
         lg = self.p['leg'] * self.bw; s = self.s
         for k in 'LR':
             b = self.bones
@@ -138,7 +145,7 @@ class Doll:
             ob = finish(P); bind(ob, self.arm, autow(self.bones, ['hips', f'thigh.{k}', f'shin.{k}'], power=5)); self.add(group, ob)
             P = Part(f'{group}.shoe.{k}')
             c = Vector((an.x, -.035 * s, .045 * s))
-            blob(P, c, (.05 * s * (1.1 if boot else 1), .122 * s, .052 * s * (1.25 if boot else 1)), shoe_mat, None, segs=12, rings=8, cut=lambda co: co.z < .0)
+            blob(P, c, (.05 * s * (1.1 if boot else 1) * foot, .122 * s * foot, .052 * s * (1.25 if boot else 1) * foot), shoe_mat, None, segs=12, rings=8, cut=lambda co: co.z < .0)
             if boot:
                 limb(P, an + Vector((0, 0, -.06)), an + Vector((0, 0, .16 * s)), [(0, .058 * s, .06 * s), (1, .055 * s, .057 * s)], shoe_mat, None)
             ob = finish(P); bind(ob, self.arm, autow(self.bones, [f'shin.{k}', f'foot.{k}'], power=8)); self.add(group, ob)
@@ -247,6 +254,8 @@ class Doll:
             for (x, y, z, r) in ((.08, -.12, 1.22, .07), (-.1, -.11, 1.0, .06), (.12, .08, 1.3, .07), (-.06, .1, .95, .06)):
                 blob(P, self.V(x, y, z), (r * s, r * .6 * s, r * s), patch, None, segs=8, rings=5)
             ob = finish(P); bind(ob, self.arm, lambda co: {'head': 1.0} if co.z > 1.5 * s else {'spine': 1.0}); self.add(g, ob)
+        elif name in ('ash', 'pret', 'yak'):
+            self.hell_body(name)
         elif name == 'parrot':
             pw = rmat('parrot', .95, .05); cr = rmat('crest', .8, .1); dk = rmat('dark', .5, .3); ft = rmat('shoe', .8, .1)
             s = self.s
@@ -271,6 +280,120 @@ class Doll:
                 base = hc + Vector((0, (.02 - k * .01) * s, .15 * s))
                 tip = base + Vector((0, (.04 + k * .035) * s, (.16 - abs(a) * .1) * s))
                 limb(P, base, tip, [(0, .018 * s, .03 * s), (1, .004 * s, .006 * s)], cr, None, segs=6)
+            ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
+
+    # ── 지옥 괴물 (색은 게임이 괴물마다 입힌다: 살 1 · 천 3 · 빛 12 · 금 14 · 어둠 15) ──
+    def hell_body(self, name):
+        g = 'o.' + name; s = self.s; V = self.V
+        flesh = rmat('skin', .75, .15); cloth = rmat('top', .9, .08); dark = rmat('dark', .85, .08)
+        glow = rmat('crest', .3, .7); gold = rmat('metal', .3, .6, .6); fang = rmat('parrot', .4, .5)
+        nk = self.p.get('neck', 0)
+        hc = V(0, -.005, 1.615 + nk)
+        if name == 'ash':
+            # 잿빛 망자: 마르고 그을린 몸, 갈라진 틈으로 불씨가 비치고, 허리에 해진 천
+            def gaunt(rings):
+                out = []
+                for c, u, v, rs, rf in rings:
+                    z = c.z / s
+                    out.append((c, u, v, rs * (.92 if z > 1.0 else .95), rf * (.8 if 1.0 < z < 1.3 else .95)))
+                return out
+            self.torso(g, flesh, flesh, hem=0, extra=gaunt)
+            self.arms(g, None); self.hands(g); self.legs(g, flesh, dark, foot=.85)
+            P = Part(g + '.face')
+            blob(P, hc, (.09 * s, .1 * s, .118 * s), flesh, None, segs=14, rings=10)
+            for sx in (1, -1):
+                blob(P, hc + Vector((sx * .034 * s, -.092 * s, .01 * s)), (.022 * s, .01 * s, .018 * s), dark, None, segs=8, rings=5)
+                blob(P, hc + Vector((sx * .034 * s, -.1 * s, .01 * s)), (.011 * s, .006 * s, .009 * s), glow, None, segs=6, rings=4)
+            blob(P, hc + Vector((0, -.1 * s, -.05 * s)), (.03 * s, .01 * s, .014 * s), dark, None, segs=8, rings=5)
+            for k in range(5):   # 정수리에 남은 몇 가닥
+                a = (k - 2) * .025
+                limb(P, hc + Vector((a * s, .02 * s, .1 * s)), hc + Vector((a * 1.6 * s, .1 * s, -.02 * s)), [(0, .006, .006), (1, .002, .002)], dark, None, segs=4)
+            ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
+            P = Part(g + '.rags')
+            # 허리천: 앞뒤로 늘어진 해진 자락
+            limb(P, V(0, 0, .99), V(0, 0, .84), [(0, .118 * s * self.bw, .09 * s), (1, .128 * s * self.bw, .1 * s)], cloth, None, segs=12)
+            for k in range(6):
+                a = k / 6 * math.tau
+                top = V(math.cos(a) * .1 * self.bw, math.sin(a) * .08, .86)
+                limb(P, top, top + Vector((math.cos(a) * .02, math.sin(a) * .02, -(.16 + (k % 3) * .06) * s)), [(0, .035, .012), (1, .02, .006)], cloth, None, segs=5)
+            # 불씨가 비치는 갈라진 틈
+            for (x0, z0, x1, z1, y) in ((-.06, 1.32, .04, 1.18, -.105), (.07, 1.12, .01, 1.02, -.1), (-.03, 1.24, -.08, 1.1, .095), (.05, 1.3, .1, 1.16, .09)):
+                limb(P, V(x0, y, z0), V(x1, y * 1.02, z1), [(0, .007, .007), (1, .005, .005)], glow, None, segs=4)
+            ob = finish(P); bind(ob, self.arm, lambda co: {'spine': smooth(co.z, .98 * s, 1.12 * s), 'hips': 1 - smooth(co.z, .98 * s, 1.12 * s)}); self.add(g, ob)
+            for k in 'LR':   # 팔뚝의 불씨 틈
+                sh, el = self.bones[f'upper_arm.{k}'][0], self.bones[f'upper_arm.{k}'][1]
+                wr = self.bones[f'forearm.{k}'][1]
+                P = Part(f'{g}.crack.{k}')
+                limb(P, el + (wr - el) * .2 + Vector((0, -.032, 0)), el + (wr - el) * .7 + Vector((0, -.028, 0)), [(0, .006, .006), (1, .004, .004)], glow, None, segs=4)
+                ob = finish(P); bind(ob, self.arm, rigid(f'forearm.{k}')); self.add(g, ob)
+        elif name == 'pret':
+            # 프렛: 야자나무처럼 큰 키, 막대 같은 팔다리, 부푼 배, 긴 목, 바늘구멍만 한 입, 늘어진 머리카락
+            def starved(rings):
+                out = []
+                for c, u, v, rs, rf in rings:
+                    z = c.z / s
+                    out.append((c, u, v, rs * (.9 if z > 1.15 else 1.0), rf * (.78 if z > 1.15 else 1.0)))
+                return out
+            self.torso(g, flesh, flesh, hem=0, extra=starved)
+            self.arms(g, None); self.hands(g); self.legs(g, flesh, flesh, foot=.62)
+            P = Part(g + '.belly')
+            blob(P, V(0, -.06, 1.06), (.13 * s, .13 * s, .13 * s), flesh, None, segs=14, rings=10)
+            for z in (1.26, 1.3, 1.34):   # 갈비뼈
+                limb(P, V(-.1, -.085, z), V(.1, -.085, z), [(0, .006, .006), (.5, .007, .007), (1, .006, .006)], dark, None, segs=4)
+            limb(P, V(0, 0, .96), V(0, 0, .86), [(0, .1 * s * self.bw, .085 * s), (1, .11 * s * self.bw, .09 * s)], cloth, None, segs=12)
+            limb(P, V(0, -.08, .9), V(0, -.09, .66), [(0, .05, .012), (1, .04, .008)], cloth, None, segs=5)
+            ob = finish(P); bind(ob, self.arm, lambda co: {'spine': smooth(co.z, .98 * s, 1.12 * s), 'hips': 1 - smooth(co.z, .98 * s, 1.12 * s)}); self.add(g, ob)
+            P = Part(g + '.neck')
+            limb(P, V(0, .005, 1.38), V(0, -.005, 1.55 + nk), [(0, .04 * s, .038 * s), (1, .03 * s, .03 * s)], flesh, None, segs=10)
+            ob = finish(P); bind(ob, self.arm, lambda co: {'neck': 1.0}); self.add(g, ob)
+            P = Part(g + '.head')
+            blob(P, hc, (.085 * s, .095 * s, .11 * s), flesh, None, segs=14, rings=10)
+            for sx in (1, -1):
+                blob(P, hc + Vector((sx * .032 * s, -.085 * s, .012 * s)), (.02 * s, .012 * s, .02 * s), dark, None, segs=8, rings=5)
+                blob(P, hc + Vector((sx * .032 * s, -.094 * s, .012 * s)), (.008 * s, .005 * s, .008 * s), glow, None, segs=6, rings=4)
+            blob(P, hc + Vector((0, -.098 * s, -.05 * s)), (.005 * s, .004 * s, .005 * s), dark, None, segs=6, rings=4)   # 바늘구멍 입
+            for k in range(9):   # 성긴 긴 머리카락
+                a = (k - 4) / 4
+                root = hc + Vector((a * .07 * s, (.03 + abs(a) * .03) * s, .095 * s - abs(a) * .02 * s))
+                limb(P, root, root + Vector((a * .05 * s, .06 * s, -(.22 + (k % 3) * .07) * s)), [(0, .008, .008), (1, .003, .003)], dark, None, segs=4)
+            ob = finish(P); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
+        elif name == 'yak':
+            # 야크(약샤): 우람한 몸, 금 허리띠·팔찌·목걸이, 첨탑 모양 관(차다), 송곳니와 빛나는 눈
+            def bulk(rings):
+                out = []
+                for c, u, v, rs, rf in rings:
+                    z = c.z / s
+                    k = 1.2 if 1.15 < z < 1.42 else 1.06
+                    out.append((c, u, v, rs * k + .01, rf * k * 1.08 + .012))
+                return out
+            self.torso(g, flesh, cloth, hem=1.0, extra=bulk)
+            self.arms(g, None); self.hands(g); self.legs(g, cloth, dark, bare_below=flesh)
+            P = Part(g + '.gear')
+            limb(P, V(0, 0, 1.02), V(0, 0, .95), [(0, .15 * s * self.bw, .12 * s), (1, .15 * s * self.bw, .12 * s)], gold, None, segs=14)   # 금 허리띠
+            limb(P, V(0, -.13, .97), V(0, -.15, .62), [(0, .07, .014), (1, .06, .01)], cloth, None, segs=5)                              # 앞자락
+            limb(P, V(0, -.02, 1.43), V(0, -.06, 1.36), [(0, .13 * s, .11 * s), (1, .15 * s, .13 * s)], gold, None, segs=14)            # 목걸이
+            ob = finish(P); bind(ob, self.arm, lambda co: {'spine': smooth(co.z, .98 * s, 1.12 * s), 'hips': 1 - smooth(co.z, .98 * s, 1.12 * s)}); self.add(g, ob)
+            for k in 'LR':   # 팔찌
+                el, wr = self.bones[f'forearm.{k}'][0], self.bones[f'forearm.{k}'][1]
+                P = Part(f'{g}.band.{k}')
+                limb(P, el + (wr - el) * .72, el + (wr - el) * .86, [(0, .048, .048), (1, .046, .046)], gold, None, segs=10)
+                ob = finish(P); bind(ob, self.arm, rigid(f'forearm.{k}')); self.add(g, ob)
+            P = Part(g + '.head')
+            blob(P, hc, (.1 * s, .108 * s, .12 * s), flesh, None, segs=14, rings=10)
+            for sx in (1, -1):
+                blob(P, hc + Vector((sx * .038 * s, -.095 * s, .022 * s)), (.022 * s, .012 * s, .016 * s), glow, None, segs=8, rings=5)
+                limb(P, hc + Vector((sx * .03 * s, -.1 * s, -.05 * s)), hc + Vector((sx * .036 * s, -.11 * s, -.095 * s)), [(0, .012, .01), (1, .002, .002)], fang, None, segs=5)
+            blob(P, hc + Vector((0, -.106 * s, -.05 * s)), (.045 * s, .01 * s, .014 * s), dark, None, segs=8, rings=5)
+            # 관: 머리띠 + 겹겹이 좁아지는 첨탑
+            limb(P, hc + Vector((0, 0, .05 * s)), hc + Vector((0, 0, .09 * s)), [(0, .11 * s, .12 * s), (1, .108 * s, .118 * s)], gold, None, segs=14)
+            for k in range(5):
+                z0 = (.09 + k * .055) * s
+                r = (.085 - k * .016) * s
+                limb(P, hc + Vector((0, .005, z0)), hc + Vector((0, .005, z0 + .05 * s)), [(0, r, r), (.6, r * .8, r * .8), (1, r * .9, r * .9)], gold, None, segs=12)
+            limb(P, hc + Vector((0, .005, .36 * s)), hc + Vector((0, .005, .46 * s)), [(0, .014, .014), (1, .002, .002)], gold, None, segs=6)
+            blob(P, hc + Vector((0, -.11 * s, .07 * s)), (.016 * s, .008 * s, .016 * s), glow, None, segs=6, rings=4)
+            for sx in (1, -1):   # 귀 장식
+                limb(P, hc + Vector((sx * .1 * s, 0, .02 * s)), hc + Vector((sx * .13 * s, .02 * s, .12 * s)), [(0, .018, .008), (1, .004, .004)], gold, None, segs=5)
             ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
 
     # ── 방어구 (평상복 몸 위에 겹친다) ──
@@ -416,6 +539,12 @@ class Doll:
             for k in range(6):   # 바늘귀에서 늘어진 금실
                 a = grip - d * (.14 + k * .02) + Vector((0, .02 * k, -.07 * k))
                 limb(P, a, a + Vector((0, .02, -.07)), [(0, .006, .006), (1, .006, .006)], gold, None, segs=4)
+        elif name == 'club':
+            limb(P, grip - d * .12, grip + d * .1, [(0, .026, .026), (1, .024, .024)], dark, None, segs=8)
+            limb(P, grip + d * .1, grip + d * .95, [(0, .026, .026), (.5, .04, .04), (1, .062, .062)], wood, None, segs=10)
+            for t in (.42, .66, .9):
+                limb(P, grip + d * (t - .02), grip + d * (t + .03), [(0, .03 + t * .04, .03 + t * .04), (1, .03 + t * .04, .03 + t * .04)], metal, None, segs=10)
+            limb(P, grip + d * .95, grip + d * 1.02, [(0, .05, .05), (1, .018, .018)], metal, None, segs=8)
         elif name == 'pistol':
             fwd = Vector((0, -1, 0))
             limb(P, grip + Vector((0, .01, .04)), grip + Vector((0, -.01, -.06)), [(0, .016, .026), (1, .016, .026)], dark, None, segs=6)

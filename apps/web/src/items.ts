@@ -13,6 +13,9 @@ export interface ItemDef {
   name: Record<Lang, string>;
   store?: 'mart' | 'pharmacy' | 'food' | 'cafe'; // 우주새가 아니라 거리 가게에서 파는 것
   now?: boolean; // 가게에서 바로 먹는다 (가방에 넣지 않음)
+  hell?: boolean; // 지옥의 우주새(황혼)에서만, 저승돈으로 판다
+  sprite?: string; // 몸에 그릴 때 쓰는 그림 (지옥 무기·방어구는 현실 그림을 빌려 쓴다)
+  icon?: string; // 아이콘 그림 (없으면 key)
 }
 
 export const ITEMS: ItemDef[] = [
@@ -55,6 +58,20 @@ export const ITEMS: ItemDef[] = [
   { key: 'coffee', cat: 'goods', price: 65, heal: 35, store: 'cafe', now: true, name: { ko: '커피', th: 'กาแฟ', en: 'Coffee' } },
   { key: 'thaitea', cat: 'goods', price: 45, heal: 30, store: 'cafe', now: true, name: { ko: '타이 밀크티', th: 'ชาไทย', en: 'Thai milk tea' } },
   { key: 'cake', cat: 'goods', price: 80, heal: 60, store: 'cafe', now: true, name: { ko: '케이크', th: 'เค้ก', en: 'Cake' } },
+  // 지옥 (황혼의 우주새 · 저승돈) — 단검·둔기·장병기·검 네 갈래
+  { key: 'hdagger', cat: 'weapon', price: 30, atk: 6, hell: true, sprite: 'dagger', name: { ko: '녹슨 망자의 단검', th: 'มีดสั้นสนิมของผู้ตาย', en: 'Rusted dead man’s dagger' } },
+  { key: 'hhammer', cat: 'weapon', price: 70, atk: 8, hell: true, sprite: 'hammer', name: { ko: '뼈 망치', th: 'ค้อนกระดูก', en: 'Bone hammer' } },
+  { key: 'hspear', cat: 'weapon', price: 110, atk: 9, hell: true, sprite: 'pipe', name: { ko: '쇠사슬 창', th: 'หอกโซ่', en: 'Chain spear' } },
+  { key: 'hsword', cat: 'weapon', price: 200, atk: 12, hell: true, sprite: 'sword', name: { ko: '흑철 검', th: 'ดาบเหล็กดำ', en: 'Black-iron sword' } },
+  { key: 'hhelm', cat: 'armor', price: 45, def: 3, hell: true, sprite: 'helmet', icon: 'helmet', name: { ko: '그을린 투구', th: 'หมวกเกราะไหม้เกรียม', en: 'Scorched helm' } },
+  { key: 'hvest', cat: 'armor', price: 150, def: 6, hell: true, sprite: 'vest', icon: 'vest', name: { ko: '망자의 가죽 조끼', th: 'เสื้อหนังของผู้ตาย', en: 'Dead man’s leather vest' } },
+  { key: 'hgloves', cat: 'armor', price: 20, def: 1, hell: true, sprite: 'gloves', icon: 'gloves', name: { ko: '사슬 장갑', th: 'ถุงมือโซ่', en: 'Chain gloves' } },
+  { key: 'hshin', cat: 'armor', price: 35, def: 2, hell: true, sprite: 'shinguard', icon: 'shinguard', name: { ko: '뼈 정강이받이', th: 'สนับแข้งกระดูก', en: 'Bone greaves' } },
+  { key: 'hboots', cat: 'armor', price: 60, def: 2, hell: true, sprite: 'boots', icon: 'boots', name: { ko: '숯 장화', th: 'รองเท้าถ่าน', en: 'Charcoal boots' } },
+  { key: 'lethe', cat: 'goods', price: 3, heal: 60, hell: true, icon: 'water', name: { ko: '망각의 물', th: 'น้ำแห่งการลืมเลือน', en: 'Water of oblivion' } },
+  { key: 'ashcake', cat: 'goods', price: 6, heal: 130, hell: true, icon: 'cake', name: { ko: '재떡', th: 'ขนมเถ้า', en: 'Ash cake' } },
+  { key: 'hbandage', cat: 'goods', price: 8, heal: 150, hell: true, icon: 'bandage', name: { ko: '검은 붕대', th: 'ผ้าพันแผลสีดำ', en: 'Black bandage' } },
+  { key: 'bloodfruit', cat: 'goods', price: 12, heal: 260, hell: true, icon: 'choco', name: { ko: '피 열매', th: 'ผลไม้เลือด', en: 'Blood fruit' } },
   // 음식점마다 실제 업종(지도의 cuisine)에 맞는 메뉴
   ...([
     ['pizza', 120, 140, '피자 한 조각', 'พิซซ่าหนึ่งชิ้น', 'Pizza slice'], ['pasta', 220, 190, '파스타', 'พาสต้า', 'Pasta'],
@@ -133,8 +150,22 @@ export function effectText(it: ItemDef, l: Lang): string {
   return parts.join(' · ');
 }
 
-export function priceText(n: number): string {
-  return `฿${n.toLocaleString('en-US')}`;
+export function priceText(n: number, hell = false): string {
+  return hell ? `冥${n.toLocaleString('en-US')}` : `฿${n.toLocaleString('en-US')}`;
+}
+
+/** 물건 아이콘 — 지옥 물건은 현실 그림을 빌려 그을리고 붉게 물들인다 */
+export function iconFor(it: ItemDef): HTMLCanvasElement {
+  const c = itemIcon(it.icon ?? it.sprite ?? it.key);
+  if (!it.hell) return c;
+  const g = c.getContext('2d')!;
+  g.globalCompositeOperation = 'source-atop';
+  g.fillStyle = 'rgba(70,8,4,0.42)';
+  g.fillRect(0, 0, 32, 32);
+  g.fillStyle = 'rgba(255,90,30,0.18)';
+  g.fillRect(0, 22, 32, 10);
+  g.globalCompositeOperation = 'source-over';
+  return c;
 }
 
 // ───────────────────────── 32×32 아이콘 ─────────────────────────

@@ -29,6 +29,17 @@ export interface Zone {
   spawn: { i: number; j: number };
   attribution?: string;
   blocked: Uint8Array; // 1 = 걸을 수 없음
+  /** 지옥 층 (현실 지도에는 없음) */
+  hell?: HellInfo;
+}
+export interface HellInfo {
+  floor: number;
+  rest: { i: number; j: number; r: number }; // 휴식 공간 (황혼의 우주새 둘레, 싸움 불가·괴물 못 들어옴)
+  up: { i: number; j: number }; // 올라가는 계단 (층주를 쓰러뜨려야 열림) · 1층은 출구 = 파샤르
+  down: { i: number; j: number }; // 내려가는 계단 (언제나 열림)
+  boss: { i: number; j: number };
+  pashar?: { i: number; j: number };
+  spawns: [number, number][]; // 괴물이 나오는 자리
 }
 
 export function tileAt(z: Zone, i: number, j: number): TileType {
@@ -36,7 +47,7 @@ export function tileAt(z: Zone, i: number, j: number): TileType {
   return TYPES[z.tiles[j * z.W + i]];
 }
 
-function finalize(z: Omit<Zone, 'blocked'>): Zone {
+export function finalize(z: Omit<Zone, 'blocked'>): Zone {
   const blocked = new Uint8Array(z.W * z.H);
   for (let k = 0; k < blocked.length; k++) {
     const t = TYPES[z.tiles[k]];

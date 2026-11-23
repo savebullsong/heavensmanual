@@ -4,7 +4,7 @@
 
 export type HitKind = 'fist' | 'blunt' | 'blade' | 'gun';
 /** 맞는 쪽의 몸: 같은 무기라도 대상마다 소리가 다르다 */
-export type Body = 'flesh' | 'thug' | 'suturer' | 'monster' | 'player';
+export type Body = 'flesh' | 'thug' | 'suturer' | 'monster' | 'player' | 'ash' | 'pret' | 'yak';
 
 const BLADES = new Set(['knife', 'dagger', 'sword', 'hatchet', 'needle']);
 export function hitKind(weapon: string | null | undefined, ranged = false): HitKind {
@@ -168,6 +168,20 @@ export function impact(kind: HitKind, s: Spot, crit = false, body: Body = 'flesh
     const gg = ctx!.createGain(); gg.gain.setValueAtTime(0.0001, t); gg.gain.exponentialRampToValueAtTime(0.35, t + 0.04); gg.gain.exponentialRampToValueAtTime(0.0001, t + 0.38);
     const trem = ctx!.createOscillator(); trem.frequency.value = 23; const tg = ctx!.createGain(); tg.gain.value = 0.15; trem.connect(tg).connect(gg.gain);
     g.connect(lf).connect(gg).connect(o); g.start(t); g.stop(t + 0.42); trem.start(t); trem.stop(t + 0.42);
+  } else if (body === 'ash') {
+    // 잿빛 망자: 마른 숯이 부서지는 바삭한 소리 + 재가 흩날림
+    noise(o, t, 0.12, 'highpass', 1800, 900, 0.8, 0.6, 0.002);
+    noise(o, t + 0.02, 0.2, 'bandpass', 700, 300, 1.2, 0.35);
+    tone(o, t, 0.1, 'sine', 120 * pitch, 60, 0.4);
+  } else if (body === 'pret') {
+    // 프렛: 텅 빈 몸이 울리는 소리 + 가늘고 높은 신음
+    tone(o, t, 0.18, 'triangle', 240 * pitch, 140, 0.45);
+    grunt(o, t + 0.03, 330 * pitch, [900, 2400], 0.16, 0.32);
+  } else if (body === 'yak') {
+    // 야크: 거대한 몸통을 치는 깊은 울림 + 낮은 노성
+    tone(o, t, 0.3, 'sine', 70 * pitch, 34, 1.0);
+    noise(o, t, 0.08, 'lowpass', 900, 200, 0.8, 0.6);
+    if (Math.random() < 0.5) grunt(o, t + 0.05, 82 * pitch, [480, 820], 0.3, 0.3);
   } else if (body === 'player') {
     // 내가 맞을 때: 가슴이 울리는 낮은 쿵
     tone(o, t, 0.2, 'sine', 80, 40, 1.0);

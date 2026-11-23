@@ -22,7 +22,14 @@ export interface Save {
   // 비회원: 처음 거리로 나선 뒤 지난 시간(초)과 미스 황의 전화
   streetSecs?: number;
   called?: boolean;
+  // 2단계: 지금 있는 세계와 지옥에서의 걸음
+  realm?: 'real' | 'ghost' | 'hell';
+  /** 지옥: 지금 층, 이번 지옥행에서 쓰러뜨린 층주, 저승돈(영혼에 붙어 다음 지옥행에도 남는다) */
+  hell?: { floor: number; cleared: number[]; notes: number };
+  /** 세계마다 우주새에 봉인된 물건 — 그 세계의 우주새에서 되찾는다 */
+  vault?: Partial<Record<'real' | 'hell', Stash>>;
 }
+export interface Stash { bag: Record<string, number>; ammo: number }
 export type Slot = 'weapon' | 'head' | 'body' | 'hands' | 'legs' | 'shins' | 'feet';
 // v2: 작은 캐릭터와 '처음 모습' 시나리오로 바뀌어 예전 저장은 새로 시작한다
 const KEY = 'heavensmanual.save.v2';

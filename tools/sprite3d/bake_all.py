@@ -23,7 +23,15 @@ for sex in 'mf':
 jobs.append({'sex': 'm', 'build': 1, 'sets': [{'kind': 'base', 'outfit': 'suturer', 'mode': 'm'}, {'kind': 'weapon', 'weapon': 'needle'}], 'tag': 'suturer'})
 jobs.append({'sex': 'm', 'build': 1, 'monster': True, 'sets': [{'kind': 'base', 'outfit': 'stitched', 'mode': 'm'}, {'kind': 'weapon', 'weapon': 'needle'}], 'tag': 'suturer'})
 jobs.append({'sex': 'm', 'build': 1, 'child': True, 'sets': [{'kind': 'base', 'outfit': 'casual', 'mode': 'w'}] + [{'kind': 'hair', 'style': h} for h in HAIRS]})
+# 지옥 괴물 (2단계): 망자·프렛은 맨손, 야크는 몽둥이. 제 몸을 가림막으로
+for mk, outfit, mode, weapon in (('a', 'ash', 'u', None), ('p', 'pret', 'u', None), ('y', 'yak', 'm', 'club')):
+    sets = [{'kind': 'base', 'outfit': outfit, 'mode': mode}] + ([{'kind': 'weapon', 'weapon': weapon}] if weapon else [])
+    jobs.append({'sex': 'm', 'build': 1, 'monster': mk, 'occluder': outfit, 'sets': sets, 'tag': 'hell'})
 args = sys.argv[2:]
+# --scale2: 같은 크기의 인물을 픽셀 두 배로 (게임에서는 반으로 줄여 같은 크기, 더 섬세)
+if '--scale2' in args:
+    args.remove('--scale2')
+    for j in jobs: j['scale'] = 2
 # --dirs8: 이미 구운 층에 상하좌우 4방향(서기·걷기)만 덧붙인다
 if '--dirs8' in args:
     args.remove('--dirs8')

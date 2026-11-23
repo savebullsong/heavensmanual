@@ -30,11 +30,12 @@ def mat(name, hexcol, rough=0.7, spec=0.25, metal=0.0, emit=None):
 def skeleton(p):
     """p: 체형 값. 남자 기준 키 1.75m. 왼쪽 = +X, 앞 = -Y"""
     s = p['h']; sw = p['shoulder']; hw = p['hipw']
+    nk = p.get('neck', 0)   # 목이 긴 괴물(프렛)은 머리를 그만큼 위로
     B = {
         'hips': ((0, 0, .93), (0, 0, 1.03), None),
         'spine': ((0, 0, 1.03), (0, 0, 1.42), 'hips'),
-        'neck': ((0, 0, 1.42), (0, 0, 1.50), 'spine'),
-        'head': ((0, 0, 1.50), (0, 0, 1.74), 'neck'),
+        'neck': ((0, 0, 1.42), (0, 0, 1.50 + nk), 'spine'),
+        'head': ((0, 0, 1.50 + nk), (0, 0, 1.74 + nk), 'neck'),
     }
     for side, k in ((1, 'L'), (-1, 'R')):
         B[f'upper_arm.{k}'] = ((side * sw, 0, 1.40), (side * (sw + .03), .01, 1.12), 'spine')

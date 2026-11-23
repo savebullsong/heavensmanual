@@ -9,7 +9,7 @@ export const FOOT_Y = 46;
 
 export type Sex = 'f' | 'm';
 export type Facing = 'front' | 'back';
-export type Outfit = 'casual' | 'apron' | 'raincoat' | 'patient' | 'parrot' | 'suturer' | 'stitched';
+export type Outfit = 'casual' | 'apron' | 'raincoat' | 'patient' | 'parrot' | 'suturer' | 'stitched' | 'ash' | 'pret' | 'yak';
 export interface Look {
   sex: Sex;
   build: number; // 0 마름 · 1 보통 · 2 건장
@@ -21,6 +21,8 @@ export interface Look {
   outfit?: Outfit;
   child?: boolean;
   aura?: boolean; // 드물게 나타나는 광채
+  /** 구역 번호 → 색 (지옥 괴물·파샤르처럼 정해진 색을 덮어쓸 때) */
+  cols?: Record<number, string>;
 }
 
 export const HAIR_STYLES = ['short', 'swept', 'bob', 'long', 'ponytail', 'buzz'] as const;

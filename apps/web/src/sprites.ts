@@ -15,12 +15,19 @@ export const FOOT = { x: 48, y: 82 };
 /** 사람 머리 꼭대기까지 대략의 높이 (이름표·체력 막대 자리) */
 export const HEAD_H = 50;
 
-export interface Frame { tex: Texture; ax: number; ay: number; w: number; h: number }
+/** k = 화면 배율 (2배 해상도로 구운 그림은 0.5로 줄여 같은 크기로 보인다) */
+export interface Frame { tex: Texture; ax: number; ay: number; w: number; h: number; k: number }
+
+/** 구운 인물 그림의 픽셀 밀도 (sprites/scale.json · 없으면 1) */
+export let PX = 1;
+export const pxReady: Promise<number> = fetch('./sprites/scale.json').then((r) => (r.ok ? r.json() : { px: 1 })).then((j: { px?: number }) => (PX = Math.max(1, Math.min(4, j.px ?? 1)))).catch(() => 1);
 export interface CharSet {
   mode: Mode;
   attack: Anim | null;
   frames: Map<string, Frame>;
   counts: Partial<Record<Anim, number>>;
+  /** 공격·맞기·쓰러짐까지 상하좌우로 구워져 있으면 싸울 때도 8방향을 본다 */
+  eight: boolean;
   /** 광채용: 서 있는 장면의 실루엣 (방향별) */
   masks: Map<Dir, { w: number; h: number; ox: number; oy: number; solid: Uint8Array }>;
 }
@@ -58,7 +65,7 @@ export function dirFromTile(di: number, dj: number, prev: Dir, eight = true): Di
 }
 
 // ───────────────────────── 층 읽기 ─────────────────────────
-interface Layer { w: number; px: Uint8ClampedArray; meta: Record<string, number[] | null> }
+interface Layer { w: number; px: Uint8ClampedArray; meta: Record<string, number[] | null>; /** 이 층의 픽셀 밀도 (_px, 없으면 1) */ lp: number }
 const layers = new Map<string, Promise<Layer | null>>();
 function loadLayer(key: string): Promise<Layer | null> {
   let p = layers.get(key);
@@ -70,11 +77,13 @@ function loadLayer(key: string): Promise<Layer | null> {
           new Promise<HTMLImageElement>((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = `./sprites/${key}.png`; }),
         ]);
         if (!meta) return null;
+        const lp = Math.max(1, (meta._px as number[] | undefined)?.[0] ?? 1);
+        delete meta._px;
         const c = document.createElement('canvas');
         c.width = img.width; c.height = img.height;
         const g = c.getContext('2d', { willReadFrequently: true })!;
         g.drawImage(img, 0, 0);
-        return { w: img.width, px: g.getImageData(0, 0, img.width, img.height).data, meta };
+        return { w: img.width, px: g.getImageData(0, 0, img.width, img.height).data, meta, lp };
       } catch {
         return null;
       }
@@ -108,6 +117,11 @@ function ramp(h: string): Uint8ClampedArray {
 }
 function palette(look: Look): Uint8ClampedArray[] {
   const o = look.outfit ?? 'casual';
+  if (look.cols) {
+    const pal: Uint8ClampedArray[] = [];
+    for (let k = 0; k < 16; k++) pal.push(ramp(look.cols[k] ?? FIXED[k] ?? '#ff00ff'));
+    return pal;
+  }
   const shoe = o === 'raincoat' ? '#2d342e' : o === 'patient' ? '#d6d2c8' : o === 'apron' ? '#3a2418' : o === 'parrot' ? '#8f7f70' : '#3a332e';
   const cols: Record<number, string> = {
     ...FIXED,
@@ -128,6 +142,10 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
   // 봉합자: 사람 모습 / 변신한 모습 (머리카락·방어구 없음, 늘 큰 바늘)
   if ((o as string) === 'suturer') return { base: 'b-m1-suturer-m', hair: null, weapon: 'w-m-needle', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   if ((o as string) === 'stitched') return { base: 'b-x-stitched-m', hair: null, weapon: 'w-x-needle', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
+  // 지옥 괴물: 망자(맨손) · 프렛(맨손) · 야크(몽둥이)
+  if (o === 'ash') return { base: 'b-a-ash-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
+  if (o === 'pret') return { base: 'b-p-pret-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
+  if (o === 'yak') return { base: 'b-y-yak-m', hair: null, weapon: weapon === null ? null : 'w-y-club', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   const child = !!look.child;
   const w = child ? null : weapon && (MELEE.includes(weapon) || weapon === 'pistol') ? weapon : null;
   let mode: Mode = w === 'pistol' ? 'g' : w ? 'm' : 'u';
@@ -154,15 +172,23 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
 }
 
 // ───────────────────────── 합치기 ─────────────────────────
+/** 층을 합칠 때 키우는 배수: 화면 밀도(PX) ÷ 층 밀도 (2배 그림 사이에 1배 층이 섞여도 맞물린다) */
+const up = (L: Layer) => Math.max(1, Math.round(PX / L.lp));
 const sets = new Map<string, Promise<CharSet>>();
+const MAX_SETS = 56; // 오래 안 쓴 것부터 놓아준다 (거리 사람은 계속 바뀐다)
 export function charSet(look: Look, weapon: string | null = null, armor: string[] = []): Promise<CharSet> {
   const keys = layerKeys(look, weapon, armor);
-  const id = JSON.stringify([keys, look.skin, look.hairColor, look.top, look.bottom, look.outfit ?? 'casual']);
+  const id = JSON.stringify([keys, look.skin, look.hairColor, look.top, look.bottom, look.outfit ?? 'casual', look.cols ?? null]);
   let p = sets.get(id);
-  if (!p) {
-    p = build(look, keys);
-    sets.set(id, p);
-  }
+  if (p) { sets.delete(id); sets.set(id, p); return p; }
+  p = pxReady.then(async () => {
+    const cs = await build(look, keys);
+    // 괴물 몸을 아직 굽지 않았으면 실밥 터진 봉합자 몸에 색만 입혀 쓴다
+    if (!cs.frames.size && ['ash', 'pret', 'yak'].includes(look.outfit ?? '')) return build({ ...look, outfit: 'stitched' }, layerKeys({ ...look, outfit: 'stitched' }, 'needle'));
+    return cs;
+  });
+  sets.set(id, p);
+  while (sets.size > MAX_SETS) sets.delete(sets.keys().next().value as string);
   return p;
 }
 
@@ -181,7 +207,8 @@ async function build(look: Look, keys: ReturnType<typeof layerKeys>): Promise<Ch
   order.push({ L: hair, pal });
   keys.armor.forEach((a, k) => { if (a.piece === 'helmet') order.push(armorLay(k)); });
   order.push({ L: weap, pal });
-  const names = base ? Object.keys(base.meta) : [];
+  // 모든 층에 있는 장면만 (1배·2배가 섞여 어느 층에 상하좌우 공격 장면이 없으면 대각선 장면을 쓴다)
+  const names = base ? Object.keys(base.meta).filter((n) => order.every(({ L }) => !L || n in L.meta)) : [];
   // 장면마다 겹친 테두리 상자 (발 기준)
   type Box = { name: string; x0: number; y0: number; x1: number; y1: number };
   const boxes: Box[] = [];
@@ -190,13 +217,16 @@ async function build(look: Look, keys: ReturnType<typeof layerKeys>): Promise<Ch
     for (const { L } of order) {
       const r = L?.meta[name];
       if (!r) continue;
-      x0 = Math.min(x0, r[4]); y0 = Math.min(y0, r[5]); x1 = Math.max(x1, r[4] + r[2]); y1 = Math.max(y1, r[5] + r[3]);
+      const k = up(L!);
+      x0 = Math.min(x0, r[4] * k); y0 = Math.min(y0, r[5] * k); x1 = Math.max(x1, (r[4] + r[2]) * k); y1 = Math.max(y1, (r[5] + r[3]) * k);
     }
     if (x1 < x0) continue;
-    boxes.push({ name, x0: x0 - 1, y0: y0 - 1, x1: x1 + 1, y1: y1 + 1 }); // 외곽선 자리 1px
+    // 외곽선 자리 (2배 그림은 2px). 2배면 상자를 짝수 칸에 맞춰 게임 속 크기·발 기준점이 정수로 떨어지게
+    const al = (v: number, dn: boolean) => (dn ? Math.floor(v / PX) : Math.ceil(v / PX)) * PX;
+    boxes.push({ name, x0: al(x0 - PX, true), y0: al(y0 - PX, true), x1: al(x1 + PX, false), y1: al(y1 + PX, false) });
   }
   // 선반 쌓기
-  const AW = 512;
+  const AW = 512 * PX;
   let x = 0, y = 0, rowH = 0;
   const place = new Map<string, [number, number]>();
   for (const b of boxes.slice().sort((a, c) => c.y1 - c.y0 - (a.y1 - a.y0))) {
@@ -219,19 +249,37 @@ async function build(look: Look, keys: ReturnType<typeof layerKeys>): Promise<Ch
       const r = L?.meta[b.name];
       if (!L || !r) continue;
       const [sx, sy, sw, sh, ox, oy] = r;
-      const dx = px + ox - b.x0, dy = py + oy - b.y0;
-      for (let yy = 0; yy < sh; yy++) {
-        let si = ((sy + yy) * L.w + sx) * 4;
-        let di = ((dy + yy) * AW + dx) * 4;
-        for (let xx = 0; xx < sw; xx++, si += 4, di += 4) {
-          if (L.px[si + 3] < 128) continue;
-          const v = L.px[si];
-          const rg = pal[v >> 4], lv = (v & 15) * 3;
-          d[di] = rg[lv]; d[di + 1] = rg[lv + 1]; d[di + 2] = rg[lv + 2]; d[di + 3] = 255;
+      const k = up(L);
+      const dx = px + ox * k - b.x0, dy = py + oy * k - b.y0;
+      if (k === 1) {
+        for (let yy = 0; yy < sh; yy++) {
+          let si = ((sy + yy) * L.w + sx) * 4;
+          let di = ((dy + yy) * AW + dx) * 4;
+          for (let xx = 0; xx < sw; xx++, si += 4, di += 4) {
+            if (L.px[si + 3] < 128) continue;
+            const v = L.px[si];
+            const rg = pal[v >> 4], lv = (v & 15) * 3;
+            d[di] = rg[lv]; d[di + 1] = rg[lv + 1]; d[di + 2] = rg[lv + 2]; d[di + 3] = 255;
+          }
         }
+      } else {
+        // 아직 1배로만 구운 층: 점 하나를 k×k로 키워 2배 그림에 맞춘다
+        for (let yy = 0; yy < sh; yy++)
+          for (let xx = 0; xx < sw; xx++) {
+            const si = ((sy + yy) * L.w + sx + xx) * 4;
+            if (L.px[si + 3] < 128) continue;
+            const v = L.px[si];
+            const rg = pal[v >> 4], lv = (v & 15) * 3;
+            for (let a = 0; a < k; a++)
+              for (let c = 0; c < k; c++) {
+                const di = ((dy + yy * k + a) * AW + dx + xx * k + c) * 4;
+                d[di] = rg[lv]; d[di + 1] = rg[lv + 1]; d[di + 2] = rg[lv + 2]; d[di + 3] = 255;
+              }
+          }
       }
     }
-    // 선택적 외곽선: 바깥 빈칸에 가장 어두운 이웃 색을 더 어둡게
+    // 선택적 외곽선: 바깥 빈칸에 가장 어두운 이웃 색을 더 어둡게 (2배 그림은 두 겹 = 같은 굵기로 보임)
+    for (let pass = 0; pass < PX; pass++) {
     const add: number[] = [];
     for (let yy = 0; yy < h; yy++)
       for (let xx = 0; xx < w; xx++) {
@@ -249,6 +297,7 @@ async function build(look: Look, keys: ReturnType<typeof layerKeys>): Promise<Ch
         if (best >= 0) add.push(i, Math.round(d[best] * 0.32 + 8), Math.round(d[best + 1] * 0.3 + 6), Math.round(d[best + 2] * 0.3 + 6));
       }
     for (let k = 0; k < add.length; k += 4) { const i = add[k]; d[i] = add[k + 1]; d[i + 1] = add[k + 2]; d[i + 2] = add[k + 3]; d[i + 3] = 255; }
+    }
     // 광채용 실루엣 (서 있는 장면)
     const m = /^idle-(se|sw|ne|nw|s|e|n|w)-0$/.exec(b.name);
     if (m) {
@@ -266,13 +315,13 @@ async function build(look: Look, keys: ReturnType<typeof layerKeys>): Promise<Ch
     const [px, py] = place.get(b.name)!;
     const w = b.x1 - b.x0, h = b.y1 - b.y0;
     const tex = new Texture({ source: src, frame: new Rectangle(px, py, w, h) });
-    frames.set(b.name, { tex, ax: -b.x0 / w, ay: -b.y0 / h, w, h });
+    frames.set(b.name, { tex, ax: -b.x0 / w, ay: -b.y0 / h, w, h, k: 1 / PX });
     const [an, , idx] = b.name.split('-');
     const n = Number(idx) + 1;
     if ((counts[an as Anim] ?? 0) < n) counts[an as Anim] = n;
   }
   const attack: Anim | null = keys.mode === 'u' ? 'punch' : keys.mode === 'm' ? 'swing' : keys.mode === 'g' ? 'shoot' : null;
-  return { mode: keys.mode, attack, frames, counts, masks };
+  return { mode: keys.mode, attack, frames, counts, masks, eight: frames.has('hit-s-0') };
 }
 
 /** 장면 하나 (없으면 서 있는 장면) */
@@ -288,11 +337,12 @@ export function turnedDir(d: Dir): Dir {
   return d === 's' ? 'n' : d === 'n' ? 's' : d;
 }
 
-/** 스프라이트에 장면을 건다 (장면마다 발 위치가 달라 기준점도 바꾼다) */
-export function applyFrame(s: { texture: Texture; anchor: { set(x: number, y: number): void } }, f: Frame | undefined) {
+/** 스프라이트에 장면을 건다 (장면마다 발 위치가 달라 기준점도 바꾼다). size = 괴물·층주처럼 크게 그릴 때 */
+export function applyFrame(s: { texture: Texture; anchor: { set(x: number, y: number): void }; scale: { set(x: number, y?: number): void } }, f: Frame | undefined, size = 1) {
   if (!f) return;
   if (s.texture !== f.tex) s.texture = f.tex;
   s.anchor.set(f.ax, f.ay);
+  s.scale.set(f.k * size);
 }
 
 /** 미리 불러오기 (첫 장면이 비지 않도록) */
@@ -312,7 +362,7 @@ export function auraFor(cs: CharSet): Map<Dir, Frame[]> {
     const list = auraFromMask(m.solid, m.w, m.h).map((c) => {
       const tex = Texture.from(c);
       tex.source.scaleMode = 'nearest';
-      return { tex, ax: (-m.ox + AURA_PAD) / W, ay: (-m.oy + AURA_PAD) / H, w: W, h: H };
+      return { tex, ax: (-m.ox + AURA_PAD) / W, ay: (-m.oy + AURA_PAD) / H, w: W, h: H, k: 1 / PX };
     });
     a.set(dir, list);
   }

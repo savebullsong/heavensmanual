@@ -62,7 +62,9 @@ def engine(kind):
 
 # ── 인형 ──
 D = body.Doll(job['sex'], job.get('build', 1), job.get('child', False), job.get('monster', False))
-need_outfits = {s['outfit'] for s in job['sets'] if s['kind'] == 'base'} | {'casual'}
+# 머리카락·무기를 구울 때 가림막이 되는 몸 (괴물은 제 몸으로 가린다)
+OCC = 'o.' + job.get('occluder', 'casual')
+need_outfits = {s['outfit'] for s in job['sets'] if s['kind'] == 'base'} | {OCC[2:]}
 for o in need_outfits: D.outfit(o)
 for s in job['sets']:
     if s['kind'] == 'hair': D.hair(s['style'])
@@ -121,7 +123,7 @@ def frames_for(spec):
     return poses.anims('g' if w == 'pistol' else 'm')
 
 def key_for(spec):
-    if D.monster: return f"{'b' if spec['kind'] == 'base' else 'w'}-x-{spec.get('outfit') or spec.get('weapon')}-{spec.get('mode', 'm')}" if spec['kind'] == 'base' else f"w-x-{spec['weapon']}"
+    if D.monster: return f"b-{D.mkey}-{spec['outfit']}-{spec.get('mode', 'm')}" if spec['kind'] == 'base' else f"w-{D.mkey}-{spec['weapon']}"
     if spec['kind'] == 'armor': return f"a-{D.sex}{job.get('build', 1)}-{spec['piece']}-{spec['mode']}"
     who = 'c' if D.child else f"{D.sex}{job.get('build', 1)}" if spec['kind'] == 'base' else D.sex
     if spec['kind'] == 'base': return f"b-{who}-{spec['outfit']}-{spec['mode']}"
@@ -156,7 +158,7 @@ def pack(key, items, merge=False):
         im = np.asarray(Image.open(f'{OUT}/{key}.png').convert('LA'))
         new = {n for n, _, _ in items}
         for name, m in old.items():
-            if name in new: continue
+            if name in new or name.startswith('_'): continue
             if not m: rects.append((name, None)); continue
             px, py, w, h, ox, oy = m
             rects.append((name, (ox + FOOT[0], oy + FOOT[1], w, h, im[py:py + h, px:px + w, 0].copy(), im[py:py + h, px:px + w, 1].copy())))
@@ -179,6 +181,7 @@ def pack(key, items, merge=False):
         px, py = place[name]; x0, y0, w, h, L, A = r
         img[py:py + h, px:px + w, 0] = L; img[py:py + h, px:px + w, 1] = A
         meta[name] = [int(px), int(py), int(w), int(h), int(x0 - FOOT[0]), int(y0 - FOOT[1])]
+    if SCALE > 1: meta['_px'] = [SCALE]  # 이 층의 픽셀 밀도 (게임이 층마다 맞춰 합친다)
     Image.fromarray(img, 'LA').save(f'{OUT}/{key}.png', optimize=True)
     json.dump(meta, open(f'{OUT}/{key}.json', 'w'), separators=(',', ':'))
 
@@ -188,11 +191,11 @@ for spec in job['sets']:
     if spec['kind'] == 'base':
         groups = {'o.' + spec['outfit']}; keep = None
     elif spec['kind'] == 'hair':
-        groups = {'h.' + spec['style'], 'o.casual'}; keep = {'hair'}
+        groups = {'h.' + spec['style'], OCC}; keep = {'hair'}
     elif spec['kind'] == 'armor':
-        groups = {'a.' + spec['piece'], 'o.casual'}; keep = 'armor'
+        groups = {'a.' + spec['piece'], OCC}; keep = 'armor'
     else:
-        groups = {'w.' + spec['weapon'], 'o.casual'}; keep = {'wood', 'metal', 'dark', 'crest'}
+        groups = {'w.' + spec['weapon'], OCC}; keep = {'wood', 'metal', 'dark', 'crest'}
     show(groups)
     A = frames_for(spec)
     if job.get('only'): A = {k: v for k, v in A.items() if k in job['only']}

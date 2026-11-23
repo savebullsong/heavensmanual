@@ -146,9 +146,10 @@ export class ShopRoom {
       if (!tx) return;
       this.hwang.texture = tx;
       // 같은 크기 또는 2배(더 섬세한 그림): 2배면 반으로 줄여 같은 크기로 보인다 (고해상도 화면에서 두 배 선명)
-      const k = tx.width === f.w * 2 && tx.height === f.h * 2 ? 2 : 1;
+      const lw = Math.round(f.w * f.k), lh = Math.round(f.h * f.k); // 게임 속 크기
+      const k = tx.width === lw * 2 && tx.height === lh * 2 ? 2 : 1;
       this.hwang.scale.set(1 / k);
-      if (tx.width === f.w * k && tx.height === f.h * k) this.hwang.anchor.set(f.ax, f.ay); else this.hwang.anchor.set(0.5, 1);
+      if (tx.width === lw * k && tx.height === lh * k) this.hwang.anchor.set(f.ax, f.ay); else this.hwang.anchor.set(0.5, 1);
     });
     const [hx, hy] = iso(HWANG.x, HWANG.y);
     this.hwang.position.set(hx, hy);
@@ -264,6 +265,16 @@ export class ShopRoom {
     this.clock.clear();
     hand((((h % 12) + m / 60) / 12) * Math.PI * 2, 2.2, 0x1a120c);
     hand((m / 60) * Math.PI * 2, 3.2, 0x2a1a10);
+  }
+
+  /** 세계마다 같은 가게, 다른 빛: 귀신에게는 잿빛, 지옥에서는 황혼의 붉은 가게 */
+  setRealm(r: 'real' | 'ghost' | 'hell') {
+    if (r === 'real') { this.camera.filters = []; this.setGhost(false); return; }
+    const cm = new ColorMatrixFilter();
+    if (r === 'ghost') cm.desaturate();
+    else cm.matrix = [0.95, 0.25, 0.05, 0, 0.04, 0.1, 0.42, 0.04, 0, 0, 0.06, 0.12, 0.3, 0, 0.01, 0, 0, 0, 1, 0];
+    this.camera.filters = [cm];
+    this.setGhost(r === 'ghost');
   }
 
   setGhost(on: boolean) {

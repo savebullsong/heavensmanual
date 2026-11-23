@@ -1,7 +1,7 @@
 // 관리자 페이지: 주요 인물 그림(대화창) · 게임 속 도트 그림 교체 — 두 메뉴로 나눔
 import './admin.css';
 import { PORTRAIT_SLOTS, SPRITE_SLOTS, DEFAULT_PORTRAITS, type PortraitSlot } from './portraits.ts';
-import { charSet, frameOf, MISS_HWANG } from './sprites.ts';
+import { charSet, frameOf, MISS_HWANG, PX } from './sprites.ts';
 
 const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   'miss-hwang': { name: '미스 황', where: '현실 · 우주새 점원' },
@@ -36,7 +36,8 @@ function dotSpec(slot: PortraitSlot): Promise<DotSpec | null> {
         const c = document.createElement('canvas');
         c.width = fr.width; c.height = fr.height;
         c.getContext('2d')!.drawImage(src, fr.x, fr.y, fr.width, fr.height, 0, 0, fr.width, fr.height);
-        return { canvas: c, w: c.width, h: c.height, foot: [Math.round(f.ax * f.w), Math.round(f.ay * f.h)] };
+        // 구운 그림이 2배 밀도(PX=2)면 캔버스는 2배, 필요한 크기(w·h)는 게임 속 크기로 적는다
+        return { canvas: c, w: Math.round(c.width / PX), h: Math.round(c.height / PX), foot: [Math.round((f.ax * f.w) / PX), Math.round((f.ay * f.h) / PX)] };
       }
       const name = slot === 'sprite-parrot' ? 'shop-parrot-0' : 'shop-parrot-1';
       const im = await new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = `./sprites/${name}.png`; });
@@ -212,7 +213,16 @@ function dotCard(slot: PortraitSlot) {
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   }, 'image/png');
   // 1배: 지금 게임 그림 그대로 · 2배: 같은 그림을 픽셀째 두 배로 키운 밑그림 (그 위에 섬세하게 손질)
-  down.onclick = () => { if (spec) save2(spec.canvas); };
+  down.onclick = () => {
+    if (!spec) return;
+    if (spec.canvas.width === spec.w) { save2(spec.canvas); return; }
+    const c = document.createElement('canvas');
+    c.width = spec.w; c.height = spec.h;
+    const g = c.getContext('2d')!;
+    g.imageSmoothingEnabled = false;
+    g.drawImage(spec.canvas, 0, 0, c.width, c.height);
+    save2(c);
+  };
   down2.onclick = () => {
     if (!spec) return;
     const c = document.createElement('canvas');
