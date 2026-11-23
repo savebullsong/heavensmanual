@@ -1171,9 +1171,9 @@ function openSignup(tab: 'signup' | 'login') {
   el.innerHTML = `<div class="signup-box">
     <div class="tabs"><button data-t="signup"></button><button data-t="login"></button></div>
     <h2></h2><p class="sub"></p>
-    <label><span class="l-id"></span><input class="id" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="16"><small class="r-id"></small></label>
-    <label><span class="l-pw"></span><input class="pw" type="password" autocomplete="new-password" maxlength="72"><small class="r-pw"></small></label>
-    <label class="pw2-row"><span class="l-pw2"></span><input class="pw2" type="password" autocomplete="new-password" maxlength="72"></label>
+    <label><span class="l-id"></span><input class="id" inputmode="email" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="16"><small class="r-id"></small><small class="f-err e-id"></small></label>
+    <label><span class="l-pw"></span><input class="pw" type="password" autocomplete="new-password" maxlength="72"><small class="r-pw"></small><small class="f-err e-pw"></small></label>
+    <label class="pw2-row"><span class="l-pw2"></span><input class="pw2" type="password" autocomplete="new-password" maxlength="72"><small class="f-err e-pw2"></small></label>
     <p class="err"></p>
     <div class="row"><button class="go primary"></button><button class="cancel"></button></div></div>`;
   const q = <T extends Element>(s: string) => el.querySelector(s) as T;
@@ -1195,18 +1195,40 @@ function openSignup(tab: 'signup' | 'login') {
   tLogin.onclick = () => setTab('login');
   q<HTMLButtonElement>('.cancel').onclick = () => el.remove();
   const go = q<HTMLButtonElement>('.go');
+  // 문제가 있는 칸 바로 아래에 빨갛게 (예전엔 맨 아래 한 줄이라 비밀번호 문제처럼 보였다)
+  const fieldErr = (f: 'id' | 'pw' | 'pw2' | null, msg = '') => {
+    for (const k of ['id', 'pw', 'pw2'] as const) {
+      q<HTMLElement>(`.e-${k}`).textContent = k === f ? msg : '';
+      q<HTMLInputElement>(`.${k}`).classList.toggle('bad', k === f);
+    }
+    q<HTMLElement>('.err').textContent = '';
+  };
+  const idIn = q<HTMLInputElement>('.id');
+  idIn.addEventListener('input', () => {
+    const v = idIn.value.trim().toLowerCase();
+    fieldErr(/^[a-z0-9_]*$/.test(v) ? null : 'id', L.idBadChar);
+  });
   go.onclick = async () => {
-    const id = q<HTMLInputElement>('.id').value.trim().toLowerCase(), pw = q<HTMLInputElement>('.pw').value, pw2 = q<HTMLInputElement>('.pw2').value;
+    const id = idIn.value.trim().toLowerCase(), pw = q<HTMLInputElement>('.pw').value, pw2 = q<HTMLInputElement>('.pw2').value;
     const err = q<HTMLElement>('.err');
-    if (!/^[a-z0-9_]{4,16}$/.test(id)) { err.textContent = L.idRule; return; }
-    if (pw.length < 6) { err.textContent = L.pwRule; return; }
-    if (tab === 'signup' && pw !== pw2) { err.textContent = L.pwMismatch; return; }
+    fieldErr(null);
+    // 아이디: 영어·숫자 (대문자는 소문자로 바꿔 받는다 · 밑줄 _ 은 받아 주지만 안내하지 않는다)
+    if (!/^[a-z0-9_]*$/.test(id)) { fieldErr('id', L.idBadChar); idIn.focus(); return; }
+    if (id.length < 4 || id.length > 16) { fieldErr('id', L.idBadLen); idIn.focus(); return; }
+    if (pw.length < 6) { fieldErr('pw', L.pwRule); return; }
+    if (tab === 'signup' && pw !== pw2) { fieldErr('pw2', L.pwMismatch); return; }
     go.disabled = true;
     if (tab === 'signup') {
       const r = await net.register(id, pw, state);
       go.disabled = false;
       if ('token' in r && r.token) { el.remove(); welcome(id); renderHud(); }
-      else err.textContent = 'error' in r && r.error === 'taken' ? L.errTaken : L.errNet;
+      else {
+        const e = 'error' in r ? r.error : 'net';
+        if (e === 'taken') fieldErr('id', L.errTaken);
+        else if (e === 'bad_id') fieldErr('id', L.idBadChar);
+        else if (e === 'bad_pw') fieldErr('pw', L.pwRule);
+        else err.textContent = L.errNet;
+      }
     } else {
       const r = await net.login(id, pw);
       go.disabled = false;

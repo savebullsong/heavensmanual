@@ -180,6 +180,9 @@ button.primary:hover { background: #e0b437; }
 .signup .tabs button.on { border-color: #c9a23e; color: #f2d27a; }
 .signup[data-tab="login"] .pw2-row { display: none; }
 .signup[data-tab="login"] small { display: none; }
+.signup small.f-err { display: block; color: #ff8a7a; font-weight: 600; }
+.signup small.f-err:empty { display: none; }
+.signup input.bad { border-color: #e0463a !important; box-shadow: 0 0 0 2px rgba(224, 70, 58, 0.35); }
 button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; border-color: #8a6a2a; font-weight: 700; }
 
 /* 전화 */
