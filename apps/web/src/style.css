@@ -77,3 +77,50 @@ button.primary:hover { background: #e0b437; }
 
 #hud .attrib { position: fixed; right: 8px; bottom: 6px; font-size: 11px; color: #d8ccb0; background: rgba(20,15,11,0.7); padding: 2px 6px; border-radius: 3px; pointer-events: auto; text-decoration: none; }
 .scene.loading { display: flex; align-items: center; justify-content: center; height: 100%; color: #e0b437; font-size: 18px; }
+
+/* 대상 메뉴 (사람·가게를 눌렀을 때) */
+.target-menu { position: fixed; z-index: 25; min-width: 150px; display: flex; flex-direction: column; gap: 3px; padding: 6px; background: rgba(20, 14, 10, 0.96); border: 2px solid #8a6a3a; border-radius: 6px; box-shadow: inset 0 0 0 2px #24190f, 0 6px 20px rgba(0, 0, 0, 0.5); }
+.tm-head { display: flex; flex-direction: column; padding: 2px 6px 6px; border-bottom: 1px solid #4a3424; margin-bottom: 3px; }
+.tm-head b { color: #e0b437; font-size: 14px; }
+.tm-head span { color: #b8a888; font-size: 12px; }
+.target-menu button { text-align: left; padding: 7px 10px; font-size: 14px; }
+.target-menu button.danger { color: #ff9a8a; border-color: #7a2a26; background: rgba(90, 20, 18, 0.55); }
+
+/* 가방 */
+.bag-panel { position: fixed; z-index: 18; right: 12px; top: 66px; width: min(380px, calc(100vw - 24px)); max-height: calc(100vh - 90px); }
+.bag-panel .menu-head { align-items: center; padding: 8px 10px; }
+.bag-panel .menu-head b { color: #e0b437; }
+.bag-info { padding: 6px 12px 0; font-size: 12px; color: #b8a888; }
+.bag-empty { color: #8a7a62; text-align: center; padding: 14px 0; margin: 0; }
+.menu-item.has-act .price { grid-row: 1; align-self: end; font-size: 13px; }
+.menu-item .act { grid-column: 3; grid-row: 2; justify-self: end; align-self: start; margin-top: 3px; padding: 1px 8px; font-size: 12px; color: #1a120c; background: #e0b437; border-radius: 3px; }
+.menu-item.dim .act { background: #6b5a3e; }
+.menu-item.dim .price { color: #8a7a62; }
+
+/* 알림 (선행·악행·경험치) */
+.toasts { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 22; display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
+.toast { padding: 6px 14px; background: rgba(20, 14, 10, 0.92); border: 1px solid #8a6a3a; border-radius: 4px; font-size: 14px; color: #eadfc8; transition: opacity 0.5s, transform 0.5s; }
+.toast.good { border-color: #4f8a4a; color: #b9f0b0; }
+.toast.evil { border-color: #8a2a26; color: #ffb0a6; }
+.toast.out { opacity: 0; transform: translateY(-8px); }
+
+/* 체력 막대 */
+.hpbox { display: inline-flex; align-items: center; gap: 6px; }
+.hpbar { display: inline-block; width: 80px; height: 8px; background: #2a1d14; border: 1px solid #5a4424; border-radius: 2px; overflow: hidden; }
+.hpbar > i { display: block; height: 100%; width: 100%; background: linear-gradient(#7fdc7a, #4fa84a); transition: width 0.3s; }
+.hpbar.danger > i { background: linear-gradient(#ff6a5a, #c02a20); animation: dlg-blink 0.8s steps(2) infinite; }
+.hpnum { font-style: normal; font-variant-numeric: tabular-nums; min-width: 2.6em; }
+.hud-left .work { color: #e0b437; font-size: 12px; }
+.hud-left .work:empty { display: none; }
+
+/* 죽음과 심판 */
+.death { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; background: rgba(6, 4, 3, 0); transition: background 1.2s; }
+.death.show { background: rgba(6, 4, 3, 0.86); }
+.death-box { max-width: 460px; margin: 16px; padding: 28px 26px; text-align: center; background: rgba(20, 14, 10, 0.96); border: 2px solid #6b2a26; border-radius: 8px; opacity: 0; transition: opacity 1.2s 0.4s; }
+.death.show .death-box { opacity: 1; }
+.death h1 { margin: 0 0 10px; color: #d9534f; font-size: 26px; letter-spacing: 0.06em; }
+.death p { margin: 8px 0; line-height: 1.6; }
+.death .karma { color: #b8a888; font-size: 14px; }
+.death .verdict { color: #e0b437; }
+.death .closed { color: #c9bfa8; font-style: italic; }
+.death button { margin-top: 14px; }

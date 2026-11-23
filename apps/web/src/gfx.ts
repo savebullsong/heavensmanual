@@ -163,7 +163,12 @@ export function drawBuilding(b: Building, signText: string, night: boolean) {
       g.save();
       g.translate(sx, sy);
       g.transform(1, left ? 0.5 : -0.5, 0, 1, 0, 0);
-      g.font = '600 10px sans-serif';
+      // 간판 폭에 맞춰 글씨를 줄인다 (면 한 칸 ≈ 35px)
+      const room = span * 35 - 8;
+      let fs = 10;
+      g.font = `600 ${fs}px sans-serif`;
+      while (fs > 7 && g.measureText(signText).width > room) { fs -= 1; g.font = `600 ${fs}px sans-serif`; }
+      if (g.measureText(signText).width > room) { while (signText.length > 1 && g.measureText(signText + '…').width > room) signText = signText.slice(0, -1); signText += '…'; }
       g.textAlign = 'center';
       g.fillStyle = '#fffaf0';
       g.fillText(signText, 0, 0);

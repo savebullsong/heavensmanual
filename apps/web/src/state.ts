@@ -8,7 +8,17 @@ export interface Save {
   region?: string;
   visits: number;
   lang?: Lang;
+  // 이번 생 (죽으면 사라진다)
+  wallet?: number;
+  bag?: Record<string, number>;
+  equip?: Partial<Record<Slot, string>>;
+  ammo?: number;
+  hp?: number;
+  deeds?: { good: number; evil: number };
+  // 영혼 (환생해도 남는다)
+  soul?: { rank: number; exp: number };
 }
+export type Slot = 'weapon' | 'head' | 'body' | 'hands' | 'legs' | 'shins' | 'feet';
 // v2: 작은 캐릭터와 '처음 모습' 시나리오로 바뀌어 예전 저장은 새로 시작한다
 const KEY = 'heavensmanual.save.v2';
 

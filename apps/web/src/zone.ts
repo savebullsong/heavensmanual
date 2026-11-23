@@ -44,6 +44,15 @@ function finalize(z: Omit<Zone, 'blocked'>): Zone {
     blocked[k] = t === 'block' || t === 'void' || t === 'water' ? 1 : 0;
   }
   for (const p of z.props) if (p.kind !== 'tree') blocked[p.j * z.W + p.i] = 1;
+  // 건물 바닥은 막는다. 지도 변환에서 골목·보도가 건물 밑으로 그려진 곳이 많아 사람이 건물을 뚫고 다녔다
+  // (큰길과 횡단보도만 남겨 길이 끊기지 않게 한다)
+  for (const b of z.buildings)
+    for (let j = b.j0; j < b.j0 + b.d; j++)
+      for (let i = b.i0; i < b.i0 + b.w; i++) {
+        if (i < 0 || j < 0 || i >= z.W || j >= z.H) continue;
+        const t = TYPES[z.tiles[j * z.W + i]];
+        if (t !== 'road' && t !== 'cross' && t !== 'median') blocked[j * z.W + i] = 1;
+      }
   return { ...z, blocked };
 }
 

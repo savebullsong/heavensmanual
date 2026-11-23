@@ -124,7 +124,10 @@ export function characterPixels(look: Look, facing: Facing, frame: number) {
   const legW = (child ? 2.6 : f ? 2.8 : 3.0) * w;
   const shY = U(16.4), waistY = U(23.8), hipY = U(27), kneeY = Y(35.4) + bob * 0.5, ankleY = Y(43);
   const stride = phase * (child ? 1.6 : 2.2);
-  const nearSign = front ? 1 : -1; // 화면 오른쪽 다리·팔이 앞에 온다 (뒷모습은 반대)
+  // 3/4 시점: 오른쪽 아래를 보면 몸의 오른쪽 옆면이 화면 왼쪽에 보이고(가까운 쪽), 오른쪽 위를 보면 화면 오른쪽이 가깝다
+  const nearSign = front ? -1 : 1;
+  const halfW = (side: number) => (side === nearSign ? 1 : 0.8); // 먼 쪽 몸은 좁게 보인다
+  const fwdY = front ? 0.35 : -0.35; // 앞으로 내딛는 발은 앞모습에선 아래, 뒷모습에선 위
 
   const coat = outfit === 'raincoat' || outfit === 'patient';
   const parrot = outfit === 'parrot';
@@ -133,25 +136,34 @@ export function characterPixels(look: Look, facing: Facing, frame: number) {
   const armMatLower = outfit === 'casual' || outfit === 'patient' ? SK : armMatUpper;
 
   const leg = (side: number) => {
-    const s = side * nearSign;
-    const hx0 = cx + side * (hp - legW / 2 - 0.3);
-    const ax = cx + side * 1.4 + s * stride;
-    const kx = (hx0 + ax) / 2 + s * stride * 0.25;
+    const near = side === nearSign;
+    // 걸음은 보는 방향(오른쪽 대각선)으로: 번갈아 앞뒤로 내딛는다
+    const fwd = (side === 1 ? 1 : -1) * stride;
+    const hx0 = cx + side * (hp - legW / 2 - 0.3) * halfW(side);
+    const ax = cx + side * (near ? 1.5 : 1.1) + fwd;
+    const dy = Math.max(-1, Math.min(1, fwd * fwdY)) - (near ? 0 : 0.5);
+    const ay = ankleY + dy, fy = Math.min(foot + 0.6, foot + dy);
+    const kx = (hx0 + ax) / 2 + fwd * 0.25;
+    const ky = kneeY + dy * 0.5;
+    const darken = (pts: Pt[]) => { if (!near) r.shade(pts, 1, [legMat, SH, FT, PC]); };
     if (parrot) {
-      P(limb(hx0, hipY - 1, kx, kneeY + 2, legW + 1.2, legW + 0.6), PC);
-      P(limb(kx, kneeY + 2, ax, ankleY, 1.2, 1.1), FT);
-      P([[ax - 1.6, ankleY - 0.4], [ax + 3, ankleY + 1], [ax + 3.6, foot + 0.2], [ax - 2, foot + 0.2]], FT);
+      const a = limb(hx0, hipY - 1, kx, ky + 2, legW + 1.2, legW + 0.6), b = limb(kx, ky + 2, ax, ay, 1.2, 1.1);
+      const c: Pt[] = [[ax - 1.6, ay - 0.4], [ax + 3, ay + 1], [ax + 3.6, fy + 0.2], [ax - 2, fy + 0.2]];
+      P(a, PC); P(b, FT); P(c, FT); darken(a); darken(b); darken(c);
       return;
     }
-    P(limb(hx0, hipY - 1, kx, kneeY, legW, legW * 0.86), legMat);
-    P(limb(kx, kneeY, ax, ankleY, legW * 0.86, legW * 0.66), legMat);
-    // 신발: 앞모습은 발끝이 오른쪽, 뒷모습은 뒤꿈치가 보여 짧다
+    const a = limb(hx0, hipY - 1, kx, ky, legW, legW * 0.86), b = limb(kx, ky, ax, ay, legW * 0.86, legW * 0.66);
+    P(a, legMat); P(b, legMat);
+    // 신발: 발끝은 보는 쪽(오른쪽). 뒷모습은 뒤꿈치가 보여 짧다
     const toe = front ? 2.6 : 1.6;
-    P([[ax - 1.5, ankleY - 0.6], [ax + 1.3, ankleY - 0.6], [ax + toe, foot - 1.2], [ax + toe, foot + 0.2], [ax - 1.7, foot + 0.2]], SH);
+    const sh: Pt[] = [[ax - 1.5, ay - 0.6], [ax + 1.3, ay - 0.6], [ax + toe, fy - 1.2], [ax + toe, fy + 0.2], [ax - 1.7, fy + 0.2]];
+    P(sh, SH);
+    darken(a); darken(b); darken(sh);
   };
   const arm = (side: number, swing: number) => {
     const s = side * nearSign;
-    const sx0 = cx + side * (sw - 0.9);
+    const near = side === nearSign;
+    const sx0 = cx + side * (sw - (near ? 0.7 : 1.4));
     const ex = sx0 + side * 0.6 - s * swing * 0.5, ey = U(child ? 21.5 : 21.8);
     const wx = sx0 + side * 0.4 - s * swing, wy = U(child ? 26 : 27.2);
     const ua = (child ? 2.1 : f ? 2.2 : 2.6) * w, fa = (child ? 1.8 : f ? 1.9 : 2.2) * w;
@@ -161,6 +173,7 @@ export function characterPixels(look: Look, facing: Facing, frame: number) {
     if (outfit === 'patient') P(limb(sx0, shY + 0.6, ex, ey - 1.4, ua + 1, fa + 1.2), GW);
     if (parrot) { P(limb(sx0, shY + 0.4, wx, wy + 1, ua + 1.6, 1.2), PC); P(limb(ex, ey + 1, wx, wy + 1.5, 1.4, 0.8), CR); return; }
     P(ell(wx + side * 0.1, wy + 1.1, 1.05, 1.25, 0, Math.PI * 2, 10), SK);
+    if (!near) r.shade(limb(sx0, shY, wx, wy + 2.4, ua + 2, fa + 2), 1, [armMatUpper, armMatLower, SK]);
   };
 
   // ── 긴 머리 뒷부분 (앞모습에서는 몸 뒤)
@@ -179,7 +192,8 @@ export function characterPixels(look: Look, facing: Facing, frame: number) {
     P(ell(cx, U(23), sw + 1.6, 7.6, 0, Math.PI * 2, 22), PC);
     if (front) r.shade(ell(cx + 1.4, U(24), sw - 1, 5), 3, [PC]);
   } else {
-    const torso: Pt[] = [[cx - sw, shY], [cx + sw, shY], [cx + sw - 0.3, U(19)], [cx + wa, waistY], [cx + hp, hipY], [cx - hp, hipY], [cx - wa, waistY], [cx - sw + 0.3, U(19)]];
+    const L = halfW(-1), Rr = halfW(1);
+    const torso: Pt[] = [[cx - sw * L, shY], [cx + sw * Rr, shY], [cx + (sw - 0.3) * Rr, U(19)], [cx + wa * Rr, waistY], [cx + hp * Rr, hipY], [cx - hp * L, hipY], [cx - wa * L, waistY], [cx - (sw - 0.3) * L, U(19)]];
     if (outfit === 'raincoat') {
       P([[cx - sw + 0.2, shY - 0.4], [cx + sw - 0.2, shY - 0.4], [cx + sw + 0.2, U(19)], [cx + hp + 1.5, Y(36.5)], [cx - hp - 1.5, Y(36.5)], [cx - sw - 0.2, U(19)]], RC);
       if (front) { r.shade([[cx + 0.8, shY + 1], [cx + 1.6, shY + 1], [cx + 1.8, Y(36.5)], [cx + 1, Y(36.5)]], 1, [RC]); for (const y of [19.5, 23, 26.5, 30]) D(cx + 2.3, U(y), '#5e4a18'); }
@@ -189,6 +203,8 @@ export function characterPixels(look: Look, facing: Facing, frame: number) {
       for (let y = Math.ceil(shY + 2); y < Y(35); y += 3) for (let x = Math.ceil(cx - sw); x < cx + sw + 1; x += 3) D(x + ((y / 3) % 2), y, '#8fa3b2');
     } else {
       P(torso, TP);
+      const far = -nearSign;
+      r.shade([[cx + far * sw * 0.45, shY], [cx + far * sw, shY], [cx + far * hp, hipY], [cx + far * hp * 0.5, hipY]], 1, [TP]);
       P([[cx - hp, hipY - 1.4], [cx + hp, hipY - 1.4], [cx + hp, hipY + 0.6], [cx - hp, hipY + 0.6]], BT);
       if (outfit === 'apron') {
         if (front) P([[cx - sw + 1.2, U(17.5)], [cx + sw - 0.4, U(17.5)], [cx + hp + 0.9, Y(36.5)], [cx - hp + 0.4, Y(36.5)]], AP);
