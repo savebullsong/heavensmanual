@@ -39,7 +39,7 @@ export function openLookPanel(host: HTMLElement, initial: Look, o: LookPanelOpts
     { label: L.bottom, count: BOTTOM_COLORS.length, get: () => look.bottom, set: (v) => (look.bottom = v), name: (v) => `${v + 1}`, swatch: BOTTOM_COLORS },
   ];
   const outs = o.outfits ?? [];
-  if (outs.length > 1) rows.push({ label: L.outfit, count: outs.length, get: () => Math.max(0, outs.indexOf(look.outfit ?? 'casual')), set: (v) => (look.outfit = outs[v]), name: (v) => L.outfits[outs[v]] });
+  if (outs.length > 1) rows.push({ label: L.outfit, count: outs.length, get: () => Math.max(0, outs.indexOf(look.outfit ?? 'casual')), set: (v) => (look.outfit = outs[v]), name: (v) => (L.outfits as Record<string, string>)[outs[v]] });
   const regs = o.regions ?? [];
   if (regs.length) rows.push({ label: L.region, count: regs.length, get: () => regionIdx, set: (v) => (regionIdx = v), name: (v) => (regs[v].ready ? regs[v].label : `${regs[v].label} (${L.soon})`), off: (v) => !regs[v].ready });
   for (const r of rows) {

@@ -11,6 +11,8 @@ export interface ItemDef {
   def?: number; // 방어력
   note?: 'rope' | 'needsAmmo' | 'ammo';
   name: Record<Lang, string>;
+  store?: 'mart' | 'pharmacy' | 'food' | 'cafe'; // 우주새가 아니라 거리 가게에서 파는 것
+  now?: boolean; // 가게에서 바로 먹는다 (가방에 넣지 않음)
 }
 
 export const ITEMS: ItemDef[] = [
@@ -40,20 +42,42 @@ export const ITEMS: ItemDef[] = [
   { key: 'workpants', cat: 'armor', price: 450, def: 2, name: { ko: '작업 바지', th: 'กางเกงช่าง', en: 'Work trousers' } },
   { key: 'shinguard', cat: 'armor', price: 390, def: 2, name: { ko: '정강이 보호대', th: 'สนับแข้ง', en: 'Shin guards' } },
   { key: 'boots', cat: 'armor', price: 990, def: 2, name: { ko: '안전화', th: 'รองเท้าเซฟตี้', en: 'Safety boots' } },
+  // 거리 가게 (방콕 실제 가격대)
+  { key: 'noodle', cat: 'goods', price: 15, heal: 35, store: 'mart', name: { ko: '컵라면', th: 'บะหมี่ถ้วย', en: 'Cup noodles' } },
+  { key: 'ricebox', cat: 'goods', price: 39, heal: 70, store: 'mart', name: { ko: '편의점 도시락', th: 'ข้าวกล่อง', en: 'Boxed rice meal' } },
+  { key: 'plaster', cat: 'goods', price: 25, heal: 30, store: 'mart', name: { ko: '반창고', th: 'พลาสเตอร์ยา', en: 'Plasters' } },
+  { key: 'painkiller', cat: 'goods', price: 30, heal: 60, store: 'pharmacy', name: { ko: '진통제', th: 'ยาแก้ปวด', en: 'Painkillers' } },
+  { key: 'saline', cat: 'goods', price: 20, heal: 25, store: 'pharmacy', name: { ko: '전해질 음료', th: 'เกลือแร่', en: 'Rehydration salts' } },
+  { key: 'firstaid', cat: 'goods', price: 250, heal: 300, store: 'pharmacy', name: { ko: '구급상자', th: 'ชุดปฐมพยาบาล', en: 'First-aid kit' } },
+  { key: 'padthai', cat: 'goods', price: 60, heal: 150, store: 'food', now: true, name: { ko: '팟타이', th: 'ผัดไทย', en: 'Pad thai' } },
+  { key: 'khaoman', cat: 'goods', price: 50, heal: 130, store: 'food', now: true, name: { ko: '카오만까이', th: 'ข้าวมันไก่', en: 'Chicken rice' } },
+  { key: 'noodlesoup', cat: 'goods', price: 50, heal: 120, store: 'food', now: true, name: { ko: '국수', th: 'ก๋วยเตี๋ยว', en: 'Noodle soup' } },
+  { key: 'coffee', cat: 'goods', price: 65, heal: 35, store: 'cafe', now: true, name: { ko: '커피', th: 'กาแฟ', en: 'Coffee' } },
+  { key: 'thaitea', cat: 'goods', price: 45, heal: 30, store: 'cafe', now: true, name: { ko: '타이 밀크티', th: 'ชาไทย', en: 'Thai milk tea' } },
+  { key: 'cake', cat: 'goods', price: 80, heal: 60, store: 'cafe', now: true, name: { ko: '케이크', th: 'เค้ก', en: 'Cake' } },
 ];
 
-const EFFECT: Record<Lang, { hp: string; atk: string; def: string; rope: string; needsAmmo: string; ammo: string }> = {
-  ko: { hp: '체력 +{n}', atk: '공격 {n}', def: '방어 {n}', rope: '추락을 한 번 막아 줌', needsAmmo: '탄약 필요', ammo: '권총에 넣는 탄약' },
-  th: { hp: 'พลังชีวิต +{n}', atk: 'โจมตี {n}', def: 'ป้องกัน {n}', rope: 'กันตกจากที่สูงได้หนึ่งครั้ง', needsAmmo: 'ต้องใช้กระสุน', ammo: 'กระสุนสำหรับปืนพก' },
-  en: { hp: 'HP +{n}', atk: 'Attack {n}', def: 'Defense {n}', rope: 'Saves you from one fall', needsAmmo: 'Needs ammo', ammo: 'Rounds for the pistol' },
+// 숫자는 보여 주지 않는다 (체력 막대로만 짐작). 효과는 말로
+/** 거리 가게 진열 (우주새 물건도 가게 가격으로 판다) */
+export const STORES: Record<'mart' | 'pharmacy' | 'food' | 'cafe', { key: string; price: number }[]> = {
+  mart: [{ key: 'water', price: 10 }, { key: 'cola', price: 17 }, { key: 'noodle', price: 15 }, { key: 'ricebox', price: 39 }, { key: 'chips', price: 30 }, { key: 'choco', price: 35 }, { key: 'plaster', price: 25 }],
+  pharmacy: [{ key: 'painkiller', price: 30 }, { key: 'bandage', price: 45 }, { key: 'saline', price: 20 }, { key: 'firstaid', price: 250 }, { key: 'water', price: 10 }],
+  food: [{ key: 'padthai', price: 60 }, { key: 'khaoman', price: 50 }, { key: 'noodlesoup', price: 50 }, { key: 'water', price: 10 }],
+  cafe: [{ key: 'coffee', price: 65 }, { key: 'thaitea', price: 45 }, { key: 'cake', price: 80 }, { key: 'water', price: 10 }],
+};
+
+const EFFECT: Record<Lang, { heal: string[]; atk: string[]; def: string[]; rope: string; needsAmmo: string; ammo: string }> = {
+  ko: { heal: ['조금 회복', '회복', '많이 회복', '크게 회복'], atk: ['가벼움', '묵직함', '날카로움', '위험함', '치명적'], def: ['얇음', '튼튼함', '단단함'], rope: '추락을 한 번 막아 줌', needsAmmo: '탄약 필요', ammo: '권총에 넣는 탄약' },
+  th: { heal: ['ฟื้นฟูเล็กน้อย', 'ฟื้นฟู', 'ฟื้นฟูมาก', 'ฟื้นฟูมหาศาล'], atk: ['เบา', 'หนักมือ', 'คม', 'อันตราย', 'ถึงตาย'], def: ['บาง', 'ทนทาน', 'แข็งแรง'], rope: 'กันตกจากที่สูงได้หนึ่งครั้ง', needsAmmo: 'ต้องใช้กระสุน', ammo: 'กระสุนสำหรับปืนพก' },
+  en: { heal: ['Heals a little', 'Heals', 'Heals a lot', 'Heals greatly'], atk: ['Light', 'Heavy', 'Sharp', 'Dangerous', 'Deadly'], def: ['Thin', 'Sturdy', 'Solid'], rope: 'Saves you from one fall', needsAmmo: 'Needs ammo', ammo: 'Rounds for the pistol' },
 };
 
 export function effectText(it: ItemDef, l: Lang): string {
   const E = EFFECT[l];
   const parts: string[] = [];
-  if (it.heal) parts.push(E.hp.replace('{n}', String(it.heal)));
-  if (it.atk) parts.push(E.atk.replace('{n}', String(it.atk)));
-  if (it.def) parts.push(E.def.replace('{n}', String(it.def)));
+  if (it.heal) parts.push(E.heal[it.heal <= 30 ? 0 : it.heal <= 80 ? 1 : it.heal <= 160 ? 2 : 3]);
+  if (it.atk) parts.push(E.atk[it.atk <= 4 ? 0 : it.atk <= 6 ? 1 : it.atk <= 8 ? 2 : it.atk <= 12 ? 3 : 4]);
+  if (it.def) parts.push(E.def[it.def <= 2 ? 0 : it.def <= 4 ? 1 : 2]);
   if (it.note) parts.push(E[it.note]);
   return parts.join(' · ');
 }
@@ -198,6 +222,43 @@ export function itemIcon(key: string): HTMLCanvasElement {
       P([[6, 4], [13, 4], [14, 26], [10, 29], [5, 26]], '#24262a'); P([[18, 4], [25, 4], [26, 26], [22, 29], [17, 26]], '#24262a');
       R(7, 8, 5, 14, '#5c626b'); R(19, 8, 5, 14, '#5c626b'); R(6, 10, 8, 1, '#8a6a2a'); R(18, 10, 8, 1, '#8a6a2a');
       R(6, 20, 8, 1, '#8a6a2a'); R(18, 20, 8, 1, '#8a6a2a');
+      break;
+    case 'noodle':
+      P([[8, 9], [24, 9], [22, 28], [10, 28]], '#efe9dc'); R(8, 8, 16, 3, '#c94a3a'); R(10, 16, 12, 5, '#d99a2b'); R(9, 27, 14, 2, '#cfc8b8');
+      break;
+    case 'ricebox':
+      P([[4, 14], [16, 8], [28, 14], [16, 20]], '#3a3330'); P([[4, 14], [16, 20], [16, 26], [4, 20]], '#2a2420'); P([[16, 20], [28, 14], [28, 20], [16, 26]], '#1f1a17');
+      P([[7, 14], [16, 10], [21, 12], [12, 16]], '#f4f0e6'); P([[13, 16], [22, 12], [25, 14], [16, 18]], '#c9783a'); E(20, 15, 2, 1, '#5a9a4a');
+      break;
+    case 'plaster':
+      P([[4, 20], [20, 4], [28, 12], [12, 28]], '#d9a87a'); P([[11, 13], [13, 11], [21, 19], [19, 21]], '#f2ead8');
+      for (let k = 0; k < 4; k++) R(6 + k * 4, 18 - k * 4, 1, 1, '#b8865a');
+      break;
+    case 'painkiller':
+      R(6, 8, 20, 16, '#cfd6dc'); R(6, 8, 20, 2, '#eef2f5');
+      for (let y = 0; y < 2; y++) for (let x = 0; x < 3; x++) E(11 + x * 5, 14 + y * 6, 2, 2, '#f8f8f4');
+      R(6, 22, 20, 2, '#8a96a0');
+      break;
+    case 'saline':
+      P([[9, 6], [23, 6], [25, 28], [7, 28]], '#f2a24a'); R(10, 12, 12, 8, '#fff4e0'); R(13, 14, 6, 2, '#2f6fb8');
+      break;
+    case 'firstaid':
+      R(5, 10, 22, 16, '#e8e2d6'); R(5, 10, 22, 2, '#fbfaf4'); R(13, 6, 6, 4, '#8a8478'); R(14, 13, 4, 10, '#c9302a'); R(11, 16, 10, 4, '#c9302a');
+      break;
+    case 'padthai': case 'khaoman': case 'noodlesoup': {
+      E(16, 20, 13, 7, '#efe9dc'); E(16, 19, 10, 5, key === 'noodlesoup' ? '#b8662e' : '#f6f0e2');
+      if (key === 'padthai') { E(16, 18, 8, 4, '#d9a04a'); R(12, 16, 3, 1, '#c94a3a'); R(18, 19, 3, 1, '#5a9a4a'); E(22, 17, 2, 1, '#e8d64a'); }
+      if (key === 'khaoman') { E(13, 18, 5, 3, '#fbf8f0'); P([[16, 15], [24, 15], [24, 21], [16, 21]], '#e9c49a'); R(17, 16, 6, 1, '#d9a87a'); }
+      if (key === 'noodlesoup') { for (let k = 0; k < 4; k++) R(10 + k * 3, 17, 1, 4, '#f2e2b0'); R(18, 16, 3, 2, '#5a9a4a'); }
+      break;
+    }
+    case 'coffee': case 'thaitea':
+      P([[9, 7], [23, 7], [21, 28], [11, 28]], key === 'coffee' ? '#7a4a2a' : '#e8873a'); R(8, 5, 16, 3, '#f4f0e6'); R(15, 1, 2, 5, '#c94a3a');
+      R(11, 18, 10, 4, '#f4f0e6');
+      break;
+    case 'cake':
+      P([[4, 20], [16, 12], [28, 20], [16, 26]], '#f4e6d0'); P([[4, 20], [16, 26], [16, 29], [4, 23]], '#d9a87a'); P([[16, 26], [28, 20], [28, 23], [16, 29]], '#c9905a');
+      E(16, 16, 2, 2, '#c9302a');
       break;
     case 'boots':
       P([[6, 6], [16, 6], [17, 19], [28, 21], [29, 27], [5, 27]], '#5a3a22'); R(5, 27, 25, 3, '#1c1410');

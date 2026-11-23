@@ -58,12 +58,13 @@ def engine(kind):
         sc.display.render_aa = 'OFF'
 
 # ── 인형 ──
-D = body.Doll(job['sex'], job.get('build', 1), job.get('child', False))
+D = body.Doll(job['sex'], job.get('build', 1), job.get('child', False), job.get('monster', False))
 need_outfits = {s['outfit'] for s in job['sets'] if s['kind'] == 'base'} | {'casual'}
 for o in need_outfits: D.outfit(o)
 for s in job['sets']:
     if s['kind'] == 'hair': D.hair(s['style'])
     if s['kind'] == 'weapon': D.weapon(s['weapon'])
+    if s['kind'] == 'armor' and ('a.' + s['piece']) not in D.groups: D.armor(s['piece'])
 arm = D.arm; bones = D.bones
 REST = {n: arm.data.bones[n].matrix_local.to_3x3().inverted() for n in bones}
 AX = {'X': Vector((1, 0, 0)), 'Y': Vector((0, 1, 0)), 'Z': Vector((0, 0, 1))}
@@ -93,11 +94,14 @@ def show(groups):
         for ob in obs: ob.hide_render = g not in groups
 
 def idmode(keep):
-    """keep: 그대로 둘 구역 이름들 (나머지는 가림막 = 0)"""
+    """keep: 그대로 둘 구역 이름들, 또는 'armor' (방어구 재질만). 나머지는 가림막 = 0"""
     for m in body.all_rmats():
         rid = int(m['rid'])
         region = [k for k, v in body.REG.items() if v == rid][0]
-        m.diffuse_color = body.id_color(rid if (keep is None or region in keep) else 0)
+        if keep == 'armor': ok = m.get('tag', '') == 'armor'
+        else: ok = keep is None or (region in keep and m.get('tag', '') != 'armor')
+        if keep is None and m.get('tag', '') == 'armor': ok = False
+        m.diffuse_color = body.id_color(rid if ok else 0)
 
 def frames_for(spec):
     if spec['kind'] == 'base':
@@ -109,10 +113,13 @@ def frames_for(spec):
         if D.child: return {k: A[k] for k in ('idle', 'walk')}
         A['swing'] = poses.SWING; A['shoot'] = poses.SHOOT
         return A
+    if spec['kind'] == 'armor': return poses.anims(spec['mode'])
     w = spec['weapon']
     return poses.anims('g' if w == 'pistol' else 'm')
 
 def key_for(spec):
+    if D.monster: return f"{'b' if spec['kind'] == 'base' else 'w'}-x-{spec.get('outfit') or spec.get('weapon')}-{spec.get('mode', 'm')}" if spec['kind'] == 'base' else f"w-x-{spec['weapon']}"
+    if spec['kind'] == 'armor': return f"a-{D.sex}{job.get('build', 1)}-{spec['piece']}-{spec['mode']}"
     who = 'c' if D.child else f"{D.sex}{job.get('build', 1)}" if spec['kind'] == 'base' else D.sex
     if spec['kind'] == 'base': return f"b-{who}-{spec['outfit']}-{spec['mode']}"
     if spec['kind'] == 'hair': return f"h-{'c' if D.child else D.sex}-{spec['style']}"
@@ -170,8 +177,10 @@ for spec in job['sets']:
         groups = {'o.' + spec['outfit']}; keep = None
     elif spec['kind'] == 'hair':
         groups = {'h.' + spec['style'], 'o.casual'}; keep = {'hair'}
+    elif spec['kind'] == 'armor':
+        groups = {'a.' + spec['piece'], 'o.casual'}; keep = 'armor'
     else:
-        groups = {'w.' + spec['weapon'], 'o.casual'}; keep = {'wood', 'metal', 'dark'}
+        groups = {'w.' + spec['weapon'], 'o.casual'}; keep = {'wood', 'metal', 'dark', 'crest'}
     show(groups)
     A = frames_for(spec)
     if job.get('only'): A = {k: v for k, v in A.items() if k in job['only']}

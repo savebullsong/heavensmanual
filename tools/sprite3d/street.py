@@ -319,6 +319,7 @@ def bake_modules():
             random.seed(hash(key) % 1000)
             fn(kind, m)
             if face == 'R':
+                bpy.context.view_layer.update()  # 새로 만든 물체의 위치·회전을 matrix_world에 반영 (안 하면 원점으로 돌아간다)
                 for o in col.objects:
                     if o.type == 'MESH':
                         o.matrix_world = Matrix.Rotation(math.radians(90), 4, 'Z') @ o.matrix_world
@@ -454,16 +455,28 @@ def vehicle(model):
         box(.6, -.6, .95, .66, .6, 1.68, glass, bevel=0)
         for (x, y) in ((-.7, -.62), (-.7, .62), (1.15, 0)): cyl(Vector((x, y, .25)), 'Y', .14, .25, tire)
     elif model == 'moto':
-        body = paint('body', '#a12a2a'); dark = paint('dk', '#1d1f22', .6, 0); tire = paint('tire', '#151515', .9, 0)
-        vest = paint('vest', '#e8732a', .8, 0); skin = paint('skin', '#b88462', .6, 0); pants = paint('pants', '#2a2e38', .8, 0); helm = paint('helm', '#e9e7e2', .3, .1)
-        cyl(Vector((.62, 0, .3)), 'Y', .1, .3, tire); cyl(Vector((-.62, 0, .3)), 'Y', .1, .3, tire)
-        box(-.55, -.16, .35, .55, .16, .7, body, bevel=.05); box(-.6, -.18, .7, .05, .18, .8, dark, bevel=.03)
-        box(.55, -.04, .55, .65, .04, 1.05, dark, bevel=0); box(.6, -.32, 1.02, .64, .32, 1.06, dark, bevel=0)
-        # 오토바이 택시 기사 (주황 조끼)
-        box(-.35, -.2, .8, .05, .2, 1.4, vest, bevel=.06); sphere(Vector((-.12, 0, 1.58)), .14, helm)
-        for y in (-.16, .16):
-            box(-.25, y - .07, .78, .25, y + .07, .9, pants, bevel=.03); box(.2, y - .06, .4, .3, y + .06, .85, pants, bevel=.03)
-            box(-.05, y * 1.6 - .04, 1.15, .62, y * 1.6 + .04, 1.25, skin, bevel=.02)
+        # 오토바이 택시: 바퀴 두 개, 가는 차체, 주황 조끼 기사
+        body = paint('body', '#a12a2a'); dark = paint('dk', '#1d1f22', .6, 0); tire = paint('tire', '#151515', .9, 0); chrome = paint('chr', '#b8bcc2', .25, .9)
+        vest = paint('vest', '#e8732a', .8, 0); skin = paint('skin', '#b88462', .6, 0); pants = paint('pants', '#2a2e38', .8, 0); helm = paint('helm', '#e9e7e2', .3, .1); shirt = paint('shirt', '#3a4a6a', .8, 0)
+        for x in (.72, -.72):
+            cyl(Vector((x, 0, .3)), 'Y', .09, .3, tire); cyl(Vector((x, 0, .3)), 'Y', .1, .13, chrome)
+        box(-.55, -.11, .42, .5, .11, .62, body, bevel=.05)            # 차체
+        box(-.75, -.12, .62, .1, .12, .7, dark, bevel=.04)              # 안장
+        box(-.95, -.08, .45, -.6, .08, .55, dark, bevel=.02)            # 뒤 짐받이
+        box(.55, -.05, .3, .62, .05, .95, chrome, bevel=0)              # 앞 포크
+        box(.52, -.34, .95, .6, .34, 1.0, dark, bevel=0)                # 핸들
+        box(.5, -.1, .72, .66, .1, .9, body, bevel=.03)                 # 앞 덮개
+        box(.66, -.06, .78, .7, .06, .86, paint('hl', '#fff4d0', .2, 0, 2), bevel=0)
+        # 기사: 앉은 자세
+        box(-.42, -.2, .72, .05, .2, 1.32, vest, bevel=.07)
+        box(-.38, -.18, 1.0, .02, .18, 1.3, shirt, bevel=.05)
+        box(-.4, -.21, .9, .04, .21, 1.25, vest, bevel=.06)
+        sphere(Vector((-.15, 0, 1.5)), .15, helm); sphere(Vector((-.12, 0, 1.45)), .1, skin)
+        for y in (-.15, .15):
+            box(-.3, y - .07, .66, .25, y + .07, .8, pants, bevel=.03)      # 허벅지
+            box(.15, y - .06, .3, .27, y + .06, .76, pants, bevel=.03)      # 정강이
+            box(-.05, y * 1.4 - .045, 1.12, .56, y * 1.4 + .045, 1.2, vest, bevel=.02)   # 팔
+            sphere(Vector((.56, y * 2.2, .98)), .045, skin)
     elif model == 'bus':
         body = paint('body', '#d8d2c2'); stripe = paint('st', '#b8342c', .4, .2)
         box(-3.6, -.95, .35, 3.6, .95, 2.6, body, bevel=.08)
@@ -482,6 +495,7 @@ def bake_cars():
     for mdl in models:
         for d, ang in (('se', 0), ('nw', 180)):
             clear(); vehicle(mdl)
+            bpy.context.view_layer.update()  # 바퀴(원기둥) 회전·머리(구) 위치가 사라지지 않게
             for o in col.objects:
                 if o.type == 'MESH': o.matrix_world = Matrix.Rotation(math.radians(ang), 4, 'Z') @ o.matrix_world
             frame(208, 150, 104, 100)
@@ -519,6 +533,14 @@ def bake_props():
     box(-.75, -.75, 0, .75, .75, .25, conc, bevel=.02)
     frame(160, 280, 80, 250); sc.render.filepath = f'{TMP}/pillar.png'; bpy.ops.render.render(write_still=True)
     items.append(('pillar-0', color_decode(f'{TMP}/pillar.png'), 80, 250))
+    # BTS 고가 상판 한 칸 (+i 방향, 기둥 머리 위)
+    clear(); conc3 = color_mat('deck', '#a7a39a', 'noise', 3, .08); dark3 = paint('rail', '#4a4d52', .5, .6); under = color_mat('under', '#7e7a72', 'noise', 3, .08)
+    box(0, -1.35, 7.35, T, 1.35, 8.05, conc3, bevel=0)
+    box(0, -1.2, 7.2, T, 1.2, 7.35, under, bevel=0)
+    box(0, -1.35, 8.05, T, -1.2, 8.55, conc3, bevel=0); box(0, 1.2, 8.05, T, 1.35, 8.55, conc3, bevel=0)
+    for y in (-.75, -.35, .35, .75): box(0, y - .03, 8.05, T, y + .03, 8.13, dark3, bevel=0)
+    frame(112, 280, 40, 260); sc.render.filepath = f'{TMP}/deck.png'; bpy.ops.render.render(write_still=True)
+    items.append(('deck-0', color_decode(f'{TMP}/deck.png'), 40, 260))
     # 노점 수레 (파라솔)
     clear(); cartm, um, um2, food, dark = paint('cart', '#8c8f94', .4, .6), paint('umb', '#c8402e', .8, 0), paint('umb2', '#efe6d0', .8, 0), paint('food', '#d9913a', .7, 0), paint('dk', '#2a2724', .7, 0)
     box(-.7, -.4, .5, .7, .4, 1.0, cartm); box(-.65, -.35, 1.0, .65, .35, 1.08, um2, bevel=0)

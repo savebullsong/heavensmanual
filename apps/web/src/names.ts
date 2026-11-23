@@ -1,50 +1,98 @@
-// 거리 간판 이름 — 실제 상호 대신 지어낸 이름. 건물마다 늘 같은 이름이 나오고, 언어마다 같은 뜻으로 바뀐다
-import type { Category } from './zone.ts';
+// 거리 가게: OpenStreetMap 에 실제로 있는 가게의 업종과 이름을 쓴다.
+// 체인점(브랜드)은 이름을 숨기고 업종만 적는다 (편의점·카페·은행…). 이름 없는 가게도 업종만.
+import type { Building } from './zone.ts';
 import type { Lang } from './i18n.ts';
 
-// [한국어, 태국어, 영어]
-const PREFIX: [string, string, string][] = [
-  ['행운', 'โชคดี', 'Lucky'], ['황금', 'ทองคำ', 'Golden'], ['별빛', 'แสงดาว', 'Starlight'], ['달빛', 'แสงจันทร์', 'Moonlight'],
-  ['코끼리', 'ช้างน้อย', 'Elephant'], ['망고', 'มะม่วง', 'Mango'], ['연꽃', 'ดอกบัว', 'Lotus'], ['파란 대문', 'ประตูฟ้า', 'Blue Door'],
-  ['할머니', 'คุณยาย', "Grandma's"], ['미소', 'ยิ้มแย้ม', 'Smile'], ['바나나', 'กล้วยหอม', 'Banana'], ['장미', 'กุหลาบ', 'Rose'],
-  ['비둘기', 'นกพิราบ', 'Pigeon'], ['대나무', 'ไผ่งาม', 'Bamboo'], ['붉은 등', 'โคมแดง', 'Red Lantern'], ['강변', 'ริมคลอง', 'Canal'],
-  ['고양이', 'แมวเหมียว', 'Cat'], ['열대', 'ทรอปิคอล', 'Tropical'], ['새벽', 'รุ่งอรุณ', 'Dawn'], ['구름', 'ก้อนเมฆ', 'Cloud'],
-];
+export interface Poi { t: string; n?: string; nth?: string; nen?: string; nko?: string; b?: 1 }
+type B = Building & { pois?: Poi[] };
 
-// 업종 이름 [한국어, 태국어(이름 앞에 붙음), 영어]
-const NOUN: Partial<Record<Category, [string, string, string][]>> = {
-  convenience: [['마트', 'มินิมาร์ท', 'Mart'], ['24시', 'ร้าน 24 ชม.', '24/7']],
-  pharmacy: [['약국', 'ร้านขายยา', 'Pharmacy']],
-  clinic: [['의원', 'คลินิก', 'Clinic']],
-  restaurant: [['식당', 'ร้านอาหาร', 'Kitchen'], ['국숫집', 'ก๋วยเตี๋ยว', 'Noodles'], ['밥집', 'ข้าวแกง', 'Rice House']],
-  bar: [['바', 'บาร์', 'Bar'], ['펍', 'ผับ', 'Pub']],
-  cafe: [['카페', 'คาเฟ่', 'Café'], ['커피', 'กาแฟ', 'Coffee']],
-  bank: [['은행', 'ธนาคาร', 'Bank']],
-  worship: [['사원', 'วัด', 'Temple']],
-  school: [['학교', 'โรงเรียน', 'School']],
-  hotel: [['호텔', 'โรงแรม', 'Hotel'], ['게스트하우스', 'เกสต์เฮาส์', 'Guesthouse']],
-  laundry: [['세탁소', 'ร้านซักรีด', 'Laundry']],
-  shop: [['상회', 'ร้าน', 'Store'], ['잡화점', 'ร้านค้า', 'Goods']],
-  office: [['빌딩', 'อาคาร', 'Building'], ['타워', 'ทาวเวอร์', 'Tower']],
-  condo: [['레지던스', 'เรสซิเดนซ์', 'Residence'], ['맨션', 'แมนชั่น', 'Mansion']],
+// 업종 [한국어, 태국어, 영어]
+const TYPES: Record<string, [string, string, string]> = {
+  convenience: ['편의점', 'ร้านสะดวกซื้อ', 'Convenience store'], supermarket: ['슈퍼마켓', 'ซูเปอร์มาร์เก็ต', 'Supermarket'],
+  massage: ['마사지', 'ร้านนวด', 'Massage'], hairdresser: ['미용실', 'ร้านทำผม', 'Hair salon'], beauty: ['네일·뷰티', 'ร้านเสริมสวย', 'Beauty salon'],
+  tailor: ['양복점', 'ร้านตัดสูท', 'Tailor'], clothes: ['옷가게', 'ร้านเสื้อผ้า', 'Clothing store'], laundry: ['세탁소', 'ร้านซักรีด', 'Laundry'],
+  mall: ['쇼핑몰', 'ห้างสรรพสินค้า', 'Shopping mall'], department_store: ['백화점', 'ห้างสรรพสินค้า', 'Department store'],
+  bakery: ['빵집', 'ร้านเบเกอรี่', 'Bakery'], optician: ['안경점', 'ร้านแว่นตา', 'Optician'], books: ['서점', 'ร้านหนังสือ', 'Bookstore'],
+  gift: ['기념품 가게', 'ร้านของฝาก', 'Gift shop'], shoes: ['신발 가게', 'ร้านรองเท้า', 'Shoe store'], computer: ['컴퓨터 가게', 'ร้านคอมพิวเตอร์', 'Computer shop'],
+  mobile_phone: ['휴대폰 가게', 'ร้านมือถือ', 'Phone shop'], electronics: ['전자제품 가게', 'ร้านเครื่องใช้ไฟฟ้า', 'Electronics'],
+  hardware: ['철물점', 'ร้านวัสดุก่อสร้าง', 'Hardware store'], travel_agency: ['여행사', 'บริษัทนำเที่ยว', 'Travel agency'],
+  cannabis: ['대마 판매점', 'ร้านกัญชา', 'Cannabis shop'], chemist: ['드러그스토어', 'ร้านขายยาและเครื่องสำอาง', 'Drugstore'],
+  jewelry: ['보석상', 'ร้านเพชรพลอย', 'Jeweller'], florist: ['꽃집', 'ร้านดอกไม้', 'Florist'], furniture: ['가구점', 'ร้านเฟอร์นิเจอร์', 'Furniture store'],
+  alcohol: ['주류 판매점', 'ร้านขายเหล้า', 'Liquor store'], butcher: ['정육점', 'ร้านขายเนื้อ', 'Butcher'], greengrocer: ['청과물 가게', 'ร้านผักผลไม้', 'Greengrocer'],
+  car_repair: ['자동차 정비소', 'อู่ซ่อมรถ', 'Car repair'], motorcycle: ['오토바이 가게', 'ร้านมอเตอร์ไซค์', 'Motorbike shop'], motorcycle_repair: ['오토바이 정비소', 'ร้านซ่อมมอเตอร์ไซค์', 'Motorbike repair'],
+  bicycle: ['자전거 가게', 'ร้านจักรยาน', 'Bicycle shop'], tattoo: ['타투숍', 'ร้านสัก', 'Tattoo studio'], pet: ['애견숍', 'ร้านสัตว์เลี้ยง', 'Pet shop'],
+  sports: ['스포츠용품점', 'ร้านกีฬา', 'Sports shop'], stationery: ['문구점', 'ร้านเครื่องเขียน', 'Stationery'], tobacco: ['담배 가게', 'ร้านยาสูบ', 'Tobacconist'],
+  variety_store: ['잡화점', 'ร้านขายของเบ็ดเตล็ด', 'Variety store'], kiosk: ['매점', 'ซุ้มขายของ', 'Kiosk'], coffee: ['원두 가게', 'ร้านเมล็ดกาแฟ', 'Coffee roaster'],
+  tea: ['찻집', 'ร้านชา', 'Tea shop'], cosmetics: ['화장품 가게', 'ร้านเครื่องสำอาง', 'Cosmetics'], bag: ['가방 가게', 'ร้านกระเป๋า', 'Bag shop'],
+  watches: ['시계점', 'ร้านนาฬิกา', 'Watch shop'], photo: ['사진관', 'ร้านถ่ายรูป', 'Photo studio'], copyshop: ['복사집', 'ร้านถ่ายเอกสาร', 'Copy shop'],
+  second_hand: ['중고품 가게', 'ร้านของมือสอง', 'Second-hand shop'], toys: ['장난감 가게', 'ร้านของเล่น', 'Toy shop'], art: ['화랑', 'แกลเลอรี', 'Art gallery'],
+  shop: ['가게', 'ร้านค้า', 'Shop'],
+  restaurant: ['식당', 'ร้านอาหาร', 'Restaurant'], fast_food: ['패스트푸드', 'ฟาสต์ฟู้ด', 'Fast food'], food_court: ['푸드코트', 'ศูนย์อาหาร', 'Food court'],
+  cafe: ['카페', 'คาเฟ่', 'Café'], bar: ['바', 'บาร์', 'Bar'], pub: ['펍', 'ผับ', 'Pub'], nightclub: ['클럽', 'ไนต์คลับ', 'Nightclub'],
+  ice_cream: ['아이스크림 가게', 'ร้านไอศกรีม', 'Ice cream'], internet_cafe: ['PC방', 'ร้านอินเทอร์เน็ต', 'Internet café'],
+  bank: ['은행', 'ธนาคาร', 'Bank'], bureau_de_change: ['환전소', 'ร้านแลกเงิน', 'Money exchange'],
+  pharmacy: ['약국', 'ร้านขายยา', 'Pharmacy'], clinic: ['의원', 'คลินิก', 'Clinic'], dentist: ['치과', 'คลินิกทันตกรรม', 'Dentist'], hospital: ['병원', 'โรงพยาบาล', 'Hospital'],
+  veterinary: ['동물병원', 'คลินิกสัตว์', 'Vet'],
+  school: ['학교', 'โรงเรียน', 'School'], kindergarten: ['유치원', 'โรงเรียนอนุบาล', 'Kindergarten'], library: ['도서관', 'ห้องสมุด', 'Library'],
+  place_of_worship: ['사원', 'ศาสนสถาน', 'Place of worship'], cinema: ['영화관', 'โรงภาพยนตร์', 'Cinema'], theatre: ['극장', 'โรงละคร', 'Theatre'],
+  marketplace: ['시장', 'ตลาด', 'Market'], fuel: ['주유소', 'ปั๊มน้ำมัน', 'Gas station'], car_wash: ['세차장', 'คาร์แคร์', 'Car wash'],
+  coworking_space: ['공유 오피스', 'โคเวิร์กกิ้งสเปซ', 'Coworking'], post_office: ['우체국', 'ไปรษณีย์', 'Post office'],
+  hotel: ['호텔', 'โรงแรม', 'Hotel'], hostel: ['호스텔', 'โฮสเทล', 'Hostel'], guest_house: ['게스트하우스', 'เกสต์เฮาส์', 'Guesthouse'],
+  apartment_hotel: ['서비스 아파트', 'เซอร์วิสอพาร์ตเมนต์', 'Serviced apartment'], fitness_centre: ['헬스장', 'ฟิตเนส', 'Gym'],
 };
+const LI: Record<Lang, number> = { ko: 0, th: 1, en: 2 };
 
-function hash(a: number, b: number) {
-  let h = Math.imul(a * 73856093 ^ b * 19349663, 2654435761);
-  h ^= h >>> 15;
-  return (h >>> 0) / 4294967295;
+export function typeLabel(t: string, l: Lang): string {
+  return (TYPES[t] ?? TYPES.shop)[LI[l]];
+}
+export function mainPoi(b: Building): Poi | null {
+  return (b as B).pois?.[0] ?? null;
+}
+/** 건물의 업종 (가게가 없으면 지도 분류) */
+export function kindOf(b: Building): string {
+  return mainPoi(b)?.t ?? b.cat;
+}
+const thai = /[฀-๿]/;
+/** 가게 이름: 체인점이나 이름 없는 가게는 업종 이름 */
+export function poiName(p: Poi, l: Lang): string {
+  if (p.b || !p.n) return typeLabel(p.t, l);
+  if (l === 'th') return p.nth ?? p.n;
+  if (l === 'ko') return p.nko ?? (thai.test(p.n) ? p.nen ?? p.n : p.n);
+  return p.nen ?? (thai.test(p.n) && p.nen ? p.nen : p.n);
+}
+/** 누를 수 있는 건물인가 (가게가 있거나 우주새) */
+export function interactive(b: Building) {
+  return b.cat === 'ujusae' || !!mainPoi(b);
+}
+/** 간판·이름표에 쓰는 이름 (누를 수 없는 건물은 빈칸) */
+export function buildingName(b: Building, l: Lang): string {
+  const p = mainPoi(b);
+  return p ? poiName(p, l) : '';
+}
+/** 이름표 아랫줄: 업종 (이름이 곧 업종이면 비운다 — 같은 말을 두 번 쓰지 않는다) */
+export function buildingSub(b: Building, l: Lang): string {
+  const p = mainPoi(b);
+  if (!p) return '';
+  const name = poiName(p, l), label = typeLabel(p.t, l);
+  const extra = ((b as B).pois?.length ?? 1) - 1;
+  return [name === label ? '' : label, extra > 0 ? `+${extra}` : ''].filter(Boolean).join(' · ');
 }
 
-/** 건물 하나의 간판 이름 (정부시설·우주새는 빈칸) */
-export function shopName(i0: number, j0: number, cat: Category, l: Lang): string {
-  const nouns = NOUN[cat];
-  if (!nouns) return '';
-  const p = PREFIX[Math.floor(hash(i0, j0) * PREFIX.length)];
-  const n = nouns[Math.floor(hash(j0 + 7, i0 + 3) * nouns.length)];
-  if (l === 'th') return `${n[1]}${p[1]}`;
-  if (l === 'en') return `${p[2]} ${n[2]}`;
-  return `${p[0]} ${n[0]}`;
+/** 일할 수 있는 업종 (시급은 방콕 최저임금) */
+const NO_WORK = new Set(['place_of_worship', 'school', 'kindergarten', 'library', 'post_office']);
+export function canWork(b: Building) {
+  const p = mainPoi(b);
+  return !!p && !NO_WORK.has(p.t) && !!b.sign;
 }
 
-/** 일할 수 있는 업종 */
-export const WORKPLACES: Category[] = ['convenience', 'pharmacy', 'clinic', 'restaurant', 'bar', 'cafe', 'bank', 'school', 'hotel', 'laundry', 'shop', 'office'];
+/** 물건을 살 수 있는 가게 */
+export type StoreKind = 'mart' | 'pharmacy' | 'food' | 'cafe';
+export function storeOf(b: Building): StoreKind | null {
+  for (const p of (b as B).pois ?? []) {
+    if (['convenience', 'supermarket', 'kiosk', 'variety_store'].includes(p.t)) return 'mart';
+    if (['pharmacy', 'chemist'].includes(p.t)) return 'pharmacy';
+    if (['restaurant', 'fast_food', 'food_court', 'marketplace'].includes(p.t)) return 'food';
+    if (['cafe', 'bakery', 'coffee', 'tea', 'ice_cream'].includes(p.t)) return 'cafe';
+  }
+  return null;
+}

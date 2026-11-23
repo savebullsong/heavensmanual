@@ -171,6 +171,43 @@ const CAT = (t) => {
   if (['apartments', 'residential', 'house', 'dormitory'].includes(t.building)) return 'condo';
   return null;
 };
+// 세부 업종 (간판·이름표·일자리·가게 메뉴에 쓴다). 정부시설·ATM·주차장 같은 것은 뺀다
+const DETAIL = (t) => {
+  if (GOV(t)) return null;
+  const s = t.shop, a = t.amenity, tr = t.tourism, l = t.leisure, h = t.healthcare;
+  const SHOPS = ['convenience', 'supermarket', 'massage', 'hairdresser', 'beauty', 'tailor', 'clothes', 'laundry', 'dry_cleaning', 'mall', 'bakery', 'optician', 'books', 'gift', 'shoes', 'computer', 'mobile_phone', 'electronics', 'hardware', 'doityourself', 'travel_agency', 'cannabis', 'chemist', 'jewelry', 'florist', 'furniture', 'alcohol', 'butcher', 'greengrocer', 'department_store', 'car_repair', 'motorcycle', 'motorcycle_repair', 'bicycle', 'tattoo', 'pet', 'sports', 'stationery', 'tobacco', 'variety_store', 'kiosk', 'coffee', 'tea', 'cosmetics', 'bag', 'watches', 'photo', 'copyshop', 'second_hand', 'toys', 'art'];
+  if (s && SHOPS.includes(s)) return s === 'dry_cleaning' ? 'laundry' : s === 'doityourself' ? 'hardware' : s;
+  if (s) return 'shop';
+  const AMEN = ['restaurant', 'fast_food', 'food_court', 'cafe', 'bar', 'pub', 'nightclub', 'bank', 'bureau_de_change', 'pharmacy', 'clinic', 'dentist', 'doctors', 'hospital', 'school', 'kindergarten', 'college', 'university', 'place_of_worship', 'cinema', 'theatre', 'marketplace', 'fuel', 'car_wash', 'veterinary', 'coworking_space', 'library', 'ice_cream', 'internet_cafe', 'post_office'];
+  if (a && AMEN.includes(a)) return a === 'doctors' ? 'clinic' : a === 'college' || a === 'university' ? 'school' : a;
+  if (tr === 'hotel' || tr === 'hostel' || tr === 'guest_house' || tr === 'motel' || tr === 'apartment') return tr === 'motel' ? 'hotel' : tr === 'apartment' ? 'apartment_hotel' : tr;
+  if (l === 'fitness_centre' || l === 'sports_centre') return 'fitness_centre';
+  if (h === 'clinic' || h === 'dentist') return h;
+  if (t.office === 'coworking') return 'coworking_space';
+  return null;
+};
+const BRAND_WORDS = /7-?eleven|seven eleven|familymart|lawson|tops|foodland|villa market|big ?c|lotus|starbucks|amazon|coffee world|mcdonald|kfc|burger king|subway|pizza company|swensen|dairy queen|boots|watsons|uniqlo|zara|h&m|central|robinson|emporium|terminal 21|bangkok bank|kasikorn|krungsri|siam commercial|krung thai|uob|citibank|ttb|tmb|gsb|superrich|ธนาคาร|เซเว่น|แฟมิลี่มาร์ท|สตาร์บัคส์|คาเฟ่ อเมซอน|ท็อปเจริญ/i;
+const poiOf = (t) => {
+  const d = DETAIL(t);
+  if (!d) return null;
+  const p = { t: d };
+  const brand = !!t.brand || !!t['brand:wikidata'] || BRAND_WORDS.test(t.name || '') || BRAND_WORDS.test(t['name:en'] || '');
+  if (brand) p.b = 1;
+  else if (t.name) {
+    p.n = t.name;
+    if (t['name:th'] && t['name:th'] !== t.name) p.nth = t['name:th'];
+    if (t['name:en'] && t['name:en'] !== t.name) p.nen = t['name:en'];
+    if (t['name:ko']) p.nko = t['name:ko'];
+  }
+  return p;
+};
+const poiList = [];
+for (const n of nodes.values()) {
+  const p = poiOf(n.tags);
+  if (!p) continue;
+  const [x, y] = toT(P(n));
+  poiList.push({ x, y, p });
+}
 // 가게 점(POI)을 타일 위치로 색인
 const poiAt = new Map();
 for (const n of nodes.values()) {
@@ -212,6 +249,8 @@ for (const a of areas) {
       pieces.push({ i0, j0, w: i1 - i0 + 1, d: j1 - j0 + 1, h, cat, color });
     }
   if (!pieces.length) continue;
+  const own = poiOf(a.tags);
+  if (own) for (const p of pieces) p.pois = [own];
   for (const p of pieces) for (let j = p.j0; j < p.j0 + p.d; j++) for (let i = p.i0; i < p.i0 + p.w; i++) { const k = j * W + i; if (tiles[k] === T.lot || tiles[k] === T.park) tiles[k] = T.block; }
   // 간판은 한 조각에만: 앞(+j) 면 앞이 길이면 left, 아니면 오른쪽(+i) 면
   if (cat !== 'generic' && cat !== 'condo') {
@@ -221,6 +260,36 @@ for (const a of areas) {
     else { const right = pieces.slice().sort((x, y) => y.i0 + y.w - (x.i0 + x.w))[0]; if (open(right.i0 + right.w, right.j0 + Math.floor(right.d / 2))) right.sign = 'right'; }
   }
   buildings.push(...pieces);
+}
+
+// ── 가게 점 → 건물 조각: 점이 들어 있는 조각, 없으면 2칸 안의 가장 가까운 조각
+{
+  const byCell = new Map();
+  buildings.forEach((b, k) => { for (let j = b.j0; j < b.j0 + b.d; j++) for (let i = b.i0; i < b.i0 + b.w; i++) byCell.set(j * W + i, k); });
+  let attached = 0;
+  for (const { x, y, p } of poiList) {
+    const i = Math.floor(x), j = Math.floor(y);
+    let k = byCell.get(j * W + i);
+    if (k === undefined) {
+      let best = 9;
+      for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) { const kk = byCell.get((j + dj) * W + i + di); if (kk !== undefined && Math.hypot(di, dj) < best) { best = Math.hypot(di, dj); k = kk; } }
+    }
+    if (k === undefined) continue;
+    const b = buildings[k];
+    b.pois = b.pois ?? [];
+    if (b.pois.length >= 4) continue;
+    // 이름 있는 가게를 앞에 둔다
+    if (p.n && b.pois.length && !b.pois[0].n) b.pois.unshift(p); else b.pois.push(p);
+    attached++;
+  }
+  // 가게가 붙었는데 간판 면이 없던 건물은 간판 면을 다시 찾는다
+  const open = (i, j) => i >= 0 && j >= 0 && i < W && j < H && ['walk', 'soi', 'road', 'cross', 'park', 'median'].includes(TYPES[tiles[j * W + i]]);
+  for (const b of buildings) {
+    if (!b.pois || b.sign || b.cat === 'ujusae') continue;
+    if (open(b.i0 + Math.floor(b.w / 2), b.j0 + b.d)) b.sign = 'left';
+    else if (open(b.i0 + b.w, b.j0 + Math.floor(b.d / 2))) b.sign = 'right';
+  }
+  console.error(`pois ${poiList.length}, attached ${attached}, buildings with shops ${buildings.filter((b) => b.pois).length}`);
 }
 
 // ── 소품: 가로수, BTS 기둥(수쿰빗 대로 중앙)

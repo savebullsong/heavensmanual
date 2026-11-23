@@ -368,6 +368,8 @@ def lights(night):
     add('AREA', G(4.5, 3.2, 72), 260, (1, .9, .75), 3, (math.radians(60), 0, math.radians(225)))
     if not night: add('AREA', G(-1.5, 4.6, 46), 420, (.85, .92, 1), 1.4, (0, -math.pi / 2, 0))
     add('POINT', G(4.5, 6.5, 70), 60 if not night else 30, (1, .85, .65), .5)
+    # 진열장을 비추는 빛 (물건이 잘 보이게)
+    add('AREA', G(4.6, 2.0, 46), 520 if not night else 420, (1, .93, .82), 6, (math.radians(90), 0, 0))
     bgn.inputs[1].default_value = .55 if not night else .3
 
 def render(path, W=576, H=400, ax=272, ay=110):

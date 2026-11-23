@@ -22,7 +22,11 @@ export interface CharSet {
   masks: Map<Dir, { w: number; h: number; ox: number; oy: number; solid: Uint8Array }>;
 }
 
-export const MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword'];
+export const MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle'];
+/** 방어구 겉모습: 그리는 순서와 색 (구역 3 = 본색, 구역 5 = 신발) */
+const ARMOR_ORDER = ['workpants', 'shinguard', 'boots', 'jacket', 'vest', 'gloves'];
+const ARMOR_COLOR: Record<string, string> = { helmet: '#b0302a', jacket: '#4a5236', vest: '#3a3f46', gloves: '#d8cfb4', workpants: '#4a4536', shinguard: '#2b2f36', boots: '#3a2a1a' };
+const PER_BUILD = new Set(['jacket', 'vest', 'workpants']);
 const COSTUMES = new Set(['raincoat', 'patient', 'parrot']);
 
 /** 동작 속도 (초당 장면 수)와 맞히는 장면 */
@@ -103,8 +107,11 @@ function palette(look: Look): Uint8ClampedArray[] {
 }
 
 // ───────────────────────── 어떤 층을 쓰나 ─────────────────────────
-export function layerKeys(look: Look, weapon: string | null) {
+export function layerKeys(look: Look, weapon: string | null, armor: string[] = []) {
   const o = look.outfit ?? 'casual';
+  // 봉합자: 사람 모습 / 변신한 모습 (머리카락·방어구 없음, 늘 큰 바늘)
+  if ((o as string) === 'suturer') return { base: 'b-m1-suturer-m', hair: null, weapon: 'w-m-needle', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
+  if ((o as string) === 'stitched') return { base: 'b-x-stitched-m', hair: null, weapon: 'w-x-needle', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   const child = !!look.child;
   const w = child ? null : weapon && (MELEE.includes(weapon) || weapon === 'pistol') ? weapon : null;
   let mode: Mode = w === 'pistol' ? 'g' : w ? 'm' : 'u';
@@ -117,13 +124,23 @@ export function layerKeys(look: Look, weapon: string | null) {
   else base = `b-${sex}${build}-casual-${mode}`;
   const style = HAIR_STYLES[look.hair] ?? 'short';
   const hair = COSTUMES.has(o) ? null : child ? `h-c-${style}` : `h-${sex}-${style}`;
-  return { base, hair, weapon: w ? `w-${sex}-${w}` : null, mode };
+  const arm: { key: string; piece: string }[] = [];
+  if (mode !== 'w') {
+    const ab = COSTUMES.has(o) ? 1 : build;
+    for (const piece of [...ARMOR_ORDER, 'helmet']) {
+      if (!armor.includes(piece)) continue;
+      if (COSTUMES.has(o) && PER_BUILD.has(piece)) continue; // 우비·환자복 위에는 옷 방어구를 겹치지 않는다
+      if (piece === 'helmet' && COSTUMES.has(o) && o !== 'patient') continue;
+      arm.push({ key: `a-${sex}${PER_BUILD.has(piece) ? ab : 1}-${piece}-${mode}`, piece });
+    }
+  }
+  return { base, hair, weapon: w ? `w-${sex}-${w}` : null, armor: arm, mode };
 }
 
 // ───────────────────────── 합치기 ─────────────────────────
 const sets = new Map<string, Promise<CharSet>>();
-export function charSet(look: Look, weapon: string | null = null): Promise<CharSet> {
-  const keys = layerKeys(look, weapon);
+export function charSet(look: Look, weapon: string | null = null, armor: string[] = []): Promise<CharSet> {
+  const keys = layerKeys(look, weapon, armor);
   const id = JSON.stringify([keys, look.skin, look.hairColor, look.top, look.bottom, look.outfit ?? 'casual']);
   let p = sets.get(id);
   if (!p) {
@@ -134,15 +151,27 @@ export function charSet(look: Look, weapon: string | null = null): Promise<CharS
 }
 
 async function build(look: Look, keys: ReturnType<typeof layerKeys>): Promise<CharSet> {
-  const [base, hair, weap] = await Promise.all([loadLayer(keys.base), keys.hair ? loadLayer(keys.hair) : null, keys.weapon ? loadLayer(keys.weapon) : null]);
+  const [base, hair, weap, ...arms] = await Promise.all([loadLayer(keys.base), keys.hair ? loadLayer(keys.hair) : null, keys.weapon ? loadLayer(keys.weapon) : null, ...keys.armor.map((a) => loadLayer(a.key))]);
   const pal = palette(look);
+  // 그리는 순서: 몸 → 옷 방어구 → 머리카락 → 헬멧 → 무기. 방어구는 자기 색을 쓴다
+  type Lay = { L: Layer | null; pal: Uint8ClampedArray[] };
+  const armorLay = (k: number): Lay => {
+    const piece = keys.armor[k].piece, p2 = pal.slice();
+    p2[3] = ramp(ARMOR_COLOR[piece]); p2[5] = ramp(ARMOR_COLOR[piece]);
+    return { L: arms[k], pal: p2 };
+  };
+  const order: Lay[] = [{ L: base, pal }];
+  keys.armor.forEach((a, k) => { if (a.piece !== 'helmet') order.push(armorLay(k)); });
+  order.push({ L: hair, pal });
+  keys.armor.forEach((a, k) => { if (a.piece === 'helmet') order.push(armorLay(k)); });
+  order.push({ L: weap, pal });
   const names = base ? Object.keys(base.meta) : [];
   // 장면마다 겹친 테두리 상자 (발 기준)
   type Box = { name: string; x0: number; y0: number; x1: number; y1: number };
   const boxes: Box[] = [];
   for (const name of names) {
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
-    for (const L of [base, hair, weap]) {
+    for (const { L } of order) {
       const r = L?.meta[name];
       if (!r) continue;
       x0 = Math.min(x0, r[4]); y0 = Math.min(y0, r[5]); x1 = Math.max(x1, r[4] + r[2]); y1 = Math.max(y1, r[5] + r[3]);
@@ -170,7 +199,7 @@ async function build(look: Look, keys: ReturnType<typeof layerKeys>): Promise<Ch
   for (const b of boxes) {
     const [px, py] = place.get(b.name)!;
     const w = b.x1 - b.x0, h = b.y1 - b.y0;
-    for (const L of [base, hair, weap]) {
+    for (const { L, pal } of order) {
       const r = L?.meta[b.name];
       if (!L || !r) continue;
       const [sx, sy, sw, sh, ox, oy] = r;

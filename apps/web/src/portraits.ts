@@ -1,5 +1,6 @@
 // 주요 인물 그림(대화창 초상화). 기본 그림은 public/portraits, 관리자 페이지에서 바꾼 그림이 있으면 그것을 쓴다
-export const PORTRAIT_SLOTS = ['miss-hwang', 'yellow-wing', 'hwanghon', 'parrot', 'luen', 'pashar', 'goat-king'] as const;
+// sprite-* = 게임 속 도트 그림 (화가가 손본 그림으로 갈아 끼우는 칸. 투명 PNG, 발 = 그림 아래 가운데)
+export const PORTRAIT_SLOTS = ['miss-hwang', 'yellow-wing', 'hwanghon', 'parrot', 'luen', 'pashar', 'goat-king', 'sprite-miss-hwang', 'sprite-parrot'] as const;
 export type PortraitSlot = (typeof PORTRAIT_SLOTS)[number];
 
 /** 기본 그림이 있는 칸 (없는 칸은 관리자가 올리기 전까지 그림 없이 대화한다) */

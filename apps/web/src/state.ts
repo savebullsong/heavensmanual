@@ -16,7 +16,10 @@ export interface Save {
   hp?: number;
   deeds?: { good: number; evil: number };
   // 영혼 (환생해도 남는다)
-  soul?: { rank: number; exp: number };
+  soul?: { rank: number; exp: number; stats?: { str: number; agi: number; vit: number; fai: number } };
+  // 비회원: 처음 거리로 나선 뒤 지난 시간(초)과 미스 황의 전화
+  streetSecs?: number;
+  called?: boolean;
 }
 export type Slot = 'weapon' | 'head' | 'body' | 'hands' | 'legs' | 'shins' | 'feet';
 // v2: 작은 캐릭터와 '처음 모습' 시나리오로 바뀌어 예전 저장은 새로 시작한다

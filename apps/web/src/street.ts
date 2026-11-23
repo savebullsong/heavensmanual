@@ -3,6 +3,7 @@
 import { Rectangle, Texture } from 'pixi.js';
 import { type Building, type Zone, tileAt } from './zone.ts';
 import { TW, TH, iso } from './gfx.ts';
+import { kindOf, mainPoi } from './names.ts';
 
 export const GPX = 100, UPX = 52, PPX = 20; // 1층 · 위층 · 옥상 난간 높이 (px)
 
@@ -70,8 +71,10 @@ const AWNINGS = ['#2f7a4a', '#2c5a8c', '#a33a2c', '#c08a2a', '#6a3a7a'];
 
 // ───────────────────────── 건물 ─────────────────────────
 type Face = 'L' | 'R';
-const SHOP_GLASS = new Set(['convenience', 'pharmacy', 'cafe', 'bank']);
-const SHOP_SHUTTER = new Set(['restaurant', 'bar', 'shop', 'laundry', 'clinic']);
+const SHOP_GLASS = new Set(['convenience', 'supermarket', 'pharmacy', 'chemist', 'cafe', 'bank', 'bakery', 'optician', 'mobile_phone', 'computer', 'electronics', 'clothes', 'shoes', 'cosmetics', 'fitness_centre', 'bureau_de_change', 'coworking_space', 'dentist', 'clinic', 'jewelry', 'watches', 'travel_agency', 'ice_cream', 'books']);
+const SHOP_SHUTTER = new Set(['restaurant', 'fast_food', 'food_court', 'bar', 'pub', 'nightclub', 'shop', 'laundry', 'massage', 'hairdresser', 'beauty', 'tailor', 'hardware', 'tattoo', 'cannabis', 'gift', 'variety_store', 'kiosk', 'motorcycle_repair', 'car_repair', 'alcohol', 'second_hand', 'marketplace']);
+const LOBBY = new Set(['hotel', 'hostel', 'guest_house', 'apartment_hotel', 'mall', 'department_store', 'hospital', 'school', 'cinema']);
+const TOWER = new Set(['office', 'mall', 'department_store', 'coworking_space', 'bank']);
 
 /** 층수: 변환기 높이(px = 16 + 층 × 15) → 위층 개수 */
 export function upperFloors(b: Building) {
@@ -85,6 +88,10 @@ export function buildingTop(b: Building) {
 
 function groundKind(b: Building, face: Face, k: number, n: number, onSign: boolean, r: () => number): string {
   if (b.cat === 'ujusae') return onSign && k === Math.floor(n / 2) ? 'wooddoor' : 'wood';
+  const kd = kindOf(b);
+  if (onSign && LOBBY.has(kd)) return k % 4 === 1 || k % 4 === 2 ? 'lobby' : 'glass';
+  if (onSign && SHOP_GLASS.has(kd)) return 'glass';
+  if (onSign && SHOP_SHUTTER.has(kd)) return 'shop';
   if (b.cat === 'office') return onSign ? 'lobby' : 'glass';
   if (b.cat === 'condo' || b.cat === 'hotel') return onSign ? (k % 4 === 1 || k % 4 === 2 ? 'lobby' : 'glass') : 'wall';
   if (onSign && SHOP_GLASS.has(b.cat)) return 'glass';
@@ -94,7 +101,7 @@ function groundKind(b: Building, face: Face, k: number, n: number, onSign: boole
   return face === 'L' ? (x < 0.45 ? 'shop' : x < 0.75 ? 'closed' : 'wall') : x < 0.25 ? 'shop' : x < 0.6 ? 'closed' : 'wall';
 }
 function upperKind(b: Building, k: number, f: number, colRand: number): string {
-  if (b.cat === 'office') return 'curtain';
+  if (b.cat === 'office' || TOWER.has(kindOf(b))) return 'curtain';
   if (b.cat === 'condo') return colRand < 0.55 ? 'balcony' : colRand < 0.8 ? 'plain' : 'ac';
   if (b.cat === 'hotel') return colRand < 0.6 ? 'plain' : 'ac';
   if (b.cat === 'ujusae') return 'plain';
@@ -111,7 +118,10 @@ export function drawBuildingKit(b: Building, signText: string, night: boolean) {
   const roofZ = GPX + nU * UPX;
   const top = roofZ + PPX;
   const r = rng(hash(i0, j0) + 17);
-  const MX = 36, MT = 76, MB = 28;
+  const kd = kindOf(b);
+  const temple = kd === 'place_of_worship' || b.cat === 'worship';
+  const faith = temple ? faithOf(b) : null;
+  const MX = 36, MT = temple ? 190 : 76, MB = 28;
   const minX = (i0 - j1) * (TW / 2) - MX;
   const topY = (i0 + j0) * (TH / 2) - top - MT;
   const W = (w + d) * (TW / 2) + MX * 2, H = (w + d) * (TH / 2) + top + MT + MB;
@@ -122,10 +132,11 @@ export function drawBuildingKit(b: Building, signText: string, night: boolean) {
   const D = img.data;
   const P = (x: number, y: number, z: number): [number, number] => [Math.round((x - y) * (TW / 2) - minX), Math.round((x + y) * (TH / 2) - topY - z)];
   // 건물 색
-  const wall = b.cat === 'ujusae' ? '#4a3527' : b.color;
+  const wall = b.cat === 'ujusae' ? '#4a3527' : kindOf(b) === 'place_of_worship' || b.cat === 'worship' ? '#efe9dc' : b.color;
   const trim = b.cat === 'office' ? '#9aa6b2' : b.cat === 'ujusae' ? '#2e2018' : mix(wall, '#f2efe6', 0.45);
-  const awn = SIGN_COLORS[b.cat] ? mix(SIGN_COLORS[b.cat], '#000000', 0.05) : AWNINGS[hash(i0, j0) % AWNINGS.length];
-  const glass = b.cat === 'office' ? '#4e7a86' : '#4a6070';
+  const signCol = signColor(kd);
+  const awn = signCol ? mix(signCol, '#000000', 0.05) : AWNINGS[hash(i0, j0) % AWNINGS.length];
+  const glass = b.cat === 'office' || TOWER.has(kd) ? '#4e7a86' : '#4a6070';
   const base = ['#000000', wall, trim, glass, '#c9ccce', '#3b3f44', '#231c17', night ? '#ffe0a0' : '#8a6a48', '#8d98a3', awn, '#ece6d6', '#e4e0d6', '#6b4429', '#8f8a80', '#4a7a3a', ['#c06050', '#c9a24a', '#7aa0c0'][hash(j0, i0) % 3]];
   const pal = base.map((h, k) => (k === 7 && night ? glow(h) : ramp(h)));
   const lit = glow('#f2d58a'), darkGlass = ramp('#1c2430');
@@ -150,7 +161,7 @@ export function drawBuildingKit(b: Building, signText: string, night: boolean) {
     }
   };
   const winMode = (): 0 | 1 | 2 => (night ? (r() < 0.45 ? 1 : 2) : 0);
-  const topKind = b.cat === 'office' ? 'curtain' : 'parapet';
+  const topKind = b.cat === 'office' || TOWER.has(kd) ? 'curtain' : 'parapet';
   // 뒤쪽 난간 (안쪽 면) → 지붕 → 옥상 설비 → 앞 두 면
   for (let j = j0; j < j1; j++) { const [x, y] = P(i0, j + 1, roofZ); put(`p-${topKind}-R`, x, y); }
   for (let i = i0; i < i1; i++) { const [x, y] = P(i, j0, roofZ); put(`p-${topKind}-L`, x, y); }
@@ -177,7 +188,7 @@ export function drawBuildingKit(b: Building, signText: string, night: boolean) {
   }
   g.putImageData(img, 0, 0);
   // 옥상 설비 (색 그대로)
-  if (b.cat !== 'ujusae' && w >= 2 && d >= 2) {
+  if (b.cat !== 'ujusae' && !temple && w >= 2 && d >= 2) {
     const items: [string, number, number][] = [];
     if (b.cat === 'office' || nU >= 6) items.push(['stair-0', i0 + Math.max(1, w * 0.35), j0 + Math.max(1, d * 0.4)]);
     if (b.cat !== 'office') items.push(['tank-0', i0 + 0.8 + r() * (w - 1.6), j0 + 0.8 + r() * Math.max(0.1, d * 0.4)]);
@@ -195,6 +206,9 @@ export function drawBuildingKit(b: Building, signText: string, night: boolean) {
     for (let i = i0; i < i1; i++) { const [x, y] = P(i, j1, roofZ); putTo(img2.data, W, H, `p-${topKind}-L`, x, y, pal); }
     g.putImageData(img2, 0, 0);
   }
+  if (faith === 'church') churchRoof(g, P, i0, j0, w, d, roofZ);
+  else if (faith === 'mosque' || faith === 'sikh') domeRoof(g, P, i0, j0, w, d, roofZ, faith);
+  else if (temple) templeRoof(g, P, i0, j0, w, d, roofZ);
   // 간판 (가게 이름) — 1층 처마 띠에 기울여 붙인다
   if (b.sign && b.cat !== 'ujusae' && signText) {
     const left = b.sign === 'left';
@@ -202,7 +216,7 @@ export function drawBuildingKit(b: Building, signText: string, night: boolean) {
     const A = (s: number, z: number) => (left ? P(i0 + s, j1, z) : P(i1, j1 - s, z));
     const z0 = GPX - 22, z1 = GPX - 5;
     const s0 = 0.15, s1 = Math.min(span - 0.15, Math.max(2.2, Math.min(span, 4.5)));
-    const col = SIGN_COLORS[b.cat] ?? '#a0582f';
+    const col = signCol ?? '#a0582f';
     const quad = (pts: [number, number][], fill: string) => { g.beginPath(); g.moveTo(...pts[0]); for (const p of pts.slice(1)) g.lineTo(...p); g.closePath(); g.fillStyle = fill; g.fill(); };
     quad([A(s0, z1 + 1), A(s1, z1 + 1), A(s1, z0 - 1), A(s0, z0 - 1)], '#1d1712');
     quad([A(s0, z1), A(s1, z1), A(s1, z0), A(s0, z0)], col);
@@ -224,6 +238,121 @@ export function drawBuildingKit(b: Building, signText: string, night: boolean) {
     g.restore();
   }
   return { canvas: c, x: minX, y: topY };
+}
+
+/** 업종별 간판 색 */
+function signColor(kd: string): string | null {
+  const G: [string[], string][] = [
+    [['convenience', 'supermarket', 'kiosk', 'variety_store'], '#2f8f5b'], [['pharmacy', 'chemist', 'clinic', 'dentist', 'hospital', 'veterinary'], '#3a7fb8'],
+    [['restaurant', 'fast_food', 'food_court', 'marketplace'], '#b8462f'], [['bar', 'pub', 'nightclub'], '#7a3a8a'], [['cafe', 'bakery', 'coffee', 'tea', 'ice_cream'], '#6b4a32'],
+    [['bank', 'bureau_de_change'], '#2f5d8f'], [['massage', 'beauty', 'hairdresser', 'cosmetics'], '#b0567a'], [['hotel', 'hostel', 'guest_house', 'apartment_hotel'], '#5a4a7a'],
+    [['tailor', 'clothes', 'shoes', 'bag', 'jewelry', 'watches'], '#4a5a7a'], [['laundry'], '#5a5fae'], [['hardware', 'car_repair', 'motorcycle_repair', 'motorcycle'], '#c08a2a'],
+    [['place_of_worship'], '#b8862f'], [['school', 'kindergarten', 'library'], '#8f6a2f'], [['cannabis'], '#3f7a3a'], [['fitness_centre'], '#c0392b'],
+  ];
+  for (const [ks, c] of G) if (ks.includes(kd)) return c;
+  return SIGN_COLORS[kd] ?? null;
+}
+
+/** 이름으로 종교를 가린다 (지도에는 종교 표시가 빠진 곳이 많다). 모르면 태국 사원(가장 흔함) */
+type Faith = 'buddhist' | 'church' | 'mosque' | 'sikh';
+export function faithOf(b: Building): Faith {
+  const p = mainPoi(b);
+  const n = `${p?.n ?? ''} ${p?.nen ?? ''}`.toLowerCase();
+  if (/church|chapel|cathedral|คริสต|โบสถ์คริสต์|อาสนวิหาร|christ|catholic/.test(n)) return 'church';
+  if (/mosque|masjid|มัสยิด|surau|สุเหร่า/.test(n)) return 'mosque';
+  if (/sikh|gurdwara|gurudwara|ซิกข์|namdhari|นามธารี|sangat/.test(n)) return 'sikh';
+  return 'buddhist';
+}
+
+type Proj = (x: number, y: number, z: number) => [number, number];
+const poly = (g: CanvasRenderingContext2D, pts: [number, number][], fill: string, stroke?: string, lw = 1.5) => {
+  g.beginPath(); g.moveTo(...pts[0]); for (const p of pts.slice(1)) g.lineTo(...p); g.closePath();
+  g.fillStyle = fill; g.fill(); if (stroke) { g.strokeStyle = stroke; g.lineWidth = lw; g.stroke(); }
+};
+
+/** 교회: 가파른 회색 박공 + 앞쪽 종탑(뾰족 지붕·십자가) */
+function churchRoof(g: CanvasRenderingContext2D, P: Proj, i0: number, j0: number, w: number, d: number, z0: number) {
+  const along = w >= d, i1 = i0 + w, j1 = j0 + d;
+  const H = Math.min(110, (along ? d : w) * 26 + 24);
+  if (along) {
+    const jm = (j0 + j1) / 2;
+    poly(g, [P(i0 - 0.1, j1 + 0.15, z0), P(i1 + 0.1, j1 + 0.15, z0), P(i1 + 0.1, jm, z0 + H), P(i0 - 0.1, jm, z0 + H)], '#5d6168', '#3d4046');
+    poly(g, [P(i1 + 0.1, j0 - 0.15, z0), P(i1 + 0.1, j1 + 0.15, z0), P(i1 + 0.1, jm, z0 + H)], '#d8d1c2', '#9a9286');
+    const [cx, cy] = P(i1 + 0.1, jm, z0 + H * 0.45); g.fillStyle = '#6a4a8a'; g.beginPath(); g.arc(cx, cy, Math.max(3, H * 0.08), 0, Math.PI * 2); g.fill(); // 둥근 창
+  } else {
+    const im = (i0 + i1) / 2;
+    poly(g, [P(i1 + 0.15, j0 - 0.1, z0), P(i1 + 0.15, j1 + 0.1, z0), P(im, j1 + 0.1, z0 + H), P(im, j0 - 0.1, z0 + H)], '#4f535a', '#3d4046');
+    poly(g, [P(i0 - 0.15, j1 + 0.1, z0), P(i1 + 0.15, j1 + 0.1, z0), P(im, j1 + 0.1, z0 + H)], '#d8d1c2', '#9a9286');
+  }
+  // 종탑: 앞(+i,+j) 모서리 쪽 네모 기둥
+  const s = 0.45, ti = along ? i1 - 0.6 : (i0 + i1) / 2, tj = along ? (j0 + j1) / 2 : j1 - 0.6;
+  const zt = z0 + H * 1.15, zs = zt + H * 0.7;
+  poly(g, [P(ti + s, tj - s, z0), P(ti + s, tj + s, z0), P(ti + s, tj + s, zt), P(ti + s, tj - s, zt)], '#cfc7b6');
+  poly(g, [P(ti - s, tj + s, z0), P(ti + s, tj + s, z0), P(ti + s, tj + s, zt), P(ti - s, tj + s, zt)], '#e6dfd0');
+  const [bx, by] = P(ti + s, tj, zt - H * 0.3); g.fillStyle = '#2b2a30'; g.fillRect(bx - 2, by - 6, 4, 8);
+  poly(g, [P(ti + s, tj - s, zt), P(ti + s, tj + s, zt), P(ti, tj, zs)], '#474b52');
+  poly(g, [P(ti - s, tj + s, zt), P(ti + s, tj + s, zt), P(ti, tj, zs)], '#5d6168');
+  const [kx, ky] = P(ti, tj, zs); g.fillStyle = '#e0b437'; g.fillRect(kx - 1, ky - 14, 2, 14); g.fillRect(kx - 5, ky - 10, 10, 2);
+}
+
+/** 이슬람 사원·시크 사원: 평평한 지붕 위 큰 돔 (+ 이슬람은 첨탑, 시크는 작은 금빛 돔 넷) */
+function domeRoof(g: CanvasRenderingContext2D, P: Proj, i0: number, j0: number, w: number, d: number, z0: number, faith: 'mosque' | 'sikh') {
+  const i1 = i0 + w, j1 = j0 + d;
+  const dome = (ic: number, jc: number, zb: number, R: number, light: string, dark: string, tip: string) => {
+    const [cx, cy] = P(ic, jc, zb);
+    const rx = R, rz = R * 1.15;
+    g.fillStyle = dark; g.fillRect(cx - rx * 0.92, cy - rz * 0.18, rx * 1.84, rz * 0.22); // 받침
+    const gr = g.createLinearGradient(cx - rx, 0, cx + rx, 0); gr.addColorStop(0, light); gr.addColorStop(0.55, light); gr.addColorStop(1, dark);
+    g.fillStyle = gr; g.beginPath(); g.ellipse(cx, cy - rz * 0.18, rx, rz, 0, Math.PI, Math.PI * 2); g.closePath(); g.fill();
+    g.fillStyle = tip; g.fillRect(cx - 1, cy - rz * 1.18 - 10, 2, 10); g.beginPath(); g.arc(cx, cy - rz * 1.18 - 11, 2.2, 0, Math.PI * 2); g.fill();
+  };
+  const R = Math.min(46, Math.min(w, d) * 7 + 8);
+  const ic = (i0 + i1) / 2, jc = (j0 + j1) / 2;
+  if (faith === 'mosque') {
+    dome(ic, jc, z0, R, '#3f9a6c', '#22603f', '#e0b437');
+    // 첨탑: 오른쪽 모서리 (돔과 겹치지 않게)
+    const ti = i1 - 0.5, tj = j0 + 0.5, th = R * 3.4;
+    const [mx, my] = P(ti, tj, z0);
+    g.fillStyle = '#ece6d8'; g.fillRect(mx - 4, my - th, 8, th);
+    g.fillStyle = '#cfc6b2'; g.fillRect(mx + 1, my - th, 3, th);
+    g.fillStyle = '#d9d2c2'; g.fillRect(mx - 6, my - th * 0.72, 12, 3); g.fillRect(mx - 6, my - th * 0.4, 12, 3);
+    g.fillStyle = '#2f7a55'; g.beginPath(); g.moveTo(mx - 5, my - th); g.lineTo(mx + 5, my - th); g.lineTo(mx, my - th - 14); g.closePath(); g.fill();
+  } else {
+    for (const [a, c] of [[i0 + 0.5, j0 + 0.5], [i1 - 0.5, j0 + 0.5], [i0 + 0.5, j1 - 0.5], [i1 - 0.5, j1 - 0.5]] as [number, number][]) {
+      if (a + c < ic + jc) dome(a, c, z0, R * 0.32, '#f2d27a', '#b88a2e', '#e0b437');
+    }
+    dome(ic, jc, z0, R, '#f5f1e8', '#c9c0ae', '#e0b437');
+    for (const [a, c] of [[i0 + 0.5, j0 + 0.5], [i1 - 0.5, j0 + 0.5], [i0 + 0.5, j1 - 0.5], [i1 - 0.5, j1 - 0.5]] as [number, number][]) {
+      if (a + c >= ic + jc) dome(a, c, z0, R * 0.32, '#f2d27a', '#b88a2e', '#e0b437');
+    }
+  }
+}
+
+/** 사원 지붕: 붉은 기와 박공 두 겹, 초록 테두리, 금빛 용마루와 처마 끝 장식(초파) */
+function templeRoof(g: CanvasRenderingContext2D, P: (x: number, y: number, z: number) => [number, number], i0: number, j0: number, w: number, d: number, z0: number) {
+  const along = w >= d; // 용마루 방향
+  const i1 = i0 + w, j1 = j0 + d;
+  const H = Math.min(90, (along ? d : w) * 18 + 20);
+  const quad = (pts: [number, number][], fill: string, stroke?: string) => { g.beginPath(); g.moveTo(...pts[0]); for (const p of pts.slice(1)) g.lineTo(...p); g.closePath(); g.fillStyle = fill; g.fill(); if (stroke) { g.strokeStyle = stroke; g.lineWidth = 1.5; g.stroke(); } };
+  const tiers = [{ inset: -0.25, z: 0, h: H * 0.55 }, { inset: 0.35, z: H * 0.38, h: H * 0.62 }];
+  for (const tr of tiers) {
+    const a0 = i0 - tr.inset * (along ? 0 : -1) * 0, ii0 = i0 - (along ? 0.25 : -tr.inset), ii1 = i1 + (along ? 0.25 : -tr.inset), jj0 = j0 - (along ? -tr.inset : 0.25), jj1 = j1 + (along ? -tr.inset : 0.25);
+    void a0;
+    const zb = z0 + tr.z, zt = z0 + tr.z + tr.h;
+    if (along) {
+      const jm = (jj0 + jj1) / 2;
+      quad([P(ii0, jj1, zb), P(ii1, jj1, zb), P(ii1, jm, zt), P(ii0, jm, zt)], '#b5452e', '#3f6a3a'); // 앞(+j) 경사
+      quad([P(ii1, jj0, zb), P(ii1, jj1, zb), P(ii1, jm, zt)], '#8a3424', '#c9a23e'); // 박공 삼각형
+      g.strokeStyle = '#e0b437'; g.lineWidth = 2; g.beginPath(); g.moveTo(...P(ii0, jm, zt)); g.lineTo(...P(ii1, jm, zt)); g.stroke();
+      const [fx, fy] = P(ii1, jm, zt); g.fillStyle = '#e0b437'; g.beginPath(); g.moveTo(fx, fy); g.quadraticCurveTo(fx + 8, fy - 6, fx + 6, fy - 16); g.lineTo(fx + 3, fy - 2); g.fill();
+    } else {
+      const im = (ii0 + ii1) / 2;
+      quad([P(ii1, jj0, zb), P(ii1, jj1, zb), P(im, jj1, zt), P(im, jj0, zt)], '#9a3a28', '#3f6a3a'); // 오른쪽(+i) 경사
+      quad([P(ii0, jj1, zb), P(ii1, jj1, zb), P(im, jj1, zt)], '#b5452e', '#c9a23e');
+      g.strokeStyle = '#e0b437'; g.lineWidth = 2; g.beginPath(); g.moveTo(...P(im, jj0, zt)); g.lineTo(...P(im, jj1, zt)); g.stroke();
+      const [fx, fy] = P(im, jj1, zt); g.fillStyle = '#e0b437'; g.beginPath(); g.moveTo(fx, fy); g.quadraticCurveTo(fx - 8, fy - 6, fx - 6, fy - 16); g.lineTo(fx - 3, fy - 2); g.fill();
+    }
+  }
 }
 
 function putTo(D: Uint8ClampedArray, W: number, H: number, key: string, sx: number, sy: number, pal: Uint8ClampedArray[]) {

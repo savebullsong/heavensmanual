@@ -10,6 +10,8 @@ const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   luen: { name: '루엔', where: '천국 · 환생관' },
   pashar: { name: '파샤르', where: '지옥 1층 · 환생관' },
   'goat-king': { name: '염소대왕', where: '지옥 13층 · 최종 보스' },
+  'sprite-miss-hwang': { name: '미스 황 (게임 속 도트)', where: '우주새 카운터 뒤에 서 있는 모습 · 투명 PNG, 높이 약 46px, 발 = 그림 아래 가운데' },
+  'sprite-parrot': { name: '앵무새 (게임 속 도트)', where: '카운터 끝 횃대 · 투명 PNG, 높이 약 28px, 발 = 그림 아래 가운데' },
 };
 
 const KEY_STORE = 'hm.admin.key';
@@ -129,7 +131,7 @@ function slotCard(slot: PortraitSlot) {
     if (!f) return;
     status.textContent = '그림을 줄이는 중…';
     try {
-      pending = await shrink(f);
+      pending = await shrink(f, slot);
     } catch {
       status.textContent = '이 파일은 열 수 없습니다.';
       return;
@@ -179,7 +181,12 @@ function slotCard(slot: PortraitSlot) {
 }
 
 /** 올리기 전에 긴 쪽 1712px 이하로 줄이고 webp로 바꾼다 (안 되는 브라우저는 jpeg) */
-async function shrink(f: File): Promise<Blob> {
+async function shrink(f: File, slot?: string): Promise<Blob> {
+  // 도트 그림은 줄이거나 다시 압축하지 않는다 (픽셀이 뭉개짐)
+  if (slot?.startsWith('sprite-')) {
+    if (f.type !== 'image/png') throw new Error('png only');
+    return f;
+  }
   const bmp = await createImageBitmap(f);
   const scale = Math.min(1, 1712 / bmp.height, 1200 / bmp.width);
   const c = document.createElement('canvas');

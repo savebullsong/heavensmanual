@@ -6,7 +6,7 @@
 import { put, del, get } from '@vercel/blob';
 import { createHash, timingSafeEqual } from 'node:crypto';
 
-const SLOTS = ['miss-hwang', 'yellow-wing', 'hwanghon', 'parrot', 'luen', 'pashar', 'goat-king'];
+const SLOTS = ['miss-hwang', 'yellow-wing', 'hwanghon', 'parrot', 'luen', 'pashar', 'goat-king', 'sprite-miss-hwang', 'sprite-parrot'];
 const MANIFEST = 'portraits/manifest.json';
 const TYPES: Record<string, string> = { 'image/webp': 'webp', 'image/png': 'png', 'image/jpeg': 'jpg' };
 const MAX_BYTES = 4 * 1024 * 1024;

@@ -2,7 +2,7 @@
 import json, subprocess, sys, os, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, '../../apps/web/public/sprites')
-from body import HAIRS, WEAPONS
+from body import HAIRS, WEAPONS, ARMOR
 MODES = ['u', 'm', 'g']
 jobs = []
 for sex in 'mf':
@@ -14,11 +14,19 @@ for sex in 'mf':
 for sex in 'mf':
     for b in (0, 2):
         jobs.append({'sex': sex, 'build': b, 'sets': [{'kind': 'base', 'outfit': 'casual', 'mode': m} for m in MODES]})
+# 방어구 (2차): 몸통·바지는 체형마다, 나머지는 보통 체형만
+for sex in 'mf':
+    for b in (0, 1, 2):
+        sets = [{'kind': 'armor', 'piece': p, 'mode': m} for p in (['jacket', 'vest', 'workpants'] + (['helmet', 'gloves', 'shinguard', 'boots'] if b == 1 else [])) for m in MODES]
+        jobs.append({'sex': sex, 'build': b, 'sets': sets, 'tag': 'armor'})
+# 봉합자 (사람 모습 + 변신)
+jobs.append({'sex': 'm', 'build': 1, 'sets': [{'kind': 'base', 'outfit': 'suturer', 'mode': 'm'}, {'kind': 'weapon', 'weapon': 'needle'}], 'tag': 'suturer'})
+jobs.append({'sex': 'm', 'build': 1, 'monster': True, 'sets': [{'kind': 'base', 'outfit': 'stitched', 'mode': 'm'}, {'kind': 'weapon', 'weapon': 'needle'}], 'tag': 'suturer'})
 jobs.append({'sex': 'm', 'build': 1, 'child': True, 'sets': [{'kind': 'base', 'outfit': 'casual', 'mode': 'w'}] + [{'kind': 'hair', 'style': h} for h in HAIRS]})
 only = sys.argv[2:]  # 번호로 일부만
 t0 = time.time()
 for k, j in enumerate(jobs):
-    if only and str(k) not in only: continue
+    if only and str(k) not in only and j.get('tag') not in only: continue
     print(f'== job {k}: {j["sex"]}{j["build"]}{" child" if j.get("child") else ""} ({len(j["sets"])} sets)', flush=True)
     r = subprocess.run([sys.executable, os.path.join(HERE, 'bake.py'), json.dumps(j), OUT], capture_output=True, text=True)
     for line in r.stdout.splitlines():

@@ -200,7 +200,75 @@ const dict = {
   },
 };
 
-export type Dict = (typeof dict)['ko'];
+
+// 4차 추가 문구
+const extra = {
+  ko: {
+    workingLine: '일하는 중 · {name} · 번 돈 ฿{n}', workOut: '화면을 누르면 일을 그만두고 나옵니다',
+    hpWords: ['멀쩡해 보인다.', '조금 다쳤다.', '많이 다쳤다.', '쓰러지기 직전이다.'], miss: '빗나감', healed: '회복',
+    soulTitle: '영혼', soulExp: '영혼 경험치', points: '남은 포인트 {n}', statNames: { str: '힘', agi: '민첩', vit: '생명력', fai: '신앙' },
+    statDesc: { str: '휘두르는 힘', agi: '몸놀림 · 피하기', vit: '버틸 수 있는 몸', fai: '회복 · 기적 · 결정적인 한 방' },
+    stance: { talk: '상호작용', hostile: '적대만 공격', all: '모두 공격' },
+    live: '이 세상에서 살기로 결정', ring: '전화가 왔습니다', answer: '받기', decline: '거절',
+    callLine: '당신은 모르겠지만, 당신은 가게에 여러 번 찾아왔어요. 당신을 잃고 싶지 않으면 당신이 누군지 기억하세요.',
+    yes: '예', no: '아니요', signupTitle: '이 세상에서 살기', signupSub: '아이디와 비밀번호만 있으면 됩니다. 이메일은 나중에 등록해도 됩니다.',
+    idLabel: '아이디', pwLabel: '비밀번호', pw2Label: '비밀번호 확인', signup: '살기로 결정', signupTab: '처음이에요', loginTab: '이미 살고 있어요', login: '들어가기',
+    idRule: '영문 소문자·숫자·밑줄 4~16자', pwRule: '6자 이상', pwMismatch: '비밀번호가 서로 다릅니다', errTaken: '이미 쓰는 아이디입니다', errBad: '아이디나 비밀번호가 맞지 않습니다', errNet: '연결이 불안정합니다. 잠시 뒤 다시 해 주세요',
+    welcome: '{id}, 이제 이 세상에 남습니다. 어느 기기에서든 이어서 할 수 있어요.', install: '홈 화면에 설치', installIos: 'Safari 아래 공유 버튼 → 홈 화면에 추가', installed: '설치했습니다', later: '나중에',
+    logout: '떠나기 (로그아웃)', profileTitle: '프로필', introPh: '나를 소개하는 한 줄 (140자)', contactPh: 'SNS · 메신저 (선택)', emailPh: '이메일 (선택 · 인증은 나중에)', save: '저장', saved: '저장했습니다',
+    guestNote: '지금은 이 기기에만 저장됩니다.', memberNote: '서버에 저장됩니다.',
+    report: '신고하기', reportReasons: ['부적절한 프로필', '욕설·괴롭힘', '사기·광고', '기타'], reported: '신고가 접수되었습니다.', viewProfile: '프로필 보기', noIntro: '소개가 없습니다.',
+    guestName: '이름 없는 영혼', player: '사람', playerSub: '이 세상에 사는 사람',
+    enter: '들어가기', buy: '사기', eatHere: '먹기', storeLine: '어서 오세요. 뭘 드릴까요?', storeThanks: '감사합니다.', ate: '{item}을 먹었다.',
+    suturer: '봉합자', suturerSub: '죄를 꿰매러 온 자', suturerLook: '하얀 가면 아래로 실이 늘어져 있다. 죄의 냄새를 따라온다.',
+    suturerLines: ['…꿰매야 해.', '터진 곳이 보인다.', '가만히 있어.'], stitchBurst: '…실밥이 터졌다.',
+    pvpLater: '다른 사람과 싸우려면 서버 판정이 필요해 다음에 열립니다.',
+  },
+  th: {
+    workingLine: 'กำลังทำงาน · {name} · ได้เงิน ฿{n}', workOut: 'แตะหน้าจอเพื่อเลิกงานและออกมา',
+    hpWords: ['ดูปกติดี', 'บาดเจ็บเล็กน้อย', 'บาดเจ็บหนัก', 'ใกล้จะล้มแล้ว'], miss: 'พลาด', healed: 'ฟื้นฟู',
+    soulTitle: 'วิญญาณ', soulExp: 'ค่าประสบการณ์วิญญาณ', points: 'แต้มคงเหลือ {n}', statNames: { str: 'พลัง', agi: 'ความคล่องแคล่ว', vit: 'ความอึด', fai: 'ศรัทธา' },
+    statDesc: { str: 'แรงในการฟาด', agi: 'การเคลื่อนไหว · หลบหลีก', vit: 'ร่างกายที่ทนทาน', fai: 'ฟื้นฟู · ปาฏิหาริย์ · ตีคริติคอล' },
+    stance: { talk: 'โต้ตอบ', hostile: 'โจมตีเฉพาะศัตรู', all: 'โจมตีทุกคน' },
+    live: 'ตัดสินใจอยู่ในโลกนี้', ring: 'มีสายเรียกเข้า', answer: 'รับสาย', decline: 'ปฏิเสธ',
+    callLine: 'คุณอาจไม่รู้ แต่คุณมาที่ร้านนี้หลายครั้งแล้ว ถ้าไม่อยากสูญเสียตัวเอง จงจำให้ได้ว่าคุณเป็นใคร',
+    yes: 'ใช่', no: 'ไม่', signupTitle: 'อยู่ในโลกนี้', signupSub: 'ใช้แค่ไอดีกับรหัสผ่าน อีเมลค่อยลงทะเบียนทีหลังได้',
+    idLabel: 'ไอดี', pwLabel: 'รหัสผ่าน', pw2Label: 'ยืนยันรหัสผ่าน', signup: 'ตัดสินใจอยู่', signupTab: 'ครั้งแรก', loginTab: 'อยู่ที่นี่แล้ว', login: 'เข้าสู่ระบบ',
+    idRule: 'a-z 0-9 _ 4–16 ตัว', pwRule: '6 ตัวขึ้นไป', pwMismatch: 'รหัสผ่านไม่ตรงกัน', errTaken: 'ไอดีนี้มีคนใช้แล้ว', errBad: 'ไอดีหรือรหัสผ่านไม่ถูกต้อง', errNet: 'การเชื่อมต่อไม่เสถียร ลองใหม่อีกครั้ง',
+    welcome: '{id} ตอนนี้คุณจะอยู่ในโลกนี้ เล่นต่อได้จากทุกอุปกรณ์', install: 'ติดตั้งบนหน้าจอหลัก', installIos: 'ปุ่มแชร์ของ Safari → เพิ่มลงในหน้าจอโฮม', installed: 'ติดตั้งแล้ว', later: 'ไว้ทีหลัง',
+    logout: 'ออกจากระบบ', profileTitle: 'โปรไฟล์', introPh: 'แนะนำตัวหนึ่งบรรทัด (140 ตัว)', contactPh: 'โซเชียล · แชต (ไม่บังคับ)', emailPh: 'อีเมล (ไม่บังคับ · ยืนยันทีหลัง)', save: 'บันทึก', saved: 'บันทึกแล้ว',
+    guestNote: 'ตอนนี้บันทึกไว้เฉพาะในเครื่องนี้', memberNote: 'บันทึกไว้บนเซิร์ฟเวอร์',
+    report: 'รายงาน', reportReasons: ['โปรไฟล์ไม่เหมาะสม', 'คำหยาบ·การกลั่นแกล้ง', 'หลอกลวง·โฆษณา', 'อื่น ๆ'], reported: 'ได้รับรายงานแล้ว', viewProfile: 'ดูโปรไฟล์', noIntro: 'ไม่มีคำแนะนำตัว',
+    guestName: 'วิญญาณไร้ชื่อ', player: 'ผู้คน', playerSub: 'คนที่อยู่ในโลกนี้',
+    enter: 'เข้าไป', buy: 'ซื้อ', eatHere: 'กิน', storeLine: 'ยินดีต้อนรับ รับอะไรดีคะ', storeThanks: 'ขอบคุณค่ะ', ate: 'กิน{item}แล้ว',
+    suturer: 'ผู้เย็บ', suturerSub: 'ผู้มาเย็บบาป', suturerLook: 'ด้ายห้อยลงมาจากใต้หน้ากากสีขาว มันตามกลิ่นบาปมา',
+    suturerLines: ['…ต้องเย็บ', 'เห็นรอยขาดแล้ว', 'อยู่นิ่ง ๆ'], stitchBurst: '…ด้ายขาดแล้ว',
+    pvpLater: 'การต่อสู้กับผู้เล่นอื่นต้องตัดสินบนเซิร์ฟเวอร์ จะเปิดในครั้งหน้า',
+  },
+  en: {
+    workingLine: 'Working · {name} · earned ฿{n}', workOut: 'Tap the screen to stop working and come out',
+    hpWords: ['Looks fine.', 'Slightly hurt.', 'Badly hurt.', 'About to collapse.'], miss: 'Miss', healed: 'Healed',
+    soulTitle: 'Soul', soulExp: 'Soul exp', points: '{n} points left', statNames: { str: 'Strength', agi: 'Agility', vit: 'Vitality', fai: 'Faith' },
+    statDesc: { str: 'Swing power', agi: 'Footwork · dodging', vit: 'How much you can take', fai: 'Recovery · miracles · critical blows' },
+    stance: { talk: 'Interact', hostile: 'Attack hostiles', all: 'Attack everyone' },
+    live: 'Decide to live in this world', ring: 'Incoming call', answer: 'Answer', decline: 'Decline',
+    callLine: "You don't know it, but you've come to the shop many times. If you don't want to lose yourself, remember who you are.",
+    yes: 'Yes', no: 'No', signupTitle: 'Live in this world', signupSub: 'Just an ID and a password. You can add an email later.',
+    idLabel: 'ID', pwLabel: 'Password', pw2Label: 'Confirm password', signup: 'Decide to live', signupTab: 'New here', loginTab: 'I already live here', login: 'Enter',
+    idRule: 'a–z, 0–9, _ · 4–16 chars', pwRule: '6+ characters', pwMismatch: "Passwords don't match", errTaken: 'That ID is taken', errBad: 'Wrong ID or password', errNet: 'Connection trouble. Try again shortly',
+    welcome: '{id}, you will remain in this world. Continue on any device.', install: 'Install to home screen', installIos: 'Safari share button → Add to Home Screen', installed: 'Installed', later: 'Later',
+    logout: 'Leave (log out)', profileTitle: 'Profile', introPh: 'One line about you (140 chars)', contactPh: 'Social · messenger (optional)', emailPh: 'Email (optional · verify later)', save: 'Save', saved: 'Saved',
+    guestNote: 'Saved on this device only for now.', memberNote: 'Saved on the server.',
+    report: 'Report', reportReasons: ['Inappropriate profile', 'Abuse · harassment', 'Scam · advertising', 'Other'], reported: 'Report received.', viewProfile: 'View profile', noIntro: 'No introduction.',
+    guestName: 'Nameless soul', player: 'Person', playerSub: 'Someone living in this world',
+    enter: 'Go in', buy: 'Buy', eatHere: 'Eat', storeLine: 'Welcome. What can I get you?', storeThanks: 'Thank you.', ate: 'You ate the {item}.',
+    suturer: 'Suturer', suturerSub: 'One who comes to stitch up sins', suturerLook: 'Thread hangs from under a white mask. It follows the smell of sin.',
+    suturerLines: ['…Must stitch.', 'I see the tear.', 'Hold still.'], stitchBurst: '…The stitches burst.',
+    pvpLater: 'Fighting other people needs server-side judging. It opens later.',
+  },
+};
+
+export type Dict = (typeof dict)['ko'] & (typeof extra)['ko'];
 
 function deviceLang(): Lang {
   const list = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language]) as string[];
@@ -218,6 +286,7 @@ export function lang(): Lang {
 export function setLang(l: Lang) {
   current = l;
 }
+const merged = {} as Record<Lang, Dict>;
 export function t(): Dict {
-  return dict[current] as Dict;
+  return (merged[current] ??= { ...dict[current], ...extra[current] } as Dict);
 }

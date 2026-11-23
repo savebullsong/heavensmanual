@@ -124,3 +124,65 @@ button.primary:hover { background: #e0b437; }
 .death .verdict { color: #e0b437; }
 .death .closed { color: #c9bfa8; font-style: italic; }
 .death button { margin-top: 14px; }
+
+/* 4차: 상단 오른쪽 묶음 (살기로 결정 버튼 + 메뉴) */
+#hud > .hud-tools { background: none; border: 0; padding: 0; display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; justify-content: flex-end; pointer-events: none; }
+#hud .hud-tools > * { pointer-events: auto; }
+#hud .hud-right { background: rgba(20, 15, 11, 0.78); border: 1px solid #4a3424; border-radius: 6px; padding: 6px 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 14px; }
+#hud .live { padding: 7px 12px; font-size: 13px; color: #1a120c; background: linear-gradient(#f2d27a, #c9a23e); border: 1px solid #8a6a2a; border-radius: 6px; font-weight: 700; box-shadow: 0 0 10px rgba(224, 180, 55, 0.35); }
+#hud .to-soul { background: none; border: 1px solid #6b4f36; color: #eadfc8; }
+
+/* 영혼 창 · 거리 가게 */
+.soul-panel, .store-panel { position: fixed; z-index: 18; right: 12px; top: 66px; width: min(380px, calc(100vw - 24px)); max-height: calc(100vh - 90px); overflow-y: auto; }
+.soul-panel .menu-head, .store-panel .menu-head { align-items: center; padding: 8px 10px; }
+.soul-panel .menu-head b, .store-panel .menu-head b { color: #e0b437; }
+.soul-exp { display: flex; align-items: center; gap: 8px; padding: 4px 12px; font-size: 12px; color: #b8a888; }
+.xpbar { flex: 1; height: 6px; background: #2a1d14; border: 1px solid #5a4424; border-radius: 2px; overflow: hidden; }
+.xpbar > i { display: block; height: 100%; background: linear-gradient(#a8c8ff, #6a8ed8); }
+.soul-points { padding: 2px 12px; font-size: 12px; color: #e0b437; min-height: 4px; }
+.soul-stats { display: flex; flex-direction: column; gap: 4px; padding: 6px 10px; }
+.stat-row { display: grid; grid-template-columns: 64px 1fr auto auto; align-items: center; gap: 8px; padding: 6px 8px; background: rgba(42, 31, 24, 0.75); border: 1px solid #4f3a28; border-radius: 4px; }
+.stat-row b { color: #eadfc8; font-size: 14px; }
+.stat-row span { color: #a8987c; font-size: 12px; }
+.stat-row em { font-style: normal; color: #e0b437; font-variant-numeric: tabular-nums; min-width: 1.6em; text-align: right; }
+.stat-row button { padding: 0 9px; font-size: 15px; line-height: 22px; }
+.soul-account { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px 12px; border-top: 1px solid #4a3424; margin-top: 4px; }
+.soul-account .note { margin: 0; font-size: 12px; color: #b8a888; }
+.soul-account .prof-title { color: #e0b437; font-size: 13px; }
+.soul-account input { padding: 7px 8px; background: #1c140e; border: 1px solid #5a4424; border-radius: 4px; color: #eadfc8; font: inherit; font-size: 13px; }
+.soul-account .row, .signup .row, .phone .row { display: flex; gap: 8px; justify-content: flex-end; }
+.store-line { margin: 4px 12px 2px; font-size: 13px; color: #d8ccb0; }
+
+/* 공격 태세 (오른쪽 아래, 반투명) */
+.stance { position: fixed; z-index: 15; right: 14px; bottom: 26px; display: flex; gap: 10px; align-items: flex-end; }
+.stance button { width: 54px; height: 54px; border-radius: 50%; padding: 0; background: rgba(20, 15, 11, 0.45); border: 2px solid rgba(201, 162, 62, 0.45); color: rgba(234, 223, 200, 0.85); font-size: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+.stance .st-hand { width: 44px; height: 44px; font-size: 18px; }
+.stance small { font-size: 9px; line-height: 1; margin-top: 1px; white-space: nowrap; }
+.stance[data-mode="talk"] .st-hand { border-color: #e0b437; background: rgba(60, 45, 20, 0.6); }
+.stance[data-mode="hostile"] .st-sword { border-color: #e0b437; background: rgba(120, 80, 20, 0.6); color: #fff2c8; }
+.stance[data-mode="all"] .st-sword { border-color: #ff5a4a; background: rgba(130, 25, 20, 0.65); color: #ffe0d8; box-shadow: 0 0 12px rgba(255, 70, 50, 0.5); }
+
+/* 가입 · 로그인 · 환영 */
+.signup { position: fixed; inset: 0; z-index: 45; display: flex; align-items: center; justify-content: center; background: rgba(6, 4, 3, 0.7); }
+.signup-box { width: min(360px, calc(100vw - 28px)); padding: 18px 18px 16px; background: rgba(20, 14, 10, 0.98); border: 2px solid #8a6a3a; border-radius: 8px; display: flex; flex-direction: column; gap: 9px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6); }
+.signup h2 { margin: 2px 0 0; font-size: 18px; color: #e0b437; }
+.signup .sub, .signup .ios { margin: 0; font-size: 13px; color: #c8bca0; line-height: 1.5; }
+.signup label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: #b8a888; }
+.signup input { padding: 9px 10px; background: #1c140e; border: 1px solid #5a4424; border-radius: 4px; color: #f2ead8; font-size: 15px; }
+.signup small { color: #7f725e; font-size: 11px; }
+.signup .err { margin: 0; min-height: 16px; color: #ff9a8a; font-size: 12px; }
+.signup .tabs { display: flex; gap: 6px; }
+.signup .tabs button { flex: 1; padding: 6px; font-size: 12px; background: none; border: 1px solid #4a3424; color: #a8987c; }
+.signup .tabs button.on { border-color: #c9a23e; color: #f2d27a; }
+.signup[data-tab="login"] .pw2-row { display: none; }
+.signup[data-tab="login"] small { display: none; }
+button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; border-color: #8a6a2a; font-weight: 700; }
+
+/* 전화 */
+.phone { position: fixed; z-index: 44; left: 50%; top: 18%; transform: translateX(-50%); animation: phone-in 0.4s ease-out; }
+.phone-box { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 22px; background: rgba(20, 14, 10, 0.96); border: 2px solid #c9a23e; border-radius: 14px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6); min-width: 220px; }
+.phone .ring { font-size: 34px; animation: phone-shake 0.5s steps(2) infinite; }
+.phone b { color: #f2d27a; font-size: 16px; }
+.phone span { color: #c8bca0; font-size: 13px; }
+@keyframes phone-shake { 0% { transform: rotate(-12deg); } 100% { transform: rotate(12deg); } }
+@keyframes phone-in { from { opacity: 0; transform: translate(-50%, -12px); } to { opacity: 1; transform: translate(-50%, 0); } }

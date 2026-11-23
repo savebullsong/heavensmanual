@@ -6,7 +6,8 @@ REG = {'void': 0, 'skin': 1, 'hair': 2, 'top': 3, 'bottom': 4, 'shoe': 5, 'eye':
        'gown': 9, 'bandage': 10, 'parrot': 11, 'crest': 12, 'wood': 13, 'metal': 14, 'dark': 15}
 HAIRS = ['short', 'swept', 'bob', 'long', 'ponytail', 'buzz']
 OUTFITS = ['casual', 'apron', 'raincoat', 'patient', 'parrot']
-MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword']
+MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle']
+ARMOR = ['helmet', 'jacket', 'vest', 'gloves', 'workpants', 'shinguard', 'boots']
 WEAPONS = MELEE + ['pistol']
 
 def id_color(rid):
@@ -15,8 +16,8 @@ def id_color(rid):
     return (v, v, v, 1)
 
 _rm = {}
-def rmat(region, rough=.7, spec=.25, metal=0.0, albedo=.8):
-    key = (region, rough, spec, metal, albedo)
+def rmat(region, rough=.7, spec=.25, metal=0.0, albedo=.8, tag=''):
+    key = (region, rough, spec, metal, albedo, tag)
     if key in _rm: return _rm[key]
     m = bpy.data.materials.new(f'{region}')
     try: m.use_nodes = True
@@ -28,6 +29,7 @@ def rmat(region, rough=.7, spec=.25, metal=0.0, albedo=.8):
         if k in b.inputs: b.inputs[k].default_value = spec; break
     b.inputs['Metallic'].default_value = metal
     m['rid'] = REG[region]
+    m['tag'] = tag
     m.diffuse_color = id_color(REG[region])
     _rm[key] = m
     return m
@@ -40,21 +42,23 @@ TORSO = {
     'f': [(.83, .145, .100, .000), (.90, .178, .115, .010), (.98, .172, .108, .000), (1.07, .128, .088, .000),
           (1.16, .140, .092, -.005), (1.24, .156, .118, -.026), (1.31, .158, .105, -.010), (1.39, .150, .090, .000), (1.45, .080, .060, .010)],
 }
-BODY = {'m': dict(h=1.0, shoulder=.19, hipw=.095, arm=1.15, leg=1.0),
+BODY = {'x': dict(h=1.28, shoulder=.22, hipw=.105, arm=1.4, leg=1.12),   # 변신한 봉합자 (몸집이 크다)
+        'm': dict(h=1.0, shoulder=.19, hipw=.095, arm=1.15, leg=1.0),
         'f': dict(h=.94, shoulder=.165, hipw=.092, arm=1.0, leg=.94),
         'c': dict(h=.68, shoulder=.17, hipw=.09, arm=1.05, leg=1.0)}
 BUILD = [.9, 1.0, 1.14]   # 마름 · 보통 · 건장 (뼈 위치는 같고 굵기만 다르다 → 머리·무기 층을 함께 쓴다)
 
 class Doll:
-    def __init__(self, sex, build=1, child=False):
-        key = 'c' if child else sex
+    def __init__(self, sex, build=1, child=False, monster=False):
+        key = 'x' if monster else 'c' if child else sex
         self.sex = sex; self.child = child; self.p = p = BODY[key]; self.s = s = p['h']
         self.bw = BUILD[build]
         self.bones = skeleton(p)
         self.arm = make_armature(self.bones)
         self.groups = {}   # 이름 → [객체]
         self.torso_key = 'f' if (sex == 'f' and not child) else 'm'
-        self.hk = 1.30 if child else 1.12   # 머리 크기 (아이는 더 크게)
+        self.hk = 1.30 if child else 1.0 if monster else 1.12   # 머리 크기 (아이는 더 크게)
+        self.monster = monster
 
     def V(self, x, y, z): return Vector((x, y, z)) * self.s
     def add(self, group, ob):
@@ -197,6 +201,52 @@ class Doll:
             blob(P, hc + Vector((0, .006, .012)), (.1 * s, .112 * s, .128 * s), bd, None, segs=16, rings=12, cut=lambda co: co.z < 1.62 * s or (co.y < -.04 * s and co.z < 1.655 * s))
             limb(P, hc + Vector((-.075 * s, .06 * s, .02 * s)), hc + Vector((-.11 * s, .13 * s, -.06 * s)), [(0, .02 * s, .008 * s), (1, .016 * s, .006 * s)], bd, None, segs=6)
             ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
+        elif name == 'suturer':
+            # 봉합자: 짙은 긴 코트, 꿰맨 자국이 있는 흰 가면, 챙 넓은 모자, 흰 장갑
+            coat = rmat('top', .7, .2); mask = rmat('bandage', .4, .4); dark = rmat('dark', .8, .1); bot = rmat('bottom', .8, .15); boot = rmat('shoe', .4, .5)
+            s = self.s
+            def coat_f(rings):
+                out = []
+                for c, u, v, rs, rf in rings:
+                    z = c.z / s
+                    out.append((c, u, v, rs * (1.1 if z > 1.0 else 1.25 + (1.0 - z) * .5) + .01, rf * 1.15 + .012))
+                c0, u, v, rs, rf = out[0]
+                out.insert(0, (self.V(0, .005, .5), u, v, rs * 1.2, rf * 1.25))
+                return out
+            self.torso(g, coat, coat, hem=0, extra=coat_f)
+            self.head(g, face=False); self.arms(g, coat, 1.9, cuff=True, wide=1.1); self.hands(g, mask); self.legs(g, bot, boot, boot=True)
+            P = Part(g + '.mask')
+            hc = self.V(0, -.005, 1.615)
+            blob(P, hc + Vector((0, -.012, 0)), (.096 * s, .1 * s, .126 * s), mask, None, segs=16, rings=12, cut=lambda co: co.y > .02 * s)
+            for sx in (1, -1):
+                blob(P, hc + Vector((sx * .036 * s, -.1 * s, .012 * s)), (.016 * s, .006 * s, .01 * s), dark, None, segs=8, rings=5)
+            limb(P, hc + Vector((-.045 * s, -.105 * s, -.05 * s)), hc + Vector((.045 * s, -.105 * s, -.05 * s)), [(0, .004, .004), (1, .004, .004)], dark, None, segs=6)
+            for k in range(5):
+                x = (-.04 + k * .02) * s
+                limb(P, hc + Vector((x, -.106 * s, -.035 * s)), hc + Vector((x, -.106 * s, -.065 * s)), [(0, .003, .003), (1, .003, .003)], dark, None, segs=4)
+            # 모자: 챙 + 몸통
+            limb(P, hc + Vector((0, 0, .09 * s)), hc + Vector((0, 0, .1 * s)), [(0, .2 * s, .2 * s), (1, .2 * s, .2 * s)], dark, None, segs=16)
+            limb(P, hc + Vector((0, 0, .09 * s)), hc + Vector((0, 0, .2 * s)), [(0, .1 * s, .1 * s), (1, .095 * s, .095 * s)], dark, None, segs=14)
+            ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
+        elif name == 'stitched':
+            # 변신한 봉합자: 잿빛 살을 기워 붙인 거구, 빛나는 눈
+            flesh = rmat('skin', .7, .2); dark = rmat('dark', .8, .1); glow = rmat('crest', .3, .6)
+            s = self.s
+            def bulk(rings):
+                return [(c, u, v, rs * 1.18 + .02, rf * 1.25 + .03) for c, u, v, rs, rf in rings]
+            self.torso(g, flesh, flesh, hem=0, extra=bulk)
+            self.head(g, face=False); self.arms(g, flesh, 1.95, wide=1.35); self.hands(g, flesh); self.legs(g, flesh, dark, boot=True)
+            P = Part(g + '.face')
+            hc = self.V(0, -.005, 1.615)
+            for sx in (1, -1):
+                blob(P, hc + Vector((sx * .038 * s, -.1 * s, .012 * s)), (.028 * s, .012 * s, .02 * s), glow, None, segs=8, rings=5)
+            # 꿰맨 자국: 몸 앞뒤로 가로지르는 굵은 실
+            for z, rx in ((1.62, .1), (1.3, .2), (1.1, .17), (.85, .19)):
+                limb(P, self.V(-rx, -.13 if z < 1.5 else -.1, z), self.V(rx, -.13 if z < 1.5 else -.1, z - .06), [(0, .016, .016), (1, .016, .016)], dark, None, segs=5)
+            patch = rmat('gown', .8, .1)
+            for (x, y, z, r) in ((.08, -.12, 1.22, .07), (-.1, -.11, 1.0, .06), (.12, .08, 1.3, .07), (-.06, .1, .95, .06)):
+                blob(P, self.V(x, y, z), (r * s, r * .6 * s, r * s), patch, None, segs=8, rings=5)
+            ob = finish(P); bind(ob, self.arm, lambda co: {'head': 1.0} if co.z > 1.5 * s else {'spine': 1.0}); self.add(g, ob)
         elif name == 'parrot':
             pw = rmat('parrot', .95, .05); cr = rmat('crest', .8, .1); dk = rmat('dark', .5, .3); ft = rmat('shoe', .8, .1)
             s = self.s
@@ -222,6 +272,75 @@ class Doll:
                 tip = base + Vector((0, (.04 + k * .035) * s, (.16 - abs(a) * .1) * s))
                 limb(P, base, tip, [(0, .018 * s, .03 * s), (1, .004 * s, .006 * s)], cr, None, segs=6)
             ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
+
+    # ── 방어구 (평상복 몸 위에 겹친다) ──
+    def armor(self, piece):
+        g = 'a.' + piece; s = self.s; V = self.V
+        main = rmat('top', .55, .3, tag='armor'); dark = rmat('dark', .6, .2, tag='armor'); metal = rmat('metal', .25, .6, .7, tag='armor'); bootm = rmat('shoe', .45, .4, tag='armor')
+        if piece == 'helmet':
+            P = Part(g)
+            hc = V(0, -.005, 1.615)
+            blob(P, hc + Vector((0, .005, .02)), (.118 * s, .13 * s, .13 * s), main, None, segs=16, rings=12, cut=lambda co: co.z < 1.53 * s or (co.y < -.03 * s and co.z < 1.64 * s))
+            blob(P, hc + Vector((0, -.1, .025)), (.085 * s, .03 * s, .045 * s), metal, None, segs=10, rings=6)
+            ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
+            return
+        if piece in ('jacket', 'vest'):
+            grow = 1.12 if piece == 'jacket' else 1.18
+            def fit(rings):
+                out = []
+                for c, u, v, rs, rf in rings:
+                    z = c.z / s
+                    if z < (.9 if piece == 'jacket' else .96): continue
+                    out.append((c, u, v, rs * grow + .012, rf * (grow + .06) + .014))
+                return out
+            self.torso(g, main, main, hem=0, extra=fit)
+            if piece == 'jacket':
+                am = self.p['arm'] * self.bw
+                for k, sx in (('L', 1), ('R', -1)):
+                    sh, el = self.bones[f'upper_arm.{k}'][0], self.bones[f'upper_arm.{k}'][1]
+                    wr = self.bones[f'forearm.{k}'][1]
+                    P = Part(f'{g}.sleeve.{k}')
+                    limb(P, sh + Vector((0, 0, .02)), el, [(0, .07 * am, .07 * am), (1, .058 * am, .058 * am)], main, None)
+                    limb(P, el, wr - (wr - el) * .08, [(0, .056 * am, .056 * am), (1, .046 * am, .046 * am)], main, None)
+                    blob(P, el, (.058 * am, .058 * am, .058 * am), main, None, segs=10, rings=7)
+                    blob(P, sh + Vector((-sx * .015, 0, 0)), (.074 * am, .068 * am, .068 * am), main, None, segs=10, rings=7)
+                    ob = finish(P); bind(ob, self.arm, autow(self.bones, ['spine', f'upper_arm.{k}', f'forearm.{k}'], power=5)); self.add(g, ob)
+            else:
+                P = Part(g + '.plates')
+                for z in (1.32, 1.18):
+                    limb(P, V(-.11, -.125, z), V(.11, -.125, z), [(0, .012, .055), (1, .012, .055)], dark, None, segs=6)
+                ob = finish(P); bind(ob, self.arm, lambda co: {'spine': 1.0}); self.add(g, ob)
+            return
+        if piece == 'gloves':
+            am = self.p['arm'] * self.bw
+            for k in 'LR':
+                wr, hd = self.bones[f'forearm.{k}'][1], self.bones[f'hand.{k}'][1]
+                P = Part(f'{g}.{k}')
+                blob(P, (wr + hd) / 2 + Vector((0, -.008, .01)), (.031 * am, .037 * am, .056 * am), main, None, segs=10, rings=7)
+                limb(P, wr + (wr - hd) * .3, wr - (wr - hd) * .2, [(0, .034 * am, .034 * am), (1, .03 * am, .03 * am)], main, None, segs=8)
+                ob = finish(P); bind(ob, self.arm, autow(self.bones, [f'forearm.{k}', f'hand.{k}'], power=8)); self.add(g, ob)
+            return
+        lg = self.p['leg'] * self.bw
+        for k in 'LR':
+            b = self.bones
+            hp, kn = b[f'thigh.{k}'][0], b[f'thigh.{k}'][1]
+            an = b[f'shin.{k}'][1]
+            P = Part(f'{g}.{k}')
+            if piece == 'workpants':
+                limb(P, hp + Vector((0, 0, .04)), kn, [(0, .094 * lg, .097 * lg), (.5, .08 * lg, .083 * lg), (1, .065 * lg, .068 * lg)], main, None)
+                limb(P, kn, an + Vector((0, 0, .03)), [(0, .065 * lg, .068 * lg), (.4, .061 * lg, .068 * lg), (1, .054 * lg, .056 * lg)], main, None)
+                blob(P, kn, (.066 * lg, .069 * lg, .066 * lg), main, None, segs=10, rings=7)
+                blob(P, (hp + kn) / 2 + Vector((0, -.02, 0)) + Vector(((1 if k == 'L' else -1) * .07, 0, 0)), (.03, .05, .06), dark, None, segs=8, rings=6)
+                ob = finish(P); bind(ob, self.arm, autow(self.bones, ['hips', f'thigh.{k}', f'shin.{k}'], power=5)); self.add(g, ob)
+            elif piece == 'shinguard':
+                limb(P, kn + Vector((0, -.05, -.02)), an + Vector((0, -.04, .08)), [(0, .05 * lg, .03 * lg), (1, .045 * lg, .028 * lg)], main, None, segs=8)
+                blob(P, kn + Vector((0, -.055, 0)), (.05 * lg, .035 * lg, .05 * lg), dark, None, segs=8, rings=6)
+                ob = finish(P); bind(ob, self.arm, autow(self.bones, [f'thigh.{k}', f'shin.{k}'], power=8)); self.add(g, ob)
+            elif piece == 'boots':
+                c = Vector((an.x, -.035 * s, .05 * s))
+                blob(P, c, (.058 * s, .13 * s, .06 * s), bootm, None, segs=12, rings=8, cut=lambda co: co.z < .0)
+                limb(P, an + Vector((0, 0, -.06)), an + Vector((0, 0, .2 * s)), [(0, .062 * s, .064 * s), (1, .058 * s, .06 * s)], bootm, None)
+                ob = finish(P); bind(ob, self.arm, autow(self.bones, [f'shin.{k}', f'foot.{k}'], power=8)); self.add(g, ob)
 
     # ── 머리카락 ──
     def hair(self, style):
@@ -290,6 +409,13 @@ class Doll:
         elif name == 'shovel':
             limb(P, grip - d * .3, grip + d * .78, [(0, .018, .018), (1, .018, .018)], wood, None, segs=8)
             limb(P, grip + d * .78, grip + d * 1.05, [(0, .006, .09), (.7, .006, .1), (1, .004, .05)], metal, None, segs=6)
+        elif name == 'needle':
+            gold = rmat('crest', .4, .5)
+            limb(P, grip - d * .12, grip + d * 1.05, [(0, .022, .022), (.15, .016, .016), (.9, .012, .012), (1, .002, .002)], metal, None, segs=8)
+            limb(P, grip - d * .16, grip - d * .12, [(0, .03, .012), (1, .03, .012)], metal, None, segs=6)
+            for k in range(6):   # 바늘귀에서 늘어진 금실
+                a = grip - d * (.14 + k * .02) + Vector((0, .02 * k, -.07 * k))
+                limb(P, a, a + Vector((0, .02, -.07)), [(0, .006, .006), (1, .006, .006)], gold, None, segs=4)
         elif name == 'pistol':
             fwd = Vector((0, -1, 0))
             limb(P, grip + Vector((0, .01, .04)), grip + Vector((0, -.01, -.06)), [(0, .016, .026), (1, .016, .026)], dark, None, segs=6)
