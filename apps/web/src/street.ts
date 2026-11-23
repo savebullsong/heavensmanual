@@ -1,0 +1,323 @@
+// 미리 구운 거리 조각: 건물 면(1층·위층·난간), 지붕 타일, 바닥 타일, 차, 소품 (tools/sprite3d/street.py)
+// 건물 조각은 '구역 번호 × 16 + 음영'이라 건물마다 벽색·차양색·밤 창문 불빛을 따로 입힌다.
+import { Rectangle, Texture } from 'pixi.js';
+import { type Building, type Zone, tileAt } from './zone.ts';
+import { TW, TH, iso } from './gfx.ts';
+
+export const GPX = 100, UPX = 52, PPX = 20; // 1층 · 위층 · 옥상 난간 높이 (px)
+
+interface Atlas { img: HTMLCanvasElement; px: Uint8ClampedArray; meta: Record<string, number[]> }
+let bld: Atlas, ground: Atlas, cars: Atlas, props: Atlas;
+const texCache = new Map<string, { tex: Texture; ax: number; ay: number }>();
+
+async function loadAtlas(name: string): Promise<Atlas> {
+  const [meta, img] = await Promise.all([
+    fetch(`./sprites/${name}.json`).then((r) => r.json()),
+    new Promise<HTMLImageElement>((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = `./sprites/${name}.png`; }),
+  ]);
+  const c = document.createElement('canvas');
+  c.width = img.width; c.height = img.height;
+  const g = c.getContext('2d', { willReadFrequently: true })!;
+  g.drawImage(img, 0, 0);
+  return { img: c, px: g.getImageData(0, 0, c.width, c.height).data, meta };
+}
+
+export let kitOk = false;
+export const streetReady: Promise<boolean> = (async () => {
+  try {
+    [bld, ground, cars, props] = await Promise.all(['bld', 'ground', 'cars', 'props'].map(loadAtlas));
+    kitOk = true;
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
+function rng(seed: number) {
+  let s = (seed >>> 0) % 2147483647 || 1;
+  return () => (s = (s * 16807) % 2147483647) / 2147483647;
+}
+const hash = (a: number, b: number) => ((a * 73856093) ^ (b * 19349663)) >>> 0;
+
+// ───────────────────────── 색 ─────────────────────────
+function hex(h: string): number[] { return [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255); }
+function ramp(h: string): Uint8ClampedArray {
+  const c = hex(h);
+  const out = new Uint8ClampedArray(48);
+  const cool = [0.84, 0.88, 1.08];
+  for (let lv = 0; lv < 16; lv++) {
+    const f = lv / 11;
+    for (let k = 0; k < 3; k++) {
+      let v: number;
+      if (f <= 1) { const g = Math.pow(f, 1.4); v = c[k] * g; v = v * (1 - (1 - g) * 0.45) + v * cool[k] * (1 - g) * 0.45; }
+      else v = c[k] + (1 - c[k]) * (f - 1) * 1.2;
+      out[lv * 3 + k] = Math.round(Math.max(0, Math.min(1, v)) * 255);
+    }
+  }
+  return out;
+}
+const glow = (h: string) => { const r = new Uint8ClampedArray(48); const c = hex(h); for (let lv = 0; lv < 16; lv++) for (let k = 0; k < 3; k++) r[lv * 3 + k] = Math.round(Math.min(1, c[k] * (0.82 + lv * 0.02)) * 255); return r; };
+function mix(a: string, b: string, t: number) {
+  const x = hex(a), y = hex(b);
+  return '#' + x.map((v, k) => Math.round((v + (y[k] - v) * t) * 255).toString(16).padStart(2, '0')).join('');
+}
+
+export const SIGN_COLORS: Record<string, string> = {
+  convenience: '#2f8f5b', pharmacy: '#3a7fb8', clinic: '#3f8f8a', restaurant: '#b8462f', bar: '#7a3a8a', cafe: '#6b4a32', bank: '#2f5d8f',
+  worship: '#b8862f', school: '#8f6a2f', hotel: '#5a4a7a', laundry: '#5a5fae', shop: '#a0582f', office: '#55606e', condo: '#55606e',
+};
+const AWNINGS = ['#2f7a4a', '#2c5a8c', '#a33a2c', '#c08a2a', '#6a3a7a'];
+
+// ───────────────────────── 건물 ─────────────────────────
+type Face = 'L' | 'R';
+const SHOP_GLASS = new Set(['convenience', 'pharmacy', 'cafe', 'bank']);
+const SHOP_SHUTTER = new Set(['restaurant', 'bar', 'shop', 'laundry', 'clinic']);
+
+/** 층수: 변환기 높이(px = 16 + 층 × 15) → 위층 개수 */
+export function upperFloors(b: Building) {
+  if (b.cat === 'ujusae') return 1;
+  const lv = Math.max(1, Math.round((b.h - 16) / 15));
+  return Math.max(0, Math.min(8, lv - 1));
+}
+export function buildingTop(b: Building) {
+  return GPX + upperFloors(b) * UPX + PPX;
+}
+
+function groundKind(b: Building, face: Face, k: number, n: number, onSign: boolean, r: () => number): string {
+  if (b.cat === 'ujusae') return onSign && k === Math.floor(n / 2) ? 'wooddoor' : 'wood';
+  if (b.cat === 'office') return onSign ? 'lobby' : 'glass';
+  if (b.cat === 'condo' || b.cat === 'hotel') return onSign ? (k % 4 === 1 || k % 4 === 2 ? 'lobby' : 'glass') : 'wall';
+  if (onSign && SHOP_GLASS.has(b.cat)) return 'glass';
+  if (onSign && SHOP_SHUTTER.has(b.cat)) return 'shop';
+  if (onSign) return 'shop';
+  const x = r();
+  return face === 'L' ? (x < 0.45 ? 'shop' : x < 0.75 ? 'closed' : 'wall') : x < 0.25 ? 'shop' : x < 0.6 ? 'closed' : 'wall';
+}
+function upperKind(b: Building, k: number, f: number, colRand: number): string {
+  if (b.cat === 'office') return 'curtain';
+  if (b.cat === 'condo') return colRand < 0.55 ? 'balcony' : colRand < 0.8 ? 'plain' : 'ac';
+  if (b.cat === 'hotel') return colRand < 0.6 ? 'plain' : 'ac';
+  if (b.cat === 'ujusae') return 'plain';
+  const h = (hash(k * 7 + 3, f * 13 + 1) % 100) / 100;
+  if (colRand < 0.12) return 'wall';
+  return h < 0.45 ? 'grille' : h < 0.75 ? 'ac' : h < 0.92 ? 'plain' : 'balcony';
+}
+
+/** 건물 한 채를 조각으로 조립해 캔버스 한 장에 그린다 (gfx.drawBuilding 과 같은 꼴) */
+export function drawBuildingKit(b: Building, signText: string, night: boolean) {
+  const { i0, j0, w, d } = b;
+  const i1 = i0 + w, j1 = j0 + d;
+  const nU = upperFloors(b);
+  const roofZ = GPX + nU * UPX;
+  const top = roofZ + PPX;
+  const r = rng(hash(i0, j0) + 17);
+  const MX = 36, MT = 76, MB = 28;
+  const minX = (i0 - j1) * (TW / 2) - MX;
+  const topY = (i0 + j0) * (TH / 2) - top - MT;
+  const W = (w + d) * (TW / 2) + MX * 2, H = (w + d) * (TH / 2) + top + MT + MB;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d')!;
+  const img = g.createImageData(W, H);
+  const D = img.data;
+  const P = (x: number, y: number, z: number): [number, number] => [Math.round((x - y) * (TW / 2) - minX), Math.round((x + y) * (TH / 2) - topY - z)];
+  // 건물 색
+  const wall = b.cat === 'ujusae' ? '#4a3527' : b.color;
+  const trim = b.cat === 'office' ? '#9aa6b2' : b.cat === 'ujusae' ? '#2e2018' : mix(wall, '#f2efe6', 0.45);
+  const awn = SIGN_COLORS[b.cat] ? mix(SIGN_COLORS[b.cat], '#000000', 0.05) : AWNINGS[hash(i0, j0) % AWNINGS.length];
+  const glass = b.cat === 'office' ? '#4e7a86' : '#4a6070';
+  const base = ['#000000', wall, trim, glass, '#c9ccce', '#3b3f44', '#231c17', night ? '#ffe0a0' : '#8a6a48', '#8d98a3', awn, '#ece6d6', '#e4e0d6', '#6b4429', '#8f8a80', '#4a7a3a', ['#c06050', '#c9a24a', '#7aa0c0'][hash(j0, i0) % 3]];
+  const pal = base.map((h, k) => (k === 7 && night ? glow(h) : ramp(h)));
+  const lit = glow('#f2d58a'), darkGlass = ramp('#1c2430');
+  const put = (key: string, sx: number, sy: number, glassMode: 0 | 1 | 2 = 0) => {
+    const m = bld.meta[key];
+    if (!m) return;
+    const [ax, ay, mw, mh, ox, oy] = m;
+    const X = sx + ox, Y = sy + oy;
+    for (let yy = 0; yy < mh; yy++) {
+      const ty = Y + yy;
+      if (ty < 0 || ty >= H) continue;
+      let si = ((ay + yy) * bld.img.width + ax) * 4;
+      for (let xx = 0; xx < mw; xx++, si += 4) {
+        if (bld.px[si + 3] < 128) continue;
+        const tx = X + xx;
+        if (tx < 0 || tx >= W) continue;
+        const v = bld.px[si], reg = v >> 4, lv = (v & 15) * 3;
+        const rp = reg === 3 && glassMode ? (glassMode === 1 ? lit : darkGlass) : pal[reg];
+        const di = (ty * W + tx) * 4;
+        D[di] = rp[lv]; D[di + 1] = rp[lv + 1]; D[di + 2] = rp[lv + 2]; D[di + 3] = 255;
+      }
+    }
+  };
+  const winMode = (): 0 | 1 | 2 => (night ? (r() < 0.45 ? 1 : 2) : 0);
+  const topKind = b.cat === 'office' ? 'curtain' : 'parapet';
+  // 뒤쪽 난간 (안쪽 면) → 지붕 → 옥상 설비 → 앞 두 면
+  for (let j = j0; j < j1; j++) { const [x, y] = P(i0, j + 1, roofZ); put(`p-${topKind}-R`, x, y); }
+  for (let i = i0; i < i1; i++) { const [x, y] = P(i, j0, roofZ); put(`p-${topKind}-L`, x, y); }
+  for (let j = j0; j < j1; j++)
+    for (let i = i0; i < i1; i++) { const [x, y] = P(i, j, roofZ); put(`roof-${hash(i, j) % 3}`, x, y); }
+  // 앞 두 면: 먼 칸부터 가까운 칸으로, 칸마다 아래층부터
+  const leftSign = b.sign === 'left', rightSign = b.sign === 'right';
+  const colRand = (k: number, f: Face) => (hash(k * 3 + (f === 'L' ? 1 : 2), i0 + j0) % 1000) / 1000;
+  // 오른쪽 면 (x = i1, j 증가 = 가까워짐)
+  for (let j = j0; j < j1; j++) {
+    const k = j - j0, cr = colRand(k, 'R');
+    let [x, y] = P(i1, j + 1, 0);
+    put(`g-${groundKind(b, 'R', k, d, rightSign, r)}-R`, x, y, winMode());
+    for (let f = 0; f < nU; f++) { [x, y] = P(i1, j + 1, GPX + f * UPX); put(`u-${upperKind(b, k, f, cr)}-R`, x, y, winMode()); }
+    [x, y] = P(i1, j + 1, roofZ); put(`p-${topKind}-R`, x, y);
+  }
+  // 왼쪽 면 (y = j1, i 증가 = 가까워짐)
+  for (let i = i0; i < i1; i++) {
+    const k = i - i0, cr = colRand(k, 'L');
+    let [x, y] = P(i, j1, 0);
+    put(`g-${groundKind(b, 'L', k, w, leftSign, r)}-L`, x, y, winMode());
+    for (let f = 0; f < nU; f++) { [x, y] = P(i, j1, GPX + f * UPX); put(`u-${upperKind(b, k, f, cr)}-L`, x, y, winMode()); }
+    [x, y] = P(i, j1, roofZ); put(`p-${topKind}-L`, x, y);
+  }
+  g.putImageData(img, 0, 0);
+  // 옥상 설비 (색 그대로)
+  if (b.cat !== 'ujusae' && w >= 2 && d >= 2) {
+    const items: [string, number, number][] = [];
+    if (b.cat === 'office' || nU >= 6) items.push(['stair-0', i0 + Math.max(1, w * 0.35), j0 + Math.max(1, d * 0.4)]);
+    if (b.cat !== 'office') items.push(['tank-0', i0 + 0.8 + r() * (w - 1.6), j0 + 0.8 + r() * Math.max(0.1, d * 0.4)]);
+    for (let n = 0; n < Math.min(3, Math.floor((w * d) / 12)); n++) items.push(['acbox-0', i0 + 0.6 + r() * (w - 1.2), j0 + 0.6 + r() * (d - 1.2)]);
+    items.sort((a, c2) => a[1] + a[2] - (c2[1] + c2[2]));
+    for (const [key, x, y] of items) {
+      const m = props.meta[key];
+      if (!m) continue;
+      const [px, py] = P(x, y, roofZ);
+      g.drawImage(props.img, m[0], m[1], m[2], m[3], px + m[4], py + m[5], m[2], m[3]);
+    }
+    // 앞 난간이 설비 아래를 가린다
+    const img2 = g.getImageData(0, 0, W, H);
+    for (let j = j0; j < j1; j++) { const [x, y] = P(i1, j + 1, roofZ); putTo(img2.data, W, H, `p-${topKind}-R`, x, y, pal); }
+    for (let i = i0; i < i1; i++) { const [x, y] = P(i, j1, roofZ); putTo(img2.data, W, H, `p-${topKind}-L`, x, y, pal); }
+    g.putImageData(img2, 0, 0);
+  }
+  // 간판 (가게 이름) — 1층 처마 띠에 기울여 붙인다
+  if (b.sign && b.cat !== 'ujusae' && signText) {
+    const left = b.sign === 'left';
+    const span = left ? w : d;
+    const A = (s: number, z: number) => (left ? P(i0 + s, j1, z) : P(i1, j1 - s, z));
+    const z0 = GPX - 22, z1 = GPX - 5;
+    const s0 = 0.15, s1 = Math.min(span - 0.15, Math.max(2.2, Math.min(span, 4.5)));
+    const col = SIGN_COLORS[b.cat] ?? '#a0582f';
+    const quad = (pts: [number, number][], fill: string) => { g.beginPath(); g.moveTo(...pts[0]); for (const p of pts.slice(1)) g.lineTo(...p); g.closePath(); g.fillStyle = fill; g.fill(); };
+    quad([A(s0, z1 + 1), A(s1, z1 + 1), A(s1, z0 - 1), A(s0, z0 - 1)], '#1d1712');
+    quad([A(s0, z1), A(s1, z1), A(s1, z0), A(s0, z0)], col);
+    quad([A(s0, z1), A(s1, z1), A(s1, z1 - 2), A(s0, z1 - 2)], mix(col, '#ffffff', 0.3));
+    const [sx, sy] = A((s0 + s1) / 2, z0 + 4);
+    g.save();
+    g.translate(sx, sy);
+    g.transform(1, left ? 0.5 : -0.5, 0, 1, 0, 0);
+    const room = (s1 - s0) * 35 - 8;
+    let fs = 11, text = signText;
+    g.font = `700 ${fs}px sans-serif`;
+    while (fs > 7 && g.measureText(text).width > room) { fs -= 1; g.font = `700 ${fs}px sans-serif`; }
+    if (g.measureText(text).width > room) { while (text.length > 1 && g.measureText(text + '…').width > room) text = text.slice(0, -1); text += '…'; }
+    g.textAlign = 'center';
+    g.fillStyle = 'rgba(0,0,0,0.35)';
+    g.fillText(text, 1, 1);
+    g.fillStyle = night ? '#fff6d8' : '#fffaf0';
+    g.fillText(text, 0, 0);
+    g.restore();
+  }
+  return { canvas: c, x: minX, y: topY };
+}
+
+function putTo(D: Uint8ClampedArray, W: number, H: number, key: string, sx: number, sy: number, pal: Uint8ClampedArray[]) {
+  const m = bld.meta[key];
+  if (!m) return;
+  const [ax, ay, mw, mh, ox, oy] = m;
+  for (let yy = 0; yy < mh; yy++) {
+    const ty = sy + oy + yy;
+    if (ty < 0 || ty >= H) continue;
+    let si = ((ay + yy) * bld.img.width + ax) * 4;
+    for (let xx = 0; xx < mw; xx++, si += 4) {
+      if (bld.px[si + 3] < 128) continue;
+      const tx = sx + ox + xx;
+      if (tx < 0 || tx >= W) continue;
+      const v = bld.px[si], rp = pal[v >> 4], lv = (v & 15) * 3, di = (ty * W + tx) * 4;
+      D[di] = rp[lv]; D[di + 1] = rp[lv + 1]; D[di + 2] = rp[lv + 2]; D[di + 3] = 255;
+    }
+  }
+}
+
+// ───────────────────────── 바닥 ─────────────────────────
+export const CHUNK = 24;
+const GROUND_KEY: Record<string, string> = { road: 'road', median: 'median', walk: 'walk', soi: 'soi', cross: 'cross', lot: 'lot', block: 'block', park: 'park', water: 'water' };
+export function drawGroundKit(z: Zone, i0: number, j0: number): { canvas: HTMLCanvasElement; x: number; y: number } | null {
+  const i1 = Math.min(z.W, i0 + CHUNK), j1 = Math.min(z.H, j0 + CHUNK);
+  let any = false;
+  for (let j = j0; j < j1 && !any; j++) for (let i = i0; i < i1; i++) if (tileAt(z, i, j) !== 'void') { any = true; break; }
+  if (!any) return null;
+  const minX = (i0 - j1) * (TW / 2), minY = (i0 + j0) * (TH / 2);
+  const c = document.createElement('canvas');
+  c.width = (i1 - i0 + j1 - j0) * (TW / 2) + 2;
+  c.height = (i1 - i0 + j1 - j0) * (TH / 2) + 2;
+  const g = c.getContext('2d')!;
+  g.imageSmoothingEnabled = false;
+  const S = (x: number, y: number): [number, number] => { const [a, b] = iso(x, y); return [a - minX, b - minY]; };
+  for (let j = j0; j < j1; j++)
+    for (let i = i0; i < i1; i++) {
+      const t = tileAt(z, i, j);
+      if (t === 'void') continue;
+      const m = ground.meta[`${GROUND_KEY[t] ?? 'lot'}-${hash(i, j) % 4}`];
+      if (!m) continue;
+      const [x, y] = S(i, j);
+      g.drawImage(ground.img, m[0], m[1], m[2], m[3], x + m[4], y + m[5], m[2], m[3]);
+      if (t === 'cross') {
+        g.strokeStyle = 'rgba(236,232,222,0.92)'; g.lineWidth = 7;
+        for (let k = 0; k < 2; k++) {
+          const a = S(i + 0.2 + k * 0.5, j + 0.12), b = S(i + 0.2 + k * 0.5, j + 0.88);
+          g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+        }
+      }
+    }
+  // 연석과 차선
+  const line = (j: number, a0: number, a1: number, color: string, dashed: boolean, width = 2) => {
+    if (j < j0 || j > j1) return;
+    const s0 = Math.max(a0, i0), s1 = Math.min(a1 + 1, i1);
+    if (s1 <= s0) return;
+    const a = S(s0, j), b = S(s1, j);
+    g.strokeStyle = color; g.lineWidth = width; g.setLineDash(dashed ? [12, 14] : []);
+    g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+  };
+  for (const l of z.lanes) {
+    if (l.j < j0 - 1 || l.j > j1 || l.i1 < i0 || l.i0 >= i1) continue;
+    const mid = Math.floor((Math.max(l.i0, i0) + Math.min(l.i1, i1 - 1)) / 2);
+    const up = tileAt(z, mid, l.j - 1), down = tileAt(z, mid, l.j + 1);
+    if (up === 'road' || up === 'cross') line(l.j, l.i0, l.i1, 'rgba(225,222,212,0.85)', true);
+    else if (up === 'median') line(l.j, l.i0, l.i1, '#d8b63c', false);
+    else if (up === 'walk') { line(l.j, l.i0, l.i1, '#8e877b', false, 3); line(l.j, l.i0, l.i1, '#c9c2b4', false, 1); }
+    if (down === 'median') line(l.j + 1, l.i0, l.i1, '#d8b63c', false);
+    else if (down === 'walk') { line(l.j + 1, l.i0, l.i1, '#8e877b', false, 3); line(l.j + 1, l.i0, l.i1, '#c9c2b4', false, 1); }
+  }
+  g.setLineDash([]);
+  return { canvas: c, x: minX, y: minY };
+}
+
+// ───────────────────────── 차 · 소품 ─────────────────────────
+function sub(a: Atlas, key: string) {
+  const id = `${a === cars ? 'c' : 'p'}:${key}`;
+  let hit = texCache.get(id);
+  if (!hit) {
+    const m = a.meta[key];
+    if (!m) return null;
+    let src = (a as Atlas & { src?: Texture['source'] }).src;
+    if (!src) { src = Texture.from(a.img).source; src.scaleMode = 'nearest'; (a as Atlas & { src?: Texture['source'] }).src = src; }
+    const tex = new Texture({ source: src, frame: new Rectangle(m[0], m[1], m[2], m[3]) });
+    hit = { tex, ax: -m[4] / m[2], ay: -m[5] / m[3] };
+    texCache.set(id, hit);
+  }
+  return hit;
+}
+export const CAR_MODELS = ['taxi-pink', 'taxi-pink', 'taxi-green', 'sedan-white', 'sedan-black', 'sedan-silver', 'sedan-red', 'sedan-blue', 'pickup', 'tuktuk', 'moto', 'moto', 'bus'];
+/** 차 그림: dir = +1 (i 증가, 화면 오른쪽 아래) → se, -1 → nw. 기준점 = 차 바닥 가운데 */
+export function carSprite(model: string, dir: 1 | -1) {
+  return sub(cars, `${model}-${dir > 0 ? 'se' : 'nw'}`);
+}
+export function propSprite(kind: string, variant = 0) {
+  return sub(props, `${kind}-${variant}`) ?? sub(props, `${kind}-0`);
+}

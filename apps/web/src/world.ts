@@ -1,10 +1,11 @@
 // 현실 세계 장면 (PixiJS): 실제 지도, 화면 근처만 불러오기, 클릭 이동, 행인·불량배, 차량, 방콕 실시간 낮밤
 // 1단계-B: 대상 메뉴(말 걸기·살펴보기·공격·강제 공격), 싸움과 체력, 쓰러짐과 돈 줍기, 가게 노동, 차 사고
 import { Application, Container, Graphics, Rectangle, Sprite, Text, Texture } from 'pixi.js';
-import { characterPixels, auraFrames, SPRITE_W, SPRITE_H, FOOT_Y, AURA_PAD, type Look, type Facing } from './character.ts';
-import { toCanvas } from './raster.ts';
+import { type Look } from './character.ts';
+import { charSet, frameOf, applyFrame, dirFromScreen, auraFor, makeAuraSprite, ANIM_FPS, IMPACT, type CharSet, type Dir, type Anim, type Frame } from './sprites.ts';
 import { type Zone, type Building, type Lane, findPath, walkable, randomWalkTileNear, tileAt } from './zone.ts';
-import { iso, drawGroundChunk, CHUNK, drawBuilding, drawProp, drawCar, CAR_COLORS, TW, TH } from './gfx.ts';
+import { iso, TW, TH, drawBuilding, drawGroundChunk, buildingHeight } from './gfx.ts';
+import { drawBuildingKit, drawGroundKit, buildingTop, carSprite, propSprite, CAR_MODELS, CHUNK, kitOk } from './street.ts';
 import { t, lang } from './i18n.ts';
 import { bangkokClock, nightFactor } from './clock.ts';
 import { shopName, WORKPLACES } from './names.ts';
@@ -21,11 +22,15 @@ interface Walker {
   x: number; y: number; // 연속 격자 좌표 (타일 중심 = i + 0.5)
   path: [number, number][];
   speed: number;
-  frames: Record<Facing, Texture[]>;
+  cs: CharSet | null; // 미리 구운 그림 (불러오는 중이면 null)
+  look: Look;
+  weapon: string | null;
+  dressId: number;
   sprite: Sprite;
-  facing: Facing;
-  side: number; // 1 = 오른쪽을 봄, -1 = 왼쪽 (좌우 뒤집기)
+  dir: Dir;
   anim: number;
+  act: { anim: Anim; t: number } | null; // 한 번 재생하는 동작 (공격·맞음·쓰러짐)
+  pend: { to: Walker; dmg: number; at: number } | null; // 동작이 닿는 순간 들어갈 피해
   wait: number;
   isPlayer: boolean;
   kind: 'player' | NpcKind;
@@ -48,7 +53,7 @@ interface Car {
   sprite: Sprite; ax: number; ay: number; honked: boolean; bubble?: Text; bubbleT: number;
 }
 interface Coin { x: number; y: number; amount: number; sprite: Graphics; fromVictim: boolean; life: number }
-interface BView { parts: Sprite[]; base: Texture; x: number; y: number; w: number; h: number }
+interface BView { parts: Sprite[]; base: Texture; x: number; y: number; w: number; h: number; top: number; lx: number; ly: number; alpha?: Uint8Array }
 interface Floater { obj: Container; t: number; vy: number }
 type LabelRef = { kind: 'shop' } | { kind: 'b'; k: number } | { kind: 'w'; w: Walker } | null;
 
@@ -63,37 +68,7 @@ export interface WorldHooks {
   work(state: { name: string; earned: number } | null): void;
   useAmmo(): boolean;
 }
-export interface Gear { atk: number; def: number; ranged: boolean }
-
-const lookCache = new Map<string, Record<Facing, Texture[]>>();
-export function lookTextures(look: Look): Record<Facing, Texture[]> {
-  const key = JSON.stringify(look);
-  const hit = lookCache.get(key);
-  if (hit) return hit;
-  const mk = (f: Facing) => [0, 1, 2, 3].map((fr) => tex(toCanvas(characterPixels(look, f, fr), SPRITE_W, SPRITE_H)));
-  const res = { front: mk('front'), back: mk('back') };
-  lookCache.set(key, res);
-  return res;
-}
-const auraCache = new Map<string, Record<Facing, Texture[]>>();
-/** 광채 4장면 (앞·뒤) */
-export function auraTextures(look: Look): Record<Facing, Texture[]> {
-  const key = JSON.stringify(look);
-  const hit = auraCache.get(key);
-  if (hit) return hit;
-  const mk = (f: Facing) => auraFrames(characterPixels(look, f, 0)).map((c) => tex(c));
-  const res = { front: mk('front'), back: mk('back') };
-  auraCache.set(key, res);
-  return res;
-}
-/** 발 기준점에 맞춘 광채 스프라이트 */
-export function makeAuraSprite(): Sprite {
-  const s = new Sprite();
-  s.anchor.set(0.5, (FOOT_Y + AURA_PAD) / (SPRITE_H + AURA_PAD * 2));
-  s.blendMode = 'add';
-  s.eventMode = 'none';
-  return s;
-}
+export interface Gear { atk: number; def: number; ranged: boolean; weapon: string | null }
 
 const PED_COUNT = 14;
 const THUG_COUNT = 4;
@@ -124,8 +99,7 @@ export class WorldScene {
   private chunks = new Map<string, Sprite>();
   private bViews = new Map<number, BView>();
   private bIndex = new Map<string, number[]>();
-  private propTex = new Map<string, { tex: Texture; anchorY: number }>();
-  private carTex = new Map<string, { tex: Texture; ax: number; ay: number }>();
+
   private glows: { s: Sprite; i: number; j: number }[] = [];
   private tall: Sprite[] = []; // 기둥·가로등·나무 (플레이어를 가리면 비친다)
   private faded = new Set<Sprite>();
@@ -136,7 +110,8 @@ export class WorldScene {
   private ring = new Graphics();
   private arrow = new Graphics();
   private aura = makeAuraSprite();
-  private auraTex: Record<Facing, Texture[]> | null = null;
+  private auraTex: Map<Dir, Frame[]> | null = null;
+  private dressSeq = 0;
   private time = 0;
   private label = new Container();
   private labelText = new Text({ text: '', style: { fontFamily: 'system-ui, sans-serif', fontSize: 13, fontWeight: '600', fill: '#fff6d8' } });
@@ -145,7 +120,7 @@ export class WorldScene {
   private labelFor: LabelRef = null;
   private hoverFor: LabelRef = null;
   private insets = { right: 0, bottom: 0 };
-  private gear: Gear = { atk: 0, def: 0, ranged: false };
+  private gear: Gear = { atk: 0, def: 0, ranged: false, weapon: null };
   private combatT = 99; // 마지막 싸움 뒤 지난 시간
   private criminalT = 0; // 먼저 공격한 표시가 남은 시간
   private carCool = 0;
@@ -189,22 +164,13 @@ export class WorldScene {
   }
 
   // ───────────────────────── 소품 · 바닥 · 건물 불러오기 ─────────────────────────
-  private propTexture(kind: string) {
-    let hit = this.propTex.get(kind);
-    if (!hit) {
-      const c = drawProp({ i: 0, j: 0, kind: kind as 'tree' });
-      hit = { tex: tex(c), anchorY: kind === 'tree' ? 80 / 86 : kind === 'cart' ? 50 / 56 : 1 };
-      this.propTex.set(kind, hit);
-    }
-    return hit;
-  }
-
   private placeProps() {
     for (const p of this.zone.props) {
-      const pt = this.propTexture(p.kind);
+      const pt = propSprite(p.kind, (p.i * 7 + p.j * 3) % 3);
+      if (!pt) continue;
       const s = new Sprite(pt.tex);
       const [x, y] = iso(p.i + 0.5, p.j + 0.5);
-      s.anchor.set(0.5, pt.anchorY);
+      s.anchor.set(pt.ax, pt.ay);
       s.position.set(x, y);
       s.zIndex = p.i + p.j + 0.99;
       this.objects.addChild(s);
@@ -212,7 +178,7 @@ export class WorldScene {
       if (p.kind === 'lamp') {
         const glow = new Sprite(this.glowTex());
         glow.anchor.set(0.5);
-        glow.position.set(x + 6, y - 96);
+        glow.position.set(x + 19, y - 136);
         glow.blendMode = 'add';
         this.lights.addChild(glow);
         this.glows.push({ s: glow, i: p.i, j: p.j });
@@ -248,7 +214,7 @@ export class WorldScene {
         want.add(key);
         if (!this.chunks.has(key) && budget > 0) {
           budget--;
-          const ch = drawGroundChunk(this.zone, ci * CHUNK, cj * CHUNK);
+          const ch = kitOk ? drawGroundKit(this.zone, ci * CHUNK, cj * CHUNK) : drawGroundChunk(this.zone, ci * CHUNK, cj * CHUNK);
           const s = new Sprite(ch ? tex(ch.canvas) : Texture.EMPTY);
           if (ch) s.position.set(ch.x, ch.y);
           this.ground.addChild(s);
@@ -256,7 +222,7 @@ export class WorldScene {
         }
       }
     for (const [key, s] of this.chunks) if (!want.has(key)) { s.destroy({ texture: s.texture !== Texture.EMPTY, textureSource: s.texture !== Texture.EMPTY }); this.chunks.delete(key); }
-    let bBudget = all ? 1e9 : 10;
+    let bBudget = all ? 1e9 : 3;
     const wantB = new Set<number>();
     for (let cj = d0 - 1; cj <= d1; cj++)
       for (let ci = c0 - 1; ci <= c1; ci++)
@@ -277,7 +243,7 @@ export class WorldScene {
    * 건물 한 장에 순서 하나만 주면 넓은 건물 뒤를 걷는 사람이 지붕 위에 그려진다
    */
   private makeBuilding(b: Building): BView {
-    const d = drawBuilding(b, this.nameOf(b), this.night === 1);
+    const d = kitOk ? drawBuildingKit(b, this.nameOf(b), this.night === 1) : drawBuilding(b, this.nameOf(b), this.night === 1);
     const base = tex(d.canvas);
     const i1 = b.i0 + b.w, j1 = b.j0 + b.d;
     const cornerX = (i1 - j1) * (TW / 2);
@@ -293,7 +259,12 @@ export class WorldScene {
       this.objects.addChild(s);
       parts.push(s);
     }
-    return { parts, base, x: d.x, y: d.y, w: W, h: H };
+    const top = kitOk ? buildingTop(b) : buildingHeight(b.h);
+    const [lx] = iso(b.i0 + b.w / 2, b.j0 + b.d / 2);
+    const id = d.canvas.getContext('2d')!.getImageData(0, 0, W, H).data;
+    const alpha = new Uint8Array(W * H);
+    for (let k = 0; k < alpha.length; k++) alpha[k] = id[k * 4 + 3] > 0 ? 1 : 0;
+    return { parts, base, x: d.x, y: d.y, w: W, h: H, top, lx, ly: (b.i0 + b.j0) * (TH / 2) - top + 4, alpha };
   }
 
   private dropBuilding(v: BView) {
@@ -307,18 +278,35 @@ export class WorldScene {
   }
 
   // ───────────────────────── 사람 ─────────────────────────
-  private makeWalker(look: Look, i: number, j: number, kind: Walker['kind']): Walker {
-    const frames = lookTextures(look);
-    const sprite = new Sprite(frames.front[0]);
-    sprite.anchor.set(0.5, FOOT_Y / SPRITE_H);
+  private makeWalker(look: Look, i: number, j: number, kind: Walker['kind'], weapon: string | null = null): Walker {
+    const sprite = new Sprite();
+    sprite.visible = false;
     this.objects.addChild(sprite);
     const isPlayer = kind === 'player';
     const maxHp = isPlayer ? PLAYER_MAX_HP : kind === 'thug' ? 220 : 120;
-    return {
-      x: i + 0.5, y: j + 0.5, path: [], speed: isPlayer ? 2.3 : kind === 'thug' ? 0.9 : 0.75 + Math.random() * 0.35, frames, sprite,
-      facing: 'front', side: Math.random() < 0.5 ? 1 : -1, anim: 0, wait: Math.random() * 3, isPlayer, kind,
+    const dirs: Dir[] = ['se', 'sw', 'ne', 'nw'];
+    const w: Walker = {
+      x: i + 0.5, y: j + 0.5, path: [], speed: isPlayer ? 2.3 : kind === 'thug' ? 0.9 : 0.75 + Math.random() * 0.35, cs: null, look, weapon, dressId: 0, sprite,
+      dir: dirs[Math.floor(Math.random() * 4)], anim: 0, act: null, pend: null, wait: Math.random() * 3, isPlayer, kind,
       hp: maxHp, maxHp, down: 0, target: null, atkT: 0, firstBy: null, flee: 0, hurtT: 0, barT: 0, repathT: 0, home: [i, j], bubbleT: 0,
     };
+    this.dress(w, look, weapon);
+    return w;
+  }
+
+  /** 옷·무기가 바뀌면 그림을 새로 합친다 (불러오는 동안은 이전 그림 유지) */
+  private dress(w: Walker, look: Look, weapon: string | null) {
+    w.look = look;
+    w.weapon = weapon;
+    const id = (w.dressId = ++this.dressSeq);
+    charSet(look, weapon).then((cs) => {
+      if (w.dressId !== id || w.sprite.destroyed) return;
+      w.cs = cs;
+      if (w.isPlayer) {
+        this.auraTex = look.aura ? auraFor(cs) : null;
+        this.aura.visible = !!this.auraTex;
+      }
+    });
   }
 
   private spawnPlayer(look: Look, hp: number) {
@@ -327,13 +315,17 @@ export class WorldScene {
     this.player.hp = Math.max(1, Math.min(PLAYER_MAX_HP, hp));
     this.walkers.push(this.player);
     this.objects.addChild(this.ring, this.aura, this.arrow);
-    this.setAura(look);
   }
 
   private npcLook(kind: NpcKind): Look {
     const r = (n: number) => Math.floor(Math.random() * n);
     if (kind === 'thug') return { sex: Math.random() < 0.85 ? 'm' : 'f', build: 1 + r(2), skin: r(3), hair: [0, 5, 1][r(3)], hairColor: r(2), top: 4, bottom: 3 };
     return { sex: Math.random() < 0.5 ? 'f' : 'm', build: r(3), skin: r(3), hair: r(6), hairColor: r(3), top: r(4), bottom: r(3) };
+  }
+
+  private npcWeapon(kind: NpcKind): string | null {
+    if (kind !== 'thug') return null;
+    return [null, 'bat', 'pipe', 'knife', 'bat', null][Math.floor(Math.random() * 6)];
   }
 
   /** 플레이어 근처 보도(불량배는 골목)에 사람을 세운다. 이미 있던 사람이면 자리만 옮긴다 */
@@ -348,21 +340,12 @@ export class WorldScene {
     if (!spot) return;
     if (existing) {
       Object.assign(existing, { x: spot[0] + 0.5, y: spot[1] + 0.5, path: [], hp: existing.maxHp, down: 0, target: null, firstBy: null, flee: 0, home: spot });
-      existing.sprite.rotation = 0;
-      existing.frames = lookTextures(this.npcLook(kind));
+      existing.act = null;
+      existing.pend = null;
+      this.dress(existing, this.npcLook(kind), this.npcWeapon(kind));
       return;
     }
-    this.walkers.push(this.makeWalker(this.npcLook(kind), spot[0], spot[1], kind));
-  }
-
-  private carTexture(color: string) {
-    let hit = this.carTex.get(color);
-    if (!hit) {
-      const d = drawCar(color, color === '#e46aa6' || color === '#8cc63f');
-      hit = { tex: tex(d.canvas), ax: d.ax, ay: d.ay };
-      this.carTex.set(color, hit);
-    }
-    return hit;
+    this.walkers.push(this.makeWalker(this.npcLook(kind), spot[0], spot[1], kind, this.npcWeapon(kind)));
   }
 
   private spawnCars() {
@@ -370,8 +353,10 @@ export class WorldScene {
     for (const lane of lanes) {
       const n = Math.max(1, Math.floor((lane.i1 - lane.i0) / 40));
       for (let k = 0; k < n && this.cars.length < MAX_CARS; k++) {
-        const ct = this.carTexture(CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)]);
+        const ct = carSprite(CAR_MODELS[Math.floor(Math.random() * CAR_MODELS.length)], lane.dir);
+        if (!ct) continue;
         const sprite = new Sprite(ct.tex);
+        sprite.anchor.set(ct.ax, ct.ay);
         this.objects.addChild(sprite);
         const max = 4.5 + Math.random() * 2.5;
         this.cars.push({ lane, x: lane.i0 + Math.random() * (lane.i1 - lane.i0), speed: max, max, sprite, ax: ct.ax, ay: ct.ay, honked: false, bubbleT: 0 });
@@ -381,11 +366,12 @@ export class WorldScene {
 
   // ───────────────────────── 바깥에서 부르는 것 ─────────────────────────
   setLook(look: Look) {
-    this.player.frames = lookTextures(look);
-    this.setAura(look);
+    this.dress(this.player, look, this.gear.weapon);
   }
   setGear(g: Gear) {
+    const changed = g.weapon !== this.gear.weapon;
     this.gear = g;
+    if (changed && this.player) this.dress(this.player, this.player.look, g.weapon);
   }
   /** 먹거나 붕대를 감아 체력을 채운다 */
   heal(n: number) {
@@ -394,15 +380,12 @@ export class WorldScene {
     this.float(p, `+${n}`, '#8fe08a');
     this.hooks.hp(p.hp, p.maxHp);
   }
-  private setAura(look: Look) {
-    this.auraTex = look.aura ? auraTextures(look) : null;
-    this.aura.visible = !!this.auraTex;
-  }
   setInsets(right: number, bottom: number) {
     this.insets = { right, bottom };
   }
   turnPlayer() {
-    this.player.facing = this.player.facing === 'front' ? 'back' : 'front';
+    const d = this.player.dir;
+    this.player.dir = ((d[0] === 's' ? 'n' : 's') + d[1]) as Dir;
   }
   relabel() {
     this.clearBuildings();
@@ -418,7 +401,8 @@ export class WorldScene {
     p.y = out[1] + 0.5;
     p.path = [];
     p.target = null;
-    p.facing = 'front';
+    p.dir = 'se';
+    p.act = null;
     if (hp !== undefined) p.hp = hp;
     this.dead = false;
     this.wantShop = false;
@@ -429,7 +413,8 @@ export class WorldScene {
   /** 다시 태어날 때 몸을 일으킨다 */
   revive(look: Look) {
     const p = this.player;
-    p.sprite.rotation = 0;
+    p.act = null;
+    p.pend = null;
     p.hp = p.maxHp;
     this.criminalT = 0;
     this.dead = false;
@@ -477,7 +462,7 @@ export class WorldScene {
     for (const [k, v] of this.bViews) {
       if (wx < v.x || wx > v.x + v.w || wy < v.y || wy > v.y + v.h) continue;
       const b = this.zone.buildings[k];
-      const h = v.h - (b.w + b.d) * (TH / 2);
+      const h = v.top;
       let hitB = false;
       for (let z = 0; z <= h && !hitB; z += 4) {
         const fx = (wx / (TW / 2) + (wy + z) / (TH / 2)) / 2, fy = ((wy + z) / (TH / 2) - wx / (TW / 2)) / 2;
@@ -618,6 +603,7 @@ export class WorldScene {
     if (to.down > 0 || this.dead) return;
     to.hp -= dmg;
     to.hurtT = 0.18;
+    if (!to.act || to.act.anim === 'hit') { to.act = { anim: 'hit', t: 0 }; to.pend = null; }
     to.barT = 5;
     this.float(to, String(Math.round(dmg)), from.isPlayer ? '#fff1b0' : '#ff8a7a');
     if (from.isPlayer || to.isPlayer) this.combatT = 0;
@@ -649,7 +635,8 @@ export class WorldScene {
     w.path = [];
     w.target = null;
     w.flee = 0;
-    w.sprite.rotation = -w.side * Math.PI / 2;
+    w.pend = null;
+    w.act = { anim: 'fall', t: 0 };
     if (by.isPlayer) {
       by.target = null;
       if (w.kind === 'thug') {
@@ -680,7 +667,8 @@ export class WorldScene {
     p.hp = 0;
     p.path = [];
     p.target = null;
-    p.sprite.rotation = -p.side * Math.PI / 2;
+    p.pend = null;
+    p.act = { anim: 'fall', t: 0 };
     this.stopWork();
     this.hooks.hp(0, p.maxHp);
     for (const w of this.walkers) if (w.target === p) w.target = null;
@@ -707,14 +695,52 @@ export class WorldScene {
   }
 
   /** 휘두르는 순간의 짧은 빛 줄 */
-  private swing(from: Walker, to: Walker) {
+  /** 맞는 순간의 효과: 근접은 베는 선, 총은 총구 불꽃과 탄도 */
+  private swing(from: Walker, to: Walker, ranged = false) {
     const g = new Graphics();
-    const [ax, ay] = iso((from.x + to.x) / 2, (from.y + to.y) / 2);
-    g.moveTo(-6, -2).lineTo(6, 3).stroke({ color: 0xfff6d8, width: 2, alpha: 0.9 });
-    g.position.set(ax, ay - 22);
+    if (ranged) {
+      const [ax, ay] = iso(from.x, from.y), [bx, by] = iso(to.x, to.y);
+      const dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy) || 1;
+      const mx = ax + (dx / L) * 15, my = ay - 31 + (dy / L) * 7;
+      g.circle(mx, my, 6).fill({ color: 0xffb040, alpha: 0.35 }).circle(mx, my, 3).fill({ color: 0xfff2a0, alpha: 0.95 });
+      g.moveTo(mx, my).lineTo(bx, by - 26).stroke({ color: 0xfff6d8, width: 1, alpha: 0.55 });
+      g.circle(bx, by - 26, 2.5).fill({ color: 0xffe08a, alpha: 0.9 });
+      g.zIndex = 1e6 - 4;
+      this.objects.addChild(g);
+      this.floaters.push({ obj: g, t: 0.09, vy: 0 });
+      return;
+    }
+    const [ax, ay] = iso(to.x, to.y);
+    g.moveTo(-7, -3).lineTo(7, 3).stroke({ color: 0xfff6d8, width: 2, alpha: 0.9 });
+    g.moveTo(-5, 2).lineTo(4, -2).stroke({ color: 0xffffff, width: 1, alpha: 0.6 });
+    g.position.set(ax, ay - 28);
     g.zIndex = 1e6 - 4;
     this.objects.addChild(g);
-    this.floaters.push({ obj: g, t: 0.15, vy: 0 });
+    this.floaters.push({ obj: g, t: 0.14, vy: 0 });
+  }
+
+  /** 지금 보여 줄 장면을 고른다: 한 번 재생하는 동작 → 쓰러져 있음 → 걷기 → 서 있기 */
+  private pose(w: Walker, moving: boolean, dt: number) {
+    if (w.act) {
+      w.act.t += dt;
+      if (w.pend && w.act.t >= w.pend.at) this.landHit(w);
+    } else if (w.pend) this.landHit(w);
+    const cs = w.cs;
+    w.sprite.visible = !!cs;
+    if (!cs) return;
+    const downed = w.down > 0 || (w.isPlayer && this.dead);
+    let anim: Anim = moving ? 'walk' : 'idle';
+    let i = moving ? Math.floor(w.anim) : 0;
+    if (w.act) {
+      const n = cs.counts[w.act.anim] ?? 0;
+      const fi = Math.floor(w.act.t * ANIM_FPS[w.act.anim]);
+      if (w.act.anim === 'fall' && n) { anim = 'fall'; i = Math.min(n - 1, fi); }
+      else if (!n || fi >= n) w.act = null;
+      else { anim = w.act.anim; i = fi; }
+    }
+    if (!w.act && downed) { anim = 'fall'; i = (cs.counts.fall ?? 1) - 1; }
+    if (anim === 'walk') i %= cs.counts.walk ?? 8;
+    applyFrame(w.sprite, frameOf(cs, anim, w.dir, i));
   }
 
   /** 사람 한 명의 싸움 행동 (쫓아가서 때리기) */
@@ -738,8 +764,7 @@ export class WorldScene {
     }
     w.path = [];
     const sdx = (tg.x - w.x - (tg.y - w.y)) * (TW / 2), sdy = (tg.x - w.x + tg.y - w.y) * (TH / 2);
-    if (Math.abs(sdx) > 0.5) w.side = sdx > 0 ? 1 : -1;
-    w.facing = sdy >= 0 ? 'front' : 'back';
+    if (!w.act || w.act.anim !== 'fall') w.dir = dirFromScreen(sdx, sdy, w.dir);
     w.atkT -= dt;
     if (w.atkT > 0) return;
     if (w.isPlayer) {
@@ -747,14 +772,30 @@ export class WorldScene {
       if (ranged && !this.hooks.useAmmo()) { this.gear.ranged = false; return; }
       let dmg = rand(4, 8) + this.gear.atk * 3;
       if (Math.random() * 100 < critChance(0)) dmg *= CRIT_MULTIPLIER;
-      this.swing(w, tg);
-      this.hit(w, tg, dmg);
+      this.startAttack(w, tg, dmg);
     } else {
       w.atkT = 1.1;
-      const dmg = Math.max(1, rand(4, 9) - (tg.isPlayer ? this.gear.def : 0));
-      this.swing(w, tg);
-      this.hit(w, tg, dmg);
+      const dmg = Math.max(1, rand(4, 9) + (w.weapon ? 3 : 0) - (tg.isPlayer ? this.gear.def : 0));
+      this.startAttack(w, tg, dmg);
     }
+  }
+
+  /** 공격 동작을 시작하고, 무기가 닿는 장면에서 피해를 준다 */
+  private startAttack(w: Walker, tg: Walker, dmg: number) {
+    const anim: Anim = w.cs?.attack ?? 'punch';
+    w.act = { anim, t: 0 };
+    w.pend = { to: tg, dmg, at: (IMPACT[anim] ?? 1) / ANIM_FPS[anim] };
+  }
+
+  private landHit(w: Walker) {
+    const pd = w.pend!;
+    w.pend = null;
+    const tg = pd.to;
+    if (tg.down > 0 || (tg.isPlayer && this.dead) || w.down > 0) return;
+    const ranged = w.isPlayer && this.gear.ranged;
+    if (Math.hypot(tg.x - w.x, tg.y - w.y) > (ranged ? RANGED : MELEE) + 0.6) return;
+    this.swing(w, tg, ranged);
+    this.hit(w, tg, pd.dmg);
   }
 
   private stepWalker(w: Walker, dt: number) {
@@ -763,8 +804,7 @@ export class WorldScene {
     const tx = ti + 0.5, ty = tj + 0.5;
     const dx = tx - w.x, dy = ty - w.y, dist = Math.hypot(dx, dy);
     const sdy = (dx + dy) * (TH / 2), sdx = (dx - dy) * (TW / 2);
-    if (Math.abs(sdy) > 0.01) w.facing = sdy > 0 ? 'front' : 'back';
-    if (Math.abs(sdx) > 0.01) w.side = sdx > 0 ? 1 : -1;
+    w.dir = dirFromScreen(sdx, sdy, w.dir);
     let speed = w.speed;
     if (w.flee > 0) speed = 1.9;
     if (w.isPlayer && isDanger(w.hp, w.maxHp)) speed *= DANGER_SPEED;
@@ -790,9 +830,8 @@ export class WorldScene {
       } else if (!(w.isPlayer && this.dead)) this.fight(w, dt);
       const moving = w.down <= 0 && !(w.isPlayer && this.dead) && this.stepWalker(w, dt);
       if (!w.isPlayer && w.down <= 0) this.think(w, moving, dt, nf);
-      w.anim = moving ? w.anim + dt * (w.flee > 0 ? 1.9 : w.speed) * 3.4 : 0;
-      w.sprite.texture = w.frames[w.facing][moving ? Math.floor(w.anim) % 4 : 0];
-      w.sprite.scale.x = w.down > 0 || (w.isPlayer && this.dead) ? 1 : w.side;
+      w.anim = moving ? w.anim + dt * (w.flee > 0 ? 1.9 : w.speed) * 8.5 : 0;
+      this.pose(w, moving, dt);
       const [sx, sy] = iso(w.x, w.y);
       w.sprite.position.set(sx, sy);
       w.sprite.zIndex = w.down > 0 ? w.x + w.y - 0.3 : w.x + w.y;
@@ -810,7 +849,13 @@ export class WorldScene {
     if (this.working) {
       const at = Math.floor(p.x) === this.working.spot[0] && Math.floor(p.y) === this.working.spot[1] && !p.path.length;
       if (at) {
-        if (!this.working.on) { this.working.on = true; p.facing = 'back'; this.workTick = 0; }
+        if (!this.working.on) {
+          this.working.on = true;
+          this.workTick = 0;
+          const b = this.zone.buildings[this.working.k];
+          const bx = b.i0 + b.w / 2 - p.x, by = b.j0 + b.d / 2 - p.y;
+          p.dir = dirFromScreen(bx - by, bx + by, p.dir);
+        }
         this.working.earned += WAGE_PER_SEC * dt;
         this.hooks.money(WAGE_PER_SEC * dt);
         this.workTick -= dt;
@@ -875,9 +920,8 @@ export class WorldScene {
     this.arrow.zIndex = 1e6 - 5;
     this.arrow.visible = !this.dead;
     if (this.auraTex) {
-      this.aura.texture = this.auraTex[p.facing][Math.floor(this.time * 9) % 4];
+      applyFrame(this.aura, this.auraTex.get(p.dir)?.[Math.floor(this.time * 9) % 4]);
       this.aura.position.set(px, py);
-      this.aura.scale.x = p.side;
       this.aura.zIndex = p.x + p.y - 0.005;
       this.aura.alpha = 0.75 + Math.sin(this.time * 5.3) * 0.2;
       this.aura.visible = !this.dead;
@@ -954,7 +998,7 @@ export class WorldScene {
       c.sprite.visible = near;
       if (near) {
         const [sx, sy] = iso(c.x, cy);
-        c.sprite.position.set(sx - c.ax, sy - c.ay);
+        c.sprite.position.set(sx, sy);
         c.sprite.zIndex = c.x + cy;
       }
       if (c.bubble) {
@@ -1023,7 +1067,7 @@ export class WorldScene {
       const v = this.bViews.get(k);
       if (!v) { this.label.visible = false; return; }
       text = f.kind === 'shop' ? t().shopLabel : this.nameOf(this.zone.buildings[k]);
-      x = v.x + v.w / 2; y = v.y + 10;
+      x = v.lx; y = v.ly;
     }
     if (this.labelText.text !== text) {
       this.labelText.text = text;
@@ -1037,7 +1081,8 @@ export class WorldScene {
 
   /** 플레이어 앞을 가리는 건물 띠·기둥은 반쯤 비친다 (사람이 지붕이나 기둥 위에 선 것처럼 보이지 않게) */
   private seeThrough(px: number, py: number, depth: number) {
-    const x0 = px - 9, x1 = px + 9, y0 = py - 40, y1 = py - 10; // 발끝이 아니라 몸통이 가려질 때만
+    // 플레이어를 가리는 건물은 통째로 비친다 (띠 하나만 비치면 사람이 지붕 위에 서 있는 것처럼 보인다)
+    const x0 = px - 12, x1 = px + 12, y0 = py - 48, y1 = py - 4;
     const hit = (s: Sprite, w: number, h: number, ax: number, ay: number) => {
       const sx = s.x - w * ax, sy = s.y - h * ay;
       return s.zIndex > depth && sx < x1 && sx + w > x0 && sy < y1 && sy + h > y0;
@@ -1045,12 +1090,25 @@ export class WorldScene {
     const now = new Set<Sprite>();
     for (const v of this.bViews.values()) {
       if (v.x > x1 || v.x + v.w < x0 || v.y > y1 || v.y + v.h < y0) continue;
-      for (const s of v.parts) if (hit(s, s.width, s.height, 0, 0)) now.add(s);
+      if (v.parts.some((s) => hit(s, s.width, s.height, 0, 0) && this.opaqueAt(v, px - v.x, py - 26 - v.y))) for (const s of v.parts) now.add(s);
     }
     for (const s of this.tall) if (hit(s, s.width, s.height, s.anchor.x, s.anchor.y)) now.add(s);
     for (const s of this.faded) if (!now.has(s) && !s.destroyed) s.alpha = 1;
-    for (const s of now) s.alpha = 0.42;
+    for (const s of now) s.alpha = 0.3;
     this.faded = now;
+  }
+
+  /** 건물 그림에서 그 자리에 실제로 벽이 있는가 (투명한 여백이면 가리지 않는 것) */
+  private opaqueAt(v: BView, x: number, y: number) {
+    const a = v.alpha;
+    if (!a) return true;
+    const ix = Math.round(x), iy = Math.round(y);
+    for (const [dx, dy] of [[0, 0], [0, -10], [0, 10], [-6, 0], [6, 0]]) {
+      const xx = ix + dx, yy = iy + dy;
+      if (xx < 0 || yy < 0 || xx >= v.w || yy >= v.h) continue;
+      if (a[yy * v.w + xx]) return true;
+    }
+    return false;
   }
 
   private refreshNight(nf: number) {

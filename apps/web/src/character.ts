@@ -288,9 +288,15 @@ export function parrotPixels(crestUp: boolean) {
 /** 광채: 몸의 윤곽 바깥으로 금빛이 일렁이며 위로 솟는 4장면 (가산 혼합으로 그린다) */
 export const AURA_PAD = 10;
 export function auraFrames(px: (string | null)[]): HTMLCanvasElement[] {
-  const W = SPRITE_W + AURA_PAD * 2, H = SPRITE_H + AURA_PAD * 2;
+  const solid = new Uint8Array(SPRITE_W * SPRITE_H);
+  for (let i = 0; i < solid.length; i++) solid[i] = px[i] ? 1 : 0;
+  return auraFromMask(solid, SPRITE_W, SPRITE_H);
+}
+/** 실루엣(w×h, 1 = 몸) → 사방으로 AURA_PAD 만큼 넓힌 광채 4장면 */
+export function auraFromMask(mask: Uint8Array, w0: number, h0: number): HTMLCanvasElement[] {
+  const W = w0 + AURA_PAD * 2, H = h0 + AURA_PAD * 2;
   const solid = new Uint8Array(W * H);
-  for (let y = 0; y < SPRITE_H; y++) for (let x = 0; x < SPRITE_W; x++) if (px[y * SPRITE_W + x]) solid[(y + AURA_PAD) * W + x + AURA_PAD] = 1;
+  for (let y = 0; y < h0; y++) for (let x = 0; x < w0; x++) if (mask[y * w0 + x]) solid[(y + AURA_PAD) * W + x + AURA_PAD] = 1;
   // 윤곽까지 거리: 위쪽은 멀리까지 닿게 해서 불꽃처럼 솟는다
   const MAXD = 8;
   const dist = new Float32Array(W * H).fill(99);

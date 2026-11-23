@@ -9,6 +9,7 @@ import { openLookPanel, lookPanelInsets } from './lookpanel.ts';
 import { ITEMS, itemIcon, effectText, priceText, type ItemDef, type ItemCat } from './items.ts';
 import { preloadPortrait } from './portraits.ts';
 import { sukhumvitTestZone, decodeZone, type Zone } from './zone.ts';
+import { streetReady } from './street.ts';
 import { ARRIVALS, rollArrival, arrivalLook, type Arrival, type Look, type Outfit } from './character.ts';
 import { t, lang, setLang, LANGS, type Lang } from './i18n.ts';
 import { load, save, type Slot } from './state.ts';
@@ -96,7 +97,7 @@ async function enterWorld() {
   ui.hidden = false;
   ui.className = 'scene loading';
   ui.textContent = t().loading;
-  const zone = await zoneReady;
+  const [zone] = await Promise.all([zoneReady, streetReady]);
   ui.hidden = true;
   ui.textContent = '';
   ui.className = '';
@@ -364,7 +365,7 @@ function gear() {
   const w = eq.weapon ? itemByKey(eq.weapon) : null;
   const pistol = w?.key === 'pistol';
   const def = Object.entries(eq).reduce((s, [slot, k]) => (slot === 'weapon' || !k ? s : s + (itemByKey(k).def ?? 0)), 0);
-  return { atk: pistol ? ((state.ammo ?? 0) > 0 ? w.atk ?? 0 : 1) : w?.atk ?? 0, def, ranged: pistol && (state.ammo ?? 0) > 0 };
+  return { atk: pistol ? ((state.ammo ?? 0) > 0 ? w.atk ?? 0 : 1) : w?.atk ?? 0, def, ranged: pistol && (state.ammo ?? 0) > 0, weapon: w?.key ?? null };
 }
 
 function toggleBag() {
