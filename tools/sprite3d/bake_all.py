@@ -23,7 +23,12 @@ for sex in 'mf':
 jobs.append({'sex': 'm', 'build': 1, 'sets': [{'kind': 'base', 'outfit': 'suturer', 'mode': 'm'}, {'kind': 'weapon', 'weapon': 'needle'}], 'tag': 'suturer'})
 jobs.append({'sex': 'm', 'build': 1, 'monster': True, 'sets': [{'kind': 'base', 'outfit': 'stitched', 'mode': 'm'}, {'kind': 'weapon', 'weapon': 'needle'}], 'tag': 'suturer'})
 jobs.append({'sex': 'm', 'build': 1, 'child': True, 'sets': [{'kind': 'base', 'outfit': 'casual', 'mode': 'w'}] + [{'kind': 'hair', 'style': h} for h in HAIRS]})
-only = sys.argv[2:]  # 번호로 일부만
+args = sys.argv[2:]
+# --dirs8: 이미 구운 층에 상하좌우 4방향(서기·걷기)만 덧붙인다
+if '--dirs8' in args:
+    args.remove('--dirs8')
+    for j in jobs: j.update({'dirs': ['s', 'e', 'n', 'w'], 'only': ['idle', 'walk'], 'merge': True})
+only = args  # 번호나 태그로 일부만
 t0 = time.time()
 for k, j in enumerate(jobs):
     if only and str(k) not in only and j.get('tag') not in only: continue

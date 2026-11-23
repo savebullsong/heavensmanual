@@ -15,6 +15,7 @@ import { ARRIVALS, rollArrival, arrivalLook, type Arrival, type Look, type Outfi
 import { t, lang, setLang, LANGS, type Lang } from './i18n.ts';
 import { load, save, type Slot } from './state.ts';
 import { bangkokClock } from './clock.ts';
+import { unlockAudio, isMuted, setMuted } from './sfx.ts';
 import { applyDeed, addSoulExp, judge, isDanger, DEED_TABLE, newStats, soulExpToNext, maxHp as maxHpFor, POINTS_PER_RANK, STAT_KEYS, STAT_MAX, type DeedKey, type StatKey } from '../../../packages/shared/src/rules.ts';
 
 const state = load();
@@ -156,12 +157,16 @@ const hooks: WorldHooks = {
     workLine = st ? t().workingLine.replace('{name}', st.name).replace('{n}', st.earned.toFixed(2)) : '';
     const el = hud.querySelector('.work');
     if (el) { el.textContent = workLine; el.setAttribute('title', st ? t().workOut : ''); }
+    hud.querySelector('.hud-left')?.classList.toggle('working', !!st);
   },
   store(kind, name) {
     openStore(kind, name);
   },
   person(id, info, x, y) {
     personMenu(id, info, x, y);
+  },
+  place(name, sub) {
+    showPlace(name, sub);
   },
   useAmmo() {
     if ((state.ammo ?? 0) <= 0) { toast(t().noAmmo); return false; }
@@ -540,18 +545,23 @@ function renderHud() {
   hud.hidden = false;
   const place = scene === 'shop' ? L.shopLabel : L.zones[world?.zone.id ?? ''] ?? '';
   const live = !net.account() ? `<button class="live">${L.live}</button>` : '';
+  const narrow = matchMedia('(max-width: 640px)').matches;
+  hudNarrow = narrow;
+  const langName = (l: Lang) => narrow ? l.toUpperCase() : l === 'ko' ? '한국어' : l === 'th' ? 'ไทย' : 'English';
   hud.innerHTML = `
-    <div class="hud-left"><b>${place}</b>${scene === 'shop' ? `<span class="hint">${L.hintShop}</span>` : ''}<span class="work">${workLine}</span></div>
+    <div class="hud-left${workLine ? ' working' : ''}"><div class="where" data-zone="${place.replace(/"/g, '&quot;')}"><b>${place}</b></div>${scene === 'shop' ? `<span class="hint">${L.hintShop}</span>` : ''}<span class="work">${workLine}</span></div>
     <div class="hud-tools">${live}<div class="hud-right">
-      <span class="clock"></span>
-      <span class="hpbox" title="${L.hpLabel}"><i class="hpbar"><i></i></i></span>
+      <span class="hpbox" title="${L.hpLabel}"><span class="clock"></span><i class="hpbar"><i></i></i></span>
       <span class="wallet"></span>
       <button class="to-soul">${L.rank} ${state.soul?.rank ?? 1}</button>
       <button class="to-bag">${L.bag}</button>
-      <select class="lang" aria-label="language">${LANGS.map((l) => `<option value="${l}" ${l === lang() ? 'selected' : ''}>${l === 'ko' ? '한국어' : l === 'th' ? 'ไทย' : 'English'}</option>`).join('')}</select>
+      <button class="snd${isMuted() ? ' off' : ''}" aria-label="${L.sound}" title="${L.sound}">${SND_SVG}</button>
+      <select class="lang" aria-label="language">${LANGS.map((l) => `<option value="${l}" ${l === lang() ? 'selected' : ''}>${langName(l)}</option>`).join('')}</select>
     </div></div>
     ${scene === 'world' && world?.zone.attribution ? '<a class="attrib" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>' : ''}`;
   (hud.querySelector('.to-bag') as HTMLButtonElement).onclick = toggleBag;
+  const snd = hud.querySelector('.snd') as HTMLButtonElement;
+  snd.onclick = () => { unlockAudio(); setMuted(!isMuted()); snd.classList.toggle('off', isMuted()); };
   (hud.querySelector('.to-soul') as HTMLButtonElement).onclick = toggleSoul;
   const lb = hud.querySelector('.live') as HTMLButtonElement | null;
   if (lb) lb.onclick = () => openSignup('signup');
@@ -568,6 +578,32 @@ function renderHud() {
   updateHud();
 }
 
+let hudNarrow = false;
+const SND_SVG = '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M3 7.5h3.2L10.5 4v12L6.2 12.5H3z" fill="currentColor"/><path class="w" d="M13 6.5c1.6 1.9 1.6 5.1 0 7M15.4 4.4c2.8 3.1 2.8 8.1 0 11.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path class="x" d="M13.2 7.6l4.6 4.8M17.8 7.6l-4.6 4.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+document.addEventListener('pointerdown', unlockAudio, true);
+// 길게 누르기 = 이동이라, 게임 화면에서는 길게 눌러도 메뉴가 뜨지 않게
+document.getElementById('game')?.addEventListener('contextmenu', (e) => e.preventDefault());
+addEventListener('resize', () => { if (!hud.hidden && matchMedia('(max-width: 640px)').matches !== hudNarrow) renderHud(); });
+
+/** 누른 건물·가까이 온 가게 이름: 위쪽 지역 이름 자리에 잠깐 바꿔 보여 준다 (팝업 없음) */
+let placeTimer = 0;
+function showPlace(name: string, sub: string) {
+  const el = hud.querySelector('.hud-left .where') as HTMLElement | null;
+  if (!el) return;
+  el.innerHTML = `<b></b>${sub ? '<small></small>' : ''}`;
+  (el.querySelector('b') as HTMLElement).textContent = name;
+  if (sub) (el.querySelector('small') as HTMLElement).textContent = sub;
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash', 'is-place');
+  clearTimeout(placeTimer);
+  placeTimer = window.setTimeout(() => {
+    el.classList.remove('flash', 'is-place');
+    el.innerHTML = '';
+    const b = document.createElement('b');
+    b.textContent = el.dataset.zone ?? '';
+    el.append(b);
+  }, 2600);
+}
+
 function updateHpBar(hp: number, max: number) {
   const bar = hud.querySelector('.hpbar > i') as HTMLElement | null;
   if (!bar) return;
@@ -577,10 +613,11 @@ function updateHpBar(hp: number, max: number) {
 }
 
 function updateHud() {
+  // 좁은 화면에서는 '방콕'·'지갑' 글자를 빼고 숫자만 (CSS가 .lbl을 숨김)
   const el = hud.querySelector('.clock');
-  if (el) el.textContent = `${t().bkk} ${bangkokClock().label}`;
+  if (el) el.innerHTML = `<span class="lbl">${t().bkk}</span> ${bangkokClock().label}`;
   const w = hud.querySelector('.wallet');
-  if (w) w.textContent = `${t().wallet} ฿${Math.floor(state.wallet ?? 0).toLocaleString('en-US')}`;
+  if (w) w.innerHTML = `<span class="lbl">${t().wallet}</span> ฿${Math.floor(state.wallet ?? 0).toLocaleString('en-US')}`;
   updateHpBar(state.hp ?? maxHp(), maxHp());
 }
 

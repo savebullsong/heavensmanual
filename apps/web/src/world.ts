@@ -2,13 +2,14 @@
 // 1단계-B: 대상 메뉴(말 걸기·살펴보기·공격·강제 공격), 싸움과 체력, 쓰러짐과 돈 줍기, 가게 노동, 차 사고
 import { Application, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture } from 'pixi.js';
 import { type Look } from './character.ts';
-import { charSet, frameOf, applyFrame, dirFromScreen, auraFor, makeAuraSprite, ANIM_FPS, IMPACT, type CharSet, type Dir, type Anim, type Frame } from './sprites.ts';
+import { charSet, frameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, ANIM_FPS, IMPACT, type CharSet, type Dir, type Anim, type Frame } from './sprites.ts';
 import { type Zone, type Building, type Lane, findPath, walkable, randomWalkTileNear, tileAt } from './zone.ts';
 import { iso, TW, TH, drawBuilding, drawGroundChunk, buildingHeight } from './gfx.ts';
 import { drawBuildingKit, drawGroundKit, buildingTop, carSprite, propSprite, CAR_MODELS, CHUNK, kitOk } from './street.ts';
 import { t, lang } from './i18n.ts';
 import { bangkokClock, nightFactor } from './clock.ts';
 import { buildingName, buildingSub, interactive, canWork, storeOf, type StoreKind } from './names.ts';
+import * as sfx from './sfx.ts';
 import { carHit, isDanger, DANGER_SPEED, critChance, CRIT_MULTIPLIER, regenPerMinute, OUT_OF_COMBAT_S, dodgeChance, maxHp as maxHpFor, newStats, type DeedKey, type Stats } from '../../../packages/shared/src/rules.ts';
 
 function tex(c: HTMLCanvasElement): Texture {
@@ -34,7 +35,7 @@ interface Walker {
   dir: Dir;
   anim: number;
   act: { anim: Anim; t: number } | null; // 한 번 재생하는 동작 (공격·맞음·쓰러짐)
-  pend: { to: Walker; dmg: number; at: number } | null; // 동작이 닿는 순간 들어갈 피해
+  pend: { to: Walker; dmg: number; at: number; crit?: boolean } | null; // 동작이 닿는 순간 들어갈 피해
   wait: number;
   isPlayer: boolean;
   kind: 'player' | NpcKind | 'remote';
@@ -76,6 +77,8 @@ export interface WorldHooks {
   useAmmo(): boolean;
   store(kind: StoreKind, name: string): void;
   person(id: string, info: RemoteInfo, x: number, y: number): void;
+  /** 누른 건물·가까이 온 가게의 이름을 화면 위쪽에 잠깐 보여 준다 */
+  place(name: string, sub: string): void;
 }
 export interface Gear { atk: number; def: number; ranged: boolean; weapon: string | null; armor: string[] }
 
@@ -126,6 +129,18 @@ export class WorldScene {
   private auraTex: Map<Dir, Frame[]> | null = null;
   private dressSeq = 0;
   private time = 0;
+  // 누른 자리 표시: 이동 = 바닥 파동, 공격 = 대상 발밑 붉은 표적, 상호작용 = 출입·말풍선 아이콘
+  private fxLayer = new Graphics();
+  private ripple: { x: number; y: number; t: number } | null = null;
+  private mark: { w: Walker; t: number } | null = null;
+  private door = new Graphics();
+  private doorFor: number | null = null; // 아이콘이 떠 있는 건물 (-1 = 우주새)
+  private doorAt = { x: 0, y: 0 };
+  private talkIcon = new Graphics();
+  private fronts = new Map<number, [number, number] | null>();
+  // 길게 누르기 (0.25초) = 무조건 이동, 누른 채 움직이면 목적지가 따라온다
+  private press: { id: number; x: number; y: number; sx: number; sy: number; t0: number; hold: boolean; next: number } | null = null;
+  private skipTap = false;
   private label = new Container();
   private labelText = new Text({ text: '', style: { fontFamily: 'system-ui, sans-serif', fontSize: 13, fontWeight: '600', fill: '#fff6d8' } });
   private labelBg = new Graphics();
@@ -149,7 +164,8 @@ export class WorldScene {
 
   constructor(private app: Application, readonly zone: Zone, look: Look, private onEnterShop: () => void, private hooks: WorldHooks, hp = PLAYER_MAX_HP) {
     this.objects.sortableChildren = true;
-    this.camera.addChild(this.ground, this.objects);
+    this.camera.addChild(this.ground, this.fxLayer, this.objects);
+    this.fxLayer.eventMode = 'none';
     this.root.addChild(this.camera, this.overlay, this.lights, this.danger);
     this.lights.eventMode = 'none';
     this.overlay.eventMode = 'none';
@@ -166,15 +182,34 @@ export class WorldScene {
     this.spawnCars();
     this.root.eventMode = 'static';
     this.root.hitArea = this.app.screen;
-    this.root.on('pointertap', (e) => this.onTap(e.global.x, e.global.y, e.ctrlKey || e.metaKey || e.shiftKey));
-    this.root.on('pointermove', (e) => { if (e.pointerType === 'mouse') this.onHover(e.global.x, e.global.y); });
+    this.root.on('pointerdown', (e) => {
+      sfx.unlockAudio();
+      this.skipTap = false;
+      this.press = { id: e.pointerId, x: e.global.x, y: e.global.y, sx: e.global.x, sy: e.global.y, t0: this.time, hold: false, next: 0 };
+    });
+    this.root.on('globalpointermove', (e) => {
+      const pr = this.press;
+      if (pr && pr.id === e.pointerId) { pr.x = e.global.x; pr.y = e.global.y; }
+      if (e.pointerType === 'mouse') this.onHover(e.global.x, e.global.y);
+    });
+    const up = (e: { pointerId: number }) => { if (this.press?.id === e.pointerId) this.press = null; };
+    this.root.on('pointerup', up);
+    this.root.on('pointerupoutside', up);
+    this.root.on('pointertap', (e) => {
+      if (this.skipTap) { this.skipTap = false; return; }
+      this.onTap(e.global.x, e.global.y, e.ctrlKey || e.metaKey || e.shiftKey);
+    });
     this.labelText.anchor.set(0.5, 1);
     this.label.addChild(this.labelBg, this.labelText);
     this.label.visible = false;
     this.label.eventMode = 'none';
     this.label.zIndex = 1e6;
     this.bars.zIndex = 1e6 - 1;
-    this.objects.addChild(this.label, this.bars);
+    this.door.zIndex = 1e6 - 3;
+    this.door.visible = false;
+    this.talkIcon.zIndex = 1e6 - 3;
+    this.talkIcon.visible = false;
+    this.objects.addChild(this.label, this.bars, this.door, this.talkIcon);
     this.update(0);
     this.stream(true);
   }
@@ -514,8 +549,7 @@ export class WorldScene {
     this.insets = { right, bottom };
   }
   turnPlayer() {
-    const d = this.player.dir;
-    this.player.dir = ((d[0] === 's' ? 'n' : 's') + d[1]) as Dir;
+    this.player.dir = turnedDir(this.player.dir);
   }
   relabel() {
     this.clearBuildings();
@@ -607,13 +641,15 @@ export class WorldScene {
 
   private onHover(gx: number, gy: number) {
     const w = this.walkerAt(gx, gy);
-    if (w) this.hoverFor = { kind: 'w', w };
-    else {
-      const k = this.buildingAt(gx, gy);
-      const b = k !== null ? this.zone.buildings[k] : null;
-      this.hoverFor = b && b.cat === 'ujusae' ? { kind: 'shop' } : b && interactive(b) ? { kind: 'b', k: k! } : null;
-    }
-    document.body.style.cursor = this.hoverFor || this.coinAt(gx, gy) ? 'pointer' : '';
+    this.hoverFor = w ? { kind: 'w', w } : null;
+    document.body.style.cursor = this.hoverFor || this.coinAt(gx, gy) || this.onDoorIcon(gx, gy) ? 'pointer' : '';
+  }
+
+  /** 출입 아이콘을 눌렀나 (손가락 크기를 생각해 넉넉하게) */
+  private onDoorIcon(gx: number, gy: number) {
+    if (!this.door.visible || this.doorFor === null) return false;
+    const { wx, wy } = this.toWorld(gx, gy);
+    return Math.hypot(wx - this.doorAt.x, wy - this.doorAt.y) < 20;
   }
 
   private onTap(gx: number, gy: number, force: boolean) {
@@ -642,39 +678,98 @@ export class WorldScene {
       this.hooks.menu(this.npcName(w), this.npcSub(w), opts, sx + this.camera.x, sy - 44 + this.camera.y);
       return;
     }
-    // 2) 떨어진 돈
+    // 2) 출입 아이콘 (가게 문 앞에 서 있을 때만 뜬다) = 상호작용
+    if (this.onDoorIcon(gx, gy)) { this.interact(this.doorFor!); return; }
+    // 3) 떨어진 돈
     const c = this.coinAt(gx, gy);
-    if (c) { this.cancelActs(); this.walkTo(Math.floor(c.x), Math.floor(c.y)); return; }
-    // 3) 건물: 우주새는 들어가기, 다른 가게는 일하기
+    if (c) { this.cancelActs(); this.walkTo(Math.floor(c.x), Math.floor(c.y)); this.rippleAt(Math.floor(c.x), Math.floor(c.y)); return; }
+    // 4) 건물: 메뉴 없이 이동만. 이름 있는 건물이면 위쪽에 이름이 잠깐 뜬다.
+    //    손가락 아래 벽 밑동(앞쪽 보도)으로 걸어간다. 가게 문 근처면 문 앞으로 맞춰 준다 → 도착하면 출입 아이콘
     const kb = this.buildingAt(gx, gy);
-    // 가게가 없는 건물은 누를 수 없다 (뒤의 길을 누른 것으로 본다)
-    const k = kb !== null && interactive(this.zone.buildings[kb]) ? kb : null;
-    if (k !== null) {
-      const b = this.zone.buildings[k];
-      if (b.cat === 'ujusae') {
-        this.cancelActs();
-        this.showLabel({ kind: 'shop' }, 2.5);
-        this.walkTo(this.zone.door.i, this.zone.door.j);
-        this.wantShop = true;
-        return;
-      }
-      const name = this.nameOf(b);
-      if (name) {
-        this.showLabel({ kind: 'b', k }, 2.5);
-        const opts: { label: string; act: () => void }[] = [];
-        const store = storeOf(b);
-        if (store) opts.push({ label: L.enter, act: () => this.goStore(k, store) });
-        if (canWork(b)) opts.push({ label: L.act.work.replace('{n}', String(WAGE_PER_HOUR)), act: () => this.goWork(k) });
-        opts.push({ label: L.act.close, act: () => undefined });
-        this.hooks.menu(name, buildingSub(b, lang()), opts, gx, gy - 10);
-        return;
-      }
+    if (kb !== null) {
+      const b = this.zone.buildings[kb];
+      const { wx } = this.toWorld(gx, gy);
+      const isShop = b.cat === 'ujusae';
+      if (isShop) this.hooks.place(t().shopLabel, '');
+      else if (interactive(b)) { const n = this.nameOf(b); if (n) this.hooks.place(n, buildingSub(b, lang())); }
+      this.cancelActs();
+      let spot = this.baseSpot(b, wx);
+      const door = isShop ? [this.zone.door.i, this.zone.door.j] as [number, number] : interactive(b) ? this.frontCached(kb) : null;
+      if (door && (!spot || Math.hypot(spot[0] - door[0], spot[1] - door[1]) <= 3)) spot = door;
+      if (spot && this.walkTo(spot[0], spot[1])) { this.rippleAt(spot[0], spot[1]); return; }
     }
-    // 4) 땅
+    // 5) 땅 (지나가는 길의 사람·건물은 신경 쓰지 않는다)
     this.cancelActs();
+    this.moveToScreen(gx, gy);
+  }
+
+  /** 화면 좌표의 땅으로 걸어간다 (못 가는 칸이면 가장 가까운 갈 수 있는 칸) */
+  private moveToScreen(gx: number, gy: number, fx = true) {
     const { wx, wy } = this.toWorld(gx, gy);
     const x = (wx / (TW / 2) + wy / (TH / 2)) / 2, y = (wy / (TH / 2) - wx / (TW / 2)) / 2;
-    this.walkTo(Math.floor(x), Math.floor(y));
+    const to = this.nearestWalkable(Math.floor(x), Math.floor(y));
+    if (!to) return;
+    if (this.walkTo(to[0], to[1]) && fx) this.rippleAt(to[0], to[1]);
+  }
+
+  private nearestWalkable(i: number, j: number): [number, number] | null {
+    if (walkable(this.zone, i, j)) return [i, j];
+    for (let r = 1; r <= 5; r++) {
+      let best: [number, number] | null = null, bd = 1e9;
+      for (let a = -r; a <= r; a++)
+        for (let c = -r; c <= r; c++) {
+          if (Math.max(Math.abs(a), Math.abs(c)) !== r || !walkable(this.zone, i + a, j + c)) continue;
+          const d = a * a + c * c;
+          if (d < bd) { bd = d; best = [i + a, j + c]; }
+        }
+      if (best) return best;
+    }
+    return null;
+  }
+
+  /** 건물 앞쪽(화면에 보이는 두 면) 밑동의 보도 중 손가락 가로 위치에 가장 가까운 칸 */
+  private baseSpot(b: Building, wx: number): [number, number] | null {
+    const i1 = b.i0 + b.w, j1 = b.j0 + b.d;
+    let best: [number, number] | null = null, bd = 1e9;
+    const test = (i: number, j: number) => {
+      if (!walkable(this.zone, i, j)) return;
+      const [sx] = iso(i + 0.5, j + 0.5);
+      const d = Math.abs(sx - wx);
+      if (d < bd) { bd = d; best = [i, j]; }
+    };
+    for (let i = b.i0 - 1; i <= i1; i++) test(i, j1);
+    for (let j = b.j0 - 1; j < j1; j++) test(i1, j);
+    return best;
+  }
+
+  private frontCached(k: number) {
+    if (!this.fronts.has(k)) this.fronts.set(k, this.frontOf(this.zone.buildings[k]));
+    return this.fronts.get(k)!;
+  }
+
+  /** 문 앞에서 아이콘을 눌렀을 때: 우주새는 들어가기, 가게는 사기·일하기 (하나뿐이면 바로) */
+  private interact(k: number) {
+    const L = t();
+    if (k === -1) {
+      this.cancelActs();
+      this.walkTo(this.zone.door.i, this.zone.door.j);
+      this.wantShop = true;
+      return;
+    }
+    const b = this.zone.buildings[k];
+    const opts: { label: string; act: () => void }[] = [];
+    const store = storeOf(b);
+    if (store) opts.push({ label: L.enter, act: () => this.goStore(k, store) });
+    if (canWork(b)) opts.push({ label: L.act.work.replace('{n}', String(WAGE_PER_HOUR)), act: () => this.goWork(k) });
+    if (opts.length === 1) { opts[0].act(); return; }
+    if (!opts.length) return;
+    opts.push({ label: L.act.close, act: () => undefined });
+    this.hooks.menu(this.nameOf(b), buildingSub(b, lang()), opts, this.doorAt.x + this.camera.x, this.doorAt.y + this.camera.y - 14);
+  }
+
+  private rippleAt(i: number, j: number) {
+    const [x, y] = iso(i + 0.5, j + 0.5);
+    this.ripple = { x, y, t: 0 };
   }
 
   private cancelActs() {
@@ -749,6 +844,7 @@ export class WorldScene {
   /** 공격 시작 (행인은 강제 공격) */
   private attack(w: Walker) {
     this.cancelActs();
+    this.mark = { w, t: 0 };
     this.player.target = w;
     this.player.atkT = Math.min(this.player.atkT, 0.2);
   }
@@ -771,9 +867,10 @@ export class WorldScene {
   }
 
   // ───────────────────────── 싸움 ─────────────────────────
-  private hit(from: Walker, to: Walker, dmg: number) {
+  private hit(from: Walker, to: Walker, dmg: number, crit = false, kind?: sfx.HitKind) {
     if (to.down > 0 || this.dead) return;
     if (to.isPlayer && Math.random() * 100 < dodgeChance(this.stats.agi)) { this.float(to, t().miss, '#d8e8ff'); return; }
+    if (kind) sfx.impact(kind, this.spotOf(to), crit);
     to.hp -= dmg;
     to.hurtT = 0.18;
     if (!to.act || to.act.anim === 'hit') { to.act = { anim: 'hit', t: 0 }; to.pend = null; }
@@ -807,6 +904,7 @@ export class WorldScene {
   }
 
   private knockDown(w: Walker, by: Walker) {
+    sfx.thud(this.spotOf(w));
     w.hp = 0;
     w.down = 30;
     w.path = [];
@@ -839,6 +937,7 @@ export class WorldScene {
   }
 
   private die(cause: 'car' | 'beaten') {
+    sfx.thud(sfx.spot(0, 0));
     if (this.dead) return;
     this.dead = true;
     const p = this.player;
@@ -906,7 +1005,7 @@ export class WorldScene {
     if (moving) {
       const step = Math.min(d, (2.3 + d) * dt);
       w.x += (dx / d) * step; w.y += (dy / d) * step;
-      w.dir = dirFromScreen((dx - dy) * (TW / 2), (dx + dy) * (TH / 2), w.dir);
+      w.dir = dirFromTile(dx, dy, w.dir);
       w.anim += dt * 2.3 * 8.5;
     } else { w.dir = rp.d; w.anim = 0; }
     this.pose(w, moving, dt);
@@ -959,16 +1058,17 @@ export class WorldScene {
       return;
     }
     w.path = [];
-    const sdx = (tg.x - w.x - (tg.y - w.y)) * (TW / 2), sdy = (tg.x - w.x + tg.y - w.y) * (TH / 2);
-    if (!w.act || w.act.anim !== 'fall') w.dir = dirFromScreen(sdx, sdy, w.dir);
+    // 공격 동작은 대각선으로만 구워져 있어 싸울 때는 대각선 넷 중에서 바라본다
+    if (!w.act || w.act.anim !== 'fall') w.dir = dirFromTile(tg.x - w.x, tg.y - w.y, w.dir, false);
     w.atkT -= dt;
     if (w.atkT > 0) return;
     if (w.isPlayer) {
       w.atkT = ATK_INTERVAL;
       if (ranged && !this.hooks.useAmmo()) { this.gear.ranged = false; return; }
       let dmg = rand(4, 8) + this.gear.atk * 3 + this.stats.str;
-      if (Math.random() * 100 < critChance(this.stats.fai)) dmg *= CRIT_MULTIPLIER;
-      this.startAttack(w, tg, dmg);
+      const crit = Math.random() * 100 < critChance(this.stats.fai);
+      if (crit) dmg *= CRIT_MULTIPLIER;
+      this.startAttack(w, tg, dmg, crit);
     } else {
       w.atkT = w.kind === 'suturer' ? (w.monster ? 0.85 : 1.0) : 1.1;
       const base = w.kind === 'suturer' ? rand(10, 18) * (w.monster ? 1.6 : 1) : rand(4, 9) + (w.weapon ? 3 : 0);
@@ -978,10 +1078,20 @@ export class WorldScene {
   }
 
   /** 공격 동작을 시작하고, 무기가 닿는 장면에서 피해를 준다 */
-  private startAttack(w: Walker, tg: Walker, dmg: number) {
+  private startAttack(w: Walker, tg: Walker, dmg: number, crit = false) {
     const anim: Anim = w.cs?.attack ?? 'punch';
     w.act = { anim, t: 0 };
-    w.pend = { to: tg, dmg, at: (IMPACT[anim] ?? 1) / ANIM_FPS[anim] };
+    w.pend = { to: tg, dmg, at: (IMPACT[anim] ?? 1) / ANIM_FPS[anim], crit };
+    sfx.swing(this.kindOf(w), this.spotOf(w));
+  }
+
+  /** 효과음: 무기 종류와 내 캐릭터에서 본 위치 */
+  private kindOf(w: Walker) {
+    return w.isPlayer ? sfx.hitKind(this.gear.weapon, this.gear.ranged) : sfx.hitKind(w.weapon);
+  }
+  private spotOf(w: Walker) {
+    const p = this.player;
+    return sfx.spot((w.x - w.y - (p.x - p.y)) * (TW / 2), (w.x + w.y - (p.x + p.y)) * (TH / 2));
   }
 
   private landHit(w: Walker) {
@@ -990,9 +1100,10 @@ export class WorldScene {
     const tg = pd.to;
     if (tg.down > 0 || (tg.isPlayer && this.dead) || w.down > 0) return;
     const ranged = w.isPlayer && this.gear.ranged;
+    if (ranged) sfx.gunshot(this.spotOf(w));
     if (Math.hypot(tg.x - w.x, tg.y - w.y) > (ranged ? RANGED : MELEE) + 0.6) return;
     this.swing(w, tg, ranged);
-    this.hit(w, tg, pd.dmg);
+    this.hit(w, tg, pd.dmg, pd.crit, this.kindOf(w));
   }
 
   private stepWalker(w: Walker, dt: number) {
@@ -1000,8 +1111,11 @@ export class WorldScene {
     const [ti, tj] = w.path[0];
     const tx = ti + 0.5, ty = tj + 0.5;
     const dx = tx - w.x, dy = ty - w.y, dist = Math.hypot(dx, dy);
-    const sdy = (dx + dy) * (TH / 2), sdx = (dx - dy) * (TW / 2);
-    w.dir = dirFromScreen(sdx, sdy, w.dir);
+    // 바라보는 쪽은 앞으로 갈 두세 칸의 평균으로 정한다 (지그재그 길에서도 몸이 한쪽을 본다)
+    let ax = 0, ay = 0;
+    const look = Math.min(3, w.path.length);
+    for (let k = 0; k < look; k++) { ax += w.path[k][0] + 0.5; ay += w.path[k][1] + 0.5; }
+    w.dir = dirFromTile(ax / look - w.x, ay / look - w.y, w.dir);
     let speed = w.speed;
     if (w.flee > 0) speed = 1.9;
     if (w.isPlayer && isDanger(w.hp, w.maxHp)) speed *= DANGER_SPEED;
@@ -1065,7 +1179,7 @@ export class WorldScene {
           p.sprite.visible = false;
           const b = this.zone.buildings[this.working.k];
           const bx = b.i0 + b.w / 2 - p.x, by = b.j0 + b.d / 2 - p.y;
-          p.dir = dirFromScreen(bx - by, bx + by, p.dir);
+          p.dir = dirFromTile(bx, by, p.dir);
         }
         this.working.earned += WAGE_PER_SEC * dt;
         this.hooks.money(WAGE_PER_SEC * dt);
@@ -1149,9 +1263,12 @@ export class WorldScene {
     const vw = this.app.screen.width - this.insets.right, vh = this.app.screen.height - this.insets.bottom;
     this.camera.position.set(Math.round(vw / 2 - px), Math.round(vh / 2 - py + 20));
     this.lights.position.copyFrom(this.camera.position);
-    // 이름표 (누른 것, 마우스를 올린 것, 우주새로 걸어가는 중)
+    // 이름표: 사람만 (건물 이름은 화면 위쪽에 잠깐)
     if (this.labelT > 0) this.labelT -= dt;
-    this.drawLabel(this.labelT > 0 ? this.labelFor : this.wantShop ? { kind: 'shop' } : this.hoverFor);
+    this.drawLabel(this.labelT > 0 ? this.labelFor : this.hoverFor);
+    this.updatePress();
+    this.drawFx(dt);
+    this.updateDoor(p);
     // 위험 상태: 화면 가장자리가 붉게 뛴다
     const W = this.app.screen.width, H = this.app.screen.height;
     this.danger.clear();
@@ -1241,8 +1358,9 @@ export class WorldScene {
     this.carBubble(c, t().crash);
     this.combatT = 0;
     const res = carHit(p.hp, p.maxHp);
+    sfx.impact('blunt', sfx.spot(0, 0), true);
     if (res.dead) { this.die('car'); return; }
-    this.float(p, String(Math.round(p.hp - res.hp)), '#ff8a7a');
+    // 피해 숫자는 보여 주지 않는다 (체력 막대로만)
     p.hp = res.hp;
     this.hooks.hp(p.hp, p.maxHp);
     let best: [number, number] | null = null, bd = 1e9;
@@ -1266,6 +1384,115 @@ export class WorldScene {
     c.bubble.anchor.set(0.5);
     this.objects.addChild(c.bubble);
     c.bubbleT = 1.2;
+  }
+
+  /** 길게 누르기: 0.25초가 지나면 무조건 이동, 누른 채 움직이면 목적지를 다시 잡는다 */
+  private updatePress() {
+    const pr = this.press;
+    if (!pr || this.dead) return;
+    if (!pr.hold) {
+      if (this.time - pr.t0 < 0.25) return;
+      pr.hold = true;
+      this.skipTap = true;
+      if (this.working?.on) { this.stopWork(); }
+      this.cancelActs();
+      this.moveToScreen(pr.x, pr.y);
+      pr.next = this.time + 0.15;
+      return;
+    }
+    if (this.time >= pr.next) {
+      pr.next = this.time + 0.15;
+      this.player.path = this.player.path.slice(0, 1);
+      this.moveToScreen(pr.x, pr.y, false);
+      const last = this.player.path[this.player.path.length - 1];
+      if (last) { const [x, y] = iso(last[0] + 0.5, last[1] + 0.5); if (this.ripple) { this.ripple.x = x; this.ripple.y = y; } }
+    }
+  }
+
+  /** 바닥 파동(이동)과 붉은 표적(공격) */
+  private drawFx(dt: number) {
+    const g = this.fxLayer;
+    g.clear();
+    const rp = this.ripple;
+    if (rp) {
+      rp.t += dt;
+      const hold = !!this.press?.hold;
+      const T = 0.55;
+      for (const off of [0, 0.18]) {
+        const k = hold ? ((rp.t + off) % T) / T : (rp.t - off) / T;
+        if (k < 0 || k > 1) continue;
+        g.ellipse(rp.x, rp.y, 4 + 13 * k, (4 + 13 * k) / 2).stroke({ color: 0xfff1c4, width: 1.5, alpha: (1 - k) * 0.9 });
+      }
+      if (!hold && rp.t > T + 0.2) this.ripple = null;
+    }
+    const m = this.mark;
+    if (m) {
+      m.t += dt;
+      if (m.t > 0.8 || m.w.down > 0) this.mark = null;
+      else {
+        const [x, y] = iso(m.w.x, m.w.y);
+        const k = Math.min(1, m.t / 0.15), a = m.t < 0.5 ? 1 : 1 - (m.t - 0.5) / 0.3;
+        const r = 16 - 4 * k;
+        g.ellipse(x, y, r, r / 2).stroke({ color: 0xe0463a, width: 2, alpha: a });
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) g.moveTo(x + dx * (r + 1), y + dy * (r / 2 + 1)).lineTo(x + dx * (r + 5), y + dy * (r / 2 + 3)).stroke({ color: 0xe0463a, width: 2, alpha: a });
+      }
+    }
+  }
+
+  /** 문 앞에 멈춰 서면 그 가게 위에 출입 아이콘. 사람에게 말 걸러 가는 중이면 그 사람 머리 위에 말풍선 */
+  private updateDoor(p: Walker) {
+    let found: number | null = null, fd = 2.3;
+    if (!this.dead && !p.path.length && !this.working && !p.target) {
+      const di = this.zone.door;
+      const dd = Math.hypot(di.i + 0.5 - p.x, di.j + 0.5 - p.y);
+      if (dd < fd) { fd = dd; found = -1; }
+      for (const k of this.bViews.keys()) {
+        const b = this.zone.buildings[k];
+        if (b.cat === 'ujusae' || !interactive(b) || (!storeOf(b) && !canWork(b))) continue;
+        const f = this.frontCached(k);
+        if (!f) continue;
+        const d = Math.hypot(f[0] + 0.5 - p.x, f[1] + 0.5 - p.y);
+        if (d < fd) { fd = d; found = k; }
+      }
+    }
+    if (found !== this.doorFor) {
+      this.doorFor = found;
+      if (found !== null) {
+        // 문이 있는 면의 가운데 (간판 쪽), 1층 차양 위
+        let fx: number, fy: number;
+        if (found === -1) { fx = this.zone.door.i + 0.5; fy = this.zone.door.j; }
+        else {
+          const b = this.zone.buildings[found];
+          const f = this.frontCached(found)!;
+          if (b.sign === 'right') { fx = b.i0 + b.w; fy = f[1] + 0.5; } else { fx = f[0] + 0.5; fy = b.j0 + b.d; }
+          const n = this.nameOf(b);
+          if (n) this.hooks.place(n, buildingSub(b, lang()));
+        }
+        if (found === -1) this.hooks.place(t().shopLabel, '');
+        const [x, y] = iso(fx, fy);
+        this.doorAt = { x, y: y - 74 };
+      }
+    }
+    this.door.visible = found !== null;
+    if (found !== null) {
+      const bob = Math.sin(this.time * 3.2) * 1.5;
+      const { x, y } = this.doorAt;
+      this.door.clear()
+        .circle(0, 0, 12).fill({ color: 0x140e0a, alpha: 0.88 }).stroke({ color: 0xe0b437, width: 1.5 })
+        .rect(-4.5, -6, 9, 12).stroke({ color: 0xfff1c4, width: 1.4 })
+        .circle(2, 0.5, 1.1).fill(0xe0b437)
+        .poly([-2, 9, 2, 9, 0, 13]).fill(0xe0b437);
+      this.door.position.set(Math.round(x), Math.round(y + bob));
+    }
+    const pd = this.pending;
+    this.talkIcon.visible = !!pd && pd.kind === 'talk';
+    if (pd && pd.kind === 'talk') {
+      const [x, y] = iso(pd.w.x, pd.w.y);
+      this.talkIcon.clear().roundRect(-8, -7, 16, 11, 4).fill({ color: 0xfff6d8, alpha: 0.95 }).stroke({ color: 0x140e0a, width: 1 })
+        .poly([-2, 4, 3, 4, -3, 8]).fill(0xfff6d8)
+        .circle(-4, -1.5, 1).circle(0, -1.5, 1).circle(4, -1.5, 1).fill(0x140e0a);
+      this.talkIcon.position.set(Math.round(x), Math.round(y - 58 + Math.sin(this.time * 4)));
+    }
   }
 
   private showLabel(f: NonNullable<LabelRef>, hold: number) {

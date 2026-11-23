@@ -204,6 +204,7 @@ const dict = {
 // 4차 추가 문구
 const extra = {
   ko: {
+    sound: '효과음 켜기·끄기',
     workingLine: '일하는 중 · {name} · 번 돈 ฿{n}', workOut: '화면을 누르면 일을 그만두고 나옵니다',
     hpWords: ['멀쩡해 보인다.', '조금 다쳤다.', '많이 다쳤다.', '쓰러지기 직전이다.'], miss: '빗나감', healed: '회복',
     soulTitle: '영혼', soulExp: '영혼 경험치', points: '남은 포인트 {n}', statNames: { str: '힘', agi: '민첩', vit: '생명력', fai: '신앙' },
@@ -225,6 +226,7 @@ const extra = {
     pvpLater: '다른 사람과 싸우려면 서버 판정이 필요해 다음에 열립니다.',
   },
   th: {
+    sound: 'เปิด/ปิดเสียงเอฟเฟกต์',
     workingLine: 'กำลังทำงาน · {name} · ได้เงิน ฿{n}', workOut: 'แตะหน้าจอเพื่อเลิกงานและออกมา',
     hpWords: ['ดูปกติดี', 'บาดเจ็บเล็กน้อย', 'บาดเจ็บหนัก', 'ใกล้จะล้มแล้ว'], miss: 'พลาด', healed: 'ฟื้นฟู',
     soulTitle: 'วิญญาณ', soulExp: 'ค่าประสบการณ์วิญญาณ', points: 'แต้มคงเหลือ {n}', statNames: { str: 'พลัง', agi: 'ความคล่องแคล่ว', vit: 'ความอึด', fai: 'ศรัทธา' },
@@ -246,6 +248,7 @@ const extra = {
     pvpLater: 'การต่อสู้กับผู้เล่นอื่นต้องตัดสินบนเซิร์ฟเวอร์ จะเปิดในครั้งหน้า',
   },
   en: {
+    sound: 'Sound effects on/off',
     workingLine: 'Working · {name} · earned ฿{n}', workOut: 'Tap the screen to stop working and come out',
     hpWords: ['Looks fine.', 'Slightly hurt.', 'Badly hurt.', 'About to collapse.'], miss: 'Miss', healed: 'Healed',
     soulTitle: 'Soul', soulExp: 'Soul exp', points: '{n} points left', statNames: { str: 'Strength', agi: 'Agility', vit: 'Vitality', fai: 'Faith' },

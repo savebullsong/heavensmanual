@@ -1,5 +1,5 @@
 // 홈 화면 설치용. 그림(sprites·zones)은 한 번 받으면 기기에 남겨 다음부터 빨리 연다
-const CACHE = 'hm-v5';
+const CACHE = 'hm-v6';
 self.addEventListener('install', (e) => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', (e) => {

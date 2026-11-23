@@ -4,12 +4,21 @@ import { portraitUrl } from './portraits.ts';
 import { parrotPixels, type Look } from './character.ts';
 import { toCanvas } from './raster.ts';
 import { iso } from './gfx.ts';
-import { charSet, frameOf, applyFrame, dirFromScreen, auraFor, makeAuraSprite, type CharSet, type Dir, type Frame } from './sprites.ts';
+import { MISS_HWANG, charSet, frameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, type CharSet, type Dir, type Frame } from './sprites.ts';
 import { RW, RD, COUNTER, DOOR, ROOM_BOUNDS, PARROT_PERCH, drawRoomBackground, drawCounterPieces, drawLamp, nightFactor } from './shopgfx.ts';
 import { bangkokClock } from './clock.ts';
 import { shopKitReady, counterStrips, type ShopKit } from './shopkit.ts';
 
-export const MISS_HWANG: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 3, top: 0, bottom: 0, outfit: 'apron' };
+export { MISS_HWANG };
+
+/** 관리자가 올린 도트 그림 (뭉개지지 않게 nearest) */
+async function loadPixel(u: string): Promise<Texture | null> {
+  try {
+    const tx = await Assets.load({ src: u, loadParser: 'loadTextures' });
+    tx.source.scaleMode = 'nearest';
+    return tx;
+  } catch { return null; }
+}
 
 const HWANG = { x: 4.6, y: 1.55 };
 const TALK_TILE: [number, number] = [4, 3];
@@ -94,7 +103,7 @@ export class ShopRoom {
   private crestT = 0;
   private bgMinute = -1;
   private kit: ShopKit | null = null;
-  private customParrot = false;
+  private customParrot: [Texture, Texture] | null = null;
   private counterSprites: Sprite[] = [];
   private lampSprites: Sprite[] = [];
   private clock = new Graphics();
@@ -128,11 +137,15 @@ export class ShopRoom {
     // 미스 황
     this.hwang = new Sprite();
     // 관리자가 손본 도트 그림이 있으면 그것을, 없으면 구운 그림을 쓴다
-    portraitUrl('sprite-miss-hwang').then(async (u) => {
-      if (u) {
-        try { const tx = await Assets.load({ src: u, loadParser: 'loadTextures' }); tx.source.scaleMode = 'nearest'; this.hwang.texture = tx; this.hwang.anchor.set(0.5, 1); return; } catch { /* 구운 그림으로 */ }
-      }
-      charSet(MISS_HWANG).then((cs) => applyFrame(this.hwang, frameOf(cs, 'idle', 'sw', 0)));
+    // 관리자 그림은 구운 그림과 크기가 같으니 발 기준점도 그대로 쓴다
+    Promise.all([charSet(MISS_HWANG), portraitUrl('sprite-miss-hwang')]).then(async ([cs, u]) => {
+      const f = frameOf(cs, 'idle', 'sw', 0);
+      applyFrame(this.hwang, f);
+      if (!u || !f) return;
+      const tx = await loadPixel(u);
+      if (!tx) return;
+      this.hwang.texture = tx;
+      if (tx.width === f.w && tx.height === f.h) this.hwang.anchor.set(f.ax, f.ay); else this.hwang.anchor.set(0.5, 1);
     });
     const [hx, hy] = iso(HWANG.x, HWANG.y);
     this.hwang.position.set(hx, hy);
@@ -184,17 +197,10 @@ export class ShopRoom {
     this.root.on('pointermove', (e) => { if (e.pointerType === 'mouse') this.onHover(e.global.x, e.global.y); });
     this.update(0);
     shopKitReady.then((k) => { if (k) this.useKit(k); });
-    portraitUrl('sprite-parrot').then(async (u) => {
-      if (!u) return;
-      try {
-        const tx = await Assets.load({ src: u, loadParser: 'loadTextures' });
-        tx.source.scaleMode = 'nearest';
-        this.customParrot = true;
-        this.parrot.texture = tx;
-        this.parrot.anchor.set(0.5, 1);
-        const [ax, ay] = iso(PARROT_PERCH.x, PARROT_PERCH.y);
-        this.parrot.position.set(ax, ay - PARROT_PERCH.z);
-      } catch { /* 구운 그림 */ }
+    // 앵무새: 볏 내림·세움 두 칸 (하나만 있으면 둘 다 그것으로)
+    Promise.all([portraitUrl('sprite-parrot'), portraitUrl('sprite-parrot-up')]).then(async ([a, b]) => {
+      const [t0, t1] = await Promise.all([a ? loadPixel(a) : null, b ? loadPixel(b) : null]);
+      if (t0 || t1) this.customParrot = [t0 ?? t1!, t1 ?? t0!];
     });
   }
 
@@ -279,7 +285,7 @@ export class ShopRoom {
   }
 
   turn() {
-    this.dir = ((this.dir[0] === 's' ? 'n' : 's') + this.dir[1]) as Dir;
+    this.dir = turnedDir(this.dir);
   }
 
   /** 대화·외형 창이 열려 있으면 화면 이동만 막는다 */
@@ -401,8 +407,10 @@ export class ShopRoom {
       const [ti, tj] = this.path[0];
       const tx = ti + 0.5, ty = tj + 0.5;
       const dx = tx - this.px, dy = ty - this.py, dist = Math.hypot(dx, dy);
-      const sdy = dx + dy, sdx = dx - dy;
-      this.dir = dirFromScreen(sdx, sdy, this.dir);
+      let ax = 0, ay = 0;
+      const look = Math.min(3, this.path.length);
+      for (let k = 0; k < look; k++) { ax += this.path[k][0] + 0.5; ay += this.path[k][1] + 0.5; }
+      this.dir = dirFromTile(ax / look - this.px, ay / look - this.py, this.dir);
       const step = SPEED * dt;
       if (dist <= step) { this.px = tx; this.py = ty; this.path.shift(); } else { this.px += (dx / dist) * step; this.py += (dy / dist) * step; }
       moving = true;
@@ -428,12 +436,13 @@ export class ShopRoom {
     // 앵무새: 가끔 머리깃을 세운다
     if (this.crestT > 0) this.crestT -= dt;
     else if (Math.random() < dt * 0.25) this.crestT = 0.6;
-    if (this.customParrot) { /* 관리자가 넣은 그림 그대로 */ }
-    else if (this.kit) {
-      const pp = this.kit.parrot[this.crestT > 0 ? 1 : 0];
-      this.parrot.texture = pp.tex;
+    const ci = this.crestT > 0 ? 1 : 0;
+    if (this.kit) {
+      // 관리자 그림은 구운 그림과 크기가 같아 같은 자리(왼쪽 위 기준)에 둔다
+      const pp = this.kit.parrot[ci];
+      this.parrot.texture = this.customParrot?.[ci] ?? pp.tex;
       this.parrot.position.set(pp.x, pp.y);
-    } else this.parrot.texture = this.parrotTex[this.crestT > 0 ? 1 : 0];
+    } else this.parrot.texture = this.customParrot?.[ci] ?? this.parrotTex[ci];
     // 이름표
     if (this.labelT > 0) { this.labelT -= dt; if (this.labelT <= 0) this.hideLabel(); }
     if (this.labelFor) { const [lx, ly] = this.labelAnchor(this.labelFor); this.label.position.set(Math.round(lx), Math.round(ly)); }

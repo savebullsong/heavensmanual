@@ -16,7 +16,8 @@ job = json.loads(sys.argv[1]); OUT = sys.argv[2]; os.makedirs(OUT, exist_ok=True
 TMP = f'/tmp/bake_{os.getpid()}'; os.makedirs(TMP, exist_ok=True)
 CELL_W, CELL_H, FOOT = 96, 100, (48, 82)
 MPP = .034; SS = 2; SAMPLES = int(job.get('samples', 10))
-DIRS = {'se': 90, 'sw': 0, 'ne': 180, 'nw': 270}
+# 화면 기준 방향 → 인형이 도는 각도. 대각선 넷(se·sw·ne·nw)은 모든 동작, 상하좌우 넷(s·e·n·w)은 서기·걷기만
+DIRS = {'se': 90, 'sw': 0, 'ne': 180, 'nw': 270, 's': 45, 'e': 135, 'n': 225, 'w': 315}
 LREF = float(job.get('lref', .80))
 
 sc = bpy.context.scene
@@ -145,9 +146,18 @@ def decode(shade_png, id_png):
     val = (maj.astype(np.uint8) * 16 + lvl).astype(np.uint8)
     return np.where(opaque, val, 0).astype(np.uint8), np.where(opaque, 255, 0).astype(np.uint8)
 
-def pack(key, items):
-    """items: [(frame name, L, A)] → 잘라서 한 장에 모은다"""
+def pack(key, items, merge=False):
+    """items: [(frame name, L, A)] → 잘라서 한 장에 모은다. merge면 이미 구운 장면에 덧붙인다"""
     rects = []
+    if merge and os.path.exists(f'{OUT}/{key}.json'):
+        old = json.load(open(f'{OUT}/{key}.json'))
+        im = np.asarray(Image.open(f'{OUT}/{key}.png').convert('LA'))
+        new = {n for n, _, _ in items}
+        for name, m in old.items():
+            if name in new: continue
+            if not m: rects.append((name, None)); continue
+            px, py, w, h, ox, oy = m
+            rects.append((name, (ox + FOOT[0], oy + FOOT[1], w, h, im[py:py + h, px:px + w, 0].copy(), im[py:py + h, px:px + w, 1].copy())))
     for name, L, A in items:
         ys, xs = np.nonzero(A)
         if len(xs) == 0: rects.append((name, None)); continue
@@ -196,7 +206,7 @@ for spec in job['sets']:
     items = []
     for name, P, dd in jobs:
         L, Al = decode(f'{TMP}/{name}_s.png', f'{TMP}/{name}_i.png'); items.append((name, L, Al))
-    pack(key, items)
+    pack(key, items, job.get('merge', False))
     total += len(jobs)
     print(f'[bake] {key} {len(jobs)} frames  {time.time() - t0:.0f}s', flush=True)
 print(f'[bake] done {total} frames in {time.time() - t0:.0f}s', flush=True)

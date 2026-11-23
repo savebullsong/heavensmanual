@@ -3,10 +3,13 @@
 import { Rectangle, Sprite, Texture } from 'pixi.js';
 import { SKIN_COLORS, HAIR_COLORS, TOP_COLORS, BOTTOM_COLORS, HAIR_STYLES, AURA_PAD, auraFromMask, type Look } from './character.ts';
 
-export type Dir = 'se' | 'sw' | 'ne' | 'nw';
+/** 화면 기준 8방향. 대각선 넷은 모든 동작, 상하좌우 넷(s·e·n·w)은 서기·걷기만 구워져 있다 */
+export type Dir = 'se' | 'sw' | 'ne' | 'nw' | 's' | 'e' | 'n' | 'w';
 export type Anim = 'idle' | 'walk' | 'hit' | 'fall' | 'punch' | 'swing' | 'shoot';
 export type Mode = 'u' | 'm' | 'g' | 'w';
-export const DIRS: Dir[] = ['se', 'sw', 'ne', 'nw'];
+export const DIRS: Dir[] = ['se', 'sw', 'ne', 'nw', 's', 'e', 'n', 'w'];
+/** 상하좌우로 굽지 않은 동작(공격·맞음·쓰러짐)을 보여 줄 때 쓸 가까운 대각선 */
+const DIAG: Record<string, Dir> = { s: 'sw', e: 'se', n: 'ne', w: 'nw' };
 /** 발 기준점이 칸 안에서 있는 곳 (굽기 도구와 같아야 한다) */
 export const FOOT = { x: 48, y: 82 };
 /** 사람 머리 꼭대기까지 대략의 높이 (이름표·체력 막대 자리) */
@@ -22,6 +25,9 @@ export interface CharSet {
   masks: Map<Dir, { w: number; h: number; ox: number; oy: number; solid: Uint8Array }>;
 }
 
+/** 미스 황의 겉모습 (우주새 카운터 뒤, 관리자 페이지 도트 칸에서도 쓴다) */
+export const MISS_HWANG: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 3, top: 0, bottom: 0, outfit: 'apron' };
+
 export const MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle'];
 /** 방어구 겉모습: 그리는 순서와 색 (구역 3 = 본색, 구역 5 = 신발) */
 const ARMOR_ORDER = ['workpants', 'shinguard', 'boots', 'jacket', 'vest', 'gloves'];
@@ -33,12 +39,22 @@ const COSTUMES = new Set(['raincoat', 'patient', 'parrot']);
 export const ANIM_FPS: Record<Anim, number> = { idle: 1, walk: 9, hit: 11, fall: 10, punch: 15, swing: 14, shoot: 12 };
 export const IMPACT: Partial<Record<Anim, number>> = { punch: 2, swing: 3, shoot: 1 };
 
-/** 화면에서 움직이는 방향 → 바라보는 쪽 */
-export function dirFromScreen(sdx: number, sdy: number, prev: Dir): Dir {
-  if (Math.abs(sdx) < 0.01 && Math.abs(sdy) < 0.01) return prev;
-  const south = Math.abs(sdy) < 0.01 ? prev[0] === 's' : sdy > 0;
-  const east = Math.abs(sdx) < 0.01 ? prev[1] === 'e' : sdx > 0;
-  return ((south ? 's' : 'n') + (east ? 'e' : 'w')) as Dir;
+/** 칸 좌표로 움직이는 방향(di, dj) → 바라보는 쪽.
+ *  +i = 화면 오른쪽 아래(se), +i+j = 아래(s), +j = 왼쪽 아래(sw), -i+j = 왼쪽(w) … (칸 각도 45°마다 한 방향)
+ *  eight = false 이면 대각선 넷만 (공격처럼 대각선으로만 구운 동작)
+ *  앞 방향과 크게 다르지 않으면 그대로 둬서 지그재그 길에서 몸이 떨리지 않게 한다 */
+const D8: Dir[] = ['se', 's', 'sw', 'w', 'nw', 'n', 'ne', 'e'];
+const D4: Dir[] = ['se', 'sw', 'nw', 'ne'];
+export function dirFromTile(di: number, dj: number, prev: Dir, eight = true): Dir {
+  if (Math.abs(di) < 1e-3 && Math.abs(dj) < 1e-3) return prev;
+  const a = Math.atan2(dj, di);
+  const list = eight ? D8 : D4, step = (Math.PI * 2) / list.length;
+  const pi = list.indexOf(prev);
+  if (pi >= 0) {
+    const d = Math.abs(((a - pi * step) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI);
+    if (d < step / 2 + 0.14) return prev;
+  }
+  return list[((Math.round(a / step) % list.length) + list.length) % list.length];
 }
 
 // ───────────────────────── 층 읽기 ─────────────────────────
@@ -234,7 +250,7 @@ async function build(look: Look, keys: ReturnType<typeof layerKeys>): Promise<Ch
       }
     for (let k = 0; k < add.length; k += 4) { const i = add[k]; d[i] = add[k + 1]; d[i + 1] = add[k + 2]; d[i + 2] = add[k + 3]; d[i + 3] = 255; }
     // 광채용 실루엣 (서 있는 장면)
-    const m = /^idle-(se|sw|ne|nw)-0$/.exec(b.name);
+    const m = /^idle-(se|sw|ne|nw|s|e|n|w)-0$/.exec(b.name);
     if (m) {
       const solid = new Uint8Array(w * h);
       for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) solid[yy * w + xx] = d[((py + yy) * AW + px + xx) * 4 + 3] ? 1 : 0;
@@ -262,8 +278,14 @@ async function build(look: Look, keys: ReturnType<typeof layerKeys>): Promise<Ch
 /** 장면 하나 (없으면 서 있는 장면) */
 export function frameOf(cs: CharSet, anim: Anim, dir: Dir, i: number): Frame | undefined {
   const n = cs.counts[anim];
-  if (!n) return cs.frames.get(`idle-${dir}-0`);
-  return cs.frames.get(`${anim}-${dir}-${Math.max(0, Math.min(n - 1, i))}`);
+  if (!n) return cs.frames.get(`idle-${dir}-0`) ?? cs.frames.get(`idle-${DIAG[dir] ?? dir}-0`);
+  const k = Math.max(0, Math.min(n - 1, i));
+  return cs.frames.get(`${anim}-${dir}-${k}`) ?? cs.frames.get(`${anim}-${DIAG[dir] ?? dir}-${k}`);
+}
+/** 반대로 돌아선 방향 (문을 나서며 뒤돌기 등): 위아래만 뒤집는다 */
+export function turnedDir(d: Dir): Dir {
+  if (d.length === 2) return ((d[0] === 's' ? 'n' : 's') + d[1]) as Dir;
+  return d === 's' ? 'n' : d === 'n' ? 's' : d;
 }
 
 /** 스프라이트에 장면을 건다 (장면마다 발 위치가 달라 기준점도 바꾼다) */
