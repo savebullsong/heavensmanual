@@ -14,8 +14,10 @@ export interface Building {
   cat: Category;
   sign?: 'left' | 'right'; // 간판 면: left = +j 면, right = +i 면
   color: string;
+  hut?: boolean; // 지옥 마을의 오두막 (지붕이 있다)
 }
-export interface Prop { i: number; j: number; kind: 'tree' | 'lamp' | 'pillar' | 'cart' }
+/** fence o: 0 = i 방향, 1 = j 방향, 2 = 모서리 기둥 */
+export interface Prop { i: number; j: number; kind: 'tree' | 'lamp' | 'pillar' | 'cart' | 'fence' | 'pole' | 'spirit' | 'moto' | 'plant' | 'bin'; o?: number }
 /** 차가 달리는 구간: j 행의 i0~i1, dir = +1 이면 +i 방향 */
 export interface Lane { j: number; i0: number; i1: number; dir: 1 | -1 }
 export interface Zone {
@@ -31,10 +33,27 @@ export interface Zone {
   blocked: Uint8Array; // 1 = 걸을 수 없음
   /** 지옥 층 (현실 지도에는 없음) */
   hell?: HellInfo;
+  /** 건물 안 (들어갈 때 만드는 작은 방) */
+  interior?: InteriorInfo;
+}
+/** 방의 가구: 바닥 사각형(타일)과 높이(px), 무엇인지 */
+export interface Furn { i: number; j: number; w: number; d: number; h: number; kind: string; v?: number }
+export interface InteriorInfo {
+  kind: string; // temple · church · mosque · gurdwara · bank · clinic · pharmacy · mart · food · cafe · bar · salon · massage · laundry · lobby · shop
+  rest: boolean; // 쉬는 곳 (싸움 불가 · 빠른 회복)
+  name: string;
+  floor: string; wall: string; trim: string;
+  exit: { i: number; j: number }; // 나가는 문 (이 칸을 밟으면 거리로)
+  clerk?: { i: number; j: number }; // 직원이 서는 곳
+  counter?: { i: number; j: number }; // 직원에게 말을 거는 자리 (카운터 앞)
+  furn: Furn[];
+  from: { b: number; out: { i: number; j: number } }; // 거리의 건물 번호와 나왔을 때 설 자리
+  store?: string; cuisine?: string; // 가게 창 (mart · pharmacy · food · cafe) / bank
+  seats: [number, number][]; // 손님이 서 있을 자리
 }
 export interface HellInfo {
   floor: number;
-  rest: { i: number; j: number; r: number }; // 휴식 공간 (황혼의 우주새 둘레, 싸움 불가·괴물 못 들어옴)
+  rest: { i: number; j: number; r: number }; // 휴식 마을 (울타리 안 ±r칸 정사각형: 황혼의 우주새, 싸움 불가·괴물 못 들어옴)
   up: { i: number; j: number }; // 올라가는 계단 (층주를 쓰러뜨려야 열림) · 1층은 출구 = 파샤르
   down: { i: number; j: number }; // 내려가는 계단 (언제나 열림)
   boss: { i: number; j: number };
@@ -100,7 +119,7 @@ export function sukhumvitTestZone(): Zone {
   };
   B(0, 10, 6, 5, 70, 'convenience', '#c9c3b5', 'left');
   B(6, 10, 6, 5, 96, 'pharmacy', '#b8c4c2', 'left');
-  B(15, 11, 3, 4, 58, 'ujusae', '#4a3527', 'left');
+  B(15, 13, 2, 2, 58, 'ujusae', '#4a3527', 'left');
   B(18, 10, 6, 5, 84, 'restaurant', '#c7a88a', 'left');
   B(24, 10, 6, 5, 112, 'cafe', '#9aa59a', 'left');
   B(30, 9, 8, 6, 190, 'office', '#8c97a6', 'left');

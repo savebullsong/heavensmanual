@@ -93,6 +93,7 @@ export function drawHellGround(z: Zone, theme: Theme, i0: number, j0: number): {
 
 /** 지옥 구조물: 재의 문턱 = 부서진 돌 폐허, 굶주림의 늪 = 판잣집, 피의 시장 = 붉은 천막 가게. 황혼의 우주새는 검붉은 돌집 */
 export function drawHellStructure(b: Building, theme: Theme, night: boolean): { canvas: HTMLCanvasElement; x: number; y: number } {
+  if (b.hut) return drawHut(b, theme);
   const { i0, j0, w, d } = b;
   const i1 = i0 + w, j1 = j0 + d;
   const shop = b.cat === 'ujusae';
@@ -257,4 +258,43 @@ export function hellProp(kind: string, theme: Theme, v: number) {
   }
   propCache.set(key, out);
   return out;
+}
+
+/** 지옥 마을의 오두막: 널빤지 벽 + 박공 지붕(잿빛 짚 · 늪은 이끼 · 시장은 붉은 함석), 불 켜진 작은 창 */
+function drawHut(b: Building, theme: Theme): { canvas: HTMLCanvasElement; x: number; y: number } {
+  const { i0, j0, w, d } = b;
+  const i1 = i0 + w, j1 = j0 + d;
+  const Hw = b.h, rise = 22, MT = 8;
+  const minX = (i0 - j1) * (TW / 2) - 6, minY = (i0 + j0) * (TH / 2) - Hw - rise - MT;
+  const W = (w + d) * (TW / 2) + 12, H = (w + d) * (TH / 2) + Hw + rise + MT + 6;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d')!;
+  const P = (x: number, y: number, z: number): [number, number] => [(x - y) * (TW / 2) - minX, (x + y) * (TH / 2) - z - minY];
+  const poly = (pts: [number, number][], fill: string) => { g.beginPath(); g.moveTo(...pts[0]); for (const p of pts.slice(1)) g.lineTo(...p); g.closePath(); g.fillStyle = fill; g.fill(); };
+  const wallL = b.color, wallR = shade(b.color, 0.72);
+  const roof = theme === 'swamp' ? ['#4a5a32', '#3a4826', '#2c381c'] : theme === 'market' ? ['#7a2a22', '#5e1e18', '#481610'] : ['#6a6058', '#544c46', '#3e3834'];
+  poly([P(i1, j0, 0), P(i1, j1, 0), P(i1, j1, Hw), P(i1, j0, Hw)], wallR);
+  poly([P(i0, j1, 0), P(i1, j1, 0), P(i1, j1, Hw), P(i0, j1, Hw)], wallL);
+  for (let k = 1; k < w * 3; k++) { const x = i0 + k / 3; poly([P(x, j1, 0), P(x + 0.02, j1, 0), P(x + 0.02, j1, Hw), P(x, j1, Hw)], shade(b.color, 0.6)); }
+  for (let k = 1; k < d * 3; k++) { const y = j0 + k / 3; poly([P(i1, y, 0), P(i1, y + 0.02, 0), P(i1, y + 0.02, Hw), P(i1, y, Hw)], shade(b.color, 0.5)); }
+  // 문과 창
+  const m = i0 + w / 2;
+  poly([P(m - 0.25, j1, 0), P(m + 0.25, j1, 0), P(m + 0.25, j1, 20), P(m - 0.25, j1, 20)], '#1a1210');
+  poly([P(i1, j0 + d / 2 - 0.2, 12), P(i1, j0 + d / 2 + 0.2, 12), P(i1, j0 + d / 2 + 0.2, 21), P(i1, j0 + d / 2 - 0.2, 21)], '#e8963a');
+  // 지붕 (i 방향 용마루)
+  const jm = (j0 + j1) / 2, ov = 0.15;
+  poly([P(i0 - ov, j0 - ov, Hw), P(i1 + ov, j0 - ov, Hw), P(i1 + ov, jm, Hw + rise), P(i0 - ov, jm, Hw + rise)], roof[2]);
+  poly([P(i1, j0, Hw), P(i1, j1, Hw), P(i1, jm, Hw + rise - 2)], wallR);
+  poly([P(i0 - ov, jm, Hw + rise), P(i1 + ov, jm, Hw + rise), P(i1 + ov, j1 + ov, Hw - 3), P(i0 - ov, j1 + ov, Hw - 3)], roof[0]);
+  for (let k = 1; k < w * 4; k++) { const x = i0 - ov + ((w + 2 * ov) * k) / (w * 4); poly([P(x - 0.015, jm, Hw + rise), P(x + 0.015, jm, Hw + rise), P(x + 0.015, j1 + ov, Hw - 3), P(x - 0.015, j1 + ov, Hw - 3)], roof[1]); }
+  const im = g.getImageData(0, 0, W, H);
+  for (let k = 3; k < im.data.length; k += 4) im.data[k] = im.data[k] < 128 ? 0 : 255;
+  g.putImageData(im, 0, 0);
+  return { canvas: c, x: minX, y: minY };
+}
+function shade(hex: string, k: number) {
+  const n = parseInt(hex.slice(1), 16);
+  const f = (v: number) => Math.round(v * k).toString(16).padStart(2, '0');
+  return `#${f(n >> 16)}${f((n >> 8) & 255)}${f(n & 255)}`;
 }

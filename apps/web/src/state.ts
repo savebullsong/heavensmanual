@@ -28,6 +28,8 @@ export interface Save {
   hell?: { floor: number; cleared: number[]; notes: number };
   /** 세계마다 우주새에 봉인된 물건 — 그 세계의 우주새에서 되찾는다 */
   vault?: Partial<Record<'real' | 'hell', Stash>>;
+  /** 하루에 한도가 있는 선행 (기도 3 · 읽기 1 · 기부 20) */
+  daily?: { d: string; pray: number; read: number; donate: number };
 }
 export interface Stash { bag: Record<string, number>; ammo: number }
 export type Slot = 'weapon' | 'head' | 'body' | 'hands' | 'legs' | 'shins' | 'feet';

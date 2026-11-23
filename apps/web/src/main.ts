@@ -15,10 +15,12 @@ import { ARRIVALS, rollArrival, arrivalLook, type Arrival, type Look, type Outfi
 import { t, lang, setLang, LANGS, type Lang } from './i18n.ts';
 import { load, save, type Slot, type Stash } from './state.ts';
 import { hellZone, OPEN_FLOORS, floorDef, MONSTERS } from './hell.ts';
+import { interiorZone } from './interior.ts';
+import { buildingName } from './names.ts';
 import { bangkokClock } from './clock.ts';
 import { unlockAudio, isMuted, setMuted } from './sfx.ts';
 import { bgmMode, cycleBgm, setIndoor, MUSIC, type BgmMode } from './bgm.ts';
-import { applyDeed, addSoulExp, judge, isDanger, DEED_TABLE, newStats, soulExpToNext, maxHp as maxHpFor, POINTS_PER_RANK, STAT_KEYS, STAT_MAX, type DeedKey, type StatKey } from '../../../packages/shared/src/rules.ts';
+import { applyDeed, addSoulExp, judge, prayerAnswerChance, restRegenPerMinute, isDanger, DEED_TABLE, newStats, soulExpToNext, maxHp as maxHpFor, POINTS_PER_RANK, STAT_KEYS, STAT_MAX, type DeedKey, type StatKey } from '../../../packages/shared/src/rules.ts';
 
 const state = load();
 if (state.lang) setLang(state.lang);
@@ -120,8 +122,19 @@ async function boot() {
 }
 
 // ───────────────────────── 장면 전환 ─────────────────────────
+/** 우주새 안도 쉬는 곳: 머문 시간만큼 체력이 찬다 (나올 때 계산) */
+let shopSince = 0;
+function restInShop() {
+  if (!shopSince) return;
+  const sec = (performance.now() - shopSince) / 1000;
+  shopSince = 0;
+  const max = maxHp();
+  state.hp = Math.min(max, (state.hp ?? max) + (restRegenPerMinute(max, state.soul?.stats?.fai ?? 1) / 60) * sec);
+}
+
 function enterShop(fromStreet: boolean) {
   scene = 'shop';
+  shopSince = performance.now();
   document.querySelector('.store-panel')?.remove(); // 거리 가게·은행 창은 두고 오지 않는다
   setIndoor(true);
   talkedThisVisit = false;
@@ -140,6 +153,8 @@ function enterShop(fromStreet: boolean) {
 }
 
 async function enterWorld(at: 'door' | [number, number] = 'door') {
+  restInShop();
+  dropInterior();
   if (inHell()) { enterHell(hellState().floor, 'shop'); return; }
   shop.stop();
   scene = 'world';
@@ -174,6 +189,7 @@ async function enterWorld(at: 'door' | [number, number] = 'door') {
 
 /** 지옥 n층으로: 떨어짐(죽음·악업) · 계단 · 구덩이 · 황혼의 가게에서 나옴 · 다시 열기 */
 async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | 'shop' | 'resume') {
+  if (how === 'shop') restInShop();
   const f = Math.max(1, Math.min(OPEN_FLOORS, floor));
   const h = hellState();
   state.realm = 'hell';
@@ -186,6 +202,7 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
   document.querySelector('.store-panel')?.remove();
   await streetReady;
   const zone = hellZone(f);
+  if (street) { street.destroy(); street = null; }
   if (world && world.zone !== zone) { world.destroy(); world = null; net.leaveZone(); }
   if (how === 'fall') state.hp = maxHp();
   if (!world) {
@@ -285,6 +302,15 @@ const hooks: WorldHooks = {
   hellAct(kind) {
     hellAct(kind);
   },
+  enterBuilding(k, out, chaser) {
+    enterInterior(k, out, chaser);
+  },
+  leaveBuilding() {
+    leaveInterior();
+  },
+  clerk() {
+    clerkTalk();
+  },
   bossDown(floor) {
     const h = hellState();
     if (!h.cleared.includes(floor)) h.cleared.push(floor);
@@ -296,6 +322,148 @@ const hooks: WorldHooks = {
     updateHud();
   },
 };
+
+// ───────────────────────── 건물 안 ─────────────────────────
+/** 방에 들어가 있는 동안 멈춰 둔 거리 (나오면 그대로 이어진다) */
+let street: WorldScene | null = null;
+
+function enterInterior(k: number, out: { i: number; j: number }, chaser: { monster: boolean; hp: number } | null) {
+  if (!world || world.zone.interior || busy) return;
+  const outer = world;
+  const b = outer.zone.buildings[k];
+  const z = interiorZone(b, k, out, buildingName(b, lang()));
+  closeMenus();
+  document.querySelector('.store-panel')?.remove();
+  outer.stop();
+  outer.root.visible = false;
+  street = outer;
+  net.leaveZone(); // 방 안은 혼자
+  const w = new WorldScene(app, z, bodyLook(), () => enterShop(true), hooks, state.hp ?? maxHp(), { realm: 'real', chaser });
+  w.crimeT = outer.crimeT;
+  world = w;
+  app.stage.addChild(w.root);
+  w.setLook(bodyLook());
+  w.setGear(gear());
+  w.setStats(stats());
+  w.placeNear(z.spawn.i, z.spawn.j, state.hp ?? maxHp());
+  w.setStance(stance);
+  w.start();
+  setIndoor(true);
+  renderHud();
+  showPlace(z.interior!.name, '');
+  if (z.interior!.rest) toast(t().restRoom, 'good');
+}
+
+/** 방의 나가는 매트: 거리의 그 건물 앞으로 (쫓던 봉합자는 따라 나온다) */
+function leaveInterior() {
+  if (!world?.zone.interior || !street) return;
+  const inner = world;
+  const info = inner.zone.interior!;
+  const ch = inner.chaserLeft();
+  const crime = inner.crimeT;
+  closeMenus();
+  document.querySelector('.store-panel')?.remove();
+  inner.destroy();
+  world = street;
+  street = null;
+  world.crimeT = crime;
+  world.root.visible = true;
+  world.setLook(bodyLook());
+  world.setGear(gear());
+  world.setStats(stats());
+  world.placeNear(info.from.out.i, info.from.out.j, state.hp ?? maxHp());
+  world.setStance(stance);
+  world.start();
+  setIndoor(false);
+  renderHud();
+  joinNet(world);
+  if (ch) world.releaseChaser(ch);
+}
+
+/** 방이 열려 있으면 버리고 거리를 되돌린다 (죽음·환생·지옥으로 갈 때) */
+function dropInterior() {
+  if (world?.zone.interior) { world.destroy(); world = street; street = null; }
+}
+
+const today = () => new Date().toISOString().slice(0, 10);
+function daily() {
+  if (state.daily?.d !== today()) state.daily = { d: today(), pray: 0, read: 0, donate: 0 };
+  return state.daily!;
+}
+function pay(n: number) {
+  if ((state.wallet ?? 0) < n) { toast(t().payShort); return false; }
+  state.wallet = (state.wallet ?? 0) - n;
+  updateHud();
+  return true;
+}
+function healFull() {
+  state.hp = maxHp();
+  world?.heal(maxHp());
+  updateHpBar(state.hp, maxHp());
+}
+
+/** 방의 직원: 업종마다 할 수 있는 것 */
+function clerkTalk() {
+  const info = world?.zone.interior;
+  if (!info) return;
+  const L = t();
+  const sub = L.clerkSub[info.kind as keyof typeof L.clerkSub] ?? '';
+  if (info.store === 'bank') { openBank(info.name); return; }
+  if (info.store === 'mart' || info.store === 'pharmacy' || info.store === 'food' || info.store === 'cafe') { openStore(info.store, info.name, info.cuisine); return; }
+  const opts: { label: string; danger?: boolean; act: () => void }[] = [];
+  const faith = ['temple', 'church', 'mosque', 'gurdwara'].includes(info.kind);
+  if (faith) {
+    opts.push({ label: L.prayBtn, act: () => {
+      const dd = daily();
+      if (dd.pray >= 3) { toast(L.prayLimit); return; }
+      dd.pray++;
+      recordDeed('pray');
+      if (Math.random() * 100 < prayerAnswerChance(state.soul?.stats?.fai ?? 1)) { world?.heal(maxHp() * 0.3); toast(L.prayAnswered, 'good'); }
+      else toast(L.prayed);
+    } });
+    opts.push({ label: L.readBtn, act: () => {
+      const dd = daily();
+      if (dd.read >= 1) { toast(L.readLimit); return; }
+      dd.read++;
+      npcSay(info.name, L.readLines[Math.floor(Math.random() * L.readLines.length)]);
+      recordDeed('readScripture');
+    } });
+    opts.push({ label: L.offerBtn, act: () => {
+      const dd = daily();
+      if (dd.donate >= 20) { toast(L.donateLimit); return; }
+      if (!pay(100)) return;
+      dd.donate++;
+      recordDeed('donate100');
+    } });
+  } else if (info.kind === 'clinic') {
+    const cost = 200;
+    opts.push({ label: L.healBuy.replace('{n}', String(cost)), act: () => { if (pay(cost)) { healFull(); toast(L.treated, 'good'); } } });
+    opts.push({ label: L.donateBtn, act: () => {
+      const dd = daily();
+      if (dd.donate >= 20) { toast(L.donateLimit); return; }
+      if (!pay(100)) return;
+      dd.donate++;
+      recordDeed('donate100');
+    } });
+  } else if (info.kind === 'massage') {
+    opts.push({ label: L.massageBtn, act: () => { if (pay(250)) { healFull(); toast(L.massaged, 'good'); } } });
+  } else if (info.kind === 'salon') {
+    opts.push({ label: L.haircutBtn, act: () => {
+      if (!state.look || !pay(300)) return;
+      state.look = { ...state.look, hair: (state.look.hair + 1 + Math.floor(Math.random() * 4)) % 6, hairColor: Math.floor(Math.random() * 4) };
+      world?.setLook(bodyLook());
+      toast(L.haircut, 'good');
+    } });
+  } else if (info.kind === 'bar') {
+    opts.push({ label: L.drinkBtn, act: () => { if (pay(80)) { world?.heal(60); toast(L.drank); } } });
+  } else {
+    npcSay(info.name, L.clerkIdle[Math.floor(Math.random() * L.clerkIdle.length)]);
+    return;
+  }
+  opts.push({ label: L.act.close, act: () => undefined });
+  save(state);
+  openTargetMenu(info.name, sub, opts, window.innerWidth / 2, window.innerHeight * 0.38);
+}
 
 // ───────────────────────── 지옥: 계단 · 구덩이 · 파샤르 ─────────────────────────
 function hellAct(kind: 'up' | 'down' | 'pashar') {
@@ -343,6 +511,7 @@ function rebirthFrom(from: 'hell' | 'ghost') {
   state.realm = 'real';
   newLife();
   save(state);
+  if (street) { street.destroy(); street = null; }
   if (world) { world.destroy(); world = null; }
   net.leaveZone();
   enterShop(false);
@@ -741,7 +910,9 @@ function showDeath(cause: 'car' | 'beaten' | 'hell') {
   // 들고 있던 돈은 길에 흩어지고, 가방은 우주새에 봉인된다 (다음 생에 되찾는다)
   const sealed = seal('real');
   state.wallet = 0;
-  const here = world?.netPos();
+  const inside = world?.zone.interior;
+  const here = inside ? { x: inside.from.out.i + 0.5, y: inside.from.out.j + 0.5 } : world?.netPos();
+  dropInterior(); // 방에서 죽었으면 방은 버리고 거리로 돌아간다
   save(state);
   el.querySelector('.money')!.textContent = [lost > 0 ? L.deathLost.replace('{n}', lost.toLocaleString('en-US')) : '', kept > 0 ? L.deathKept.replace('{n}', kept.toLocaleString('en-US')) : lost > 0 ? L.deathNoBank : '', sealed ? L.deathVault : ''].filter(Boolean).join(' ');
   el.querySelector('h1')!.textContent = L.deathTitle;
@@ -821,7 +992,7 @@ function renderHud() {
   hudNarrow = narrow;
   const langName = (l: Lang) => narrow ? l.toUpperCase() : l === 'ko' ? '한국어' : l === 'th' ? 'ไทย' : 'English';
   hud.innerHTML = `
-    <div class="hud-left${workLine ? ' working' : ''}"><div class="where" data-zone="${place.replace(/"/g, '&quot;')}"><b>${place}</b></div>${scene === 'shop' ? `<span class="hint">${realm() === 'hell' ? L.hintHell : realm() === 'ghost' ? L.hintGhost : L.hintShop}</span>` : ''}<span class="work">${workLine}</span></div>
+    <div class="hud-left${workLine ? ' working' : ''}"><div class="where" data-zone="${escHtml(place)}"><b>${escHtml(place)}</b></div>${scene === 'shop' ? `<span class="hint">${realm() === 'hell' ? L.hintHell : realm() === 'ghost' ? L.hintGhost : L.hintShop}</span>` : ''}<span class="work">${workLine}</span></div>
     <div class="hud-tools">${live}<div class="hud-right">
       <span class="hpbox" title="${L.hpLabel}"><span class="clock"></span><i class="hpbar"><i></i></i></span>
       <span class="wallet"></span>
@@ -858,11 +1029,13 @@ function renderHud() {
   updateHud();
 }
 
+const escHtml = (v: string) => v.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 /** 지금 있는 곳의 이름 (상단 왼쪽) */
 function placeName() {
   const L = t();
   const r = realm();
   if (scene === 'shop') return r === 'hell' ? L.hellShop : L.shopLabel;
+  if (world?.zone.interior) return world.zone.interior.name;
   if (r === 'hell') { const f = hellState().floor; return L.hellPlace.replace('{n}', String(f)).replace('{name}', floorDef(f).name[lang()]); }
   const z = L.zones[world?.zone.id ?? ''] ?? '';
   return r === 'ghost' ? L.ghostPlace.replace('{zone}', z) : z;

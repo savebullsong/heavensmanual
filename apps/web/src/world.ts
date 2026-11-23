@@ -3,16 +3,20 @@
 import { Application, ColorMatrixFilter, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture } from 'pixi.js';
 import { type Look } from './character.ts';
 import { charSet, frameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, ANIM_FPS, IMPACT, type CharSet, type Dir, type Anim, type Frame } from './sprites.ts';
-import { type Zone, type Building, type Lane, findPath, walkable, randomWalkTileNear, tileAt } from './zone.ts';
+import { type Zone, type Building, type Lane, type Prop, findPath, walkable, randomWalkTileNear, tileAt } from './zone.ts';
 import { iso, TW, TH, drawBuilding, drawGroundChunk, buildingHeight } from './gfx.ts';
-import { drawBuildingKit, drawGroundKit, buildingTop, carSprite, propSprite, CAR_MODELS, CHUNK, kitOk } from './street.ts';
+import { drawBuildingKit, drawGroundKit, buildingTop, upperFloors, carSprite, propSprite, CAR_MODELS, CHUNK, kitOk } from './street.ts';
 import { t, lang } from './i18n.ts';
 import { bangkokClock, nightFactor } from './clock.ts';
 import { buildingName, buildingSub, interactive, canWork, hasBank, cuisineOf, storeOf, type StoreKind } from './names.ts';
 import * as sfx from './sfx.ts';
 import { MONSTERS, floorDef, type MonsterDef } from './hell.ts';
 import { drawHellGround, drawHellStructure, hellTint, hellProp } from './hellgfx.ts';
-import { carHit, isDanger, DANGER_SPEED, critChance, CRIT_MULTIPLIER, regenPerMinute, OUT_OF_COMBAT_S, dodgeChance, maxHp as maxHpFor, newStats, type DeedKey, type Stats } from '../../../packages/shared/src/rules.ts';
+import { drawCosmicBird, COSMIC_TOP } from './ujusae.ts';
+import { streetProp, type PropPic } from './propgfx.ts';
+import { decorOf } from './decor.ts';
+import { canEnter, drawRoom, drawFurn, clerkLook } from './interior.ts';
+import { carHit, isDanger, DANGER_SPEED, critChance, CRIT_MULTIPLIER, regenPerMinute, restRegenPerMinute, OUT_OF_COMBAT_S, dodgeChance, maxHp as maxHpFor, newStats, type DeedKey, type Stats } from '../../../packages/shared/src/rules.ts';
 
 function tex(c: HTMLCanvasElement): Texture {
   const tx = Texture.from(c);
@@ -20,7 +24,7 @@ function tex(c: HTMLCanvasElement): Texture {
   return tx;
 }
 
-export type NpcKind = 'passer' | 'thug' | 'suturer' | 'monster' | 'pashar';
+export type NpcKind = 'passer' | 'thug' | 'suturer' | 'monster' | 'pashar' | 'clerk';
 export type Realm = 'real' | 'ghost' | 'hell';
 export type Stance = 'talk' | 'hostile' | 'all';
 export interface RemoteInfo { name: string; look: Look; weapon: string | null; armor: string[]; member: boolean }
@@ -44,6 +48,8 @@ interface Walker {
   kind: 'player' | NpcKind | 'remote';
   rid?: string; rinfo?: RemoteInfo; rpos?: NetPos; // 다른 사람 (실시간)
   hitBy?: boolean; // 봉합자를 이미 친 적이 있다 (악행은 한 번만)
+  farT?: number;
+  giveUp?: boolean; // 봉합자: 쫓는 사람이 멀리 떨어져 있던 시간 (오래 도망치면 포기)
   monster?: boolean; // 변신한 봉합자
   hp: number;
   maxHp: number;
@@ -72,7 +78,7 @@ interface Car {
   sprite: Sprite; ax: number; ay: number; honked: boolean; bubble?: Text; bubbleT: number;
 }
 interface Coin { x: number; y: number; amount: number; sprite: Graphics; fromVictim: boolean; life: number; notes?: boolean }
-interface BView { parts: Sprite[]; base: Texture; x: number; y: number; w: number; h: number; top: number; lx: number; ly: number; alpha?: Uint8Array }
+interface BView { parts: Sprite[]; base: Texture; x: number; y: number; w: number; h: number; top: number; lx: number; ly: number; alpha?: Uint8Array; b: Building; ghost?: { parts: Sprite[]; base: Texture; a: number } }
 interface Floater { obj: Container; t: number; vy: number }
 type LabelRef = { kind: 'shop' } | { kind: 'b'; k: number } | { kind: 'w'; w: Walker } | null;
 
@@ -106,6 +112,12 @@ export interface WorldHooks {
   bossDown(floor: number): void;
   /** 지옥: 저승돈을 주웠다 */
   notes(n: number): void;
+  /** 건물 문 앞에 닿았다: 안으로 (out = 나왔을 때 설 자리, chaser = 쫓아오던 봉합자) */
+  enterBuilding(k: number, out: { i: number; j: number }, chaser: { monster: boolean; hp: number } | null): void;
+  /** 방의 나가는 매트를 밟았다 */
+  leaveBuilding(): void;
+  /** 방의 직원에게 말을 걸었다 */
+  clerk(): void;
 }
 export interface Gear { atk: number; def: number; ranged: boolean; weapon: string | null; armor: string[] }
 
@@ -138,6 +150,10 @@ export class WorldScene {
   private chunks = new Map<string, Sprite>();
   private bViews = new Map<number, BView>();
   private bIndex = new Map<string, number[]>();
+  /** 거리 꾸밈(전봇대·산프라품·오토바이·화분·쓰레기통): 덩어리(CHUNK)마다 화면 근처만 그린다 */
+  private dIndex = new Map<string, Prop[]>();
+  private wIndex = new Map<string, [number, number, number, number][]>();
+  private dViews = new Map<string, { sprites: Sprite[]; wires: Graphics | null }>();
 
   private glows: { s: Sprite; i: number; j: number }[] = [];
   // 기둥·가로등·나무·고가 상판 (플레이어를 가리면 비친다). 상자는 objects 좌표
@@ -183,7 +199,8 @@ export class WorldScene {
   private gear: Gear = { atk: 0, def: 0, ranged: false, weapon: null, armor: [] };
   private stats: Stats = newStats();
   stance: Stance = 'talk';
-  private suturerT = 0;
+  private suturerT = 0; // 다음 봉합자가 나타날 수 있을 때까지 (나타났다 사라진 뒤 쉬는 시간)
+  private sutDue = -1; // 이번 죄에 봉합자가 오기로 정해졌다면, 나타날 때까지 남은 시간
   private combatT = 99; // 마지막 싸움 뒤 지난 시간
   private criminalT = 0; // 먼저 공격한 표시가 남은 시간
   private carCool = 0;
@@ -204,7 +221,7 @@ export class WorldScene {
   private embers: { x: number; y: number; vx: number; vy: number; t: number }[] = [];
   private emberG = new Graphics();
   private featureG = new Graphics();
-  constructor(private app: Application, readonly zone: Zone, look: Look, private onEnterShop: () => void, private hooks: WorldHooks, hp = PLAYER_MAX_HP, opts: { realm?: Realm; bossDown?: boolean } = {}) {
+  constructor(private app: Application, readonly zone: Zone, look: Look, private onEnterShop: () => void, private hooks: WorldHooks, hp = PLAYER_MAX_HP, opts: { realm?: Realm; bossDown?: boolean; chaser?: { monster: boolean; hp: number } | null } = {}) {
     this.realm = opts.realm ?? (zone.hell ? 'hell' : 'real');
     this.bossDown = !!opts.bossDown;
     this.objects.sortableChildren = true;
@@ -221,8 +238,14 @@ export class WorldScene {
       if (list) list.push(k); else this.bIndex.set(key, [k]);
     });
     this.placeProps();
+    if (!zone.hell && !zone.interior) {
+      const dec = decorOf(zone);
+      for (const p of dec.props) { const key = `${Math.floor(p.i / CHUNK)},${Math.floor(p.j / CHUNK)}`; (this.dIndex.get(key) ?? this.dIndex.set(key, []).get(key)!).push(p); }
+      for (const w of dec.wires) { const key = `${Math.floor(w[0] / CHUNK)},${Math.floor(w[1] / CHUNK)}`; (this.wIndex.get(key) ?? this.wIndex.set(key, []).get(key)!).push(w); }
+    }
     this.spawnPlayer(look, hp);
     if (this.zone.hell) this.setupHell();
+    else if (this.zone.interior) this.setupInterior(opts.chaser ?? null);
     else {
       for (let n = 0; n < PED_COUNT; n++) this.spawnNpc('passer');
       for (let n = 0; n < THUG_COUNT; n++) this.spawnNpc('thug');
@@ -257,6 +280,7 @@ export class WorldScene {
     this.labelText.anchor.set(0.5, 1);
     this.label.addChild(this.labelBg, this.labelText);
     this.label.visible = false;
+    this.label.alpha = 0.62; // 이름표는 반투명 (뒤의 길·사람이 비쳐 보이게)
     this.label.eventMode = 'none';
     this.label.zIndex = 1e6;
     this.bars.zIndex = 1e6 - 1;
@@ -304,6 +328,18 @@ export class WorldScene {
     const theme = floorDef(this.zone.hell!.floor).theme;
     for (const p of this.zone.props) {
       const v = (p.i * 7 + p.j * 3) % 4;
+      if (p.kind === 'fence') {
+        const fp = streetProp('fence', v, p.o ?? 0, false, true);
+        const ft = Texture.from(fp.canvas);
+        ft.source.scaleMode = 'nearest';
+        const fs = new Sprite(ft);
+        const [fx, fy] = iso(p.i + 0.5, p.j + 0.5);
+        fs.anchor.set(fp.ax, fp.ay);
+        fs.position.set(fx, fy);
+        fs.zIndex = p.i + p.j + 0.99;
+        this.objects.addChild(fs);
+        continue;
+      }
       const own = p.kind === 'tree' || p.kind === 'lamp' || p.kind === 'pillar';
       const pt = own ? null : propSprite(p.kind, v % 3);
       if (!own && !pt) continue;
@@ -390,6 +426,7 @@ export class WorldScene {
   }
 
   private stream(all: boolean) {
+    if (this.zone.interior) return; // 방은 처음에 한 장으로 다 그린다
     const r = this.visibleRange();
     const c0 = Math.floor(Math.max(0, r.i0) / CHUNK), c1 = Math.floor(Math.min(this.zone.W - 1, r.i1) / CHUNK);
     const d0 = Math.floor(Math.max(0, r.j0) / CHUNK), d1 = Math.floor(Math.min(this.zone.H - 1, r.j1) / CHUNK);
@@ -409,6 +446,8 @@ export class WorldScene {
         }
       }
     for (const [key, s] of this.chunks) if (!want.has(key)) { s.destroy({ texture: s.texture !== Texture.EMPTY, textureSource: s.texture !== Texture.EMPTY }); this.chunks.delete(key); }
+    for (const key of want) if (!this.dViews.has(key) && (this.dIndex.has(key) || this.wIndex.has(key))) this.dViews.set(key, this.makeDecor(key));
+    for (const [key, v] of this.dViews) if (!want.has(key)) { for (const s of v.sprites) s.destroy(); v.wires?.destroy(); this.dViews.delete(key); }
     let bBudget = all ? 1e9 : 3;
     const wantB = new Set<number>();
     for (let cj = d0 - 1; cj <= d1; cj++)
@@ -420,6 +459,43 @@ export class WorldScene {
     for (const [k, v] of this.bViews) if (!wantB.has(k)) { this.dropBuilding(v); this.bViews.delete(k); }
   }
 
+  private propTex = new Map<PropPic, Texture>();
+  private makeDecor(key: string) {
+    const sprites: Sprite[] = [];
+    for (const p of this.dIndex.get(key) ?? []) {
+      const v = Math.floor(((p.i * 7 + p.j * 13) % 17) % 6);
+      const pp = streetProp(p.kind, v, p.o ?? 0);
+      let tx = this.propTex.get(pp);
+      if (!tx) { tx = Texture.from(pp.canvas); tx.source.scaleMode = 'nearest'; this.propTex.set(pp, tx); }
+      const s = new Sprite(tx);
+      const [x, y] = iso(p.i + 0.5, p.j + 0.5);
+      s.anchor.set(pp.ax, pp.ay);
+      s.position.set(x, y);
+      s.zIndex = p.i + p.j + 0.98;
+      s.eventMode = 'none';
+      this.objects.addChild(s);
+      sprites.push(s);
+    }
+    // 전선: 전봇대 꼭대기끼리 처지게 세 가닥 (사람·건물 위로 지나간다)
+    let wires: Graphics | null = null;
+    const ws = this.wIndex.get(key);
+    if (ws?.length) {
+      wires = new Graphics();
+      wires.eventMode = 'none';
+      wires.zIndex = 9e5;
+      for (const [a, b, c, d] of ws) {
+        const [x0, y0] = iso(a + 0.5, b + 0.5), [x1, y1] = iso(c + 0.5, d + 0.5);
+        for (let k = 0; k < 3; k++) {
+          const sag = 10 + k * 5, oy = -106 + k * 4;
+          wires.moveTo(x0 - 12 + k * 8, y0 + oy).quadraticCurveTo((x0 + x1) / 2, (y0 + y1) / 2 + oy + sag * 2, x1 - 12 + k * 8, y1 + oy);
+        }
+      }
+      wires.stroke({ color: 0x1a1816, width: 1, alpha: 0.85 });
+      this.objects.addChild(wires);
+    }
+    return { sprites, wires };
+  }
+
   /** 건물 간판 이름 */
   private nameOf(b: Building) {
     return b.cat === 'ujusae' ? '' : buildingName(b, lang());
@@ -429,39 +505,80 @@ export class WorldScene {
    * 건물을 세로 띠(32px)로 잘라 띠마다 앞뒤 순서를 따로 준다.
    * 건물 한 장에 순서 하나만 주면 넓은 건물 뒤를 걷는 사람이 지붕 위에 그려진다
    */
-  private makeBuilding(b: Building): BView {
-    const hellTheme = this.zone.hell ? floorDef(this.zone.hell.floor).theme : null;
-    const d = hellTheme ? drawHellStructure(b, hellTheme, true) : kitOk ? drawBuildingKit(b, this.nameOf(b), this.night === 1, this.low) : drawBuilding(b, this.nameOf(b), this.night === 1);
-    const base = tex(d.canvas);
-    const i1 = b.i0 + b.w, j1 = b.j0 + b.d;
+  /** 그림 한 장을 세로 띠로 잘라 띠마다 앞뒤 순서를 준다 (바닥 사각형 i0·j0·w·d 기준) */
+  private strips(base: Texture, dx: number, dy: number, i0: number, j0: number, bw: number, bd: number, bias = -0.2): Sprite[] {
+    const i1 = i0 + bw, j1 = j0 + bd;
     const cornerX = (i1 - j1) * (TW / 2);
     const key = (sx: number) => (sx < cornerX ? 2 * j1 + sx / (TW / 2) : 2 * i1 - sx / (TW / 2));
     const parts: Sprite[] = [];
-    const W = d.canvas.width, H = d.canvas.height, SW = 32;
+    const W = base.source.width, H = base.source.height, SW = 32;
     for (let cx = 0; cx < W; cx += SW) {
       const w = Math.min(SW, W - cx);
       const s = new Sprite(new Texture({ source: base.source, frame: new Rectangle(cx, 0, w, H) }));
-      s.position.set(d.x + cx, d.y);
-      const a = d.x + cx, z = d.x + cx + w;
-      s.zIndex = Math.min(key(a), key(z), a < cornerX && z > cornerX ? key(cornerX) : 1e9) - 0.2;
+      s.position.set(dx + cx, dy);
+      const a = dx + cx, z = dx + cx + w;
+      s.zIndex = Math.min(key(a), key(z), a < cornerX && z > cornerX ? key(cornerX) : 1e9) + bias;
       this.objects.addChild(s);
       parts.push(s);
     }
-    const top = hellTheme ? b.h : kitOk ? buildingTop(b, this.low) : buildingHeight(b.h);
+    return parts;
+  }
+
+  private makeBuilding(b: Building): BView {
+    const hellTheme = this.zone.hell ? floorDef(this.zone.hell.floor).theme : null;
+    const d = b.cat === 'ujusae' ? drawCosmicBird(b, this.night === 1) : hellTheme ? drawHellStructure(b, hellTheme, true) : kitOk ? drawBuildingKit(b, this.nameOf(b), this.night === 1, this.low) : drawBuilding(b, this.nameOf(b), this.night === 1);
+    const base = tex(d.canvas);
+    const W = d.canvas.width, H = d.canvas.height;
+    const parts = this.strips(base, d.x, d.y, b.i0, b.j0, b.w, b.d);
+    const top = b.cat === 'ujusae' ? COSMIC_TOP : hellTheme ? b.h : kitOk ? buildingTop(b, this.low) : buildingHeight(b.h);
     const [lx] = iso(b.i0 + b.w / 2, b.j0 + b.d / 2);
     const id = d.canvas.getContext('2d')!.getImageData(0, 0, W, H).data;
     const alpha = new Uint8Array(W * H);
     for (let k = 0; k < alpha.length; k++) alpha[k] = id[k * 4 + 3] > 0 ? 1 : 0;
-    return { parts, base, x: d.x, y: d.y, w: W, h: H, top, lx, ly: (b.i0 + b.j0) * (TH / 2) - top + 4, alpha };
+    return { parts, base, x: d.x, y: d.y, w: W, h: H, top, lx, ly: (b.i0 + b.j0) * (TH / 2) - top + 4, alpha, b };
   }
 
   private dropBuilding(v: BView) {
     for (const s of v.parts) s.destroy({ texture: true });
     v.base.destroy(true);
+    this.dropGhost(v);
+  }
+  private dropGhost(v: BView) {
+    if (!v.ghost) return;
+    for (const s of v.ghost.parts) s.destroy({ texture: true });
+    v.ghost.base.destroy(true);
+    v.ghost = undefined;
   }
 
-  /** 건물 낮추기: 모든 건물을 1층 높이로 (도심에서 길이 안 보일 때) */
-  low = (() => { try { return localStorage.getItem('heavensmanual.lowb') === '1'; } catch { return false; } })();
+  /**
+   * 건물은 처음부터 낮게(1층+옥상 난간) 그린다. 가까이 다가가면 원래 높이의 모습이 희미하게 겹쳐 보인다
+   * (2.5칸 안 = 가장 진하게 30%, 5칸 밖 = 사라짐). 희미한 모습은 필요할 때만 그리고 멀어지면 버린다
+   */
+  private updateGhosts(px: number, py: number, dt: number) {
+    const on = this.low && !this.zone.hell && !this.zone.interior && kitOk;
+    for (const v of this.bViews.values()) {
+      const b = v.b;
+      let want = 0;
+      if (on && b.cat !== 'ujusae' && upperFloors(b) > 0) {
+        const dx = Math.max(b.i0 - px, 0, px - (b.i0 + b.w)), dy = Math.max(b.j0 - py, 0, py - (b.j0 + b.d));
+        const dist = Math.hypot(dx, dy);
+        want = dist < 1.5 ? 0.15 : dist < 3.5 ? (0.15 * (3.5 - dist)) / 2 : 0;
+      }
+      if (want > 0 && !v.ghost) {
+        const d = drawBuildingKit(b, this.nameOf(b), this.night === 1, false);
+        const base = tex(d.canvas);
+        v.ghost = { parts: this.strips(base, d.x, d.y, b.i0, b.j0, b.w, b.d, -0.19), base, a: 0 };
+      }
+      if (!v.ghost) continue;
+      const g = v.ghost;
+      g.a += Math.sign(want - g.a) * Math.min(Math.abs(want - g.a), dt * 0.9);
+      if (g.a <= 0.001 && want === 0) { this.dropGhost(v); continue; }
+      for (const s of g.parts) s.alpha = g.a;
+    }
+  }
+
+  /** 건물 낮추기: 처음부터 낮게 (단추로 원래 높이로 되돌릴 수 있다) */
+  low = (() => { try { return localStorage.getItem('heavensmanual.lowb') !== '0'; } catch { return true; } })();
   setLowBuildings(v: boolean) {
     if (v === this.low) return;
     this.low = v;
@@ -578,6 +695,104 @@ export class WorldScene {
     this.walkers.push(this.makeWalker(this.npcLook(kind), spot[0], spot[1], kind, this.npcWeapon(kind)));
   }
 
+  // ───────────────────────── 건물 안 ─────────────────────────
+  private clerkW: Walker | null = null;
+  private leaving = false;
+  /** 빨간 표시(먼저 공격한 죄)가 남은 시간 — 건물 안팎을 오갈 때 이어진다 */
+  get crimeT() {
+    return this.criminalT;
+  }
+  set crimeT(v: number) {
+    this.criminalT = v;
+  }
+  private chaserDue: { t: number; monster: boolean; hp: number; w?: Walker; stay?: number } | null = null;
+  private setupInterior(chaser: { monster: boolean; hp: number } | null) {
+    const info = this.zone.interior!;
+    const room = drawRoom(this.zone, false);
+    const rs = new Sprite(tex(room.canvas));
+    rs.position.set(room.x, room.y);
+    this.ground.addChild(rs);
+    for (const f of info.furn) {
+      const d = drawFurn(f, info, false);
+      this.strips(tex(d.canvas), d.x, d.y, f.i, f.j, f.w, f.d, f.h <= 2 ? -40 : -0.2);
+    }
+    if (info.clerk) {
+      const w = this.makeWalker(clerkLook(info.kind, info.from.b), info.clerk.i, info.clerk.j, 'clerk');
+      w.dir = 'sw';
+      w.wait = 1e9;
+      this.walkers.push(w);
+      this.clerkW = w;
+    }
+    const seats = info.seats.slice();
+    const n = Math.min(seats.length, info.rest ? 2 : 3, 1 + (info.from.b % 3));
+    for (let k = 0; k < n; k++) {
+      const [i, j] = seats.splice((info.from.b * 7 + k * 3) % seats.length, 1)[0];
+      const w = this.makeWalker(this.npcLook('passer'), i, j, 'passer');
+      w.wait = 6 + Math.random() * 20;
+      this.walkers.push(w);
+    }
+    if (chaser) this.chaserDue = { t: 2.5, ...chaser };
+  }
+
+  /** 방: 쫓아오던 봉합자가 문으로 들어온다 (쉬는 곳이면 문턱에서 멈췄다가 돌아간다) · 나가는 매트 */
+  private updateInterior(dt: number) {
+    const info = this.zone.interior!;
+    const p = this.player;
+    const ch = this.chaserDue;
+    if (ch) {
+      if (!ch.w) {
+        ch.t -= dt;
+        if (ch.t <= 0) {
+          const s = this.makeWalker({ sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: ch.monster ? 'stitched' : 'suturer' }, info.exit.i, info.exit.j, 'suturer', 'needle');
+          s.hp = Math.max(1, ch.hp);
+          if (ch.monster) { s.monster = true; s.speed = 2.0; }
+          s.dir = 'ne';
+          this.walkers.push(s);
+          ch.w = s;
+          if (info.rest) { ch.stay = 8; s.target = null; this.bubble(s, t().suturerSanctuary); }
+          else { s.target = p; s.firstBy = s; this.bubble(s, t().suturerFollow); }
+        }
+      } else if (ch.stay !== undefined) {
+        ch.stay -= dt;
+        ch.w.path = [];
+        if (ch.stay <= 0) { this.removeWalker(ch.w); this.chaserDue = null; }
+      } else if (ch.w.sprite.destroyed || ch.w.down > 0) this.chaserDue = null;
+    }
+    if (!this.leaving && !this.dead && !p.path.length && Math.floor(p.x) === info.exit.i && Math.floor(p.y) === info.exit.j && this.time > 0.6) {
+      this.cancelActs();
+      this.leaving = true;
+      setTimeout(() => this.hooks.leaveBuilding(), 0); // 이 장면의 틱이 끝난 뒤에 버린다
+    }
+  }
+  /** 방에서 나갈 때 아직 쫓고 있는 봉합자 (밖으로 따라 나온다) */
+  chaserLeft(): { monster: boolean; hp: number } | null {
+    const w = this.chaserDue?.w;
+    if (!w || w.sprite.destroyed || w.down > 0 || this.chaserDue?.stay !== undefined || w.giveUp) return null;
+    return { monster: !!w.monster, hp: w.hp };
+  }
+  /** 거리: 들어가는 순간 쫓아오던 봉합자 (8칸 안) → 방으로 따라 들어온다 */
+  takeChaser(): { monster: boolean; hp: number } | null {
+    const p = this.player;
+    const s = this.walkers.find((w) => w.kind === 'suturer' && w.target === p && w.down <= 0 && !w.giveUp && Math.hypot(w.x - p.x, w.y - p.y) < 8);
+    if (!s) return null;
+    this.removeWalker(s);
+    return { monster: !!s.monster, hp: s.hp };
+  }
+  /** 거리로 돌아왔을 때 따라 나오는 봉합자 */
+  releaseChaser(c: { monster: boolean; hp: number }) {
+    const d = this.zone.door;
+    void d;
+    const p = this.player;
+    const s = this.makeWalker({ sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: c.monster ? 'stitched' : 'suturer' }, Math.floor(p.x), Math.floor(p.y), 'suturer', 'needle');
+    s.hp = c.hp;
+    if (c.monster) { s.monster = true; s.speed = 2.0; }
+    s.target = p;
+    s.firstBy = s;
+    s.x = p.x + 0.6;
+    this.walkers.push(s);
+    this.suturerT = 300;
+  }
+
   // ───────────────────────── 지옥 ─────────────────────────
   /** 지옥 층: 괴물을 풀고, 층주를 세우고, 계단·파샤르를 놓는다 */
   private setupHell() {
@@ -612,23 +827,6 @@ export class WorldScene {
       }
       if (this.bossDown || h.floor === 1 && this.bossDown) g.ellipse(x, y - 40, 10, 26).fill({ color: 0xfff1c4, alpha: 0.35 });
       if (!this.bossDown) for (let k = -1; k <= 1; k += 2) g.moveTo(x - 24, y - 14 + k * 4).lineTo(x + 24, y - 14 - k * 4).stroke({ color: 0x8a8a8a, width: 2 });
-    }
-    // 휴식처: 바닥에 그은 금빛 원과 작은 촛불 (괴물이 넘어오지 못하는 자리)
-    {
-      const r = h.rest;
-      const ring = (rad: number) => {
-        const pts: number[] = [];
-        for (let k = 0; k <= 48; k++) { const a = (k / 48) * Math.PI * 2; const [x, y] = iso(r.i + 0.5 + Math.cos(a) * rad, r.j + 0.5 + Math.sin(a) * rad); pts.push(x, y); }
-        return pts;
-      };
-      g.poly(ring(r.r)).stroke({ color: 0xc9a23e, width: 2, alpha: 0.4 });
-      g.poly(ring(r.r - 0.5)).stroke({ color: 0xc9a23e, width: 1, alpha: 0.22 });
-      for (let k = 0; k < 12; k++) {
-        const a = (k / 12) * Math.PI * 2;
-        const [x, y] = iso(r.i + 0.5 + Math.cos(a) * r.r, r.j + 0.5 + Math.sin(a) * r.r);
-        g.rect(x - 1, y - 5, 2, 5).fill(0xe8dcc0);
-        g.rect(x - 1, y - 8, 2, 3).fill({ color: 0xffc04a, alpha: 0.9 });
-      }
     }
     // 내려가는 구덩이
     {
@@ -672,7 +870,7 @@ export class WorldScene {
   /** 휴식 공간 안인가 (싸움 불가, 괴물은 못 들어옴) */
   private inRest(x: number, y: number) {
     const r = this.zone.hell?.rest;
-    return !!r && Math.hypot(x - (r.i + 0.5), y - (r.j + 0.5)) < r.r;
+    return !!r && Math.abs(x - (r.i + 0.5)) < r.r && Math.abs(y - (r.j + 0.5)) < r.r;
   }
 
   private spawnCars() {
@@ -746,8 +944,20 @@ export class WorldScene {
 
   // ───────────────────────── 사람끼리 싸움 (PvP) ─────────────────────────
   /** 우주새 문 근처는 싸울 수 없다 (다시 태어나는 자리) */
+  /** 빨간 표시가 새로 붙을 때: 봉합자는 가끔만 온다 (35%, 20~60초 뒤, 한 번 다녀가면 5분은 쉼) */
+  private markCrime() {
+    const fresh = this.criminalT <= 0;
+    this.criminalT = 180;
+    if (fresh && this.sutDue < 0 && this.suturerT <= 0 && !this.zone.hell && Math.random() < 0.35) this.sutDue = 20 + Math.random() * 40;
+  }
+  /** 빨리 회복하는 자리 */
+  private restAt(x: number, y: number) {
+    if (this.zone.interior) return !!this.zone.interior.rest;
+    return this.safeAt(x, y);
+  }
   private safeAt(x: number, y: number) {
     if (this.zone.hell) return this.inRest(x, y);
+    if (this.zone.interior) return !!this.zone.interior.rest;
     return Math.hypot(x - (this.zone.door.i + 0.5), y - (this.zone.door.j + 0.5)) < 5;
   }
   /** 최근 60초 안에 나를 먼저 때린 사람 */
@@ -966,6 +1176,7 @@ export class WorldScene {
       this.hooks.person(w.rid, w.rinfo, sx + this.camera.x, sy - 44 + this.camera.y, () => this.attack(w));
       return;
     }
+    if (w && w.down <= 0 && w.kind === 'clerk' && !force) { this.showLabel({ kind: 'w', w }, 2); this.approachClerk(); return; }
     if (w && w.down <= 0) {
       // 공격 태세: 적대 대상만 / 모두
       const hostile = w.kind === 'thug' || w.kind === 'suturer' || w.target === this.player || (w.kind === 'remote' && (this.recentAttacker(w.rid) || !!w.rpos?.c));
@@ -1057,6 +1268,7 @@ export class WorldScene {
     if (this.realm === 'ghost' && k !== -1) return;
     if (k === -2) { this.hooks.hellAct('up'); return; }
     if (k === -3) { this.hooks.hellAct('down'); return; }
+    if (k === -1 && this.zone.interior) { this.cancelActs(); this.walkTo(this.zone.interior.exit.i, this.zone.interior.exit.j); return; }
     if (k === -1) {
       this.cancelActs();
       this.walkTo(this.zone.door.i, this.zone.door.j);
@@ -1065,9 +1277,12 @@ export class WorldScene {
     }
     const b = this.zone.buildings[k];
     const opts: { label: string; act: () => void }[] = [];
-    const store = storeOf(b);
-    if (store) opts.push({ label: L.enter, act: () => this.goStore(k, store) });
-    if (hasBank(b)) opts.push({ label: L.bankGo, act: () => this.goStore(k, 'bank') });
+    if (canEnter(b) && this.realm === 'real') opts.push({ label: L.goInside, act: () => this.goEnter(k) });
+    else {
+      const store = storeOf(b);
+      if (store) opts.push({ label: L.enter, act: () => this.goStore(k, store) });
+      if (hasBank(b)) opts.push({ label: L.bankGo, act: () => this.goStore(k, 'bank') });
+    }
     if (canWork(b)) opts.push({ label: L.act.work.replace('{n}', String(WAGE_PER_HOUR)), act: () => this.goWork(k) });
     if (opts.length === 1) { opts[0].act(); return; }
     if (!opts.length) return;
@@ -1113,6 +1328,7 @@ export class WorldScene {
     const L = t();
     const w = pd.w;
     if (w.kind === 'pashar') { this.hooks.hellAct('pashar'); return; }
+    if (w.kind === 'clerk') { this.hooks.clerk(); return; }
     const kind = w.kind as NpcKind;
     const r = w.hp / w.maxHp;
     if (w.mdef) {
@@ -1130,14 +1346,26 @@ export class WorldScene {
     if (kind === 'thug' && Math.random() < 0.5) { w.target = this.player; w.firstBy ??= w; }
   }
 
+  /** 직원 앞(카운터 앞 칸)으로 가서 말을 건다 */
+  approachClerk() {
+    const info = this.zone.interior;
+    const w = this.clerkW;
+    if (!info || !w) return;
+    this.cancelActs();
+    this.pending = { kind: 'talk', w };
+    const c = info.counter ?? { i: Math.floor(w.x), j: Math.floor(w.y) + 2 };
+    if (!this.walkTo(c.i, c.j)) this.finishPending();
+  }
   private npcName(w: Walker) {
     const L = t();
+    if (w.kind === 'clerk') return this.zone.interior?.name ?? '';
     if (w.mdef) return w.mdef.name[lang()];
     if (w.kind === 'pashar') return L.pashar;
     return w.kind === 'suturer' ? L.suturer : L.npc[w.kind as 'passer' | 'thug'];
   }
   private npcSub(w: Walker) {
     const L = t();
+    if (w.kind === 'clerk') return L.clerkSub[(this.zone.interior?.kind ?? 'shop') as keyof typeof L.clerkSub] ?? '';
     if (w.mdef) return w.mdef.boss ? L.hellBoss.replace('{n}', String(this.zone.hell?.floor ?? 1)) : L.hellMonster;
     if (w.kind === 'pashar') return L.pasharSub;
     return w.kind === 'suturer' ? L.suturerSub : L.npcSub[w.kind as 'passer' | 'thug'];
@@ -1152,12 +1380,30 @@ export class WorldScene {
     this.walkTo(spot[0], spot[1]);
     this.storeWant = { k, kind, spot };
   }
-  private storeWant: { k: number; kind: StoreKind | 'bank'; spot: [number, number] } | null = null;
+  private storeWant: { k: number; kind: StoreKind | 'bank' | 'enter'; spot: [number, number] } | null = null;
+  private goEnter(k: number) {
+    const b = this.zone.buildings[k];
+    const spot = this.frontOf(b);
+    if (!spot) return;
+    this.cancelActs();
+    this.walkTo(spot[0], spot[1]);
+    this.storeWant = { k, kind: 'enter', spot };
+  }
 
   /** 간판 면 앞 (사람이 설 수 있는 칸) */
   private frontOf(b: Building): [number, number] | null {
-    const spot: [number, number] = b.sign === 'right' ? [b.i0 + b.w, b.j0 + Math.floor(b.d / 2)] : [b.i0 + Math.floor(b.w / 2), b.j0 + b.d];
-    return [[0, 0], [0, 1], [1, 0], [-1, 0], [0, -1], [1, 1]].map(([a, c]) => [spot[0] + a, spot[1] + c] as [number, number]).find(([a, c]) => walkable(this.zone, a, c)) ?? null;
+    const near = (spot: [number, number]) => [[0, 0], [0, 1], [1, 0], [-1, 0], [0, -1], [1, 1]].map(([a, c]) => [spot[0] + a, spot[1] + c] as [number, number]).find(([a, c]) => walkable(this.zone, a, c)) ?? null;
+    if (b.sign) return near(b.sign === 'right' ? [b.i0 + b.w, b.j0 + Math.floor(b.d / 2)] : [b.i0 + Math.floor(b.w / 2), b.j0 + b.d]);
+    // 간판 없는 건물(사원 경내 등): 앞쪽 두 면 → 뒤쪽 두 면 순서로 걸을 수 있는 둘레 칸
+    const ring: [number, number][] = [];
+    for (let i = b.i0; i < b.i0 + b.w; i++) ring.push([i, b.j0 + b.d]);
+    for (let j = b.j0; j < b.j0 + b.d; j++) ring.push([b.i0 + b.w, j]);
+    for (let i = b.i0; i < b.i0 + b.w; i++) ring.push([i, b.j0 - 1]);
+    for (let j = b.j0; j < b.j0 + b.d; j++) ring.push([b.i0 - 1, j]);
+    const mid = (a: [number, number]) => Math.abs(a[0] - (b.i0 + b.w / 2)) + Math.abs(a[1] - (b.j0 + b.d / 2));
+    const front = ring.slice(0, b.w + b.d).filter(([a, c]) => walkable(this.zone, a, c)).sort((x, y) => mid(x) - mid(y));
+    if (front.length) return front[0];
+    return ring.find(([a, c]) => walkable(this.zone, a, c)) ?? null;
   }
 
   /** 공격 시작 (행인은 강제 공격) */
@@ -1202,7 +1448,7 @@ export class WorldScene {
           this.struckFirst.add(to.rid);
           // 지옥에서 다른 영혼을 치면 '지옥 영혼 공격' 악행 (악행 비율이 오르면 아래층으로 떨어진다)
           this.hooks.deed(this.zone.hell ? 'hellSoulHit' : 'firstStrike');
-          if (!this.zone.hell) this.criminalT = 180;
+          if (!this.zone.hell) this.markCrime();
         }
         this.combatT = 0;
         to.barT = 5;
@@ -1233,7 +1479,7 @@ export class WorldScene {
       to.firstBy = from;
       if (from.isPlayer && to.kind === 'passer') {
         this.hooks.deed('firstStrike');
-        this.criminalT = 180;
+        this.markCrime();
       }
     }
     if (to.kind === 'suturer' && from.isPlayer) {
@@ -1533,14 +1779,21 @@ export class WorldScene {
     if (this.stun > 0) { this.stun -= dt; p.path = []; }
     const clk = bangkokClock();
     const nf = nightFactor(clk.h, clk.m);
-    // 봉합자: 빨간 표시가 있는 동안 둘까지 나타난다. 표시가 사라지면 물러난다
-    this.suturerT -= dt;
+    // 봉합자: 죄를 지었을 때 가끔(35%) 하나가 나타난다. 오래 도망치면(14칸 밖에서 8초) 포기하고, 표시가 사라져도 물러난다
     const sut = this.walkers.filter((w) => w.kind === 'suturer');
-    if (this.criminalT > 0 && !this.dead && sut.length < 2 && this.suturerT <= 0) { this.suturerT = 22; this.spawnSuturer(); }
+    if (!sut.length) this.suturerT -= dt;
+    if (this.sutDue >= 0) {
+      this.sutDue -= dt;
+      if (this.sutDue < 0) { if (this.criminalT > 0 && !this.dead && !sut.length) { this.spawnSuturer(); this.suturerT = 300; } }
+    }
     for (const s of sut) {
-      if (this.criminalT > 0 && !this.dead) { if (s.down <= 0) s.target = p; continue; }
+      if (this.zone.interior?.rest) { s.target = null; continue; } // 성소: 문턱에서 기다리다 돌아간다
+      const d = Math.hypot(s.x - p.x, s.y - p.y);
+      s.farT = d > 14 ? (s.farT ?? 0) + dt : 0;
+      if (this.criminalT > 0 && !this.dead && s.farT < 8 && !s.giveUp) { if (s.down <= 0) s.target = p; continue; }
+      if (!s.giveUp && s.farT >= 8) { s.giveUp = true; this.bubble(s, t().suturerGiveUp); }
       s.target = null;
-      if (Math.hypot(s.x - p.x, s.y - p.y) > 16) this.removeWalker(s);
+      if (d > 16) this.removeWalker(s);
       else if (s.flee <= 0) s.flee = 6;
     }
     for (const w of [...this.walkers]) {
@@ -1591,7 +1844,7 @@ export class WorldScene {
       }
     }
     // 말 걸기: 가까이 가면
-    if (this.pending && Math.hypot(this.pending.w.x - p.x, this.pending.w.y - p.y) < 1.6) { p.path = []; this.finishPending(); }
+    if (this.pending && Math.hypot(this.pending.w.x - p.x, this.pending.w.y - p.y) < (this.pending.w.kind === 'clerk' ? 2.6 : 1.6)) { p.path = []; this.finishPending(); }
     // 일하기: 자리에 서 있는 동안 현실 시간으로 돈이 쌓인다. 움직이면 그만
     if (this.working) {
       const at = Math.floor(p.x) === this.working.spot[0] && Math.floor(p.y) === this.working.spot[1] && !p.path.length;
@@ -1615,7 +1868,8 @@ export class WorldScene {
     if (this.storeWant && !p.path.length && Math.floor(p.x) === this.storeWant.spot[0] && Math.floor(p.y) === this.storeWant.spot[1]) {
       const sw = this.storeWant;
       this.storeWant = null;
-      if (sw.kind === 'bank') this.hooks.bank(this.nameOf(this.zone.buildings[sw.k]));
+      if (sw.kind === 'enter') this.hooks.enterBuilding(sw.k, { i: sw.spot[0], j: sw.spot[1] }, this.takeChaser());
+      else if (sw.kind === 'bank') this.hooks.bank(this.nameOf(this.zone.buildings[sw.k]));
       else this.hooks.store(sw.kind, this.nameOf(this.zone.buildings[sw.k]), cuisineOf(this.zone.buildings[sw.k]));
     }
     // 돈 줍기
@@ -1638,14 +1892,16 @@ export class WorldScene {
       const { i, j } = this.zone.door;
       if (Math.floor(p.x) === i && Math.floor(p.y) === j) { this.wantShop = false; this.stopWork(); this.onEnterShop(); }
     }
-    // 체력: 싸움이 끝나고 20초가 지나면 천천히 찬다
+    // 체력: 싸움이 끝나고 잠시 지나면 찬다. 휴식처(지옥 마을·우주새 앞·쉬는 시설 안)에서는 바로, 아주 빠르게
     this.combatT += dt;
-    if (!this.dead && this.combatT > OUT_OF_COMBAT_S && p.hp < p.maxHp) {
+    const resting = this.restAt(p.x, p.y);
+    if (!this.dead && (resting || this.combatT > OUT_OF_COMBAT_S) && p.hp < p.maxHp) {
       const before = Math.floor(p.hp);
-      p.hp = Math.min(p.maxHp, p.hp + (regenPerMinute(p.maxHp, 0) / 60) * dt);
+      p.hp = Math.min(p.maxHp, p.hp + ((resting ? restRegenPerMinute(p.maxHp, this.stats.fai) : regenPerMinute(p.maxHp, this.stats.fai)) / 60) * dt);
       if (Math.floor(p.hp) !== before) this.hooks.hp(p.hp, p.maxHp);
     }
     if (this.criminalT > 0) this.criminalT -= dt;
+    if (this.zone.interior) this.updateInterior(dt);
     this.updateCars(dt, p);
     // 떠오르는 글씨
     for (let k = this.floaters.length - 1; k >= 0; k--) {
@@ -1716,6 +1972,7 @@ export class WorldScene {
       for (let k = 0; k < 6; k++) this.danger.rect(k * 6, k * 6, W - k * 12, H - k * 12).stroke({ color: 0xb01010, width: 6, alpha: a * (1 - k / 6) });
     }
     this.seeThrough(px, py, p.x + p.y);
+    this.updateGhosts(p.x, p.y, dt);
     this.refreshNight(nf);
     this.streamT -= dt;
     if (this.streamT <= 0) { this.streamT = 0.12; this.stream(false); }
@@ -1724,7 +1981,7 @@ export class WorldScene {
   /** 행인·불량배의 평소 행동 */
   private think(w: Walker, moving: boolean, dt: number, nf: number) {
     const p = this.player;
-    if (w.kind !== 'pashar' && !w.mdef?.boss && Math.hypot(w.x - p.x, w.y - p.y) > 34) { if (w.kind === 'suturer') this.removeWalker(w); else if (w.mdef) this.spawnMonster(w); else this.spawnNpc(w.kind as NpcKind, w); return; }
+    if (w.kind !== 'pashar' && w.kind !== 'clerk' && !w.mdef?.boss && Math.hypot(w.x - p.x, w.y - p.y) > 34) { if (w.kind === 'suturer') this.removeWalker(w); else if (w.mdef) this.spawnMonster(w); else this.spawnNpc(w.kind as NpcKind, w); return; }
     if (w.flee > 0) {
       w.flee -= dt;
       if (!w.path.length) {
@@ -1734,7 +1991,7 @@ export class WorldScene {
       }
       return;
     }
-    if (w.kind === 'pashar') return;
+    if (w.kind === 'pashar' || w.kind === 'clerk') return;
     // 지옥 괴물: 휴식 공간 밖의 영혼을 보면 곧장 덤빈다. 층주는 자기 자리를 크게 벗어나지 않는다
     if (w.mdef) {
       const d = Math.hypot(p.x - w.x, p.y - w.y);
@@ -1961,7 +2218,7 @@ export class WorldScene {
     if (!this.dead && !p.path.length && !this.working && !p.target) {
       const di = this.zone.door;
       const dd = Math.hypot(di.i + 0.5 - p.x, di.j + 0.5 - p.y);
-      if (dd < fd) { fd = dd; found = -1; }
+      if (dd < fd && !this.zone.interior) { fd = dd; found = -1; }
       // 지옥: 올라가는 계단(-2) · 내려가는 구덩이(-3)
       const h = this.zone.hell;
       if (h) {
@@ -1972,7 +2229,7 @@ export class WorldScene {
       }
       if (!this.zone.hell && this.realm !== 'ghost') for (const k of this.bViews.keys()) {
         const b = this.zone.buildings[k];
-        if (b.cat === 'ujusae' || !interactive(b) || (!storeOf(b) && !canWork(b) && !hasBank(b))) continue;
+        if (b.cat === 'ujusae' || !interactive(b) || (!canEnter(b) && !storeOf(b) && !canWork(b) && !hasBank(b))) continue;
         const f = this.frontCached(k);
         if (!f) continue;
         const d = Math.hypot(f[0] + 0.5 - p.x, f[1] + 0.5 - p.y);
@@ -2096,6 +2353,7 @@ export class WorldScene {
   }
 
   private refreshNight(nf: number) {
+    if (this.zone.interior) { this.overlay.clear(); return; } // 방 안은 늘 불이 켜져 있다
     if (this.zone.hell) {
       // 지옥: 늘 어둡고 붉다. 화로는 늘 탄다
       if (this.night !== 1) { this.night = 1; this.clearBuildings(); }

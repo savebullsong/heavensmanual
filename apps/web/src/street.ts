@@ -90,15 +90,16 @@ function groundKind(b: Building, face: Face, k: number, n: number, onSign: boole
   if (b.cat === 'ujusae') return onSign && k === Math.floor(n / 2) ? 'wooddoor' : 'wood';
   const kd = kindOf(b);
   if (onSign && LOBBY.has(kd)) return k % 4 === 1 || k % 4 === 2 ? 'lobby' : 'glass';
+  // 줄무늬 차양은 간판 면 가운데 한 칸에만 (모든 칸에 차양을 달면 거리가 차양 숲이 된다)
+  const awnBay = k === Math.floor((n - 1) / 2);
   if (onSign && SHOP_GLASS.has(kd)) return 'glass';
-  if (onSign && SHOP_SHUTTER.has(kd)) return 'shop';
+  if (onSign && SHOP_SHUTTER.has(kd)) return awnBay ? 'shop' : 'glass';
   if (b.cat === 'office') return onSign ? 'lobby' : 'glass';
   if (b.cat === 'condo' || b.cat === 'hotel') return onSign ? (k % 4 === 1 || k % 4 === 2 ? 'lobby' : 'glass') : 'wall';
   if (onSign && SHOP_GLASS.has(b.cat)) return 'glass';
-  if (onSign && SHOP_SHUTTER.has(b.cat)) return 'shop';
-  if (onSign) return 'shop';
+  if (onSign) return awnBay ? 'shop' : 'glass';
   const x = r();
-  return face === 'L' ? (x < 0.45 ? 'shop' : x < 0.75 ? 'closed' : 'wall') : x < 0.25 ? 'shop' : x < 0.6 ? 'closed' : 'wall';
+  return face === 'L' ? (x < 0.08 ? 'shop' : x < 0.55 ? 'closed' : 'wall') : x < 0.05 ? 'shop' : x < 0.5 ? 'closed' : 'wall';
 }
 function upperKind(b: Building, k: number, f: number, colRand: number): string {
   if (b.cat === 'office' || TOWER.has(kindOf(b))) return 'curtain';

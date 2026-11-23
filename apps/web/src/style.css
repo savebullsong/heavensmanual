@@ -198,7 +198,8 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 #hud .where { display: flex; flex-direction: column; min-width: 0; }
 #hud .where b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46vw; }
 #hud .where small { font-size: 11px; color: #b8a888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46vw; }
-#hud .where.is-place b { color: #f2d27a; }
+#hud .where.is-place b { color: #f2d27a; opacity: 0.72; }
+#hud .where.is-place small { opacity: 0.72; }
 #hud .where.flash { animation: place-in 0.35s ease-out; }
 @keyframes place-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 #hud .hud-left.working .where:not(.is-place) { display: none; }

@@ -326,27 +326,48 @@ const med = [...medianTiles].map((k) => [k % W, Math.floor(k / W)]).filter(([i, 
 let lastPillar = -99;
 for (const [i, j] of med) if (i - lastPillar >= 9) { props.push({ i, j, kind: 'pillar' }); lastPillar = i; }
 
-// ── 우주새: 지도 가운데(아속)에서 가장 가까운, 보도 바로 뒤의 빈 3×4 땅
+// ── 우주새: 전 세계 공통의 작은 2×2 가게. 지도 가운데(아속)에서 멀지 않으면서 큰길에서 가장 깊이 들어간 골목 안쪽
 const cx = W / 2, cy = H / 2;
 const free = (i0, j0, w, d) => { for (let j = j0; j < j0 + d; j++) for (let i = i0; i < i0 + w; i++) { if (i < 0 || j < 0 || i >= W || j >= H) return false; const t = TYPES[tiles[j * W + i]]; if (t !== 'lot' && t !== 'park') return false; } return true; };
-let shop = null, bestD = 1e9;
-for (let j = 1; j < H - 6; j++)
-  for (let i = 1; i < W - 4; i++) {
-    const d = Math.hypot(i - cx, j - cy);
-    if (d >= bestD) continue;
-    if (!free(i, j, 3, 4)) continue;
-    const fi = i + 1, fj = j + 4;
-    if (TYPES[tiles[fj * W + fi]] !== 'walk') continue;
-    let nearRoad = false;
-    for (let k = 1; k <= 4; k++) { const t = TYPES[tiles[(fj + k) * W + fi]]; if (t === 'road' || t === 'median') nearRoad = true; }
-    if (!nearRoad) continue;
-    bestD = d; shop = { i0: i, j0: j };
+// 큰길(차도·중앙분리대)에서 떨어진 거리 (칸, 걸어서)
+const roadDist = new Int32Array(W * H).fill(-1);
+{
+  const q = new Int32Array(W * H); let qh = 0, qt = 0;
+  for (let k = 0; k < W * H; k++) { const t = TYPES[tiles[k]]; if (t === 'road' || t === 'median') { roadDist[k] = 0; q[qt++] = k; } }
+  while (qh < qt) {
+    const k = q[qh++], i = k % W, j = (k - i) / W;
+    for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const ii = i + a, jj = j + b;
+      if (ii < 0 || jj < 0 || ii >= W || jj >= H) continue;
+      const kk = jj * W + ii;
+      if (roadDist[kk] >= 0) continue;
+      const t = TYPES[tiles[kk]];
+      if (t === 'block' || t === 'water' || t === 'void') continue;
+      roadDist[kk] = roadDist[k] + 1; q[qt++] = kk;
+    }
+  }
+}
+let shop = null, best = -1e9;
+for (let j = 1; j < H - 4; j++)
+  for (let i = 1; i < W - 3; i++) {
+    const dc = Math.hypot(i - cx, j - cy);
+    if (dc > 90) continue;
+    if (!free(i, j, 2, 2)) continue;
+    const fk = (j + 2) * W + i + 1;
+    if (TYPES[tiles[fk]] !== 'soi') continue; // 문 앞이 골목
+    const rd = roadDist[fk];
+    if (rd < 6) continue;
+    // 골목 한쪽이 막혀 있지 않게: 문 앞 골목이 양옆으로 이어진다
+    if (TYPES[tiles[fk - 1]] !== 'soi' && TYPES[tiles[fk + 1]] !== 'soi') continue;
+    const score = Math.min(rd, 30) * 3 - dc * 0.25;
+    if (score > best) { best = score; shop = { i0: i, j0: j }; }
   }
 let door;
 if (shop) {
-  buildings.push({ i0: shop.i0, j0: shop.j0, w: 3, d: 4, h: 58, cat: 'ujusae', color: '#4a3527', sign: 'left' });
-  for (let j = shop.j0; j < shop.j0 + 4; j++) for (let i = shop.i0; i < shop.i0 + 3; i++) tiles[j * W + i] = T.block;
-  door = { i: shop.i0 + 1, j: shop.j0 + 4 };
+  buildings.push({ i0: shop.i0, j0: shop.j0, w: 2, d: 2, h: 58, cat: 'ujusae', color: '#4a3527', sign: 'left' });
+  for (let j = shop.j0; j < shop.j0 + 2; j++) for (let i = shop.i0; i < shop.i0 + 2; i++) tiles[j * W + i] = T.block;
+  door = { i: shop.i0 + 1, j: shop.j0 + 2 };
+  console.error(`cosmic bird: ${JSON.stringify(shop)} road distance ${roadDist[door.j * W + door.i]} center ${Math.round(Math.hypot(door.i - cx, door.j - cy))}`);
 }
 
 // ── 차선: 행마다 도로가 24칸 이상 이어지는 구간. 중앙분리대 위쪽 행은 좌측통행에서 +i 방향

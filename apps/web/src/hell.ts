@@ -66,7 +66,8 @@ export function hellZone(floor: number): Zone {
   const U = { i: 18, j: 16 }; // 올라가는 계단 (1층: 출구)
   const B = { i: 27, j: 25 }; // 층주 자리
   const D = { i: 86, j: 88 }; // 내려가는 계단
-  const keep = [{ ...C, r: 9 }, { ...B, r: 7 }, { ...U, r: 4 }, { ...D, r: 4 }];
+  const VR = 11; // 휴식 마을: 울타리로 두른 정사각형 (가운데에서 ±11칸), 네 면 가운데에 문
+  const keep = [{ ...C, r: VR + 4 }, { ...B, r: 7 }, { ...U, r: 4 }, { ...D, r: 4 }];
   const free = (i: number, j: number, m = 0) => keep.every((k) => Math.hypot(i - k.i, j - k.j) > k.r + m);
   // 지형
   if (def.theme === 'ash') {
@@ -109,13 +110,23 @@ export function hellZone(floor: number): Zone {
       }
     }
   };
-  road(C, B); road(B, U); road(C, D);
-  disc(C.i, C.j, 7, 'walk'); disc(B.i, B.j, 6, 'walk'); disc(U.i, U.j, 2, 'walk'); disc(D.i, D.j, 2, 'walk');
-  // 건물: 폐허·오두막·시장 건물 (휴식 공간에는 황혼의 우주새)
+  // 마을 문 넷 (울타리 바로 바깥까지 길을 낸다)
+  const gates = [{ i: C.i, j: C.j - VR - 1 }, { i: C.i - VR - 1, j: C.j }, { i: C.i + VR + 1, j: C.j }, { i: C.i, j: C.j + VR + 1 }];
+  const gateFor = (t: { i: number; j: number }) => gates.reduce((a, g) => (Math.hypot(g.i - t.i, g.j - t.j) < Math.hypot(a.i - t.i, a.j - t.j) ? g : a));
+  road(gateFor(B), B); road(B, U); road(gateFor(D), D);
+  for (const g of gates) road(C, g);
+  disc(B.i, B.j, 6, 'walk'); disc(U.i, U.j, 2, 'walk'); disc(D.i, D.j, 2, 'walk');
+  // 마을 안: 흙바닥 광장
+  for (let j = C.j - VR + 1; j <= C.j + VR - 1; j++) for (let i = C.i - VR + 1; i <= C.i + VR - 1; i++) set(i, j, (Math.abs(i - C.i) < 5 && Math.abs(j - C.j) < 5) || (i - C.i) * (j - C.j) === 0 ? 'walk' : 'lot');
+  // 건물: 폐허·오두막·시장 건물 (마을 안에는 황혼의 우주새와 오두막 넷)
   const buildings: Building[] = [];
-  const shop: Building = { i0: C.i - 2, j0: C.j - 8, w: 4, d: 4, h: 44, cat: 'ujusae', sign: 'left', color: '#3a2a2a' };
+  const shop: Building = { i0: C.i - 1, j0: C.j - 6, w: 2, d: 2, h: 58, cat: 'ujusae', sign: 'left', color: '#3a2a2a' };
   buildings.push(shop);
-  const door = { i: shop.i0 + 2, j: shop.j0 + shop.d };
+  const door = { i: shop.i0 + 1, j: shop.j0 + shop.d };
+  const hutCol: Record<Theme, string> = { ash: '#4a3e36', swamp: '#4a4230', market: '#5a3228' };
+  for (const [di, dj, w, d] of [[-8, -8, 3, 2], [5, -9, 2, 3], [-9, 4, 2, 3], [5, 5, 3, 2], [-9, -3, 2, 2]] as const)
+    buildings.push({ i0: C.i + di, j0: C.j + dj, w, d, h: 30, cat: 'generic', color: hutCol[def.theme], hut: true });
+  for (const b of buildings) for (let j = b.j0; j < b.j0 + b.d; j++) for (let i = b.i0; i < b.i0 + b.w; i++) set(i, j, 'block');
   const occupied = (i0: number, j0: number, w: number, d: number) => {
     for (let j = j0 - 1; j <= j0 + d; j++) for (let i = i0 - 1; i <= i0 + w; i++) {
       const t = at(i, j);
@@ -134,14 +145,23 @@ export function hellZone(floor: number): Zone {
     buildings.push({ i0, j0, w, d, h, cat: 'generic', color: colors[def.theme][Math.floor(r() * colors[def.theme].length)] });
     n++;
   }
-  // 소품: 죽은 나무, 화로(밤 불빛), 부러진 기둥, 시장 좌판
+  // 소품: 마을 울타리, 죽은 나무, 화로(밤 불빛), 부러진 기둥, 시장 좌판
   const props: Prop[] = [];
+  for (let k = -VR; k <= VR; k++) {
+    const gate = Math.abs(k) <= 1;
+    for (const [i, j, o] of [[C.i + k, C.j - VR, 0], [C.i + k, C.j + VR, 0], [C.i - VR, C.j + k, 1], [C.i + VR, C.j + k, 1]] as const) {
+      if (gate) { set(i, j, 'walk'); continue; }
+      props.push({ i, j, kind: 'fence', o: Math.abs(k) === VR ? 2 : o });
+    }
+  }
+  props.push({ i: C.i + 2, j: C.j + 1, kind: 'lamp' }); // 광장 화톳불
+  for (const g of gates) for (const s2 of [-2, 2]) props.push(g.i === C.i ? { i: g.i + s2, j: g.j + (g.j < C.j ? 1 : -1), kind: 'lamp' } : { i: g.i + (g.i < C.i ? 1 : -1), j: g.j + s2, kind: 'lamp' });
   const empty = (i: number, j: number) => (at(i, j) === TI.lot || at(i, j) === TI.park) && free(i, j) && !buildings.some((b) => i >= b.i0 - 1 && i <= b.i0 + b.w && j >= b.j0 - 1 && j <= b.j0 + b.d) && !props.some((p) => Math.abs(p.i - i) + Math.abs(p.j - j) < 2);
   const scatter = (kind: Prop['kind'], n: number) => { for (let k = 0, t = 0; k < n && t < n * 30; t++) { const i = 4 + Math.floor(r() * (W - 8)), j = 4 + Math.floor(r() * (H - 8)); if (empty(i, j)) { props.push({ i, j, kind }); k++; } } };
   scatter('tree', def.theme === 'swamp' ? 150 : def.theme === 'ash' ? 70 : 10);
   scatter('pillar', def.theme === 'ash' ? 18 : 4);
   if (def.theme === 'market') {
-    for (let k = 0, t = 0; k < 70 && t < 3000; t++) {
+    for (let k = 0, t = 0; k < 16 && t < 3000; t++) { // 노점은 드문드문 (예전 70은 파라솔 숲이었다)
       const i = 4 + Math.floor(r() * (W - 8)), j = 4 + Math.floor(r() * (H - 8));
       const nearSoi = at(i + 1, j) === TI.soi || at(i - 1, j) === TI.soi || at(i, j + 1) === TI.soi || at(i, j - 1) === TI.soi;
       if (nearSoi && empty(i, j)) { props.push({ i, j, kind: 'cart' }); k++; }
@@ -158,11 +178,11 @@ export function hellZone(floor: number): Zone {
   for (let t = 0; spawns.length < 60 && t < 5000; t++) {
     const i = 4 + Math.floor(r() * (W - 8)), j = 4 + Math.floor(r() * (H - 8));
     const tt = at(i, j);
-    if ((tt === TI.lot || tt === TI.park || tt === TI.walk || tt === TI.soi) && Math.hypot(i - C.i, j - C.j) > 14 && Math.hypot(i - B.i, j - B.j) > 8) spawns.push([i, j]);
+    if ((tt === TI.lot || tt === TI.park || tt === TI.walk || tt === TI.soi) && Math.hypot(i - C.i, j - C.j) > 19 && Math.hypot(i - B.i, j - B.j) > 8) spawns.push([i, j]);
   }
   const z = finalize({
     id: `hell-${floor}`, W, H, tiles, buildings, props, lanes: [], door, spawn: door,
-    hell: { floor, rest: { i: C.i, j: C.j, r: 9 }, up: U, down: D, boss: B, pashar: floor === 1 ? { i: U.i + 3, j: U.j - 1 } : undefined, spawns },
+    hell: { floor, rest: { i: C.i, j: C.j, r: VR }, up: U, down: D, boss: B, pashar: floor === 1 ? { i: U.i + 3, j: U.j - 1 } : undefined, spawns },
   });
   cache.set(floor, z);
   return z;

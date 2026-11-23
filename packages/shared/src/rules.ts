@@ -169,10 +169,14 @@ export function dodgeChance(agi: number): number {
 
 /** 회복력: 싸움에서 벗어난 뒤 1분마다 최대 체력의 2% × (1 + 신앙/100) */
 export function regenPerMinute(max: number, fai: number): number {
-  return max * 0.02 * (1 + fai / 100);
+  return max * 0.08 * (1 + fai / 100); // 밖에서는 약 12분이면 다 찬다
+}
+/** 휴식처(지옥 마을·우주새·종교시설·은행·병원·약국 안)에서는 약 50초면 다 찬다 */
+export function restRegenPerMinute(max: number, fai: number): number {
+  return max * 1.2 * (1 + fai / 100);
 }
 /** 싸움에서 벗어났다고 보는 시간(초) */
-export const OUT_OF_COMBAT_S = 20;
+export const OUT_OF_COMBAT_S = 8;
 
 /** 기도 응답: 기도할 때 (5 + 신앙 × 0.2)% 확률로 체력 30% 회복, 시설마다 하루 한 번 */
 export function prayerAnswerChance(fai: number): number {
