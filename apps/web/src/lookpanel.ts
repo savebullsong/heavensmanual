@@ -1,34 +1,23 @@
-// 캐릭터 만들기: 성별 · 체격 · 피부 · 헤어 · 머리색 · 상의 · 하의
-import { characterPixels, SPRITE_W, SPRITE_H, HAIR_STYLES, SKIN_COLORS, HAIR_COLORS, TOP_COLORS, BOTTOM_COLORS, BUILD_COUNT, type Look, type Facing } from './character.ts';
-import { toCanvas } from './raster.ts';
+// 외형 고르기 창: 따로 확대한 그림 없이, 방 안(또는 거리)의 캐릭터가 바로 바뀐다
+import { HAIR_STYLES, SKIN_COLORS, HAIR_COLORS, TOP_COLORS, BOTTOM_COLORS, BUILD_COUNT, type Look } from './character.ts';
 import { t } from './i18n.ts';
 
-export function openCreate(host: HTMLElement, initial: Look, onDone: (look: Look) => void) {
-  host.innerHTML = '';
-  host.className = 'scene create';
+export interface LookPanelOpts {
+  title: string;
+  confirm: string;
+  onChange: (look: Look) => void;
+  onTurn: () => void;
+  onDone: (look: Look) => void;
+}
+
+export function openLookPanel(host: HTMLElement, initial: Look, o: LookPanelOpts): () => void {
   const L = t();
   const look: Look = { ...initial };
-  let facing: Facing = 'front';
-  let frame = 0;
-
-  const title = document.createElement('h1');
-  title.textContent = L.createTitle;
-  const preview = document.createElement('canvas');
-  preview.width = SPRITE_W; preview.height = SPRITE_H;
-  preview.className = 'preview';
-  const panel = document.createElement('div');
-  panel.className = 'options';
-  const wrap = document.createElement('div');
-  wrap.className = 'create-body';
-  wrap.append(preview, panel);
-  host.append(title, wrap);
-
-  const draw = () => {
-    const c = toCanvas(characterPixels(look, facing, frame), SPRITE_W, SPRITE_H);
-    const g = preview.getContext('2d')!;
-    g.clearRect(0, 0, SPRITE_W, SPRITE_H);
-    g.drawImage(c, 0, 0);
-  };
+  const el = document.createElement('div');
+  el.className = 'look-panel';
+  const title = document.createElement('h2');
+  title.textContent = o.title;
+  el.appendChild(title);
 
   type Row = { label: string; count: number; get: () => number; set: (v: number) => void; name: (v: number) => string; swatch?: string[] };
   const rows: Row[] = [
@@ -64,25 +53,30 @@ export function openCreate(host: HTMLElement, initial: Look, onDone: (look: Look
         val.appendChild(sw);
       } else val.textContent = r.name(v);
     };
-    prev.onclick = () => { r.set((r.get() - 1 + r.count) % r.count); show(); draw(); };
-    next.onclick = () => { r.set((r.get() + 1) % r.count); show(); draw(); };
+    const change = (d: number) => { r.set((r.get() + d + r.count) % r.count); show(); o.onChange({ ...look }); };
+    prev.onclick = () => change(-1);
+    next.onclick = () => change(1);
     show();
     row.append(label, prev, val, next);
-    panel.appendChild(row);
+    el.appendChild(row);
   }
   const actions = document.createElement('div');
-  actions.className = 'create-actions';
+  actions.className = 'look-actions';
   const turn = document.createElement('button');
   turn.textContent = L.turn;
-  turn.onclick = () => { facing = facing === 'front' ? 'back' : 'front'; draw(); };
+  turn.onclick = () => o.onTurn();
   const ok = document.createElement('button');
   ok.className = 'primary';
-  ok.textContent = L.confirm;
-  let alive = true;
-  ok.onclick = () => { alive = false; onDone({ ...look }); };
+  ok.textContent = o.confirm;
+  ok.onclick = () => { el.remove(); o.onDone({ ...look }); };
   actions.append(turn, ok);
-  panel.appendChild(actions);
+  el.appendChild(actions);
+  host.appendChild(el);
+  o.onChange({ ...look });
+  return () => el.remove();
+}
 
-  draw();
-  const timer = setInterval(() => { if (!alive) { clearInterval(timer); return; } frame = (frame + 1) % 4; draw(); }, 160);
+/** 창이 가리는 크기 (넓은 화면은 오른쪽, 좁은 화면은 아래) */
+export function lookPanelInsets(): { right: number; bottom: number } {
+  return window.innerWidth >= 760 ? { right: 340, bottom: 0 } : { right: 0, bottom: Math.round(window.innerHeight * 0.48) };
 }

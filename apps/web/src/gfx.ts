@@ -143,18 +143,24 @@ export function drawBuilding(b: Building, signText: string, night: boolean) {
       quad([A(span / 2 - 0.35, 20), A(span / 2 + 0.35, 20), A(span / 2 + 0.35, 0), A(span / 2 - 0.35, 0)], '#6b4429');
       quad([A(span / 2 - 0.08, 11), A(span / 2 + 0.02, 11), A(span / 2 + 0.02, 9), A(span / 2 - 0.08, 9)], '#e0b437');
     }
-    const signCol = b.cat === 'ujusae' ? '#e0b437' : SIGN_COLORS[b.cat] ?? '#c7553f';
-    quad([A(0, 33), A(span, 33), A(span, 23), A(0, 23)], signCol);
-    // 간판 글씨 (면의 기울기를 따라 기울인다)
-    const [sx, sy] = A(span / 2, 26);
-    g.save();
-    g.translate(sx, sy);
-    g.transform(1, left ? 0.5 : -0.5, 0, 1, 0, 0);
-    g.font = '600 10px sans-serif';
-    g.textAlign = 'center';
-    g.fillStyle = b.cat === 'ujusae' ? '#2a1a10' : '#fffaf0';
-    g.fillText(signText, 0, 0);
-    g.restore();
+    if (b.cat === 'ujusae') {
+      // 우주새는 간판이 없다. 처마 아래 나무 띠만 두른다 (이름은 누르면 보인다)
+      quad([A(0, 30), A(span, 30), A(span, 23), A(0, 23)], '#3a2416');
+      quad([A(0, 30), A(span, 30), A(span, 29), A(0, 29)], '#5a3d26');
+    } else {
+      const signCol = SIGN_COLORS[b.cat] ?? '#c7553f';
+      quad([A(0, 33), A(span, 33), A(span, 23), A(0, 23)], signCol);
+      // 간판 글씨 (면의 기울기를 따라 기울인다)
+      const [sx, sy] = A(span / 2, 26);
+      g.save();
+      g.translate(sx, sy);
+      g.transform(1, left ? 0.5 : -0.5, 0, 1, 0, 0);
+      g.font = '600 10px sans-serif';
+      g.textAlign = 'center';
+      g.fillStyle = '#fffaf0';
+      g.fillText(signText, 0, 0);
+      g.restore();
+    }
   }
   // 외곽선
   g.strokeStyle = 'rgba(20,14,10,0.55)'; g.lineWidth = 1;

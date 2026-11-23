@@ -1,0 +1,220 @@
+// 우주새 상품: 소비품 · 무기 · 방어구 (브랜드 실명 없음, 가격은 바트)
+import type { Lang } from './i18n.ts';
+
+export type ItemCat = 'goods' | 'weapon' | 'armor';
+export interface ItemDef {
+  key: string;
+  cat: ItemCat;
+  price: number;
+  heal?: number; // 체력 회복
+  atk?: number; // 공격력
+  def?: number; // 방어력
+  note?: 'rope' | 'needsAmmo' | 'ammo';
+  name: Record<Lang, string>;
+}
+
+export const ITEMS: ItemDef[] = [
+  // 소비품
+  { key: 'chips', cat: 'goods', price: 30, heal: 25, name: { ko: '감자칩', th: 'มันฝรั่งทอด', en: 'Potato chips' } },
+  { key: 'choco', cat: 'goods', price: 35, heal: 30, name: { ko: '초콜릿', th: 'ช็อกโกแลต', en: 'Chocolate' } },
+  { key: 'cola', cat: 'goods', price: 17, heal: 15, name: { ko: '콜라', th: 'โคล่า', en: 'Cola' } },
+  { key: 'water', cat: 'goods', price: 10, heal: 10, name: { ko: '물', th: 'น้ำเปล่า', en: 'Water' } },
+  { key: 'rope', cat: 'goods', price: 120, note: 'rope', name: { ko: '밧줄', th: 'เชือก', en: 'Rope' } },
+  { key: 'bandage', cat: 'goods', price: 45, heal: 120, name: { ko: '붕대', th: 'ผ้าพันแผล', en: 'Bandage' } },
+  // 무기 — 공격력 차이가 가격에 반영된다
+  { key: 'pipe', cat: 'weapon', price: 180, atk: 4, name: { ko: '쇠파이프', th: 'ท่อเหล็ก', en: 'Steel pipe' } },
+  { key: 'hammer', cat: 'weapon', price: 290, atk: 4, name: { ko: '장도리', th: 'ค้อนหงอน', en: 'Claw hammer' } },
+  { key: 'knife', cat: 'weapon', price: 390, atk: 5, name: { ko: '식칼', th: 'มีดทำครัว', en: 'Kitchen knife' } },
+  { key: 'shovel', cat: 'weapon', price: 420, atk: 5, name: { ko: '삽', th: 'พลั่ว', en: 'Shovel' } },
+  { key: 'bat', cat: 'weapon', price: 850, atk: 6, name: { ko: '야구 배트', th: 'ไม้เบสบอล', en: 'Baseball bat' } },
+  { key: 'hatchet', cat: 'weapon', price: 950, atk: 7, name: { ko: '손도끼', th: 'ขวานมือ', en: 'Hatchet' } },
+  { key: 'dagger', cat: 'weapon', price: 1800, atk: 8, name: { ko: '단검', th: 'มีดสั้น', en: 'Dagger' } },
+  { key: 'sword', cat: 'weapon', price: 7500, atk: 12, name: { ko: '장검', th: 'ดาบยาว', en: 'Longsword' } },
+  { key: 'pistol', cat: 'weapon', price: 45000, atk: 20, note: 'needsAmmo', name: { ko: '권총', th: 'ปืนพก', en: 'Pistol' } },
+  { key: 'ammo', cat: 'weapon', price: 600, note: 'ammo', name: { ko: '권총탄 12발', th: 'กระสุนปืนพก 12 นัด', en: 'Pistol rounds ×12' } },
+  // 방어구
+  { key: 'helmet', cat: 'armor', price: 690, def: 3, name: { ko: '헬멧', th: 'หมวกกันน็อก', en: 'Helmet' } },
+  { key: 'jacket', cat: 'armor', price: 1290, def: 4, name: { ko: '보호 재킷', th: 'แจ็กเก็ตกันกระแทก', en: 'Protective jacket' } },
+  { key: 'vest', cat: 'armor', price: 4900, def: 7, name: { ko: '방호 조끼', th: 'เสื้อเกราะ', en: 'Protective vest' } },
+  { key: 'gloves', cat: 'armor', price: 120, def: 1, name: { ko: '작업 장갑', th: 'ถุงมือช่าง', en: 'Work gloves' } },
+  { key: 'workpants', cat: 'armor', price: 450, def: 2, name: { ko: '작업 바지', th: 'กางเกงช่าง', en: 'Work trousers' } },
+  { key: 'shinguard', cat: 'armor', price: 390, def: 2, name: { ko: '정강이 보호대', th: 'สนับแข้ง', en: 'Shin guards' } },
+  { key: 'boots', cat: 'armor', price: 990, def: 2, name: { ko: '안전화', th: 'รองเท้าเซฟตี้', en: 'Safety boots' } },
+];
+
+const EFFECT: Record<Lang, { hp: string; atk: string; def: string; rope: string; needsAmmo: string; ammo: string }> = {
+  ko: { hp: '체력 +{n}', atk: '공격 {n}', def: '방어 {n}', rope: '추락을 한 번 막아 줌', needsAmmo: '탄약 필요', ammo: '권총에 넣는 탄약' },
+  th: { hp: 'พลังชีวิต +{n}', atk: 'โจมตี {n}', def: 'ป้องกัน {n}', rope: 'กันตกจากที่สูงได้หนึ่งครั้ง', needsAmmo: 'ต้องใช้กระสุน', ammo: 'กระสุนสำหรับปืนพก' },
+  en: { hp: 'HP +{n}', atk: 'Attack {n}', def: 'Defense {n}', rope: 'Saves you from one fall', needsAmmo: 'Needs ammo', ammo: 'Rounds for the pistol' },
+};
+
+export function effectText(it: ItemDef, l: Lang): string {
+  const E = EFFECT[l];
+  const parts: string[] = [];
+  if (it.heal) parts.push(E.hp.replace('{n}', String(it.heal)));
+  if (it.atk) parts.push(E.atk.replace('{n}', String(it.atk)));
+  if (it.def) parts.push(E.def.replace('{n}', String(it.def)));
+  if (it.note) parts.push(E[it.note]);
+  return parts.join(' · ');
+}
+
+export function priceText(n: number): string {
+  return `฿${n.toLocaleString('en-US')}`;
+}
+
+// ───────────────────────── 32×32 아이콘 ─────────────────────────
+const OUTLINE = [20, 14, 10];
+
+export function itemIcon(key: string): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = c.height = 32;
+  const g = c.getContext('2d')!;
+  const R = (x: number, y: number, w: number, h: number, col: string) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+  const E = (cx: number, cy: number, rx: number, ry: number, col: string) => {
+    g.fillStyle = col;
+    for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++)
+      for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++)
+        if (((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 <= 1) g.fillRect(x, y, 1, 1);
+  };
+  // 굵기 있는 대각선 (왼쪽 아래 → 오른쪽 위)
+  const Ln = (x0: number, y0: number, x1: number, y1: number, w: number, col: string) => {
+    g.fillStyle = col;
+    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+    for (let k = 0; k <= n; k++) {
+      const x = x0 + ((x1 - x0) * k) / n, y = y0 + ((y1 - y0) * k) / n;
+      g.fillRect(Math.round(x - w / 2), Math.round(y - w / 2), w, w);
+    }
+  };
+  const P = (pts: [number, number][], col: string) => {
+    g.fillStyle = col;
+    g.beginPath();
+    g.moveTo(pts[0][0], pts[0][1]);
+    for (const p of pts.slice(1)) g.lineTo(p[0], p[1]);
+    g.closePath();
+    g.fill();
+  };
+
+  switch (key) {
+    case 'cola':
+      R(10, 5, 12, 2, '#b9b9b4'); R(9, 7, 14, 21, '#8e1f1c'); R(9, 7, 3, 21, '#b8322c'); R(20, 7, 3, 21, '#5e1412');
+      R(9, 13, 14, 6, '#2a1210'); R(12, 15, 8, 2, '#d8d2c4'); R(10, 27, 12, 2, '#9a9a94'); R(13, 4, 6, 1, '#d6d6d0');
+      break;
+    case 'chips':
+      P([[8, 6], [24, 6], [25, 27], [7, 27]], '#d99a2b');
+      for (let x = 8; x < 25; x += 2) { R(x, 4, 1, 3, '#c9c4b4'); R(x, 27, 1, 3, '#c9c4b4'); }
+      R(8, 5, 17, 2, '#e8e2d0'); R(7, 26, 18, 2, '#e8e2d0'); R(9, 8, 3, 18, '#f2c25a');
+      E(16, 18, 5, 4, '#f6dd8a'); E(16, 18, 3, 2, '#e9c463'); R(10, 10, 12, 3, '#8a2e1e');
+      break;
+    case 'choco':
+      P([[5, 20], [20, 5], [27, 12], [12, 27]], '#4a2a18');
+      for (let k = 0; k < 3; k++) for (let m = 0; m < 2; m++) Ln(9 + k * 5 + m * 3, 21 - k * 5 + m * 3, 11 + k * 5 + m * 3, 19 - k * 5 + m * 3, 1, '#6e4128');
+      P([[12, 27], [27, 12], [29, 15], [15, 30]], '#7a1e2a'); P([[20, 18], [24, 14], [26, 16], [22, 20]], '#c9a23e');
+      break;
+    case 'water':
+      R(13, 3, 6, 3, '#2f6fb8'); R(12, 6, 8, 2, '#9fc6e4'); P([[11, 8], [21, 8], [23, 12], [23, 28], [9, 28], [9, 12]], '#b9dcef');
+      R(9, 15, 14, 7, '#e8f2f6'); R(11, 17, 10, 3, '#3f8fd0'); R(10, 9, 2, 18, '#e6f4fb'); R(20, 12, 2, 15, '#8fbcd6');
+      break;
+    case 'rope':
+      E(16, 17, 12, 10, '#b08a52'); E(16, 17, 9, 7, '#8a6838'); E(16, 17, 6, 4.5, '#c49a5e'); E(16, 17, 3, 2, '#2b2014');
+      for (let a = 0; a < 18; a++) { const t = (a / 18) * Math.PI * 2; R(Math.round(16 + Math.cos(t) * 10.5), Math.round(17 + Math.sin(t) * 8.5), 1, 1, '#e0c08a'); }
+      Ln(24, 24, 29, 30, 3, '#b08a52');
+      break;
+    case 'bandage':
+      E(13, 16, 9, 9, '#ece8de'); E(13, 16, 5, 5, '#d6d0c2'); E(13, 16, 2, 2, '#a89f8c');
+      P([[19, 22], [28, 18], [30, 23], [21, 27]], '#ece8de'); R(22, 22, 6, 1, '#cfc8b8');
+      R(6, 12, 2, 8, '#fbfaf4');
+      break;
+    case 'knife':
+      P([[4, 27], [19, 12], [22, 15], [8, 28]], '#dfe4ea'); Ln(5, 27, 19, 13, 1, '#f6f9fc'); Ln(9, 28, 21, 16, 1, '#9aa3ad');
+      Ln(21, 12, 28, 5, 4, '#3a2418'); R(22, 10, 2, 2, '#c9c4b8'); R(25, 7, 2, 2, '#c9c4b8');
+      break;
+    case 'bat':
+      Ln(4, 28, 10, 22, 3, '#8a6238'); Ln(10, 22, 26, 6, 6, '#c49a5e'); Ln(11, 20, 25, 6, 2, '#e0bd84');
+      R(2, 28, 4, 3, '#5a3d22'); Ln(5, 27, 8, 24, 1, '#2a1a10');
+      break;
+    case 'hammer':
+      Ln(6, 28, 19, 13, 4, '#7a5232'); Ln(7, 26, 18, 14, 1, '#a07448');
+      P([[14, 10], [22, 4], [27, 9], [23, 13]], '#5d6470'); P([[22, 4], [25, 2], [30, 6], [27, 9]], '#7c8492');
+      P([[14, 10], [10, 9], [8, 12], [12, 13]], '#4a505a'); Ln(9, 11, 12, 11, 1, '#2e323a');
+      break;
+    case 'pipe':
+      Ln(4, 28, 27, 5, 6, '#6e747c'); Ln(4, 26, 26, 4, 2, '#a9afb6'); Ln(6, 29, 28, 7, 1, '#454a50');
+      E(27, 5, 3, 3, '#3a3e44'); E(27, 5, 1.5, 1.5, '#1e2125');
+      break;
+    case 'hatchet':
+      Ln(7, 29, 19, 9, 3, '#8a6238'); Ln(8, 28, 18, 11, 1, '#b08a52');
+      P([[15, 7], [23, 3], [28, 10], [24, 17], [18, 13]], '#7c8492'); P([[24, 17], [28, 10], [29, 15], [26, 19]], '#c9ced6');
+      R(16, 9, 4, 4, '#4a505a');
+      break;
+    case 'shovel':
+      Ln(3, 29, 18, 14, 2, '#8a6238'); E(4, 28, 3, 3, '#5a3d22'); E(4, 28, 1.5, 1.5, '#14100c');
+      P([[17, 12], [24, 5], [30, 8], [29, 15], [21, 19]], '#7c8492'); P([[24, 5], [30, 8], [29, 11], [25, 9]], '#a9afb6');
+      Ln(17, 15, 20, 12, 2, '#4a505a');
+      break;
+    case 'dagger':
+      P([[13, 19], [24, 6], [27, 5], [26, 8], [15, 21]], '#dfe4ea'); Ln(14, 19, 25, 6, 1, '#f6f9fc');
+      Ln(9, 15, 17, 23, 2, '#a07c3a'); Ln(6, 27, 12, 21, 3, '#3a2418'); E(5, 28, 2, 2, '#a07c3a');
+      break;
+    case 'sword':
+      P([[9, 21], [27, 3], [30, 2], [29, 5], [11, 23]], '#dfe4ea'); Ln(10, 21, 28, 3, 1, '#f6f9fc');
+      Ln(5, 17, 15, 27, 2, '#8a6a2a'); Ln(3, 29, 9, 23, 3, '#3a2418'); E(3, 29, 2, 2, '#8a6a2a');
+      break;
+    case 'pistol':
+      P([[4, 9], [28, 9], [28, 15], [13, 15], [12, 26], [5, 26], [7, 15], [4, 15]], '#25272b');
+      R(4, 9, 24, 2, '#4a4e55'); R(6, 18, 5, 7, '#3a2f28'); P([[13, 15], [17, 15], [17, 20], [13, 19]], '#1a1b1e');
+      R(14, 16, 2, 2, '#4a4e55'); R(26, 8, 2, 1, '#4a4e55'); R(9, 12, 12, 1, '#3a3d42');
+      break;
+    case 'ammo':
+      R(5, 16, 22, 12, '#4a5a3a'); R(5, 16, 22, 2, '#6a7a52'); R(7, 20, 18, 3, '#d8d2c4');
+      for (let k = 0; k < 4; k++) { R(7 + k * 5, 6, 3, 10, '#c9963a'); R(7 + k * 5, 4, 3, 3, '#b0703a'); R(7 + k * 5, 6, 1, 10, '#e8c26a'); }
+      break;
+    case 'helmet':
+      E(16, 16, 12, 11, '#2b2f36');
+      g.clearRect(0, 22, 32, 10); R(5, 20, 22, 4, '#2b2f36');
+      P([[9, 14], [26, 13], [26, 20], [11, 20]], '#5c7f9a'); R(12, 15, 10, 1, '#a9c7da');
+      R(8, 6, 6, 2, '#4a505a'); R(4, 24, 24, 2, '#1a1c20');
+      break;
+    case 'jacket':
+      P([[10, 5], [22, 5], [29, 12], [26, 15], [24, 13], [24, 28], [8, 28], [8, 13], [6, 15], [3, 12]], '#4a5236');
+      R(15, 6, 2, 22, '#2e3322'); R(16, 6, 1, 22, '#b9b49a'); R(10, 5, 4, 3, '#3a4028'); R(18, 5, 4, 3, '#3a4028');
+      for (let y = 10; y < 28; y += 5) { R(8, y, 7, 1, '#3a4028'); R(17, y, 7, 1, '#3a4028'); }
+      break;
+    case 'vest':
+      P([[9, 4], [13, 4], [16, 8], [19, 4], [23, 4], [26, 10], [26, 28], [6, 28], [6, 10]], '#3a3f46');
+      R(9, 12, 6, 9, '#4f5660'); R(17, 12, 6, 9, '#4f5660'); R(6, 23, 20, 3, '#2a2e33');
+      R(8, 24, 2, 1, '#9aa3ad'); R(22, 24, 2, 1, '#9aa3ad');
+      break;
+    case 'gloves':
+      P([[4, 22], [4, 12], [6, 9], [8, 12], [9, 8], [11, 11], [12, 8], [14, 12], [15, 16], [16, 22]], '#d1a83a');
+      P([[16, 24], [16, 13], [18, 10], [20, 13], [21, 9], [23, 12], [24, 9], [26, 13], [27, 17], [28, 24]], '#e0b84a');
+      R(4, 22, 12, 5, '#8a6a2a'); R(16, 24, 12, 5, '#9a7a32');
+      break;
+    case 'workpants':
+      P([[8, 3], [24, 3], [26, 29], [19, 29], [16, 12], [13, 29], [6, 29]], '#2f3c55');
+      R(8, 3, 16, 3, '#25304a'); R(15, 4, 2, 6, '#1c2438'); R(7, 18, 6, 5, '#46557a'); R(19, 18, 6, 5, '#46557a');
+      R(10, 7, 4, 3, '#25304a');
+      break;
+    case 'shinguard':
+      P([[6, 4], [13, 4], [14, 26], [10, 29], [5, 26]], '#24262a'); P([[18, 4], [25, 4], [26, 26], [22, 29], [17, 26]], '#24262a');
+      R(7, 8, 5, 14, '#5c626b'); R(19, 8, 5, 14, '#5c626b'); R(6, 10, 8, 1, '#8a6a2a'); R(18, 10, 8, 1, '#8a6a2a');
+      R(6, 20, 8, 1, '#8a6a2a'); R(18, 20, 8, 1, '#8a6a2a');
+      break;
+    case 'boots':
+      P([[6, 6], [16, 6], [17, 19], [28, 21], [29, 27], [5, 27]], '#5a3a22'); R(5, 27, 25, 3, '#1c1410');
+      E(25, 23, 4, 3, '#7c8492'); R(7, 6, 9, 2, '#3a2416');
+      for (let y = 10; y < 18; y += 3) R(11, y, 4, 1, '#c9b48a');
+      break;
+  }
+  // 반투명 가장자리를 정리하고 1px 외곽선을 두른다
+  const im = g.getImageData(0, 0, 32, 32);
+  const d = im.data;
+  for (let k = 3; k < d.length; k += 4) d[k] = d[k] > 110 ? 255 : 0;
+  const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < 32 && y < 32 && d[(y * 32 + x) * 4 + 3] > 0;
+  const edge: number[] = [];
+  for (let y = 0; y < 32; y++)
+    for (let x = 0; x < 32; x++)
+      if (!solid(x, y) && (solid(x - 1, y) || solid(x + 1, y) || solid(x, y - 1) || solid(x, y + 1))) edge.push(y * 32 + x);
+  for (const p of edge) { d[p * 4] = OUTLINE[0]; d[p * 4 + 1] = OUTLINE[1]; d[p * 4 + 2] = OUTLINE[2]; d[p * 4 + 3] = 255; }
+  g.putImageData(im, 0, 0);
+  return c;
+}

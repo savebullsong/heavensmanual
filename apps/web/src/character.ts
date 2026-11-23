@@ -34,10 +34,10 @@ export function characterPixels(look: Look, facing: Facing, frame: number, opt: 
     [SK]: ramp(SKIN_COLORS[look.skin]),
     [EAR]: ramp(SKIN_COLORS[look.skin]),
     [HR]: ramp(HAIR_COLORS[look.hairColor]),
-    [TP]: ramp(look.outfit === 'apron' ? '#2e2a33' : TOP_COLORS[look.top]),
-    [BT]: ramp(look.outfit === 'apron' ? '#2e2a33' : BOTTOM_COLORS[look.bottom]),
+    [TP]: ramp(look.outfit === 'apron' ? '#e4dfd3' : TOP_COLORS[look.top]),
+    [BT]: ramp(look.outfit === 'apron' ? '#3a2f28' : BOTTOM_COLORS[look.bottom]),
     [SH]: ramp(look.outfit === 'apron' ? '#3a2418' : '#e6e2da'),
-    [AP]: ramp('#c9a23e'),
+    [AP]: ramp('#b39b74'),
     [RB]: ramp('#e0b437'),
   };
   const r = new Raster(SPRITE_W, SPRITE_H, pal);
@@ -140,7 +140,7 @@ export function characterPixels(look: Look, facing: Facing, frame: number, opt: 
 
   // ── 앞치마 (상점 직원용)
   if (look.outfit === 'apron' && front) {
-    P([[cx - 5, 35], [cx + 5, 35], [cx + 6, 49], [cx + hp * 0.9, 64], [cx + hp * 0.82, 84], [cx - hp * 0.82, 84], [cx - hp * 0.9, 64], [cx - 6, 49]], AP);
+    P([[cx - 5, 35], [cx + 5, 35], [cx + 6, 49], [cx + hp * 0.9, 64], [cx + hp * 0.96, 97], [cx - hp * 0.96, 97], [cx - hp * 0.9, 64], [cx - 6, 49]], AP);
   }
 
   // ── 머리
@@ -172,7 +172,6 @@ export function characterPixels(look: Look, facing: Facing, frame: number, opt: 
       ponytail: [[[30.2, 13], [30.3, 9.2], [32.6, 6.4], [36, 5.4], [39.4, 6.4], [41.8, 9.2], [41.9, 13], [41.1, 12.2], [39.4, 10.4], [36, 9.8], [32.6, 10.4], [31, 12.2]]],
     };
     for (const p of fringe[style]) P(p, HR);
-    if (look.outfit === 'apron') P([[40.2, 7], [43, 6.4], [43.4, 9.6], [41, 9.6]], RB);
   } else {
     const backHair: Record<string, Pt[][]> = {
       buzz: [[[30.2, 9.6], [32, 6.6], [36, 5.8], [40, 6.6], [41.8, 9.6], [42, 15], [30, 15]]],
@@ -183,7 +182,6 @@ export function characterPixels(look: Look, facing: Facing, frame: number, opt: 
       ponytail: [[[29.4, 10], [31.2, 6.4], [36, 5.2], [40.8, 6.4], [42.6, 10], [42.6, 20], [29.4, 20]], [[34.6, 15], [37.4, 15], [38.2, 30], [37.2, 42], [34.8, 42], [33.8, 30]]],
     };
     for (const p of backHair[style]) P(p, HR);
-    if (look.outfit === 'apron') P([[34.4, 14], [37.6, 14], [37.6, 16.6], [34.4, 16.6]], RB);
   }
 
   // ── 수동 음영

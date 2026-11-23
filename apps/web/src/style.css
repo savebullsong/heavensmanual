@@ -8,35 +8,64 @@ button:hover { background: #3a2b20; }
 button.primary { background: #c9a23e; color: #1c140d; border-color: #e0b437; font-weight: 600; }
 button.primary:hover { background: #e0b437; }
 
-/* 상점 */
-#ui { position: fixed; inset: 0; overflow: auto; }
-.scene.shop { display: flex; flex-direction: column; align-items: center; min-height: 100%; padding: 12px; gap: 10px; }
-.shop-stage { position: relative; width: min(100%, 960px, calc((100vh - 240px) * 16 / 9)); min-width: 320px; aspect-ratio: 16 / 9; }
-.shop-stage canvas { width: 100%; height: 100%; image-rendering: pixelated; border: 2px solid #4a3424; border-radius: 6px; display: block; }
-.shop-sign { position: absolute; left: 4%; top: 6%; padding: 2px 10px; background: #e0b437; color: #2a1a10; font-weight: 700; letter-spacing: 0.08em; border: 2px solid #6b4a2c; border-radius: 3px; font-size: clamp(12px, 2.2vw, 20px); transform: rotate(-3deg); }
-.dialog { width: min(100%, 960px); background: #1d1510; border: 2px solid #8a6a3a; border-radius: 6px; padding: 12px 16px 14px; position: relative; box-shadow: inset 0 0 0 2px #2c2016; }
-.speaker { display: inline-block; background: #8a6a3a; color: #1c140d; font-weight: 700; padding: 1px 10px; border-radius: 3px; margin-bottom: 6px; }
-.line { min-height: 3em; line-height: 1.5; font-size: 17px; }
-.choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.choices.items .item { display: flex; align-items: center; gap: 8px; }
-.item .icon { width: 32px; height: 32px; image-rendering: pixelated; }
-.item .price { color: #e0b437; font-size: 13px; }
-.wallet { position: absolute; right: 14px; top: 10px; font-size: 13px; color: #b8a888; }
+#ui { position: fixed; inset: 0; overflow: auto; z-index: 30; }
 
-/* 캐릭터 만들기 */
-.scene.create { display: flex; flex-direction: column; align-items: center; padding: 24px 12px; gap: 12px; min-height: 100%; }
-.scene.create h1 { font-size: 22px; font-weight: 600; margin: 0; color: #e0b437; }
-.create-body { display: flex; gap: 28px; align-items: center; flex-wrap: wrap; justify-content: center; }
-.preview { width: 216px; height: 432px; image-rendering: pixelated; background: radial-gradient(#3a2e24, #1d1510 70%); border: 2px solid #4a3424; border-radius: 8px; }
-.options { display: flex; flex-direction: column; gap: 8px; min-width: 280px; }
-.opt { display: grid; grid-template-columns: 96px 40px 1fr 40px; align-items: center; gap: 6px; }
+/* 대화창: 주요 인물은 그림을 크게 세운다 (일본 RPG식) */
+.dlg { position: fixed; inset: 0; z-index: 20; user-select: none; -webkit-user-select: none; }
+.dlg-portrait { position: absolute; left: max(-40px, calc(50% - 620px)); bottom: 0; height: min(88vh, 880px); opacity: 0; transform: translateX(-28px); transition: opacity 0.28s ease, transform 0.28s ease; pointer-events: none; }
+.dlg-portrait img { height: 100%; width: auto; display: block;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 74%, transparent 97%), linear-gradient(to right, transparent 0, #000 16%, #000 80%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 74%, transparent 97%), linear-gradient(to right, transparent 0, #000 16%, #000 80%, transparent 100%);
+  mask-composite: intersect; }
+.dlg::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 30% 60%, rgba(8, 5, 3, 0.1), rgba(8, 5, 3, 0.45)); opacity: 0; transition: opacity 0.28s; pointer-events: none; }
+.dlg.has-portrait::before { opacity: 1; }
+.dlg-portrait.show { opacity: 1; transform: none; }
+.dlg-box { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(96vw, 980px); min-height: 136px; padding: 26px 24px 18px; background: linear-gradient(rgba(24, 17, 12, 0.95), rgba(13, 9, 6, 0.97)); border: 2px solid #8a6a3a; border-radius: 6px; box-shadow: inset 0 0 0 2px #24190f, inset 0 0 0 3px #5a4424, 0 10px 32px rgba(0, 0, 0, 0.55); }
+.dlg-name { position: absolute; top: -16px; left: 18px; background: #c9a23e; color: #1c140d; font-weight: 700; padding: 3px 14px; border: 2px solid #6b4a2c; border-radius: 3px; letter-spacing: 0.04em; font-size: 15px; }
+.dlg-text { font-size: 18px; line-height: 1.65; min-height: 3.3em; white-space: pre-wrap; }
+.dlg-next { position: absolute; right: 18px; bottom: 10px; color: #e0b437; font-size: 12px; animation: dlg-blink 0.9s steps(2) infinite; }
+@keyframes dlg-blink { 50% { opacity: 0; } }
+.dlg-choices { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-top: 8px; }
+.dlg-choices:empty { display: none; }
+.dlg-panel { position: absolute; right: max(10px, calc(50% - 490px)); bottom: 168px; width: min(430px, calc(100vw - 20px)); max-height: calc(100vh - 240px); display: flex; }
+
+/* 상품 창 */
+.shop-menu { flex: 1; display: flex; flex-direction: column; min-height: 0; background: rgba(20, 14, 10, 0.97); border: 2px solid #8a6a3a; border-radius: 6px; box-shadow: inset 0 0 0 2px #24190f; }
+.menu-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 6px; padding: 8px 8px 0; border-bottom: 1px solid #4a3424; }
+.menu-tabs { display: flex; gap: 3px; }
+.menu-tabs button { padding: 5px 12px; font-size: 14px; border-radius: 4px 4px 0 0; border-bottom: 0; }
+.menu-tabs button.on { background: #c9a23e; color: #1c140d; border-color: #e0b437; font-weight: 600; }
+.menu-close { padding: 2px 9px; margin-bottom: 4px; }
+.menu-list { overflow: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+.menu-item { display: grid; grid-template-columns: 32px 1fr auto; column-gap: 12px; align-items: center; text-align: left; padding: 6px 10px; background: rgba(42, 31, 24, 0.75); border-color: #4f3a28; }
+.menu-item .icon { grid-row: 1 / span 2; width: 32px; height: 32px; image-rendering: pixelated; }
+.menu-item .name { grid-column: 2; font-size: 15px; }
+.menu-item .effect { grid-column: 2; font-size: 12px; color: #b8a888; }
+.menu-item .price { grid-column: 3; grid-row: 1 / span 2; color: #e0b437; font-variant-numeric: tabular-nums; }
+
+/* 외형 창: 캐릭터는 게임 화면에서 그대로 바뀐다 */
+.look-panel { position: fixed; right: 0; top: 0; bottom: 0; width: 340px; z-index: 15; overflow: auto; display: flex; flex-direction: column; gap: 8px; padding: 20px 16px 16px; background: rgba(20, 14, 10, 0.95); border-left: 2px solid #8a6a3a; }
+.look-panel h2 { margin: 0 0 6px; font-size: 18px; font-weight: 600; color: #e0b437; }
+.opt { display: grid; grid-template-columns: 84px 40px 1fr 40px; align-items: center; gap: 6px; }
 .opt-label { color: #b8a888; font-size: 14px; }
 .opt-value { text-align: center; display: flex; justify-content: center; }
 .swatch { display: inline-block; width: 28px; height: 18px; border: 1px solid #6b4f36; border-radius: 3px; }
-.create-actions { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }
+.look-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: auto; padding-top: 12px; }
+
+@media (max-width: 759px) {
+  .look-panel { left: 0; right: 0; top: auto; width: auto; height: 48vh; border-left: 0; border-top: 2px solid #8a6a3a; padding: 14px 12px; gap: 6px; }
+  .look-panel h2 { font-size: 16px; }
+}
+@media (max-width: 640px) {
+  .dlg-portrait { left: -14vw; height: min(64vh, 620px); }
+  .dlg-box { bottom: 8px; min-height: 120px; padding: 24px 16px 14px; }
+  .dlg-text { font-size: 16px; }
+  .dlg-panel { right: 10px; left: 10px; width: auto; bottom: 146px; max-height: calc(100vh - 210px); }
+}
 
 /* 월드 HUD */
-#hud { position: fixed; left: 0; right: 0; top: 0; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 10px 12px; pointer-events: none; flex-wrap: wrap; }
+#hud { position: fixed; left: 0; right: 0; top: 0; z-index: 10; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 10px 12px; pointer-events: none; flex-wrap: wrap; }
 #hud > div { pointer-events: auto; background: rgba(20, 15, 11, 0.78); border: 1px solid #4a3424; border-radius: 6px; padding: 6px 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 14px; }
 #hud .hud-left { flex-direction: column; align-items: flex-start; gap: 2px; }
 #hud .hint { font-size: 12px; color: #b8a888; }

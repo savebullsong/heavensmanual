@@ -63,6 +63,12 @@ export class WorldScene {
   private wantShop = false;
   private streamT = 0;
   private marker = new Graphics().ellipse(0, 0, 17, 7).stroke({ color: 0xe0b437, width: 2, alpha: 0.9 });
+  private shopLabel = new Container();
+  private shopLabelText = new Text({ text: '', style: { fontFamily: 'system-ui, sans-serif', fontSize: 13, fontWeight: '600', fill: '#fff6d8' } });
+  private shopLabelBg = new Graphics();
+  private shopLabelT = 0;
+  private shopHover = false;
+  private insets = { right: 0, bottom: 0 };
   private tick = (tk: { deltaMS: number }) => this.update(Math.min(0.05, tk.deltaMS / 1000));
 
   constructor(private app: Application, readonly zone: Zone, look: Look, private onEnterShop: () => void) {
@@ -84,6 +90,14 @@ export class WorldScene {
     this.root.eventMode = 'static';
     this.root.hitArea = this.app.screen;
     this.root.on('pointertap', (e) => this.onTap(e.global.x, e.global.y));
+    this.root.on('pointermove', (e) => { if (e.pointerType === 'mouse') this.onHover(e.global.x, e.global.y); });
+    this.shopLabelText.anchor.set(0.5, 1);
+    this.shopLabel.addChild(this.shopLabelBg, this.shopLabelText);
+    this.shopLabel.visible = false;
+    this.shopLabel.eventMode = 'none';
+    this.shopLabel.zIndex = 1e6;
+    this.objects.addChild(this.shopLabel);
+    this.setShopLabel();
     this.update(0);
     this.stream(true);
   }
@@ -238,10 +252,56 @@ export class WorldScene {
     this.player.frames = lookTextures(look);
   }
 
+  /** 외형 창 등으로 화면 일부가 가려지면 남은 곳 가운데에 플레이어를 둔다 */
+  setInsets(right: number, bottom: number) {
+    this.insets = { right, bottom };
+  }
+
+  turnPlayer() {
+    this.player.facing = this.player.facing === 'front' ? 'back' : 'front';
+  }
+
   /** 언어가 바뀌면 간판 글씨를 다시 그린다 */
   relabel() {
     this.clearBuildings();
     this.stream(true);
+    this.setShopLabel();
+  }
+
+  private setShopLabel() {
+    this.shopLabelText.text = t().shopLabel;
+    const w = Math.ceil(this.shopLabelText.width) + 14, h = 20;
+    this.shopLabelBg.clear().roundRect(-w / 2, -h + 2, w, h, 4).fill({ color: 0x140e0a, alpha: 0.82 }).stroke({ color: 0xc9a23e, width: 1, alpha: 0.9 });
+    this.shopLabelText.position.set(0, -2);
+  }
+
+  /** 우주새 상점에서 나올 때: 가게 문 앞에 선다 */
+  placeAtDoor() {
+    const p = this.player;
+    const { i, j } = this.zone.door;
+    // 문 바로 앞 칸에 선다 (다시 누르면 한 걸음 걸어 들어가며 이름이 보이도록)
+    const out = [[i, j + 1], [i + 1, j + 1], [i - 1, j + 1], [i, j + 2]].find(([a, b]) => walkable(this.zone, a, b)) ?? [i, j];
+    p.x = out[0] + 0.5;
+    p.y = out[1] + 0.5;
+    p.path = [];
+    p.facing = 'front';
+    this.wantShop = false;
+    this.shopLabelT = 0;
+  }
+
+  /** 화면 좌표가 우주새 건물 위인지 */
+  private overShop(gx: number, gy: number): boolean {
+    const wx = gx - this.camera.x, wy = gy - this.camera.y;
+    for (const [k, s] of this.bSprites) {
+      if (this.zone.buildings[k].cat !== 'ujusae') continue;
+      if (wx >= s.x && wx <= s.x + s.width && wy >= s.y && wy <= s.y + s.height) return true;
+    }
+    return false;
+  }
+
+  private onHover(gx: number, gy: number) {
+    this.shopHover = this.overShop(gx, gy);
+    document.body.style.cursor = this.shopHover ? 'pointer' : '';
   }
 
   start() {
@@ -249,17 +309,16 @@ export class WorldScene {
   }
   stop() {
     this.app.ticker.remove(this.tick);
+    document.body.style.cursor = '';
   }
 
   private onTap(gx: number, gy: number) {
     const wx = gx - this.camera.x, wy = gy - this.camera.y;
-    // 우주새 건물을 누르면 입구로 걸어가 상점으로 들어간다
-    for (const [k, s] of this.bSprites) {
-      if (this.zone.buildings[k].cat !== 'ujusae') continue;
-      if (wx >= s.x && wx <= s.x + s.width && wy >= s.y && wy <= s.y + s.height) {
-        this.walkTo(this.zone.door.i, this.zone.door.j, true);
-        return;
-      }
+    // 우주새 건물을 누르면 이름이 뜨고, 입구로 걸어가 상점으로 들어간다
+    if (this.overShop(gx, gy)) {
+      this.shopLabelT = 2.5;
+      this.walkTo(this.zone.door.i, this.zone.door.j, true);
+      return;
     }
     const x = (wx / (TW / 2) + wy / (TH / 2)) / 2, y = (wy / (TH / 2) - wx / (TW / 2)) / 2;
     this.walkTo(Math.floor(x), Math.floor(y), false);
@@ -351,8 +410,15 @@ export class WorldScene {
     const [px, py] = iso(p.x, p.y);
     this.marker.position.set(px, py);
     this.marker.zIndex = p.x + p.y - 0.01;
-    this.camera.position.set(Math.round(this.app.screen.width / 2 - px), Math.round(this.app.screen.height / 2 - py + 60));
+    const vw = this.app.screen.width - this.insets.right, vh = this.app.screen.height - this.insets.bottom;
+    this.camera.position.set(Math.round(vw / 2 - px), Math.round(vh / 2 - py + (this.insets.bottom ? 70 : 60)));
     this.lights.position.copyFrom(this.camera.position);
+    // 우주새 이름표: 누르거나 마우스를 올렸을 때
+    if (this.shopLabelT > 0) this.shopLabelT -= dt;
+    let shopSprite: Sprite | undefined;
+    if (this.shopLabelT > 0 || this.shopHover || this.wantShop) for (const [k, s] of this.bSprites) if (this.zone.buildings[k].cat === 'ujusae') shopSprite = s;
+    this.shopLabel.visible = !!shopSprite;
+    if (shopSprite) this.shopLabel.position.set(Math.round(shopSprite.x + shopSprite.width / 2), Math.round(shopSprite.y + 10));
     this.refreshNight();
     this.streamT -= dt;
     if (this.streamT <= 0) { this.streamT = 0.12; this.stream(false); }
