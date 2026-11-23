@@ -175,7 +175,7 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
 /** 층을 합칠 때 키우는 배수: 화면 밀도(PX) ÷ 층 밀도 (2배 그림 사이에 1배 층이 섞여도 맞물린다) */
 const up = (L: Layer) => Math.max(1, Math.round(PX / L.lp));
 const sets = new Map<string, Promise<CharSet>>();
-const MAX_SETS = 56; // 오래 안 쓴 것부터 놓아준다 (거리 사람은 계속 바뀐다)
+const MAX_SETS = 32; // 오래 안 쓴 것부터 놓아준다 (거리 사람은 계속 바뀐다 · 2배 그림은 한 벌에 약 3MB)
 export function charSet(look: Look, weapon: string | null = null, armor: string[] = []): Promise<CharSet> {
   const keys = layerKeys(look, weapon, armor);
   const id = JSON.stringify([keys, look.skin, look.hairColor, look.top, look.bottom, look.outfit ?? 'casual', look.cols ?? null]);
@@ -308,7 +308,8 @@ async function build(look: Look, keys: ReturnType<typeof layerKeys>): Promise<Ch
   }
   g.putImageData(img, 0, 0);
   const src = Texture.from(canvas).source;
-  src.scaleMode = 'nearest';
+  // 2배 그림을 보통 화면(픽셀 밀도 1)에서 반으로 줄이면 '가장 가까운 점'만 골라 깨진다 → 네 점을 섞어 줄인다
+  src.scaleMode = Math.min(2, window.devicePixelRatio || 1) >= PX ? 'nearest' : 'linear';
   const frames = new Map<string, Frame>();
   const counts: CharSet['counts'] = {};
   for (const b of boxes) {

@@ -10,6 +10,8 @@ import { bangkokClock } from './clock.ts';
 import { shopKitReady, counterStrips, type ShopKit } from './shopkit.ts';
 
 export { MISS_HWANG };
+/** 지옥의 우주새: 같은 얼굴, 검은 레이스 옷의 황혼 */
+const HWANGHON: Look = { ...MISS_HWANG, cols: { 1: '#e6c2a6', 2: '#c9a46e', 3: '#18121a', 4: '#120e12', 5: '#0c0a0a', 6: '#1a1210', 7: '#2a161c' } };
 
 /** 관리자가 올린 도트 그림 (뭉개지지 않게 nearest) */
 async function loadPixel(u: string): Promise<Texture | null> {
@@ -138,19 +140,7 @@ export class ShopRoom {
     this.hwang = new Sprite();
     // 관리자가 손본 도트 그림이 있으면 그것을, 없으면 구운 그림을 쓴다
     // 관리자 그림은 구운 그림과 크기가 같으니 발 기준점도 그대로 쓴다
-    Promise.all([charSet(MISS_HWANG), portraitUrl('sprite-miss-hwang')]).then(async ([cs, u]) => {
-      const f = frameOf(cs, 'idle', 'sw', 0);
-      applyFrame(this.hwang, f);
-      if (!u || !f) return;
-      const tx = await loadPixel(u);
-      if (!tx) return;
-      this.hwang.texture = tx;
-      // 같은 크기 또는 2배(더 섬세한 그림): 2배면 반으로 줄여 같은 크기로 보인다 (고해상도 화면에서 두 배 선명)
-      const lw = Math.round(f.w * f.k), lh = Math.round(f.h * f.k); // 게임 속 크기
-      const k = tx.width === lw * 2 && tx.height === lh * 2 ? 2 : 1;
-      this.hwang.scale.set(1 / k);
-      if (tx.width === lw * k && tx.height === lh * k) this.hwang.anchor.set(f.ax, f.ay); else this.hwang.anchor.set(0.5, 1);
-    });
+    this.dressKeeper(false);
     const [hx, hy] = iso(HWANG.x, HWANG.y);
     this.hwang.position.set(hx, hy);
     this.hwang.zIndex = HWANG.x + HWANG.y;
@@ -267,8 +257,36 @@ export class ShopRoom {
     hand((m / 60) * Math.PI * 2, 3.2, 0x2a1a10);
   }
 
+  /** 카운터 뒤의 사람: 현실은 미스 황(관리자가 손본 도트가 있으면 그것), 지옥은 검은 레이스의 황혼 */
+  private keeperId = 0;
+  private keeperHell: boolean | null = null;
+  private dressKeeper(hell: boolean) {
+    if (this.keeperHell === hell) return;
+    this.keeperHell = hell;
+    const id = ++this.keeperId;
+    if (hell) {
+      charSet(HWANGHON).then((cs) => { if (id === this.keeperId) applyFrame(this.hwang, frameOf(cs, 'idle', 'sw', 0)); });
+      return;
+    }
+    Promise.all([charSet(MISS_HWANG), portraitUrl('sprite-miss-hwang')]).then(async ([cs, u]) => {
+      if (id !== this.keeperId) return;
+      const f = frameOf(cs, 'idle', 'sw', 0);
+      applyFrame(this.hwang, f);
+      if (!u || !f) return;
+      const tx = await loadPixel(u);
+      if (!tx) return;
+      this.hwang.texture = tx;
+      // 같은 크기 또는 2배(더 섬세한 그림): 2배면 반으로 줄여 같은 크기로 보인다 (고해상도 화면에서 두 배 선명)
+      const lw = Math.round(f.w * f.k), lh = Math.round(f.h * f.k); // 게임 속 크기
+      const k = tx.width === lw * 2 && tx.height === lh * 2 ? 2 : 1;
+      this.hwang.scale.set(1 / k);
+      if (tx.width === lw * k && tx.height === lh * k) this.hwang.anchor.set(f.ax, f.ay); else this.hwang.anchor.set(0.5, 1);
+    });
+  }
+
   /** 세계마다 같은 가게, 다른 빛: 귀신에게는 잿빛, 지옥에서는 황혼의 붉은 가게 */
   setRealm(r: 'real' | 'ghost' | 'hell') {
+    this.dressKeeper(r === 'hell');
     if (r === 'real') { this.camera.filters = []; this.setGhost(false); return; }
     const cm = new ColorMatrixFilter();
     if (r === 'ghost') cm.desaturate();
