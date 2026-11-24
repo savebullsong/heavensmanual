@@ -19,7 +19,7 @@ export interface Deeds {
 }
 
 export type Afterlife =
-  | { world: 'heaven'; bonusSoulExp: number }
+  | { world: 'heaven' }
   | { world: 'ghost' }
   | { world: 'hell'; floor: number };
 
@@ -39,14 +39,13 @@ export function hellFloor(ratio: number): number {
   return Math.min(HELL_FLOORS, Math.max(1, f));
 }
 
-/** 천국행 보너스 영혼 경험치 환산 비율 — 미정 (기획서 15장). 임시값 */
-export const HEAVEN_BONUS_PER_GOOD = 10; // 천국에서 환생할 때 선행 1점 = 영혼 경험치 10 (11월 24일)
+// 19차: 천국에서 환생하는 혜택은 없다 — 천국을 떠나 다시 태어나는 것은 영혼의 강등이다 (환생관 루엔이 말린다)
 
 /** 사후 판정: 기록 없음·정확히 50% → 귀신, 50% 미만 → 천국, 50% 초과 → 지옥 */
 export function judge(d: Deeds): Afterlife {
   const r = evilRatio(d);
   if (r === null || r === 50) return { world: 'ghost' };
-  if (r < 50) return { world: 'heaven', bonusSoulExp: Math.floor(d.good * HEAVEN_BONUS_PER_GOOD) };
+  if (r < 50) return { world: 'heaven' };
   return { world: 'hell', floor: hellFloor(r) };
 }
 

@@ -35,7 +35,11 @@ export interface Save {
   realm?: 'real' | 'ghost' | 'hell' | 'heaven';
   adminTrip?: 'real' | 'ghost' | 'heaven' | 'hell'; // 관리자가 시찰(지옥 층 이동·천국)을 떠나기 전의 세계 (돌아갈 곳)
   /** 천국: 환생할 때 받을 선행 보너스 (영혼 경험치) */
-  heaven?: { bonus: number; met?: boolean; admin?: boolean };
+  heaven?: { met?: boolean; admin?: boolean };
+  /** 19차 지옥면죄부: 앞으로 짓는 악행에서 지워 줄 남은 점수 (한 장 = 30, 최대 10장 = 300) */
+  absolve?: number;
+  /** 19차 켈베로스 호출: 지옥 로비에서 사 온 횟수 (현실에서 부르면 10분 동안 함께 싸운다) */
+  kerberos?: number;
   /** 지옥: 지금 층, 이번 지옥행에서 쓰러뜨린 층주, 노전(영혼에 붙어 다음 지옥행에도 남는다) */
   hell?: {
     floor: number; cleared: number[]; notes: number; met?: boolean;

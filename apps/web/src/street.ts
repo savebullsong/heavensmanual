@@ -390,6 +390,9 @@ export function drawGroundKit(z: Zone, i0: number, j0: number): { canvas: HTMLCa
   const g = c.getContext('2d')!;
   g.imageSmoothingEnabled = false;
   const S = (x: number, y: number): [number, number] => { const [a, b] = iso(x, y); return [a - minX, b - minY]; };
+  // 19차: 계단처럼 꺾이는 경계(풀밭·물·공터·보도·골목)는 모서리 반쪽을 이웃 땅 그림으로 덮어 비스듬한 선으로 · 연못 위 보도는 나무 다리
+  const SOFT: Record<string, number> = { water: 0, lot: 1, block: 1, park: 2, walk: 3, soi: 3 };
+  const bridge = (i: number, j: number) => tileAt(z, i, j) === 'walk' && [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([a, b]) => tileAt(z, i + a, j + b) === 'water').length >= 2;
   for (let j = j0; j < j1; j++)
     for (let i = i0; i < i1; i++) {
       const t = tileAt(z, i, j);
@@ -398,6 +401,38 @@ export function drawGroundKit(z: Zone, i0: number, j0: number): { canvas: HTMLCa
       if (!m) continue;
       const [x, y] = S(i, j);
       g.drawImage(ground.img, m[0], m[1], m[2], m[3], x + m[4], y + m[5], m[2], m[3]);
+      if (t === 'walk' && bridge(i, j)) {
+        g.beginPath(); g.moveTo(x, y); g.lineTo(x + TW / 2, y + TH / 2); g.lineTo(x, y + TH); g.lineTo(x - TW / 2, y + TH / 2); g.closePath();
+        g.fillStyle = '#8a6a48'; g.fill();
+        g.strokeStyle = '#5e4630'; g.lineWidth = 1;
+        for (let k = 1; k < 4; k++) { const a = S(i + k / 4, j), b = S(i + k / 4, j + 1); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
+        continue;
+      }
+      const pt = SOFT[t];
+      if (pt !== undefined) {
+        const N = (a: number, b: number) => tileAt(z, i + a, j + b);
+        const corners: [[number, number], [number, number], [number, number], [number, number], [number, number], [number, number][]][] = [
+          [[-1, 0], [0, -1], [-1, -1], [1, 0], [0, 1], [[i, j], [i + 1, j], [i, j + 1]]],
+          [[1, 0], [0, -1], [1, -1], [-1, 0], [0, 1], [[i + 1, j], [i + 1, j + 1], [i, j]]],
+          [[1, 0], [0, 1], [1, 1], [-1, 0], [0, -1], [[i + 1, j + 1], [i, j + 1], [i + 1, j]]],
+          [[-1, 0], [0, 1], [-1, 1], [1, 0], [0, -1], [[i, j + 1], [i, j], [i + 1, j + 1]]],
+        ];
+        for (const [n1, n2, dg, o1, o2, tri] of corners) {
+          const X = N(n1[0], n1[1]);
+          if (X === t || X !== N(n2[0], n2[1]) || X !== N(dg[0], dg[1]) || N(o1[0], o1[1]) === X || N(o2[0], o2[1]) === X) continue;
+          const px = SOFT[X];
+          if (px === undefined || px <= pt || bridge(i + n1[0], j + n1[1])) continue;
+          const mx = ground.meta[`${GROUND_KEY[X] ?? 'lot'}-${hash(i + n1[0], j + n1[1]) % 4}`];
+          if (!mx) continue;
+          g.save();
+          g.beginPath();
+          tri.forEach(([a, b], k) => { const [qx, qy] = S(a, b); if (k) g.lineTo(qx, qy); else g.moveTo(qx, qy); });
+          g.closePath();
+          g.clip();
+          g.drawImage(ground.img, mx[0], mx[1], mx[2], mx[3], x + mx[4], y + mx[5], mx[2], mx[3]);
+          g.restore();
+        }
+      }
       if (t === 'cross') {
         g.strokeStyle = 'rgba(236,232,222,0.92)'; g.lineWidth = 7;
         for (let k = 0; k < 2; k++) {

@@ -12,7 +12,7 @@ const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   'yellow-wing': { name: '황색날개', where: '천국 · 우주새 점원' },
   hwanghon: { name: '황혼', where: '지옥 · 유황새 점원 (미스 황과는 다른 사람이라고 믿는다)' },
   parrot: { name: '앵무새', where: '우주새 · 환생시키는 순간에만 말함' },
-  luen: { name: '루엔', where: '천국 · 환생관' },
+  luen: { name: '루엔', where: '천국 · 구름 계단 위 환생의 테라스' },
   pashar: { name: '파샤르', where: '지옥 1층 · 환생관' },
   'goat-king': { name: '염소대왕', where: '지옥 13층 · 최종 보스' },
   besk: { name: '베스크', where: '지옥 3층 · 베스크 대부소의 대부업자' },

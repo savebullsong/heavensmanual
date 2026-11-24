@@ -7,7 +7,8 @@ const TI = Object.fromEntries(TYPES.map((t, k) => [t, k])) as Record<TileType, n
 export type Category =
   | 'convenience' | 'pharmacy' | 'clinic' | 'restaurant' | 'bar' | 'cafe' | 'bank' | 'worship' | 'school'
   | 'hotel' | 'laundry' | 'shop' | 'office' | 'condo' | 'ujusae' | 'loan' | 'generic'
-  | 'hbank' | 'atone' | 'rebirth'; // 지옥: 지옥 은행 · 속죄의 회당 · (1층 불탄 도시 골목 끝) 환생 로비 입구
+  | 'hbank' | 'atone' | 'rebirth' // 지옥: 지옥 은행 · 속죄의 회당 · (1층 불탄 도시 골목 끝) 환생 로비 입구
+  | 'terrace'; // 천국: 구름 계단 위 환생의 테라스 (환생관 루엔)
 
 export interface Building {
   i0: number; j0: number; w: number; d: number; // 바닥 사각형 (타일)
@@ -41,6 +42,12 @@ export interface Zone {
   hell?: HellInfo;
   /** 건물 안 (들어갈 때 만드는 작은 방) */
   interior?: InteriorInfo;
+  /** 19차: 현실 구역에 우주새가 있는가 (아속 구역에만). 없으면 zone.door 는 처음 서는 자리일 뿐 */
+  shop?: boolean;
+  /** 19차: 구역 잇기 — 걷는 범위(i0..i1, j0..j1, 끝 제외)와 서쪽·동쪽 이웃 구역. 범위 밖 둘레는 보이기만 한다 */
+  edges?: { w: string | null; e: string | null; c: number; i0: number; i1: number; j0: number; j1: number };
+  /** 전체 지도에서 이 구역 (0,0)의 자리 (구역 사이 좌표를 맞춘다) */
+  origin?: { i: number; j: number };
 }
 /** 방의 가구: 바닥 사각형(타일)과 높이(px), 무엇인지 */
 export interface Furn { i: number; j: number; w: number; d: number; h: number; kind: string; v?: number }
@@ -91,6 +98,9 @@ export function finalize(z: Omit<Zone, 'blocked'>): Zone {
     blocked[k] = t === 'block' || t === 'void' || t === 'water' ? 1 : 0;
   }
   for (const p of z.props) if (p.kind !== 'tree' && p.kind !== 'bones' && p.kind !== 'crack' && p.kind !== 'reeds') blocked[p.j * z.W + p.i] = 1; // 나무·흩어진 뼈·땅의 자국은 밟고 지나간다
+  // 구역 둘레(이웃 거리가 보이기만 하는 곳)는 걸을 수 없다
+  const e = z.edges;
+  if (e) for (let j = 0; j < z.H; j++) for (let i = 0; i < z.W; i++) if (i < e.i0 || i >= e.i1 || j < e.j0 || j >= e.j1) blocked[j * z.W + i] = 1;
   // 건물 바닥은 막는다. 지도 변환에서 골목·보도가 건물 밑으로 그려진 곳이 많아 사람이 건물을 뚫고 다녔다
   // (큰길과 횡단보도만 남겨 길이 끊기지 않게 한다)
   for (const b of z.buildings)
@@ -107,12 +117,13 @@ export function finalize(z: Omit<Zone, 'blocked'>): Zone {
 export function decodeZone(json: {
   id: string; W: number; H: number; codes: string; types: string[]; tiles: string;
   buildings: Building[]; props: Prop[]; lanes: Lane[]; door: { i: number; j: number }; spawn: { i: number; j: number }; attribution?: string;
+  shop?: boolean; edges?: Zone['edges']; origin?: Zone['origin'];
 }): Zone {
   const map = new Uint8Array(128);
   for (let k = 0; k < json.codes.length; k++) map[json.codes.charCodeAt(k)] = TI[json.types[k] as TileType] ?? 0;
   const tiles = new Uint8Array(json.W * json.H);
   for (let k = 0; k < tiles.length; k++) tiles[k] = map[json.tiles.charCodeAt(k)];
-  return finalize({ id: json.id, W: json.W, H: json.H, tiles, buildings: json.buildings, props: json.props, lanes: json.lanes, door: json.door, spawn: json.spawn, attribution: json.attribution });
+  return finalize({ id: json.id, W: json.W, H: json.H, tiles, buildings: json.buildings, props: json.props, lanes: json.lanes, door: json.door, spawn: json.spawn, attribution: json.attribution, shop: json.shop ?? true, edges: json.edges, origin: json.origin });
 }
 
 /** 수쿰빗 대로를 본뜬 시험 구역 (실제 지도를 불러오지 못할 때 쓴다) */

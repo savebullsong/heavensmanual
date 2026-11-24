@@ -26,7 +26,7 @@ function streetSeller(b: Building): 'tools' | 'dept' | undefined {
 
 export function roomKind(b: Building): string {
   if (b.cat === 'loan') return 'loan'; // 지옥 3층 베스크 대부소
-  if (b.cat === 'hbank' || b.cat === 'atone' || b.cat === 'rebirth') return b.cat; // 지옥 은행 · 속죄의 회당 · 지옥 로비
+  if (b.cat === 'hbank' || b.cat === 'atone' || b.cat === 'rebirth' || b.cat === 'terrace') return b.cat; // 지옥 은행 · 속죄의 회당 · 지옥 로비 · 천국 환생의 테라스
   const k = kindOf(b);
   if (k === 'place_of_worship' || b.cat === 'worship') {
     const f = faithOf(b);
@@ -34,6 +34,7 @@ export function roomKind(b: Building): string {
   }
   if (k === 'bank' || k === 'bureau_de_change') return 'bank';
   if (['clinic', 'hospital', 'dentist', 'veterinary'].includes(k) || b.cat === 'clinic') return 'clinic';
+  if (['fitness_centre', 'fitness_center', 'sports_centre', 'gym', 'dojo'].includes(k)) return 'gym'; // 19차 헬스장
   // 대표 가게(첫 POI)의 업종이 먼저 (한 건물에 식당·미용실이 같이 있으면 대표 가게의 방)
   if (['convenience', 'supermarket', 'kiosk', 'variety_store'].includes(k)) return 'mart';
   if (['pharmacy', 'chemist'].includes(k)) return 'pharmacy';
@@ -49,12 +50,12 @@ export function roomKind(b: Building): string {
 }
 
 /** 쉬는 곳: 종교시설·은행·병원·약국 (싸움 불가 · 빠른 회복) */
-export const REST_ROOMS = new Set(['temple', 'church', 'mosque', 'gurdwara', 'bank', 'clinic', 'pharmacy', 'hbank', 'atone', 'rebirth']);
+export const REST_ROOMS = new Set(['temple', 'church', 'mosque', 'gurdwara', 'bank', 'clinic', 'pharmacy', 'hbank', 'atone', 'rebirth', 'terrace']);
 
 const SIZE: Record<string, [number, number]> = {
   temple: [13, 11], church: [13, 11], mosque: [12, 11], gurdwara: [12, 11], bank: [12, 10], clinic: [12, 10], pharmacy: [9, 8],
   mart: [11, 9], food: [12, 10], cafe: [10, 9], bar: [10, 9], salon: [9, 8], massage: [10, 9], laundry: [9, 8], lobby: [11, 9], shop: [9, 8], loan: [10, 8],
-  hbank: [10, 8], atone: [11, 10], rebirth: [23, 17],
+  hbank: [10, 8], atone: [11, 10], rebirth: [23, 17], terrace: [17, 14], gym: [13, 11],
 };
 const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   temple: { floor: 'temple', wall: '#e9dcc0', trim: '#a8322a' }, church: { floor: 'stone', wall: '#e8e2d4', trim: '#6b4a30' },
@@ -68,6 +69,8 @@ const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   loan: { floor: 'dark', wall: '#3a2420', trim: '#8a6a2a' },
   hbank: { floor: 'dark', wall: '#34302c', trim: '#8a6a2a' }, atone: { floor: 'stone', wall: '#4a4440', trim: '#6a2a22' },
   rebirth: { floor: 'marble', wall: '#dfe3e6', trim: '#56687a' },
+  terrace: { floor: 'cloud', wall: '#f6f2ea', trim: '#c9a23e' },
+  gym: { floor: 'rubber', wall: '#d6d8da', trim: '#c83a2a' },
 };
 
 /** 거리의 건물 k에 들어갈 때 방을 만든다 (같은 건물이면 늘 같은 방) */
@@ -85,10 +88,14 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
   const x1 = W - 2, y1 = H - 2; // 마지막 바닥 칸
   switch (kind) {
     case 'mart':
+      // 19차 손질: 뒤 벽 진열대 · 냉장고 줄 · 가운데 진열대 두 줄(끝에 특가 매대) · 계산대 앞 과자 걸이 · 아이스크림 냉동고 · 장바구니
       F(W - 5, 2, 3, 1, 22, 'counter'); clerk = { i: W - 4, j: 1 }; counter = { i: W - 4, j: 3 };
       F(1, 1, W - 6, 1, 50, 'shelf', 1);
-      for (const jj of [4, 6]) if (jj < y1 - 1) F(2, jj, W - 6, 1, 40, 'shelf', jj);
+      for (const jj of [4, 6]) if (jj < y1 - 1) { F(2, jj, W - 7, 1, 40, 'shelf', jj); F(W - 5, jj, 1, 1, 22, 'island', jj); }
       F(x1, 4, 1, 3, 56, 'fridge');
+      F(W - 6, 3, 1, 1, 30, 'snackrack', 2);
+      if (y1 - 1 > 6) F(1, y1 - 1, 2, 1, 18, 'freezer');
+      F(mid + 1, y1, 1, 1, 8, 'baskets');
       seats.push([3, 5], [5, 3]);
       break;
     case 'pharmacy':
@@ -187,9 +194,37 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
       F(1, 1, 1, 1, 30, 'plant'); F(x1, 9, 1, 1, 30, 'plant'); F(1, 13, 1, 1, 30, 'plant');
       break;
     }
+    case 'terrace': {
+      // 천국 환생의 테라스: 구름 위에 뜬 흰 대리석 단 (벽 없음). 뒤쪽 가운데 환생의 문 — 문 안으로 아래 세상의 빛이 비친다.
+      // 문 앞에 환생관 루엔, 네 귀퉁이 등불 기둥, 앞쪽 대리석 의자 둘. 앞 가장자리 가운데에서 구름 계단으로 내려간다
+      F(mid - 2, 1, 5, 1, 104, 'rgate'); clerk = { i: mid, j: 2 }; counter = { i: mid, j: 4 };
+      for (const [ii, jj] of [[2, 2], [W - 3, 2], [2, 8], [W - 3, 8]]) F(ii, jj, 1, 1, 70, 'cpillar', ii + jj);
+      F(3, 10, 2, 1, 12, 'cbench'); F(W - 5, 10, 2, 1, 12, 'cbench');
+      // 둥글게 깎은 모서리 (구름 위의 단이라 반듯한 네모가 아니게)
+      for (const [ii, jj] of [[W - 2, 1], [W - 3, 1], [W - 2, 2], [1, H - 2], [2, H - 2], [1, H - 3], [W - 2, H - 2], [W - 3, H - 2], [W - 2, H - 3], [W - 4, H - 2], [W - 2, H - 4]]) tiles[jj * W + ii] = TI.void;
+      break;
+    }
+    case 'gym': {
+      // 19차 헬스장: 거울 벽 앞 덤벨 걸이 · 러닝머신 줄 · 벤치 프레스 · 스쿼트 랙 · 샌드백 · 요가 매트 · 안내 데스크(트레이너)
+      F(W - 5, y1 - 2, 3, 1, 22, 'counter', 4); clerk = { i: W - 4, j: y1 - 3 }; counter = { i: W - 4, j: y1 - 1 };
+      F(2, 1, 4, 1, 24, 'dumbbells');
+      for (let n = 0; n < 3; n++) F(1, 3 + n * 2, 2, 1, 26, 'treadmill', n);
+      F(7, 1, 2, 2, 60, 'squatrack');
+      F(5, 4, 2, 1, 20, 'benchpress'); F(8, 5, 2, 1, 20, 'benchpress', 1);
+      F(x1, 1, 1, 1, 64, 'punchbag'); F(x1, 3, 1, 1, 64, 'punchbag', 1);
+      F(5, 7, 2, 1, 2, 'mat'); F(8, 7, 2, 1, 2, 'mat', 1);
+      seats.push([4, 6], [9, 3], [6, 8]);
+      break;
+    }
     default:
+      // 19차 손질: 뒤 벽·왼쪽 벽 진열장, 가운데 진열 탁자 둘과 옷걸이, 거울, 입구 매트 앞 장바구니, 계산대(금전등록기)
       F(W - 5, 2, 3, 1, 22, 'counter', 8); clerk = { i: W - 4, j: 1 }; counter = { i: W - 4, j: 3 };
-      F(1, 1, W - 6, 1, 46, 'shelf', 8); F(2, 4, 2, 1, 20, 'display', 1); F(5, 4, 1, 2, 20, 'display', 2);
+      F(1, 1, W - 6, 1, 46, 'shelf', 8);
+      if (y1 - 2 > 3) F(1, 3, 1, y1 - 4, 40, 'shelf', 5);
+      F(3, 4, 2, 1, 18, 'island', 1); if (y1 > 6) F(3, 6, 2, 1, 18, 'island', 4);
+      F(W - 4, 5, 1, 2, 34, 'rack', 2);
+      F(x1, y1 - 1, 1, 1, 50, 'mirror');
+      F(mid - 1, y1, 1, 1, 8, 'baskets');
       break;
   }
   for (const f of furn) if (f.h > 2) for (let j = f.j; j < f.j + f.d; j++) for (let i = f.i; i < f.i + f.w; i++) tiles[j * W + i] = TI.block;
@@ -231,10 +266,89 @@ function painter(minX: number, minY: number, W: number, H: number) {
 const FLOORS: Record<string, [string, string]> = {
   temple: ['#8a3a2a', '#9a4632'], stone: ['#b8b0a2', '#aaa294'], prayer: ['#2f6a52', '#3a7a5e'], marble: ['#e4e0da', '#d6d2cc'], pale: ['#e2e8e6', '#d4dcda'],
   grey: ['#c8c8c4', '#bcbcb8'], terracotta: ['#b8704a', '#a8643e'], wood: ['#a0764e', '#946a44'], dark: ['#4a3426', '#3e2c20'], checker: ['#ece8e4', '#3a3434'],
+  cloud: ['#ebe4d6', '#e2dacb'],
+  rubber: ['#3a3c40', '#34363a'],
 };
+
+/** 뭉게구름 한 덩이: 아래는 옅은 보랏빛 그늘, 위는 흰 빛 (도트 느낌이 나게 좌표를 반올림) */
+function cloudPuff(g: CanvasRenderingContext2D, x: number, y: number, r: number, a = 1) {
+  x = Math.round(x); y = Math.round(y); r = Math.round(r);
+  g.globalAlpha = a;
+  g.fillStyle = '#cfd3e2'; g.beginPath(); g.ellipse(x, y + r * 0.22, r, r * 0.6, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#f4f3f0'; g.beginPath(); g.ellipse(x - r * 0.06, y, r * 0.94, r * 0.56, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(x - r * 0.28, y - r * 0.2, r * 0.52, r * 0.3, 0, 0, Math.PI * 2); g.fill();
+  g.globalAlpha = 1;
+}
+
+/** 19차: 천국 '환생의 테라스' — 벽 없이 구름 위에 뜬 흰 대리석 단. 뒤로는 먼 구름 봉우리, 가장자리 아래는 구름 바다 */
+function drawTerrace(z: Zone): { canvas: HTMLCanvasElement; x: number; y: number } {
+  const info = z.interior!;
+  const W = z.W, H = z.H;
+  const M = 170;
+  const minX = (0 - H) * (TW / 2) - M, maxX = W * (TW / 2) + M;
+  const minY = -190, maxY = (W + H) * (TH / 2) + M;
+  const { c, g, P, poly } = painter(minX, minY, maxX - minX, maxY - minY);
+  const VOID = TI.void;
+  const floor = (i: number, j: number) => i >= 1 && j >= 1 && i < W - 1 && j < H - 1 && z.tiles[j * W + i] !== VOID;
+  const hsh = (a: number, b: number) => { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return s - Math.floor(s); };
+  // 1) 먼 구름 봉우리 (단 뒤쪽 하늘 — 벽이 있던 자리)
+  for (let n = 0; n < 9; n++) {
+    const [x, y] = P(-1.5 + n * 0.2, -1 + n * 2.1, 40 + hsh(n, 1) * 70);
+    for (let k = 0; k < 4; k++) cloudPuff(g, x + (k - 1.5) * 22 + hsh(n, k) * 10, y + k * 9, 26 + hsh(k, n) * 16, 0.75);
+  }
+  for (let n = 0; n < 9; n++) {
+    const [x, y] = P(-1 + n * 2.1, -1.5 + n * 0.2, 40 + hsh(n, 7) * 80);
+    for (let k = 0; k < 4; k++) cloudPuff(g, x + (k - 1.5) * 22 + hsh(k, n + 3) * 10, y + k * 9, 26 + hsh(n + 2, k) * 16, 0.75);
+  }
+  // 2) 단 뒤쪽 가장자리 밑의 구름 (단이 그 위에 얹혀 있다)
+  for (let j = 0; j < H; j += 1.4) { const [x, y] = P(0.6, j, -4); cloudPuff(g, x, y, 24 + hsh(j, 2) * 10); }
+  for (let i = 0; i < W; i += 1.4) { const [x, y] = P(i, 0.6, -4); cloudPuff(g, x, y, 24 + hsh(i, 5) * 10); }
+  // 3) 대리석 단의 두께 (앞쪽 면) — 금띠 한 줄
+  const T = 14;
+  for (let j = 1; j < H - 1; j++) for (let i = 1; i < W - 1; i++) {
+    if (!floor(i, j)) continue;
+    if (!floor(i + 1, j)) { poly([P(i + 1, j, 0), P(i + 1, j + 1, 0), P(i + 1, j + 1, -T), P(i + 1, j, -T)], '#cfc9bc'); poly([P(i + 1, j, -3), P(i + 1, j + 1, -3), P(i + 1, j + 1, -5), P(i + 1, j, -5)], '#c9a23e'); }
+    if (!floor(i, j + 1)) { poly([P(i, j + 1, 0), P(i + 1, j + 1, 0), P(i + 1, j + 1, -T), P(i, j + 1, -T)], '#e2ddd2'); poly([P(i, j + 1, -3), P(i + 1, j + 1, -3), P(i + 1, j + 1, -5), P(i, j + 1, -5)], '#d9b44a'); }
+  }
+  // 4) 바닥: 흰 대리석 (옅은 결) + 가운데 금빛 해무늬 + 출구에서 문까지 옅은 하늘빛 길
+  const [fa, fb] = FLOORS.cloud;
+  for (let j = 1; j < H - 1; j++) for (let i = 1; i < W - 1; i++) {
+    if (!floor(i, j)) continue;
+    poly([P(i, j, 0), P(i + 1, j, 0), P(i + 1, j + 1, 0), P(i, j + 1, 0)], (i + j) % 2 ? fb : fa);
+    if (hsh(i, j) < 0.3) poly([P(i + 0.15, j + 0.25, 0), P(i + 0.75, j + 0.5, 0), P(i + 0.77, j + 0.54, 0), P(i + 0.17, j + 0.29, 0)], '#d2c9b8');
+  }
+  const mid = Math.floor(W / 2), ex = info.exit;
+  poly([P(mid - 0.1, 3, 0.2), P(mid + 1.1, 3, 0.2), P(mid + 1.1, H - 1, 0.2), P(mid - 0.1, H - 1, 0.2)], '#d9b44a');
+  poly([P(mid + 0.02, 3, 0.3), P(mid + 0.98, 3, 0.3), P(mid + 0.98, H - 1, 0.3), P(mid + 0.02, H - 1, 0.3)], '#c8d4ec');
+  {
+    const [cx, cy] = P(mid + 0.5, Math.floor(H / 2) + 0.5, 0.4);
+    g.strokeStyle = '#d9b44a'; g.lineWidth = 2;
+    g.beginPath(); g.ellipse(cx, cy, 58, 29, 0, 0, Math.PI * 2); g.stroke();
+    g.lineWidth = 1;
+    for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; g.beginPath(); g.moveTo(cx + Math.cos(a) * 46, cy + Math.sin(a) * 23); g.lineTo(cx + Math.cos(a) * 56, cy + Math.sin(a) * 28); g.stroke(); }
+  }
+  // 5) 앞 가장자리 아래 구름 (단이 구름 위에 떠 있다)
+  for (let j = 1; j < H - 1; j++) for (let i = 1; i < W - 1; i++) {
+    if (!floor(i, j)) continue;
+    if (!floor(i + 1, j)) { const [x, y] = P(i + 1.3, j + 0.5, -24); cloudPuff(g, x, y, 20 + hsh(i, j) * 9); }
+    if (!floor(i, j + 1) && !(i === ex.i)) { const [x, y] = P(i + 0.5, j + 1.3, -24); cloudPuff(g, x, y, 20 + hsh(j, i) * 9); }
+  }
+  // 6) 나가는 곳: 구름 계단 셋이 아래로 이어진다 (거리로 내려가는 길)
+  for (let k = 2; k >= 0; k--) {
+    const y0 = H - 1 + k * 0.55, z0 = -8 - k * 12;
+    poly([P(ex.i, y0, z0), P(ex.i + 1, y0, z0), P(ex.i + 1, y0 + 0.55, z0), P(ex.i, y0 + 0.55, z0)], '#f4f1ea');
+    poly([P(ex.i, y0 + 0.55, z0), P(ex.i + 1, y0 + 0.55, z0), P(ex.i + 1, y0 + 0.55, z0 - 6), P(ex.i, y0 + 0.55, z0 - 6)], '#d8d3c8');
+    const [x, y] = P(ex.i + 1.1, y0 + 0.3, z0 - 10); cloudPuff(g, x, y, 12, 0.9);
+    const [x2, y2] = P(ex.i - 0.1, y0 + 0.5, z0 - 12); cloudPuff(g, x2, y2, 11, 0.9);
+  }
+  poly([P(ex.i, ex.j, 0.5), P(ex.i + 1, ex.j, 0.5), P(ex.i + 1, ex.j + 1, 0.5), P(ex.i, ex.j + 1, 0.5)], '#e6dcc0');
+  void c;
+  return { canvas: c, x: minX, y: minY };
+}
 
 /** 바닥 + 뒤쪽 두 벽 + 벽 장식 (방 전체를 한 장으로) */
 export function drawRoom(z: Zone, night: boolean): { canvas: HTMLCanvasElement; x: number; y: number } {
+  if (z.interior!.kind === 'terrace') return drawTerrace(z);
   const info = z.interior!;
   const W = z.W, H = z.H;
   const minX = (0 - H) * (TW / 2) - 8, maxX = W * (TW / 2) + 8;
@@ -311,6 +425,12 @@ export function drawRoom(z: Zone, night: boolean): { canvas: HTMLCanvasElement; 
     for (let x = 2; x < W - 3; x += 2) onR(x + 0.1, x + 0.9, 30, 70, '#c8dce4');
   } else if (k === 'mart' || k === 'shop') {
     onR(W - 5, W - 2, 66, 76, info.trim);
+    onR(2, W - 6, 80, 86, mixHex(info.trim, '#ffffff', 0.35)); // 19차: 뒤 벽 위 간판 띠
+  } else if (k === 'gym') {
+    // 거울 벽과 붉은 띠, 동기 부여 문구판
+    onR(2, W - 2, 12, 72, night ? '#5a6a80' : '#a8c0d0'); for (let x = 3; x < W - 2; x += 2.5) onR(x, x + 0.08, 12, 72, '#7a8a9a');
+    onR(2, W - 2, 76, 82, info.trim);
+    winL(2, 6, 30, 70, night ? '#22304a' : '#a8c8d8');
   } else if (k === 'rebirth') {
     // 창구 위 번호판(붉은 숫자) · 가운데 큰 안내판 · 시계
     for (let n = 0; n < 5; n++) {
@@ -342,7 +462,7 @@ export function drawRoom(z: Zone, night: boolean): { canvas: HTMLCanvasElement; 
 export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas: HTMLCanvasElement; x: number; y: number } {
   const { i, j, w, d, h } = f;
   const i1 = i + w, j1 = j + d;
-  const extra = f.kind === 'altar' ? 64 : f.kind === 'salonchair' || f.kind === 'candle' ? 18 : 14;
+  const extra = f.kind === 'altar' ? 64 : f.kind === 'rgate' ? 46 : f.kind === 'cpillar' ? 30 : f.kind === 'salonchair' || f.kind === 'candle' ? 18 : 14;
   const minX = (i - j1) * (TW / 2) - 4, maxX = (i1 - j) * (TW / 2) + 4;
   const minY = (i + j) * (TH / 2) - h - extra, maxY = (i1 + j1) * (TH / 2) + 4;
   const { c, g, P, poly } = painter(minX, minY, maxX - minX, maxY - minY);
@@ -418,6 +538,54 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       for (const x of [i + 0.3, i1 - 0.3]) { const [fx, fy] = P(x, j1 - 0.2, h * 0.5); g.fillStyle = '#f2a03a'; g.beginPath(); g.ellipse(fx, fy - 4, 4, 4, 0, 0, Math.PI * 2); g.fill(); }
       break;
     }
+    case 'rgate': {
+      // 환생의 문: 흰 대리석 기둥 둘과 둥근 아치, 금띠. 열린 문 안으로 아래 세상의 빛이 위로 비쳐 오른다.
+      // 아치 위에는 루엔의 별 가시 후광과 같은 금빛 별
+      const yz = j + 0.5, top = h - 16, spring = h - 40;
+      const xa = i + 0.95, xb = i1 - 0.95, cxm = (xa + xb) / 2, rr = (xb - xa) / 2;
+      // 문 안의 빛 (아래가 밝은 하늘빛 → 위로 흰빛)
+      for (let n = 0; n < 14; n++) {
+        const z0 = (n / 14) * spring, z1 = ((n + 1) / 14) * spring;
+        poly([P(xa, yz, z0), P(xb, yz, z0), P(xb, yz, z1), P(xa, yz, z1)], mixHex('#9fc4ec', '#fffaf0', n / 13));
+      }
+      { const pts: Pt[] = [P(xa, yz, spring)]; for (let k = 0; k <= 12; k++) { const a = Math.PI - (k / 12) * Math.PI; pts.push(P(cxm + Math.cos(a) * rr, yz, spring + Math.sin(a) * (top - spring))); } pts.push(P(xb, yz, spring)); poly(pts, '#fffdf6'); }
+      // 빛줄기와 반짝임
+      for (let n = 0; n < 5; n++) { const x = xa + 0.25 + n * ((xb - xa - 0.5) / 4); poly([P(x - 0.04, yz, 0), P(x + 0.04, yz, 0), P(x + 0.02, yz, spring - 6), P(x - 0.02, yz, spring - 6)], '#ffffff', 0.55); }
+      for (let n = 0; n < 9; n++) { const [sx, sy] = P(xa + ((n * 37) % 10) / 10 * (xb - xa), yz, 8 + ((n * 23) % 9) * 6); g.fillStyle = '#ffffff'; g.fillRect(Math.round(sx), Math.round(sy), 1, 1); g.fillRect(Math.round(sx) - 1, Math.round(sy), 3, 1); g.fillRect(Math.round(sx), Math.round(sy) - 1, 1, 3); }
+      // 아치 테 (문 둘레 대리석) — 앞면만
+      { const outer: Pt[] = []; const inner: Pt[] = []; for (let k = 0; k <= 12; k++) { const a = Math.PI - (k / 12) * Math.PI; outer.push(P(cxm + Math.cos(a) * (rr + 0.18), j1, spring + Math.sin(a) * (top - spring + 6))); inner.push(P(cxm + Math.cos(a) * rr, j1, spring + Math.sin(a) * (top - spring))); } poly([...outer, ...inner.reverse()], '#ece6d8'); }
+      // 기둥 (받침·몸·머리)
+      for (const x0 of [i + 0.1, i1 - 0.9]) {
+        B3(x0 - 0.05, j + 0.05, x0 + 0.85, j1 - 0.05, 0, 8, '#e2dccf');
+        B3(x0 + 0.08, j + 0.15, x0 + 0.72, j1 - 0.15, 8, top, '#f4f0e8');
+        for (let q = 0; q < 3; q++) faceL(x0 + 0.18 + q * 0.2, x0 + 0.22 + q * 0.2, 12, top - 4, '#ddd7ca');
+        B3(x0 - 0.05, j + 0.05, x0 + 0.85, j1 - 0.05, top - 6, top, '#d9b44a');
+      }
+      // 상인방과 금띠, 위의 별
+      B3(i, j + 0.05, i1, j1 - 0.05, top, h, '#f2eee6');
+      faceL(i + 0.1, i1 - 0.1, top + 5, top + 8, '#c9a23e');
+      { const [sx, sy] = P(i + w / 2, j1, h + 20);
+        g.fillStyle = '#fff4c8'; g.globalAlpha = 0.35; g.beginPath(); g.ellipse(sx, sy, 24, 24, 0, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1;
+        g.strokeStyle = '#d9b44a'; g.lineWidth = 2;
+        for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2 + Math.PI / 8, L2 = k % 2 ? 11 : 18; g.beginPath(); g.moveTo(sx + Math.cos(a) * 5, sy + Math.sin(a) * 5); g.lineTo(sx + Math.cos(a) * L2, sy + Math.sin(a) * L2); g.stroke(); }
+        g.fillStyle = '#f2d27a'; g.beginPath(); g.ellipse(sx, sy, 5, 5, 0, 0, Math.PI * 2); g.fill(); }
+      break;
+    }
+    case 'cpillar': {
+      // 등불 기둥: 구름 받침 위 흰 기둥, 금빛 머리, 위에 작은 등불 (루엔의 등불과 같은 빛)
+      B3(i + 0.22, j + 0.22, i1 - 0.22, j1 - 0.22, 0, h, '#f4f0e8');
+      faceL(i + 0.3, i + 0.34, 6, h - 6, '#ddd7ca'); faceL(i + 0.6, i + 0.64, 6, h - 6, '#ddd7ca');
+      B3(i + 0.12, j + 0.12, i1 - 0.12, j1 - 0.12, h - 5, h, '#d9b44a');
+      const [lx, ly] = P(i + 0.5, j + 0.5, h);
+      g.fillStyle = '#fff2c0'; g.globalAlpha = 0.3; g.beginPath(); g.ellipse(lx, ly - 12, 18, 18, 0, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1;
+      g.fillStyle = '#c9a23e'; g.fillRect(Math.round(lx) - 5, Math.round(ly) - 4, 10, 3);
+      g.fillStyle = '#fff6d8'; g.fillRect(Math.round(lx) - 4, Math.round(ly) - 17, 8, 13);
+      g.fillStyle = '#f2c85a'; g.fillRect(Math.round(lx) - 2, Math.round(ly) - 13, 4, 6);
+      g.fillStyle = '#c9a23e'; g.fillRect(Math.round(lx) - 5, Math.round(ly) - 19, 10, 2); g.fillRect(Math.round(lx) - 1, Math.round(ly) - 22, 2, 3);
+      { const [bx, by] = P(i + 0.5, j + 0.5, 0); cloudPuff(g, bx - 6, by + 2, 11, 0.95); cloudPuff(g, bx + 8, by + 4, 9, 0.95); }
+      break;
+    }
+    case 'cbench': B3(i + 0.05, j + 0.2, i1 - 0.05, j1 - 0.2, 6, h, '#f2eee6'); for (const x of [i + 0.15, i1 - 0.45]) B3(x, j + 0.25, x + 0.3, j1 - 0.25, 0, 6, '#d9d2c4'); faceL(i + 0.1, i1 - 0.1, h - 2, h, '#d9b44a'); break;
     case 'ledgerdesk': {
       // 검붉은 책상, 펼친 장부와 깃펜, 쌓인 노전, 앞판의 금 테
       box(i + 0.05, j + 0.1, i1 - 0.05, j1 - 0.1, 0, h, '#4a1e16', '#3a1410', '#2a0e0a');
@@ -497,6 +665,66 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
     }
     case 'mat': box(i, j + 0.1, i1, j1 - 0.1, 0, h, '#e8dcc0', '#c8a878', '#a88858'); B3(i + 0.1, j + 0.25, i + 0.5, j1 - 0.25, h, h + 3, '#f2f2ec'); break;
     case 'washer': B3(i + 0.08, j + 0.08, i1 - 0.08, j1 - 0.08, 0, h, '#e8eef2'); { const [wx, wy] = P(i + 0.5, j1 - 0.08, h * 0.5); g.fillStyle = '#5a6a7a'; g.beginPath(); g.ellipse(wx, wy, 7, 7, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#a8c8e0'; g.beginPath(); g.ellipse(wx, wy, 5, 5, 0, 0, Math.PI * 2); g.fill(); } break;
+    case 'island': {
+      // 진열 탁자: 나무 상판 위에 개어 둔 물건·상자 무더기
+      B3(i + 0.08, j + 0.12, i1 - 0.08, j1 - 0.12, 0, h - 3, '#b08a5e');
+      box(i + 0.04, j + 0.08, i1 - 0.04, j1 - 0.08, h - 3, h, '#d8c8a8', '#b8a888', '#a09070');
+      for (let x = i + 0.2; x < i1 - 0.25; x += 0.32) for (let n = 0; n < 2 + (Math.floor(x * 7) % 2); n++) B3(x, j + 0.3, x + 0.24, j + 0.7, h + n * 3, h + n * 3 + 3, pick(Math.floor(x * 11) + n));
+      break;
+    }
+    case 'rack': {
+      // 옷걸이: 쇠 기둥 두 개와 가로대, 걸린 옷들
+      for (const y of [j + 0.15, j1 - 0.15]) B3(i + 0.45, y - 0.05, i + 0.55, y + 0.05, 0, h, '#8a8a8a');
+      poly([P(i + 0.5, j + 0.15, h), P(i + 0.5, j1 - 0.15, h), P(i + 0.5, j1 - 0.15, h - 2), P(i + 0.5, j + 0.15, h - 2)], '#6a6a6a');
+      for (let y = j + 0.25; y < j1 - 0.2; y += 0.16) poly([P(i + 0.5, y, h - 2), P(i + 0.5, y + 0.12, h - 2), P(i + 0.5, y + 0.12, h - 22), P(i + 0.5, y, h - 22)], pick(Math.floor(y * 13)));
+      break;
+    }
+    case 'mirror': B3(i + 0.7, j + 0.1, i1 - 0.05, j1 - 0.1, 0, h, '#6a5a4a'); faceL(i + 0.72, i1 - 0.07, 4, h - 4, night ? '#7a8aa0' : '#c8dce8'); poly([P(i + 0.8, j1, 10), P(i + 0.86, j1, 10), P(i + 0.95, j1, h - 8), P(i + 0.89, j1, h - 8)], '#f2f8ff', 0.6); break;
+    case 'baskets': for (let n = 0; n < 3; n++) B3(i + 0.2, j + 0.2, i1 - 0.2, j1 - 0.2, n * 2.5, n * 2.5 + 3, n % 2 ? '#c83a2a' : '#d84a3a'); break;
+    case 'snackrack': B3(i + 0.3, j + 0.3, i1 - 0.3, j1 - 0.3, 0, h, '#5a5a5a'); for (let z = 6; z < h - 2; z += 6) for (let x = i + 0.32; x < i1 - 0.35; x += 0.12) faceL(x, x + 0.09, z, z + 4, pick(Math.floor(x * 17 + z))); break;
+    case 'freezer': { B3(i + 0.05, j + 0.15, i1 - 0.05, j1 - 0.15, 0, h, '#e8ecee'); box(i + 0.1, j + 0.2, i1 - 0.1, j1 - 0.2, h, h + 1, night ? '#b8d8e8' : '#d2eef8', '#a8c8d8', '#98b8c8'); for (let x = i + 0.25; x < i1 - 0.2; x += 0.3) B3(x, j + 0.35, x + 0.2, j + 0.65, h - 6, h - 2, pick(Math.floor(x * 5))); break; }
+    case 'treadmill': {
+      // 러닝머신: 검은 벨트 · 앞쪽 손잡이 기둥과 화면
+      box(i + 0.05, j + 0.25, i1 - 0.05, j1 - 0.25, 0, 6, '#2a2a2e', '#1e1e22', '#141418');
+      box(i + 0.15, j + 0.3, i1 - 0.35, j1 - 0.3, 6, 7, '#3a3a3e', '#2a2a2e', '#202024');
+      for (const y of [j + 0.28, j1 - 0.32]) B3(i1 - 0.3, y, i1 - 0.22, y + 0.06, 6, h, '#9a9ea4');
+      B3(i1 - 0.35, j + 0.25, i1 - 0.15, j1 - 0.25, h - 4, h, '#2a2a2e');
+      faceL(i1 - 0.33, i1 - 0.17, h - 3, h - 1, night ? '#4af08a' : '#3ac07a');
+      break;
+    }
+    case 'benchpress': {
+      // 벤치 프레스: 패드 벤치 · 받침대 · 원판 낀 바벨
+      B3(i + 0.3, j + 0.35, i1 - 0.3, j1 - 0.35, 0, 8, '#4a4a4e'); box(i + 0.3, j + 0.35, i1 - 0.3, j1 - 0.35, 8, 11, '#c83a2a', '#a82a1e', '#8a2216');
+      for (const y of [j + 0.12, j1 - 0.18]) B3(i + 0.4, y, i + 0.46, y + 0.06, 0, h, '#9a9ea4');
+      poly([P(i + 0.43, j - 0.1, h), P(i + 0.43, j1 + 0.1, h), P(i + 0.43, j1 + 0.1, h - 2), P(i + 0.43, j - 0.1, h - 2)], '#c8ccd2');
+      for (const y of [j - 0.05, j1 + 0.05]) { const [cx, cy] = P(i + 0.43, y, h - 1); g.fillStyle = '#1e1e22'; g.beginPath(); g.ellipse(cx, cy, 3, 7, 0, 0, Math.PI * 2); g.fill(); }
+      break;
+    }
+    case 'squatrack': {
+      // 스쿼트 랙: 네 기둥 쇠틀 · 걸린 바벨 · 옆 원판 걸이
+      for (const [x, y] of [[i + 0.1, j + 0.1], [i1 - 0.2, j + 0.1], [i + 0.1, j1 - 0.2], [i1 - 0.2, j1 - 0.2]] as const) B3(x, y, x + 0.1, y + 0.1, 0, h, '#2a2a2e');
+      box(i + 0.1, j + 0.1, i1 - 0.1, j + 0.2, h - 3, h, '#3a3a3e', '#2a2a2e', '#1e1e22'); box(i + 0.1, j1 - 0.2, i1 - 0.1, j1 - 0.1, h - 3, h, '#3a3a3e', '#2a2a2e', '#1e1e22');
+      poly([P(i - 0.15, j + 0.9, h * 0.6), P(i1 + 0.15, j + 0.9, h * 0.6), P(i1 + 0.15, j + 0.9, h * 0.6 - 2), P(i - 0.15, j + 0.9, h * 0.6 - 2)], '#c8ccd2');
+      for (const x of [i - 0.05, i1 + 0.05]) { const [cx, cy] = P(x, j + 0.9, h * 0.6 - 1); g.fillStyle = '#c83a2a'; g.beginPath(); g.ellipse(cx, cy, 7, 8, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#1e1e22'; g.beginPath(); g.ellipse(cx, cy, 2, 2, 0, 0, Math.PI * 2); g.fill(); }
+      box(i + 0.4, j + 0.4, i + 0.6, j + 0.6, 0, 1, '#1e1e22', '#141418', '#0e0e10');
+      break;
+    }
+    case 'dumbbells': {
+      // 덤벨 걸이: 두 단 선반에 크기 순서대로
+      B3(i + 0.05, j + 0.3, i1 - 0.05, j1 - 0.3, 0, h, '#3a3a3e');
+      for (const z of [h * 0.45, h]) for (let x = i + 0.15; x < i1 - 0.2; x += 0.3) { const [cx, cy] = P(x + 0.12, j + 0.5, z + 2); const rr = 2 + ((x - i) / w) * 3; g.fillStyle = '#1e1e22'; g.fillRect(Math.round(cx) - 4, Math.round(cy - rr), 2, Math.round(rr * 2)); g.fillRect(Math.round(cx) + 3, Math.round(cy - rr), 2, Math.round(rr * 2)); g.fillStyle = '#9a9ea4'; g.fillRect(Math.round(cx) - 2, Math.round(cy) - 1, 5, 2); }
+      break;
+    }
+    case 'punchbag': {
+      // 샌드백: 천장에서 늘어진 쇠사슬과 붉은 가죽 자루
+      const [cx, cy] = P(i + 0.5, j + 0.5, h);
+      g.fillStyle = '#6a6a6a'; g.fillRect(Math.round(cx), Math.round(cy) - 6, 1, 14);
+      g.fillStyle = f.v ? '#2a2a2e' : '#a82a1e'; g.fillRect(Math.round(cx) - 6, Math.round(cy) + 8, 12, 34);
+      g.fillStyle = f.v ? '#3a3a3e' : '#c83a2a'; g.fillRect(Math.round(cx) - 6, Math.round(cy) + 8, 4, 34);
+      g.fillStyle = '#1e1e22'; g.fillRect(Math.round(cx) - 6, Math.round(cy) + 12, 12, 2); g.fillRect(Math.round(cx) - 6, Math.round(cy) + 36, 12, 2);
+      break;
+    }
+    case 'mat': poly([P(i + 0.05, j + 0.2, 1), P(i1 - 0.05, j + 0.2, 1), P(i1 - 0.05, j1 - 0.2, 1), P(i + 0.05, j1 - 0.2, 1)], f.v ? '#3a6a9a' : '#7a3a8a'); break;
     case 'display': B3(i + 0.1, j + 0.1, i1 - 0.1, j1 - 0.1, 0, h, '#c8b090'); for (let x = i + 0.25; x < i1 - 0.2; x += 0.35) B3(x, j + 0.3, x + 0.2, j + 0.6, h, h + 6, pick(Math.floor(x * 7))); break;
     case 'plant': {
       B3(i + 0.3, j + 0.3, i1 - 0.3, j1 - 0.3, 0, 12, '#9a5a3a');
@@ -518,12 +746,16 @@ const STAFF: Record<string, [string, string]> = {
   church: ['#2a2a2e', '#2a2a2e'], mosque: ['#e8e4da', '#e8e4da'], gurdwara: ['#e8a23a', '#2a3a6a'], mart: ['#2a6aa8', '#2a2a30'],
   food: ['#e8e2d6', '#3a2a22'], cafe: ['#4a3022', '#2a2a30'], bar: ['#1e1c22', '#1e1c22'], salon: ['#c96a8a', '#2a2a30'],
   massage: ['#6a3a5a', '#4a2a3a'], laundry: ['#3a6a9a', '#34455f'], lobby: ['#5a4630', '#2a2a30'], shop: ['#5a5a5a', '#34455f'],
+  gym: ['#1e1e22', '#1e1e22'],
 };
 /** 대부업자 베스크: 붉은 피부·대머리·아주 뚱뚱·금 장신구·장부 */
 export const BESK_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'besk', cols: { 1: '#b8382a', 3: '#3a1410', 4: '#2a100c', 5: '#140a08', 6: '#e8c050', 9: '#3a1410', 10: '#e8dcc0', 12: '#f2d27a', 13: '#4a2a1a', 14: '#e0b437', 15: '#140e0c' } };
 /** 지옥 로비의 환생관 파샤르 (컨셉 아트: 잿빛 머리, 검은 망토 코트에 은 장식, 낡은 장부와 깃펜) */
 export const PASHAR_LOOK: Look = { sex: 'm', build: 0, skin: 0, hair: 1, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: '#e8d6c8', 10: '#e8d6c8', 2: '#9a9aa2', 3: '#1c1c22', 4: '#22222a', 9: '#1c1c22', 5: '#141418' } };
+/** 천국의 환생관 루엔 (컨셉 아트: 길고 흰 머리, 흰 법의에 옅은 푸른 띠, 흰 날개, 등불) */
+export const LUEN_LOOK: Look = { sex: 'f', build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, cols: { 1: '#f2dccc', 10: '#f2dccc', 2: '#e8e6f2', 3: '#f8f6f2', 4: '#b8c4e2', 9: '#f8f6f2', 5: '#d8ccb0' } };
 export function clerkLook(kind: string, seed: number): Look {
+  if (kind === 'terrace') return LUEN_LOOK;
   if (kind === 'loan') return BESK_LOOK;
   if (kind === 'rebirth') return PASHAR_LOOK;
   if (kind === 'hbank') return { sex: 'm', build: 0, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: '#9a948c', 10: '#9a948c', 2: '#2a2622', 3: '#1e1c1c', 4: '#1a1818', 9: '#1e1c1c', 5: '#0e0c0c' } }; // 잿빛 피부의 은행원

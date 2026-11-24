@@ -423,6 +423,18 @@ export function hellZone(floor: number): Zone {
     const oi = !inV(i + 1, j) || !inV(i - 1, j), oj = !inV(i, j + 1) || !inV(i, j - 1);
     props.push({ i, j, kind: 'fence', o: oi && oj ? 2 : oi ? 1 : 0 });
   }
+  // 19차: 출입문 앞(간판 면)은 울타리를 비우고 땅으로 — 문 앞이 울타리 너머에 갇혀 못 들어가던 일 (2층 속죄의 회당)
+  for (const b of buildings) {
+    if (!b.sign) continue;
+    const fi = b.sign === 'right' ? b.i0 + b.w : b.i0 + Math.floor(b.w / 2), fj = b.sign === 'right' ? b.j0 + Math.floor(b.d / 2) : b.j0 + b.d;
+    for (let n = props.length - 1; n >= 0; n--) { const q = props[n]; if (q.kind === 'fence' && Math.abs(q.i - fi) <= 1 && Math.abs(q.j - fj) <= 1) props.splice(n, 1); }
+    for (const [a, c] of [[0, 0], [0, 1], [1, 0], [-1, 0], [1, 1], [-1, 1]]) {
+      const ii = fi + a, jj = fj + c;
+      if (buildings.some((o) => ii >= o.i0 && ii < o.i0 + o.w && jj >= o.j0 && jj < o.j0 + o.d)) continue;
+      const tt = at(ii, jj);
+      if (tt === TI.block || tt === TI.water) set(ii, jj, 'walk');
+    }
+  }
   // 마을 불빛: 1층 광장 모닥불 · 2층 도깨비불 장대 · 3층 붉은 등롱
   const vLight: Prop['kind'] = T === 'ash' ? 'lamp' : 'lantern';
   props.push({ i: C.i + 2, j: C.j + 1, kind: T === 'ash' ? 'bonfire' : 'lantern' });

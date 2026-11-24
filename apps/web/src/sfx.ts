@@ -125,9 +125,16 @@ function grunt(o: AudioNode, t: number, f0: number, vowel: [number, number], pea
 }
 
 /** 맞는 소리 = 무기 층 + 몸 층. 치명타는 한 겹 더 묵직하게. pitch = 사람마다 다른 높낮이 */
-export function impact(kind: HitKind, s: Spot, crit = false, body: Body = 'flesh', pitch = 1) {
+export function impact(kind: HitKind, s: Spot, crit = false, body: Body = 'flesh', pitch = 1, size = 1) {
   if (!ready()) return;
   const t = ctx!.currentTime, o = out(s, crit ? 1.25 : 1);
+  // 19차: 큰 몸일수록 둔탁하게 — 낮게 깔리는 쿵 소리와 먹먹한 울림을 더하고, 몸 소리 높이를 낮춘다
+  if (size > 1.05) {
+    const k = Math.min(1.6, size - 1);
+    tone(o, t, 0.22 + k * 0.18, 'sine', 78 / size, 34 / size, 0.55 + k * 0.5);
+    noise(o, t, 0.16 + k * 0.12, 'lowpass', 420 / size, 120, 0.7, 0.35 + k * 0.4, 0.006);
+    pitch /= Math.sqrt(size);
+  }
   // 무기
   if (kind === 'fist') {
     tone(o, t, 0.13, 'sine', jit(150) * pitch, 55, 0.9);
@@ -249,4 +256,14 @@ export function rankUp() {
   [392, 494, 587, 784].forEach((f, k) => { tone(o, t + 0.08 + k * 0.11, 1.5, 'triangle', f, f * 1.003, 0.16); tone(o, t + 0.08 + k * 0.11, 1.2, 'sine', f * 2, f * 2.004, 0.07); });
   tone(o, t + 0.55, 2.0, 'sine', 1175, 1176, 0.12);
   noise(o, t + 0.5, 1.4, 'highpass', 4000, 7000, 0.5, 0.1, 0.15);
+}
+
+/** 19차: 자동차 경적 (길을 막으면). 두 음이 섞인 짧고 거친 소리, 화가 날수록 길게 */
+export function horn(s: Spot, long = false) {
+  if (!ready()) return;
+  const t = ctx!.currentTime, o = out(s, 0.55);
+  const dur = long ? 0.55 : 0.22;
+  tone(o, t, dur, 'square', 392, 388, 0.16);
+  tone(o, t, dur, 'square', 494, 490, 0.12);
+  if (long) { tone(o, t + 0.65, 0.18, 'square', 392, 388, 0.14); tone(o, t + 0.65, 0.18, 'square', 494, 490, 0.1); }
 }

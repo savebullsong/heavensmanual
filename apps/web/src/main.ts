@@ -9,7 +9,7 @@ import { openLookPanel, lookPanelInsets } from './lookpanel.ts';
 import { ITEMS, STORES, menuFor, iconFor, effectText, priceText, HELL_FOOD, type ItemDef, type ItemCat } from './items.ts';
 import * as net from './net.ts';
 import { preloadPortrait } from './portraits.ts';
-import { sukhumvitTestZone, decodeZone, type Zone } from './zone.ts';
+import { sukhumvitTestZone, decodeZone, type Zone, type Building } from './zone.ts';
 import { streetReady } from './street.ts';
 import { ARRIVALS, rollArrival, arrivalLook, type Arrival, type Look, type Outfit } from './character.ts';
 import { t, lang, setLang, LANGS, type Lang } from './i18n.ts';
@@ -65,17 +65,32 @@ let talkedThisVisit = false;
 let busy = false;
 let workLine = '';
 
-// 실제 지도 존을 미리 불러 둔다 (실패하면 시험 구역)
-const ZONE_URL = 'zones/bkk-sukhumvit-asok.json';
-const zoneReady: Promise<Zone> = fetch(ZONE_URL)
-  .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
-  .then((j) => decodeZone(j))
-  .catch(() => sukhumvitTestZone());
+// 19차: 수쿰빗을 대로를 따라 다섯 구역으로 나눴다 (나나 · 소이 8–17 · 아속 · 소이 20–33 · 프롬퐁). 우주새는 아속에만.
+// 구역은 필요할 때 불러 두고(이웃 구역은 미리), 실패하면 시험 구역
+const ZONE_IDS = ['bkk-nana', 'bkk-soi8-17', 'bkk-asok', 'bkk-soi20-33', 'bkk-phromphong'];
+const HOME_ZONE = 'bkk-asok';
+const zoneCache = new Map<string, Promise<Zone>>();
+function loadZone(id: string): Promise<Zone> {
+  if (!ZONE_IDS.includes(id)) id = HOME_ZONE;
+  let p = zoneCache.get(id);
+  if (!p) {
+    p = fetch(`zones/${id}.json`)
+      .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+      .then((j) => decodeZone(j))
+      .catch(() => { zoneCache.delete(id); return sukhumvitTestZone(); });
+    zoneCache.set(id, p);
+  }
+  return p;
+}
+loadZone(HOME_ZONE);
 
 const shopLabels = () => ({ hwang: state.realm === 'hell' ? t().hwanghon : t().clerk, parrot: t().parrot, door: t().doorLabel });
 const realm = () => state.realm ?? 'real';
 /** 관리자 캐릭터의 투명 모드 (관리자로 지정된 계정만) */
 const INVIS_KEY = 'heavensmanual.invisible';
+/** 19차: 자동 반격 (영혼 설정) — 기본은 켬 */
+const COUNTER_KEY = 'heavensmanual.counter';
+const autoCounter = () => { try { return localStorage.getItem(COUNTER_KEY) !== '0'; } catch { return true; } };
 const invisible = () => !!net.account()?.admin && localStorage.getItem(INVIS_KEY) === '1';
 /** 노자돈 환율: ฿10 = 노전 1닢 */
 const OBOL_RATE = 10;
@@ -147,7 +162,7 @@ async function boot() {
   setInterval(updateHud, 1000);
   setInterval(() => { snapPos(); save(state); }, 4000);
   addEventListener('pagehide', () => { snapPos(); save(state); });
-  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce }; // 개발용 확인 창구
+  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar() }; // 개발용 확인 창구
 }
 
 // ───────────────────────── 장면 전환 ─────────────────────────
@@ -161,7 +176,7 @@ function snapPos() {
 }
 /** 적어 둔 자리로 돌아간다 */
 async function resumeAt(pos: NonNullable<typeof state.pos>) {
-  await enterWorld([pos.i, pos.j]);
+  await enterWorld([pos.i, pos.j], pos.z);
   if (!world || world.zone.id !== pos.z) return;
   if (pos.k !== undefined && world.zone.buildings[pos.k] && realm() === 'real') {
     enterInterior(pos.k, { i: pos.i, j: pos.j }, null, !!pos.work);
@@ -198,9 +213,12 @@ function enterShop(fromStreet: boolean) {
   net.leaveZone();
 }
 
-async function enterWorld(at: 'door' | [number, number] = 'door') {
+async function enterWorld(at: 'door' | [number, number] = 'door', zoneId?: string) {
   restInShop();
   dropInterior();
+  // 어느 구역: 우주새 문 = 아속. 자리로 들어가면 주어진 구역 → 지금 서 있던 현실 구역 → 아속 (모르는 구역(옛 저장)이면 우주새 문 앞)
+  if (zoneId !== undefined && !ZONE_IDS.includes(zoneId)) { at = 'door'; zoneId = undefined; }
+  const zid = at === 'door' ? HOME_ZONE : zoneId ?? (world && !world.zone.hell && !world.zone.interior && ZONE_IDS.includes(world.zone.id) ? world.zone.id : HOME_ZONE);
   if (inHell()) { enterHell(hellState().floor, 'shop'); return; }
   shop.stop();
   scene = 'world';
@@ -209,12 +227,12 @@ async function enterWorld(at: 'door' | [number, number] = 'door') {
   ui.hidden = false;
   ui.className = 'scene loading';
   ui.textContent = t().loading;
-  const [zone] = await Promise.all([zoneReady, streetReady]);
+  const [zone] = await Promise.all([loadZone(zid), streetReady]);
   ui.hidden = true;
   ui.textContent = '';
   ui.className = '';
   const want = realm() === 'ghost' ? 'ghost' : realm() === 'heaven' ? 'heaven' : 'real';
-  if (world && (world.zone.hell || world.realm !== want)) { world.destroy(); world = null; }
+  if (world && (world.zone.hell || world.realm !== want || world.zone.id !== zone.id)) { world.destroy(); world = null; }
   if (!world) {
     world = new WorldScene(app, zone, bodyLook(), () => enterShop(true), hooks, state.hp ?? maxHp(), { realm: want });
     app.stage.addChild(world.root);
@@ -227,11 +245,54 @@ async function enterWorld(at: 'door' | [number, number] = 'door') {
   else world.placeNear(at[0], at[1], state.hp ?? maxHp());
   world.setStance(stance);
   world.setInvisible(invisible());
+  world.setAutoCounter(autoCounter());
   world.start();
   renderHud();
   showStance(want !== 'ghost');
+  for (const nb of [zone.edges?.w, zone.edges?.e]) if (nb) loadZone(nb); // 이웃 구역은 미리
   if (want === 'ghost') { net.leaveZone(); return; } // 귀신은 산 사람들 사이에 보이지 않는다
   joinNet(world);
+}
+
+/** 19차: 구역 끝으로 걸어 나가면 이웃 구역으로 (같은 거리의 다음 토막). 좌표는 전체 지도 기준으로 맞춘다 */
+let crossing = false;
+async function crossEdge(dir: 'w' | 'e', x: number, y: number) {
+  if (!world || crossing || busy || world.zone.interior || world.zone.hell || dlg.isOpen) return;
+  const z = world.zone;
+  const id = dir === 'w' ? z.edges?.w : z.edges?.e;
+  if (!id) { toast(t().edgeEnd); return; }
+  crossing = true;
+  try {
+    const next = await loadZone(id);
+    if (!world || world.zone !== z) return;
+    const o0 = z.origin ?? { i: 0, j: 0 }, o1 = next.origin ?? { i: 0, j: 0 };
+    let ni = Math.floor(x) + o0.i - o1.i;
+    const nj = Math.floor(y) + o0.j - o1.j;
+    if (next.edges) ni = Math.max(next.edges.i0, Math.min(next.edges.i1 - 1, ni));
+    const want = world.realm, crime = world.crimeT;
+    closeMenus();
+    world.destroy();
+    net.leaveZone();
+    world = new WorldScene(app, next, bodyLook(), () => enterShop(true), hooks, state.hp ?? maxHp(), { realm: want });
+    app.stage.addChild(world.root);
+    world.crimeT = crime;
+    world.setLook(bodyLook());
+    world.setGear(gear());
+    world.setStats(stats());
+    world.placeNear(ni, nj, state.hp ?? maxHp());
+    world.setStance(stance);
+    world.setInvisible(invisible());
+    world.setAutoCounter(autoCounter());
+    world.start();
+    renderHud();
+    showPlace(t().zones[id] ?? id, '');
+    snapPos();
+    save(state);
+    for (const nb of [next.edges?.w, next.edges?.e]) if (nb) loadZone(nb);
+    if (want !== 'ghost') joinNet(world);
+  } finally {
+    crossing = false;
+  }
 }
 
 /** 지옥 n층으로: 떨어짐(죽음·악업) · 계단 · 구덩이 · 황혼의 가게에서 나옴 · 다시 열기 */
@@ -299,6 +360,7 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
   else if (how === 'resume' && state.pos?.w === 'hell' && state.pos.f === f && state.pos.z === zone.id) w.placeNear(state.pos.i, state.pos.j, hp); // 다시 열면 마지막 자리
   else w.placeNear(zh.rest.i, zh.rest.j, hp);
   w.setStance(stance);
+  w.setAutoCounter(autoCounter());
   w.setInvisible(invisible()); // 관리자 투명은 층을 옮겨도 그대로
   if (zh.exit === 'ford' && (h.fed ?? 0) >= GURMA_FULL && !h.cleared.includes(f)) w.gurmaSleep(); // 배불러 잠든 구르마
   w.start();
@@ -334,7 +396,7 @@ function adminTeleport(to: number | 'back' | 'heaven') {
   if (!state.adminTrip) state.adminTrip = realm() as 'real' | 'ghost' | 'heaven' | 'hell';
   if (to === 'heaven') {
     if (realm() === 'heaven') return;
-    state.heaven ??= { bonus: 0, admin: true };
+    state.heaven ??= { admin: true };
     state.realm = 'heaven';
     save(state);
     if (world) { world.destroy(); world = null; net.leaveZone(); }
@@ -368,6 +430,23 @@ const hooks: WorldHooks = {
     state.wallet = (state.wallet ?? 0) + n;
     updateHud();
   },
+  elder(name) {
+    talkToElder(name);
+  },
+  wage(n, where, stiffed) {
+    const L = t();
+    const amt = (Math.floor(n * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 });
+    if (stiffed) {
+      // 19차: 일을 시킬 만큼 시키고 한 푼도 주지 않고 내쫓는 사장
+      npcSay(L.bossOf.replace('{shop}', where), L.stiffLines[Math.floor(Math.random() * L.stiffLines.length)]);
+      toast(L.stiffToast.replace('{n}', amt));
+      return;
+    }
+    if (n <= 0) return;
+    state.wallet = (state.wallet ?? 0) + n;
+    updateHud();
+    toast(L.wagePaid.replace('{n}', amt), 'good');
+  },
   deed(key, opt) {
     recordDeed(key, opt);
   },
@@ -381,6 +460,9 @@ const hooks: WorldHooks = {
   },
   heavenAct(what) {
     heavenAct(what);
+  },
+  edge(dir, x, y) {
+    crossEdge(dir, x, y);
   },
   menu(title, sub, options, x, y) {
     openTargetMenu(title, sub, options, x, y);
@@ -497,17 +579,33 @@ let street: WorldScene | null = null;
 
 function enterInterior(k: number, out: { i: number; j: number }, chaser: { monster: boolean; hp: number } | null, work = false) {
   if (!world || world.zone.interior || busy) return;
-  const outer = world;
-  const b = outer.zone.buildings[k];
+  const b = world.zone.buildings[k];
   const L0 = t();
-  const z = interiorZone(b, k, out, b.cat === 'loan' ? L0.beskHouse : b.cat === 'hbank' ? L0.hbankName : b.cat === 'atone' ? L0.atoneName : b.cat === 'rebirth' ? L0.rebirthName : buildingName(b, lang()));
+  openRoom(interiorZone(b, k, out, b.cat === 'loan' ? L0.beskHouse : b.cat === 'hbank' ? L0.hbankName : b.cat === 'atone' ? L0.atoneName : b.cat === 'rebirth' ? L0.rebirthName : buildingName(b, lang())), chaser, work);
+}
+/** 19차: 천국의 구름 계단 → 환생의 테라스. 거리의 건물이 아니라 구름 위에 따로 떠 있는 단 (환생관 루엔은 여기에만 있다) */
+function enterTerrace() {
+  if (!world || world.zone.interior || busy || realm() !== 'heaven') return;
+  const st = world.heavenStair;
+  if (!st) return;
+  const b: Building = { i0: st.i, j0: st.j, w: 1, d: 1, h: 0, cat: 'terrace', color: '#ffffff' };
+  const fx = worldFade('heaven', false);
+  fx.covered.then(() => {
+    openRoom(interiorZone(b, -4, { i: st.i, j: st.j + 1 }, t().terraceName), null, false);
+    toast(t().terraceArrive);
+    fx.done();
+  });
+}
+function openRoom(z: Zone, chaser: { monster: boolean; hp: number } | null, work: boolean) {
+  if (!world || world.zone.interior) return;
+  const outer = world;
   closeMenus();
   document.querySelector('.store-panel')?.remove();
   outer.stop();
   outer.root.visible = false;
   street = outer;
   net.leaveZone(); // 방 안은 혼자
-  const w = new WorldScene(app, z, bodyLook(), () => enterShop(true), hooks, state.hp ?? maxHp(), { realm: realm() === 'hell' ? 'hell' : 'real', chaser, work: work ? z.interior!.name : undefined });
+  const w = new WorldScene(app, z, bodyLook(), () => enterShop(true), hooks, state.hp ?? maxHp(), { realm: realm() === 'hell' ? 'hell' : realm() === 'heaven' ? 'heaven' : 'real', chaser, work: work ? z.interior!.name : undefined });
   w.crimeT = outer.crimeT;
   world = w;
   app.stage.addChild(w.root);
@@ -516,12 +614,13 @@ function enterInterior(k: number, out: { i: number; j: number }, chaser: { monst
   w.setStats(stats());
   w.placeNear(z.spawn.i, z.spawn.j, state.hp ?? maxHp());
   w.setStance(stance);
+  w.setAutoCounter(autoCounter());
   w.start();
   setIndoor(true);
   renderHud();
   showPlace(z.interior!.name, '');
   if (work) toast(t().workInside);
-  else if (z.interior!.rest) toast(t().restRoom, 'good');
+  else if (z.interior!.rest && z.interior!.kind !== 'terrace') toast(t().restRoom, 'good');
 }
 
 /** 방의 나가는 매트: 거리의 그 건물 앞으로 (쫓던 대식자는 따라 나온다) */
@@ -543,6 +642,7 @@ function leaveInterior() {
   world.setStats(stats());
   world.placeNear(info.from.out.i, info.from.out.j, state.hp ?? maxHp());
   world.setStance(stance);
+  world.setAutoCounter(autoCounter());
   world.start();
   setIndoor(false);
   renderHud();
@@ -582,6 +682,7 @@ function clerkTalk() {
   if (info.kind === 'hbank') { openHellBank(); return; }
   if (info.kind === 'atone') { openAtone(); return; }
   if (info.kind === 'rebirth') { talkToPashar(); return; }
+  if (info.kind === 'terrace') { talkToOfficer(); return; }
   if (info.store === 'bank') { openBank(info.name); return; }
   if (info.store === 'mart' || info.store === 'pharmacy' || info.store === 'food' || info.store === 'cafe' || info.store === 'tools' || info.store === 'dept') { openStore(info.store, info.name, info.cuisine); return; }
   const opts: { label: string; danger?: boolean; act: () => void }[] = [];
@@ -637,6 +738,41 @@ function clerkTalk() {
   opts.push({ label: L.act.close, act: () => undefined });
   save(state);
   openTargetMenu(info.name, sub, opts, window.innerWidth / 2, window.innerHeight * 0.38);
+}
+
+/**
+ * 19차: 종교시설의 가장 높은 이 (주지 스님 · 대주교 · 대이맘 · 수석 그란티) — 현실에만.
+ * 보시 ฿10,000을 받고 신앙을 뺀 능력치(힘·민첩·체력)를 처음으로 되돌린다. 되돌린 점수는 다시 나눌 수 있다
+ */
+const RESET_COST = 10000;
+async function talkToElder(name: string) {
+  if (busy || dlg.isOpen) return;
+  const L = t();
+  busy = true;
+  dlg.open({ name });
+  await dlg.say(L.elderGreet);
+  const s = stats();
+  const freed = s.str - 1 + (s.agi - 1) + (s.vit - 1);
+  await dlg.say(L.elderOffer.replace('{n}', RESET_COST.toLocaleString('en-US')).replace('{p}', String(freed)));
+  const c = await dlg.choose([L.elderReset.replace('{n}', RESET_COST.toLocaleString('en-US')), L.elderNo]);
+  if (c === 0) {
+    if (freed <= 0) await dlg.say(L.elderNothing);
+    else if ((state.wallet ?? 0) < RESET_COST) await dlg.say(L.elderPoor);
+    else {
+      state.wallet = (state.wallet ?? 0) - RESET_COST;
+      state.soul = { ...state.soul!, stats: { str: 1, agi: 1, vit: 1, fai: s.fai } };
+      state.hp = Math.min(state.hp ?? maxHp(), maxHp());
+      world?.setStats(stats());
+      world?.setGear(gear());
+      save(state);
+      updateHud();
+      await dlg.say(L.elderDone.replace('{p}', String(freed)));
+      toast(L.elderToast.replace('{p}', String(freed)), 'good');
+    }
+  } else await dlg.say(L.elderBye);
+  dlg.close();
+  busy = false;
+  renderHud();
 }
 
 // ───────────────────────── 지옥: 위층 길 · 아래층 계단 ─────────────────────────
@@ -754,6 +890,8 @@ async function talkToTalus() {
  * 지옥 로비 가운데 창구의 환생관 파샤르: 이번 생의 악행 비율에 따라 혜택이 다르다.
  * 악행 100% = 아무것도 못 가져가고 태어날 도시도 고를 수 없다 · 그 밖 = 노전의 (100 − 악행%)만큼 현생 돈으로 바꿔 가고 도시를 고른다
  */
+const INDULGENCE = 666; // 지옥면죄부 한 장 (노전)
+const KERBEROS = 333; // 켈베로스 호출 한 번 (노전)
 async function talkToPashar() {
   if (busy) return;
   const L = t();
@@ -763,6 +901,26 @@ async function talkToPashar() {
   await dlg.say(L.lobbyGreet);
   const ratio = Math.round(evilRatio(state.deeds ?? { good: 0, evil: 0 }) ?? 100);
   await dlg.say(L.lobbyRatio.replace('{r}', String(ratio)));
+  // 19차 환생 혜택 둘: 가진 노전(손에 든 것 + 은행)으로 산다. 은행 돈은 저절로 빠진다
+  const spend = (n: number) => { const a = Math.min(n, Math.floor(h.notes)); h.notes -= a; h.bank = Math.max(0, (h.bank ?? 0) - (n - a)); save(state); renderHud(); };
+  await dlg.say(L.perkIntro);
+  for (;;) {
+    const obol = Math.floor(h.notes + (h.bank ?? 0));
+    const ind = Math.round((state.absolve ?? 0) / 30);
+    const c = await dlg.choose([
+      L.perkInd.replace('{n}', String(INDULGENCE)).replace('{h}', String(ind)),
+      L.perkKerb.replace('{n}', String(KERBEROS)).replace('{h}', String(state.kerberos ?? 0)),
+      L.perkDone.replace('{o}', obol.toLocaleString('en-US')),
+    ]);
+    if (c === 0) {
+      if (ind >= 10) await dlg.say(L.perkIndMax);
+      else if (obol < INDULGENCE) await dlg.say(L.perkPoor);
+      else { spend(INDULGENCE); state.absolve = (state.absolve ?? 0) + 30; save(state); await dlg.say(L.perkIndGot.replace('{h}', String(ind + 1))); }
+    } else if (c === 1) {
+      if (obol < KERBEROS) await dlg.say(L.perkPoor);
+      else { spend(KERBEROS); state.kerberos = (state.kerberos ?? 0) + 1; save(state); await dlg.say(L.perkKerbGot); }
+    } else break;
+  }
   let carry = 0;
   let region = 'bkk';
   if (ratio >= 100) {
@@ -820,8 +978,18 @@ function recordDeed(key: DeedKey, opt: { floor?: number; share?: number } = {}) 
   // 모든 생에 걸친 기록에도 같은 만큼
   state.deedsAll = applyDeed(state.deedsAll ?? { good: 0, evil: 0 }, key, opt).deeds;
   const rule = DEED_TABLE[key];
-  const pts = fmtKarma(karmaPoints(key));
+  let pts = fmtKarma(karmaPoints(key));
   const parts: string[] = [];
+  // 19차 지옥면죄부: 남은 면죄 점수만큼 이 악행을 지운다 (이번 생 · 모든 생 기록 모두)
+  if (rule.kind === 'evil' && (state.absolve ?? 0) > 0) {
+    const raw = karmaPoints(key);
+    const f = Math.min(raw, state.absolve ?? 0);
+    state.absolve = Math.round(((state.absolve ?? 0) - f) * 10) / 10;
+    state.deeds.evil = Math.max(0, Math.round((state.deeds.evil - f) * 10) / 10);
+    if (state.deedsAll) state.deedsAll.evil = Math.max(0, Math.round((state.deedsAll.evil - f) * 10) / 10);
+    parts.push(L.absolved.replace('{n}', fmtKarma(f)).replace('{m}', fmtKarma(state.absolve)));
+    pts = fmtKarma(Math.max(0, raw - f));
+  }
   if (opt.share !== undefined) parts.push(L.guardAssist.replace('{p}', String(Math.round(opt.share * 100))));
   if (rule.kind === 'good') parts.push(L.toastGood.replace('{n}', pts));
   if (rule.kind === 'evil') parts.push(L.toastEvil.replace('{n}', pts));
@@ -1259,6 +1427,23 @@ function renderBag() {
   info.className = 'bag-info';
   info.textContent = [(state.ammo ?? 0) > 0 ? L.ammoLeft.replace('{n}', String(state.ammo)) : '', (state.arrows ?? 0) > 0 ? L.arrowsLeft.replace('{n}', String(state.arrows)) : ''].filter(Boolean).join(' · ');
   info.hidden = !info.textContent;
+  // 19차 켈베로스 호출 (지옥 로비에서 사 온 것): 현실에서만 부를 수 있다
+  if ((state.kerberos ?? 0) > 0 && bagTab === 'use') {
+    const kb = document.createElement('button');
+    kb.className = 'bag-kerberos';
+    const left = world?.kerberosLeft ?? 0;
+    kb.textContent = left > 0 ? L.kerbActive.replace('{m}', String(Math.ceil(left / 60))) : L.kerbCall.replace('{n}', String(state.kerberos));
+    kb.disabled = left > 0;
+    kb.onclick = () => {
+      if (!world || scene !== 'world' || realm() !== 'real' || world.zone.interior) { toast(L.kerbOnlyReal); return; }
+      if (!world.summonKerberos(600)) return;
+      state.kerberos = Math.max(0, (state.kerberos ?? 1) - 1);
+      save(state);
+      el.remove();
+    };
+    info.hidden = false;
+    info.appendChild(kb);
+  }
   const list = document.createElement('div');
   list.className = 'menu-list';
   const bag = state.bag ?? {};
@@ -1488,7 +1673,7 @@ function showDeath(cause: 'car' | 'beaten' | 'hell') {
     btn.textContent = L.toHeaven;
     btn.onclick = () => {
       el.remove();
-      state.heaven = { bonus: j.world === 'heaven' ? j.bonusSoulExp : 0, met: state.heaven?.met };
+      state.heaven = { met: state.heaven?.met };
       state.realm = 'heaven';
       state.hp = maxHp();
       save(state);
@@ -1505,33 +1690,43 @@ function showDeath(cause: 'car' | 'beaten' | 'hell') {
 }
 
 // ───────────────────────── 천국 (3단계) ─────────────────────────
-function heavenAct(what: 'officer' | 'yellowwing' | 'shop' | 'assault') {
+function heavenAct(what: 'officer' | 'yellowwing' | 'shop' | 'assault' | 'terrace') {
   if (busy || dlg.isOpen) return;
-  if (what === 'officer') talkToOfficer();
+  if (what === 'terrace') enterTerrace();
+  else if (what === 'officer') talkToOfficer();
   else if (what === 'yellowwing') talkToYellowWing();
   else if (what === 'shop') npcSay(t().shopLabel, t().heavenShopEmpty);
   else heavenAssault();
 }
-/** 천국의 환생관: 언제든 다시 태어날 수 있다. 쌓은 선행만큼 영혼 경험치를 얹어 준다 */
+/**
+ * 천국의 환생관 루엔 (구름 계단 위 환생의 테라스): 19차 — 천국에서 환생하는 혜택은 없다.
+ * 천국을 떠나 다시 태어나겠다는 영혼은 드물다. 루엔은 의아해하고, 세 번에 걸쳐 온 힘으로 말린다.
+ * 그래도 가겠다면 한숨을 쉬고 문을 연다 (가져가는 것도, 덤도 없다)
+ */
 async function talkToOfficer() {
   const L = t();
   busy = true;
-  const bonus = state.heaven?.bonus ?? 0;
   dlg.open({ name: L.officer, portrait: 'luen' });
   await dlg.say(L.offGreet);
-  await dlg.say(L.offAsk.replace('{n}', bonus.toLocaleString('en-US')));
-  const c = await dlg.choose([L.offYes, L.offNo]);
-  if (c === 1) { await dlg.say(L.offStay); dlg.close(); busy = false; return; }
+  const c0 = await dlg.choose([L.offAskRebirth, L.offJustLook]);
+  if (c0 !== 0) { await dlg.say(L.offStay); dlg.close(); busy = false; return; }
+  // 의아함
+  await dlg.say(L.offPuzzled);
+  // 설득 세 번: 천국에 있는 것 → 아래에 기다리는 것 → 영혼의 강등. 한 번이라도 '다시 생각해 보겠다'면 멈춘다
+  for (const [plea, more] of L.offPleas as [string, string][]) {
+    await dlg.say(plea);
+    if (more) await dlg.say(more);
+    const c = await dlg.choose([L.offInsist, L.offReconsider]);
+    if (c !== 0) { await dlg.say(L.offRelief); dlg.close(); busy = false; return; }
+  }
+  await dlg.say(L.offLast);
+  const fin = await dlg.choose([L.offFinalGo, L.offReconsider]);
+  if (fin !== 0) { await dlg.say(L.offRelief); dlg.close(); busy = false; return; }
+  await dlg.say(L.offSigh);
   dlg.close();
   busy = false;
-  if (bonus > 0) {
-    const soul = state.soul ?? { rank: 1, exp: 0 };
-    const up = addSoulExp(soul.rank, soul.exp, bonus);
-    state.soul = { ...soul, rank: up.rank, exp: up.exp };
-    toast(L.offBonus.replace('{n}', bonus.toLocaleString('en-US')), 'good');
-    if (up.rank > soul.rank) rankUpShow(up.rank);
-  }
-  rebirthFrom('heaven');
+  const fx = worldFade('heaven', false);
+  fx.covered.then(() => { rebirthFrom('heaven'); fx.done(); });
 }
 /** 황색날개: 미스 황과 같은 얼굴이지만 스스로는 다른 사람이라 여긴다. 천국의 물건은 공짜 */
 const HEAVEN_GIFTS = ['water', 'cola', 'choco', 'chips', 'bandage'];
@@ -1539,7 +1734,7 @@ async function talkToYellowWing() {
   const L = t();
   busy = true;
   dlg.open({ name: L.yellowWing, portrait: 'yellow-wing' });
-  if (!state.heaven?.met) { state.heaven = { bonus: state.heaven?.bonus ?? 0, met: true }; save(state); await dlg.say(L.ywFirst); }
+  if (!state.heaven?.met) { state.heaven = { ...state.heaven, met: true }; save(state); await dlg.say(L.ywFirst); }
   else await dlg.say(L.ywLines[Math.floor(Math.random() * L.ywLines.length)]);
   await dlg.say(L.ywGreet);
   const gifts = HEAVEN_GIFTS.map((k) => ITEMS.find((i) => i.key === k)!).filter(Boolean);
@@ -1841,6 +2036,7 @@ function renderSettings() {
       <div class="set-row"><span class="lbl l-bgm"></span><div class="seg s-bgm"></div></div>
       <div class="set-row"><span class="lbl l-sfx"></span><div class="seg s-sfx"></div></div>
     </section>
+    <section class="set-sec"><h4 class="h-fight"></h4><div class="set-row"><span class="lbl l-counter"></span><div class="seg s-counter"></div></div><p class="note n-counter"></p></section>
     <section class="set-sec"><h4 class="h-lang"></h4><div class="seg s-lang wide"></div></section>
     <section class="set-sec set-acc"><h4 class="h-acc"></h4><div class="acc"></div></section>
     ${net.account()?.admin ? `<section class="set-sec set-admin"><h4 class="h-admin"></h4><div class="set-row"><span class="lbl l-inv"></span><div class="seg s-inv"></div></div><div class="set-row"><span class="lbl l-tp"></span><div class="seg s-tp"></div></div><div class="set-row"><span class="lbl"></span><button class="tp-heaven"></button></div>${state.adminTrip && state.adminTrip !== realm() ? '<div class="set-row"><span class="lbl"></span><button class="tp-back"></button></div>' : ''}<p class="note n-admin"></p></section>` : ''}`;
@@ -1867,6 +2063,11 @@ function renderSettings() {
   };
   seg(el.querySelector('.s-bgm')!, ['music', 'nature', 'off'] as BgmMode[], L.bgmOpts, bgmMode, (v) => setBgmMode(v));
   seg(el.querySelector('.s-sfx')!, ['on', 'off'], L.onOff, () => (isMuted() ? 'off' : 'on'), (v) => setMuted(v === 'off'));
+  // 19차: 자동 반격 — 나를 친 자에게 곧바로 맞선다 (가만히 서 있거나 걷는 중일 때)
+  el.querySelector('.h-fight')!.textContent = L.setFight;
+  el.querySelector('.l-counter')!.textContent = L.setCounter;
+  el.querySelector('.n-counter')!.textContent = L.setCounterNote;
+  seg(el.querySelector('.s-counter')!, ['on', 'off'], L.onOff, () => (autoCounter() ? 'on' : 'off'), (v) => { try { localStorage.setItem(COUNTER_KEY, v === 'on' ? '1' : '0'); } catch { /* 그만 */ } world?.setAutoCounter(v === 'on'); });
   seg(el.querySelector('.s-lang')!, LANGS, LANGS.map((l) => (l === 'ko' ? '한국어' : l === 'th' ? 'ไทย' : 'English')), lang, (v) => { changeLang(v); renderSettings(); });
   renderAccountSettings(el.querySelector('.acc')!);
   if (el.querySelector('.set-admin')) {
@@ -2107,6 +2308,14 @@ function renderSoul() {
     row.querySelector('em')!.innerHTML = `<span class="kg"></span> · <span class="ke"></span>`;
     row.querySelector('.kg')!.textContent = L.karmaGood.replace('{n}', fmtKarma(d.good));
     row.querySelector('.ke')!.textContent = L.karmaEvil.replace('{n}', fmtKarma(d.evil));
+    kd.appendChild(row);
+  }
+  if ((state.absolve ?? 0) > 0) {
+    const row = document.createElement('div');
+    row.className = 'stat-row soft';
+    row.innerHTML = '<b></b><em></em>';
+    row.querySelector('b')!.textContent = L.absolveRow;
+    row.querySelector('em')!.textContent = L.absolveVal.replace('{n}', fmtKarma(state.absolve ?? 0));
     kd.appendChild(row);
   }
   document.body.appendChild(el);

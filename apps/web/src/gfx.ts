@@ -36,18 +36,59 @@ export function drawGroundChunk(z: Zone, i0: number, j0: number): { canvas: HTML
   g.imageSmoothingEnabled = false;
   const S = (x: number, y: number): [number, number] => { const [a, b] = iso(x, y); return [a - minX, b - minY]; };
   const r = rnd(7 + i0 * 131 + j0 * 977);
+  // 19차: 네모 칸이 그대로 보이지 않게 — 칸마다 제멋대로인 밝기 대신 넓게 번지는 얼룩(값 잡음),
+  // 계단처럼 꺾이는 경계(풀밭·물·공터·보도)는 모서리를 비스듬히 깎아 자연스러운 선으로, 연못 위 보도는 나무 다리
+  const shade = (i: number, j: number) => {
+    const ci = Math.floor(i / 5), cj = Math.floor(j / 5), fi = (i % 5) / 5, fj = (j % 5) / 5;
+    const h = (a: number, b: number) => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); };
+    const top = h(ci, cj) * (1 - fi) + h(ci + 1, cj) * fi, bot = h(ci, cj + 1) * (1 - fi) + h(ci + 1, cj + 1) * fi;
+    return top * (1 - fj) + bot * fj;
+  };
+  const SOFT: Record<string, number> = { water: 0, lot: 1, block: 1, park: 2, walk: 3, soi: 3 };
+  const bridge = (i: number, j: number) => tileAt(z, i, j) === 'walk' && [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([a, b]) => tileAt(z, i + a, j + b) === 'water').length >= 2;
+  const diamond = (x: number, y: number) => { g.beginPath(); g.moveTo(x, y); g.lineTo(x + TW / 2, y + TH / 2); g.lineTo(x, y + TH); g.lineTo(x - TW / 2, y + TH / 2); g.closePath(); };
   for (let j = j0; j < j1; j++)
     for (let i = i0; i < i1; i++) {
       const t = tileAt(z, i, j);
       if (t === 'void') continue;
       const base = RAMPS[t];
       const [x, y] = S(i, j);
-      g.beginPath();
-      g.moveTo(x, y); g.lineTo(x + TW / 2, y + TH / 2); g.lineTo(x, y + TH); g.lineTo(x - TW / 2, y + TH / 2);
-      g.closePath();
-      g.fillStyle = base[r() < 0.5 ? 2 : r() < 0.5 ? 1 : 3];
+      diamond(x, y);
+      const sv = shade(i, j) + (r() - 0.5) * 0.12;
+      g.fillStyle = base[sv < 0.3 ? 1 : sv < 0.72 ? 2 : 3];
       g.fill();
-      if (t === 'walk') { g.strokeStyle = 'rgba(60,50,40,0.35)'; g.lineWidth = 1; g.stroke(); }
+      if (t === 'walk' && bridge(i, j)) {
+        // 나무 다리: 널빤지 결 + 양옆 난간 그림자
+        diamond(x, y); g.fillStyle = '#8a6a48'; g.fill();
+        g.strokeStyle = '#5e4630'; g.lineWidth = 1;
+        for (let k = 1; k < 4; k++) { const a = S(i + k / 4, j), b = S(i + k / 4, j + 1); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
+        continue;
+      }
+      if (t === 'walk' && (i + j) % 2 === 0) { diamond(x, y); g.strokeStyle = 'rgba(60,50,40,0.16)'; g.lineWidth = 1; g.stroke(); }
+      // 모서리 깎기: 맞닿은 두 이웃이 같은 다른 땅(그리고 대각선도)이면 그 모서리 반쪽을 이웃 땅으로 칠한다
+      const pt = SOFT[t];
+      if (pt !== undefined) {
+        const N = (a: number, b: number) => tileAt(z, i + a, j + b);
+        // [이웃1, 이웃2, 대각선, 반대쪽1, 반대쪽2, 깎을 삼각형의 세 꼭짓점]
+        const corners: [[number, number], [number, number], [number, number], [number, number], [number, number], [number, number][]][] = [
+          [[-1, 0], [0, -1], [-1, -1], [1, 0], [0, 1], [[i, j], [i + 1, j], [i, j + 1]]],
+          [[1, 0], [0, -1], [1, -1], [-1, 0], [0, 1], [[i + 1, j], [i + 1, j + 1], [i, j]]],
+          [[1, 0], [0, 1], [1, 1], [-1, 0], [0, -1], [[i + 1, j + 1], [i, j + 1], [i + 1, j]]],
+          [[-1, 0], [0, 1], [-1, 1], [1, 0], [0, -1], [[i, j + 1], [i, j], [i + 1, j + 1]]],
+        ];
+        for (const [n1, n2, dg, o1, o2, tri] of corners) {
+          const X = N(n1[0], n1[1]);
+          if (X === t || X !== N(n2[0], n2[1]) || X !== N(dg[0], dg[1]) || N(o1[0], o1[1]) === X || N(o2[0], o2[1]) === X) continue;
+          const px = SOFT[X];
+          if (px === undefined || px <= pt || bridge(i + n1[0], j + n1[1])) continue;
+          const xr = RAMPS[X], sx = shade(i + n1[0], j + n1[1]);
+          g.beginPath();
+          tri.forEach(([a, b], k) => { const [qx, qy] = S(a, b); if (k) g.lineTo(qx, qy); else g.moveTo(qx, qy); });
+          g.closePath();
+          g.fillStyle = xr[sx < 0.3 ? 1 : sx < 0.72 ? 2 : 3];
+          g.fill();
+        }
+      }
       const dots = t === 'park' ? 10 : 6;
       for (let n = 0; n < dots; n++) {
         const px = x + (r() - 0.5) * TW * 0.6, py = y + TH / 2 + (r() - 0.5) * TH * 0.5;
