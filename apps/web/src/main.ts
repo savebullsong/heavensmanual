@@ -223,8 +223,8 @@ function worldFade(kind: 'hell' | 'heaven', long: boolean) {
 }
 
 const hintedFloors = new Set<number>();
-async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | 'shop' | 'resume') {
-  const fx = how === 'fall' || how === 'drop' || how === 'down' ? hellFall(how !== 'down') : null;
+async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | 'shop' | 'resume' | 'teleport') {
+  const fx = how === 'fall' || how === 'drop' || how === 'down' || how === 'teleport' ? hellFall(how === 'fall' || how === 'drop') : null;
   if (fx) await fx.covered;
   if (how === 'shop') restInShop();
   const f = Math.max(1, Math.min(OPEN_FLOORS, floor));
@@ -258,6 +258,7 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
   else if (how === 'down') w.placeNear(zh.up.i + 1, zh.up.j + 1, hp); // 위층에서 내려오면 이 층의 계단 곁
   else w.placeNear(zh.rest.i, zh.rest.j, hp);
   w.setStance(stance);
+  w.setInvisible(invisible()); // 관리자 투명은 층을 옮겨도 그대로
   w.start();
   renderHud();
   showStance(true);
@@ -266,6 +267,29 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
   if (!h.cleared.includes(f) && how !== 'shop' && !hintedFloors.has(f)) { hintedFloors.add(f); setTimeout(() => toast(t().hellHint.replace('{boss}', MONSTERS[floorDef(f).boss].name[lang()])), 2600); }
   joinNet(w);
   fx?.done();
+}
+
+/**
+ * 관리자: 지옥 n층 휴식 마을로 바로 옮겨 간다 (지도 확인용). 지옥 밖(현실·천국·귀신)에서 왔으면 그 세계를 적어 두고
+ * '원래 세계로' 단추로 돌아간다 — 환생이 아니라 시찰에서 돌아오는 것이라 몸·돈·업은 그대로다
+ */
+function adminTeleport(to: number | 'back') {
+  if (!net.account()?.admin || busy || dlg.isOpen) return;
+  document.querySelector('.set-panel')?.remove();
+  closeMenus();
+  dropInterior();
+  if (to === 'back') {
+    const trip = state.adminTrip;
+    if (!trip || !inHell()) return;
+    delete state.adminTrip;
+    state.realm = trip;
+    save(state);
+    if (world) { world.destroy(); world = null; net.leaveZone(); }
+    enterWorld('door');
+    return;
+  }
+  if (!inHell()) state.adminTrip = realm() as 'real' | 'ghost' | 'heaven';
+  enterHell(to, 'teleport');
 }
 
 function joinNet(w: WorldScene) {
@@ -1263,7 +1287,7 @@ function renderSettings() {
     </section>
     <section class="set-sec"><h4 class="h-lang"></h4><div class="seg s-lang wide"></div></section>
     <section class="set-sec set-acc"><h4 class="h-acc"></h4><div class="acc"></div></section>
-    ${net.account()?.admin ? `<section class="set-sec set-admin"><h4 class="h-admin"></h4><div class="set-row"><span class="lbl l-inv"></span><div class="seg s-inv"></div></div><p class="note n-admin"></p></section>` : ''}`;
+    ${net.account()?.admin ? `<section class="set-sec set-admin"><h4 class="h-admin"></h4><div class="set-row"><span class="lbl l-inv"></span><div class="seg s-inv"></div></div><div class="set-row"><span class="lbl l-tp"></span><div class="seg s-tp"></div></div>${inHell() && state.adminTrip ? '<div class="set-row"><span class="lbl"></span><button class="tp-back"></button></div>' : ''}<p class="note n-admin"></p></section>` : ''}`;
   el.querySelector('.menu-head b')!.textContent = L.settings;
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
   el.querySelector('.set-sec h4')!.textContent = L.setSound;
@@ -1299,6 +1323,12 @@ function renderSettings() {
       net.nudge();
       toast(v === 'on' ? L.invisibleOn : L.invisibleOff);
     });
+    // 지옥 층 이동: 지금 있는 층이 눌린 채로 보인다
+    el.querySelector('.l-tp')!.textContent = L.adminTp;
+    const floors = Array.from({ length: OPEN_FLOORS }, (_, k) => String(k + 1));
+    seg(el.querySelector('.s-tp')!, floors, floors.map((f) => L.adminFloor.replace('{n}', f)), () => (inHell() ? String(hellState().floor) : ''), (v) => adminTeleport(Number(v)));
+    const back = el.querySelector<HTMLButtonElement>('.tp-back');
+    if (back) { back.textContent = L.adminBack.replace('{w}', state.adminTrip === 'heaven' ? L.tripHeaven : state.adminTrip === 'ghost' ? L.tripGhost : L.tripReal); back.onclick = () => adminTeleport('back'); }
   }
   document.body.appendChild(el);
   const hudBottom = document.getElementById('hud')?.getBoundingClientRect().bottom ?? 56;
