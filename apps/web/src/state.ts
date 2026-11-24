@@ -32,7 +32,17 @@ export interface Save {
   /** 천국: 환생할 때 받을 선행 보너스 (영혼 경험치) */
   heaven?: { bonus: number; met?: boolean };
   /** 지옥: 지금 층, 이번 지옥행에서 쓰러뜨린 층주, 노전(영혼에 붙어 다음 지옥행에도 남는다) */
-  hell?: { floor: number; cleared: number[]; notes: number; met?: boolean };
+  hell?: {
+    floor: number; cleared: number[]; notes: number; met?: boolean;
+    /** 지옥 은행에 맡긴 노전 (쓰러져도 남는다) */
+    bank?: number;
+    /** 속죄의 회당에 층마다 바친 노전 (다 차면 위층으로) */
+    atone?: Record<number, number>;
+    /** 이번 지옥행에서 통행세를 낸 층 (다시 지나갈 때는 받지 않는다) */
+    paid?: number[];
+    /** 2층 층주 구르마에게 준 먹이 수 (100이면 잠든다) */
+    fed?: number;
+  };
   /** 베스크에게 진 빚 (노전). 0이 되면 미납귀가 돌아간다 */
   debt?: number;
   /** 세계마다 우주새에 봉인된 물건 — 그 세계의 우주새에서 되찾는다 */

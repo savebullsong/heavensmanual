@@ -6,7 +6,7 @@ import { WorldScene, type WorldHooks, type Stance, type RemoteInfo } from './wor
 import { ShopRoom, type ShopTarget } from './shoproom.ts';
 import { Dialog } from './dialog.ts';
 import { openLookPanel, lookPanelInsets } from './lookpanel.ts';
-import { ITEMS, STORES, menuFor, iconFor, effectText, priceText, type ItemDef, type ItemCat } from './items.ts';
+import { ITEMS, STORES, menuFor, iconFor, effectText, priceText, HELL_FOOD, type ItemDef, type ItemCat } from './items.ts';
 import * as net from './net.ts';
 import { preloadPortrait } from './portraits.ts';
 import { sukhumvitTestZone, decodeZone, type Zone } from './zone.ts';
@@ -14,14 +14,14 @@ import { streetReady } from './street.ts';
 import { ARRIVALS, rollArrival, arrivalLook, type Arrival, type Look, type Outfit } from './character.ts';
 import { t, lang, setLang, LANGS, type Lang } from './i18n.ts';
 import { load, save, type Slot, type Stash } from './state.ts';
-import { hellZone, OPEN_FLOORS, floorDef, MONSTERS } from './hell.ts';
+import { hellZone, OPEN_FLOORS, floorDef, MONSTERS, GUARDS, TOLL, ATONE_GOAL, GURMA_FULL } from './hell.ts';
 import { interiorZone } from './interior.ts';
 import { buildingName } from './names.ts';
 import { bangkokClock } from './clock.ts';
 import { unlockAudio, isMuted, setMuted, plunge, chime } from './sfx.ts';
 import * as sfx from './sfx.ts';
 import { bgmMode, setBgmMode, setIndoor, type BgmMode } from './bgm.ts';
-import { applyDeed, addSoulExp, judge, prayerAnswerChance, restRegenPerMinute, isDanger, DEED_TABLE, newStats, soulExpToNext, maxHp as maxHpFor, POINTS_PER_RANK, STAT_KEYS, STAT_MAX, type DeedKey, type StatKey } from '../../../packages/shared/src/rules.ts';
+import { applyDeed, addSoulExp, judge, evilRatio, prayerAnswerChance, restRegenPerMinute, isDanger, DEED_TABLE, newStats, soulExpToNext, maxHp as maxHpFor, POINTS_PER_RANK, STAT_KEYS, STAT_MAX, type DeedKey, type StatKey } from '../../../packages/shared/src/rules.ts';
 
 const state = load();
 if (state.lang) setLang(state.lang);
@@ -275,12 +275,13 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
   const zh = zone.hell!;
   const hp = state.hp ?? maxHp();
   if (how === 'shop') w.placeAtDoor(hp);
-  else if (how === 'up') w.placeNear(zh.down.i + 1, zh.down.j + 1, hp); // 아래층에서 올라오면 이 층의 구덩이 곁
-  else if (how === 'down') w.placeNear(zh.up.i + 1, zh.up.j + 1, hp); // 위층에서 내려오면 이 층의 계단 곁
+  else if (how === 'up') w.placeNear(zh.down.i, zh.down.j - 1, hp); // 아래층에서 올라오면: 남쪽 끝 계단 머리
+  else if (how === 'down') w.placeNear(zh.up.i, zh.up.j + (zh.exit === 'ford' ? 6 : 2), hp); // 위층에서 내려오면: 이 층의 위층 길 들머리
   else if (how === 'resume' && state.pos?.w === 'hell' && state.pos.f === f && state.pos.z === zone.id) w.placeNear(state.pos.i, state.pos.j, hp); // 다시 열면 마지막 자리
   else w.placeNear(zh.rest.i, zh.rest.j, hp);
   w.setStance(stance);
   w.setInvisible(invisible()); // 관리자 투명은 층을 옮겨도 그대로
+  if (zh.exit === 'ford' && (h.fed ?? 0) >= GURMA_FULL && !h.cleared.includes(f)) w.gurmaSleep(); // 배불러 잠든 구르마
   w.start();
   renderHud();
   showStance(true);
@@ -412,6 +413,34 @@ const hooks: WorldHooks = {
     hellState().notes += n;
     updateHud();
   },
+  loot(key) {
+    const it = itemByKey(key);
+    if (!it) return;
+    addToBag(it);
+    save(state);
+    toast(t().lootGot.replace('{item}', it.name[lang()]), 'good');
+    if (document.querySelector('.bag-panel')) renderBag();
+    renderQuick();
+  },
+  vendor(kind) {
+    openHellStore(kind);
+  },
+  feedGurma() {
+    const h = hellState();
+    const bag = state.bag ?? {};
+    let gave = 0;
+    for (const k of HELL_FOOD) {
+      while ((bag[k] ?? 0) > 0 && (h.fed ?? 0) + gave < GURMA_FULL) { bag[k]--; gave++; }
+    }
+    h.fed = (h.fed ?? 0) + gave;
+    if (state.quick && !(bag[state.quick] > 0)) renderQuick();
+    save(state);
+    return { gave, total: h.fed, full: h.fed >= GURMA_FULL };
+  },
+  hasFood() {
+    const bag = state.bag ?? {};
+    return HELL_FOOD.some((k) => (bag[k] ?? 0) > 0);
+  },
   debt: () => state.debt ?? 0,
   debtEat(n) {
     const L = t();
@@ -431,7 +460,8 @@ function enterInterior(k: number, out: { i: number; j: number }, chaser: { monst
   if (!world || world.zone.interior || busy) return;
   const outer = world;
   const b = outer.zone.buildings[k];
-  const z = interiorZone(b, k, out, b.cat === 'loan' ? t().beskHouse : buildingName(b, lang()));
+  const L0 = t();
+  const z = interiorZone(b, k, out, b.cat === 'loan' ? L0.beskHouse : b.cat === 'hbank' ? L0.hbankName : b.cat === 'atone' ? L0.atoneName : b.cat === 'rebirth' ? L0.rebirthName : buildingName(b, lang()));
   closeMenus();
   document.querySelector('.store-panel')?.remove();
   outer.stop();
@@ -510,6 +540,9 @@ function clerkTalk() {
   const L = t();
   const sub = L.clerkSub[info.kind as keyof typeof L.clerkSub] ?? '';
   if (info.kind === 'loan') { talkToBesk(); return; } // 3층 피의 시장: 베스크 대부소
+  if (info.kind === 'hbank') { openHellBank(); return; }
+  if (info.kind === 'atone') { openAtone(); return; }
+  if (info.kind === 'rebirth') { talkToPashar(); return; }
   if (info.store === 'bank') { openBank(info.name); return; }
   if (info.store === 'mart' || info.store === 'pharmacy' || info.store === 'food' || info.store === 'cafe') { openStore(info.store, info.name, info.cuisine); return; }
   const opts: { label: string; danger?: boolean; act: () => void }[] = [];
@@ -567,21 +600,77 @@ function clerkTalk() {
   openTargetMenu(info.name, sub, opts, window.innerWidth / 2, window.innerHeight * 0.38);
 }
 
-// ───────────────────────── 지옥: 계단 · 구덩이 · 파샤르 ─────────────────────────
+// ───────────────────────── 지옥: 위층 길 · 아래층 계단 ─────────────────────────
 function hellAct(kind: 'up' | 'down' | 'pashar' | 'talus') {
   if (!inHell() || busy || dlg.isOpen) return;
   const L = t();
   const h = hellState();
-  if (kind === 'pashar' || (kind === 'up' && h.floor === 1)) { talkToPashar(); return; }
   if (kind === 'talus') { talkToTalus(); return; }
-  if (kind === 'up') {
-    if (floorDef(h.floor).theme === 'market') { ferry(); return; } // 3층: 나루터
-    if (!h.cleared.includes(h.floor)) { toast(L.hellLocked); return; }
-    enterHell(h.floor - 1, 'up');
-    return;
-  }
+  if (kind === 'pashar') return; // 파샤르는 지옥 로비 안 상담 책상에 있다
+  if (kind === 'up') { passUp(); return; }
   if (h.floor + 1 > OPEN_FLOORS) { toast(L.hellDeeper); return; }
   enterHell(h.floor + 1, 'down');
+}
+const sleepMs = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * 위층으로: 층주를 쓰러뜨렸거나(누구든 함께) · 통행세를 냈거나 · 2층은 구르마를 배불렸으면 지나간다.
+ * 아니면 들머리 문지기가 통행세를 받는다 (층주를 피해 가는 값은 아주 비싸다: 1층 1만 · 2층 2만 · 3층 3만).
+ * 1층은 불탄 도시 골목 끝 지옥 로비, 2층은 늪 여울을 걸어서, 3층은 나룻배로
+ */
+async function passUp() {
+  const L = t();
+  const h = hellState(), f = h.floor, def = floorDef(f);
+  const exit = world?.zone.hell?.exit;
+  const go = () => {
+    if (exit === 'alley') { rebirthGate(); return; }
+    toast(exit === 'ferry' ? L.ferryGo : L.fordGo);
+    enterHell(f - 1, 'up');
+  };
+  if (h.cleared.includes(f) || (h.paid ?? []).includes(f) || (exit === 'ford' && (h.fed ?? 0) >= GURMA_FULL)) {
+    if (exit === 'ferry' && h.cleared.includes(f)) toast(L.ferryFree);
+    go();
+    return;
+  }
+  busy = true;
+  const fare = TOLL[f] ?? 10000;
+  const gd = def.guard ? GUARDS[def.guard] : null;
+  dlg.open({ name: gd ? gd.name[lang()] : L.ferryGuard });
+  const bossName = MONSTERS[def.boss].name[lang()];
+  await dlg.say(L.tollAsk.replace('{boss}을(를)', bossName + eulReul(bossName)).replace('{boss}', bossName).replace('{n}', fare.toLocaleString('en-US')));
+  const c = await dlg.choose([L.tollPay.replace('{n}', fare.toLocaleString('en-US')), L.tollLeave]);
+  let ok = false;
+  if (c === 0 && h.notes < fare) await dlg.say(L.tollPoor.replace('{n}', fare.toLocaleString('en-US')));
+  else if (c === 0) {
+    h.notes -= fare;
+    h.paid = [...(h.paid ?? []), f];
+    save(state); renderHud();
+    await dlg.say(L.tollPaid);
+    ok = true;
+  }
+  dlg.close();
+  busy = false;
+  if (ok) go();
+}
+
+/** 1층 골목 끝, 지옥 로비 앞: 땅에서 손들이 솟아 붙잡는다. 남을 수도 있다 */
+async function rebirthGate() {
+  if (!world?.zone.hell || busy) return;
+  const L = t();
+  busy = true;
+  world.handsFx(true);
+  sfx.plunge(false);
+  await sleepMs(1000);
+  dlg.open({ name: L.handsName });
+  await dlg.say(L.handsLine);
+  const c = await dlg.choose([L.handsGo, L.handsStay]);
+  if (c === 1) { await dlg.say(L.handsStayed); dlg.close(); world?.handsFx(false); busy = false; return; }
+  dlg.close();
+  world.handsFx(false);
+  busy = false;
+  const k = world.zone.buildings.findIndex((b) => b.cat === 'rebirth');
+  const u = world.zone.hell.up;
+  if (k >= 0) enterInterior(k, { i: u.i, j: u.j + 1 }, null, false);
 }
 
 /** 지옥 2층 들판의 노름꾼 탈루스: 뼈주사위 두 개의 합이 홀인지 짝인지 노전을 건다 (맞히면 건 만큼 더, 틀리면 잃음). 불고기맛 과자도 판다 */
@@ -622,55 +711,61 @@ async function talkToTalus() {
   endTalk();
 }
 
-/** 3층 나루터: 층주 세라네가 쓰러졌으면 바로 타고, 아니면 경비병에게 뱃삯을 내고 건넌다 (혼자서도 올라갈 수 있는 다른 길) */
-const FERRY_FARE = 300;
-async function ferry() {
-  if (busy) return;
-  const L = t();
-  const h = hellState();
-  const go = () => { toast(L.ferryGo); enterHell(h.floor - 1, 'up'); };
-  if (h.cleared.includes(h.floor)) { toast(L.ferryFree); go(); return; }
-  busy = true;
-  dlg.open({ name: L.ferryGuard });
-  await dlg.say(L.ferryNo);
-  const c = await dlg.choose([L.ferryPay.replace('{n}', String(FERRY_FARE)), L.ferryLeave]);
-  if (c === 0 && h.notes < FERRY_FARE) await dlg.say(L.ferryPoor.replace('{n}', String(FERRY_FARE)));
-  dlg.close();
-  busy = false;
-  if (c === 0 && h.notes >= FERRY_FARE) { h.notes -= FERRY_FARE; save(state); renderHud(); go(); }
-}
-
-/** 지옥 1층 환생관: 층주(아쉬갈)를 쓰러뜨렸으면 현실로 다시 태어나게 해 준다 */
+/**
+ * 지옥 로비 가운데 창구의 환생관 파샤르: 이번 생의 악행 비율에 따라 혜택이 다르다.
+ * 악행 100% = 아무것도 못 가져가고 태어날 도시도 고를 수 없다 · 그 밖 = 노전의 (100 − 악행%)만큼 현생 돈으로 바꿔 가고 도시를 고른다
+ */
 async function talkToPashar() {
+  if (busy) return;
   const L = t();
   const h = hellState();
   busy = true;
   dlg.open({ name: L.pashar, portrait: 'pashar' });
-  if (!h.cleared.includes(1)) {
-    await dlg.say(L.pasharNo.replace('{boss}', MONSTERS[floorDef(1).boss].name[lang()]));
-    dlg.close();
-    busy = false;
-    return;
+  await dlg.say(L.lobbyGreet);
+  const ratio = Math.round(evilRatio(state.deeds ?? { good: 0, evil: 0 }) ?? 100);
+  await dlg.say(L.lobbyRatio.replace('{r}', String(ratio)));
+  let carry = 0;
+  let region = 'bkk';
+  if (ratio >= 100) {
+    await dlg.say(L.lobbyNothing);
+    await dlg.say(L.lobbyCityRandom);
+  } else {
+    const all = Math.floor(h.notes + (h.bank ?? 0));
+    const most = Math.floor((all * (100 - ratio)) / 100);
+    if (most > 0) { await dlg.say(L.lobbyExchange.replace('{n}', all.toLocaleString('en-US')).replace('{m}', most.toLocaleString('en-US')).replace('{x}', String(OBOL_RATE))); carry = most; }
+    else await dlg.say(L.lobbyNoObol);
+    await dlg.say(L.lobbyCity);
+    const c = await dlg.choose([L.regions.bkk, `${L.regions.seoul} ${L.lobbySoon}`]);
+    if (c === 1) await dlg.say(L.lobbySoon);
+    region = 'bkk';
   }
-  await dlg.say(L.pasharYes);
-  await dlg.say(L.pasharAsk);
-  const c = await dlg.choose([L.pasharGo, L.pasharWait]);
-  if (c === 1) { dlg.close(); busy = false; return; }
-  await dlg.say(L.pasharBye);
+  await dlg.say(L.lobbyAsk);
+  const go = await dlg.choose([L.lobbyGo, L.lobbyWait]);
+  if (go === 1) { dlg.close(); busy = false; return; }
+  await dlg.say(L.lobbyBye);
   dlg.close();
   busy = false;
-  rebirthFrom('hell');
+  // 가져가는 노전: 손에 든 것부터, 모자라면 은행에서
+  const fromHand = Math.min(carry, Math.floor(h.notes));
+  h.notes -= fromHand;
+  h.bank = Math.max(0, (h.bank ?? 0) - (carry - fromHand));
+  state.region = region;
+  rebirthFrom('hell', carry * OBOL_RATE);
+  if (carry > 0) setTimeout(() => toast(L.lobbyCarry.replace('{n}', carry.toLocaleString('en-US')).replace('{b}', (carry * OBOL_RATE).toLocaleString('en-US')), 'good'), 600);
 }
 
 /** 현실로 다시 태어난다 (지옥에서 파샤르를 거쳐, 또는 귀신이 앵무새를 만나) */
-function rebirthFrom(from: 'hell' | 'ghost' | 'heaven') {
+function rebirthFrom(from: 'hell' | 'ghost' | 'heaven', carryBaht = 0) {
   if (from === 'heaven') delete state.heaven;
   if (from === 'hell') {
     seal('hell');
-    hellState().cleared = [];
+    const h = hellState();
+    h.cleared = []; h.paid = []; h.fed = 0;
   }
   state.realm = 'real';
+  delete state.pos;
   newLife();
+  state.wallet = carryBaht; // 지옥 로비에서 노전을 바꿔 가져온 돈
   save(state);
   if (street) { street.destroy(); street = null; }
   if (world) { world.destroy(); world = null; }
@@ -716,6 +811,12 @@ function onShopArrive(target: ShopTarget) {
   else if (target === 'door') goOut();
 }
 
+/** 한국어 조사: 받침이 있으면 '을', 없으면 '를' */
+function eulReul(word: string) {
+  const c = word.charCodeAt(word.length - 1);
+  if (c < 0xac00 || c > 0xd7a3) return '을(를)';
+  return (c - 0xac00) % 28 ? '을' : '를';
+}
 /** 한국어 조사: 받침이 있으면 '이요', 없으면 '요' */
 function iyo(word: string) {
   const c = word.charCodeAt(word.length - 1);
@@ -1428,14 +1529,27 @@ function heavenFaint() {
   toast(t().heavenFaint);
 }
 
-/** 지옥에서 쓰러지면: 들고 있던 노전 절반을 잃고, 그 층의 휴식처에서 다시 일어난다 */
+/**
+ * 지옥에서 쓰러지면: 들고 있던 노전은 모두 그 자리에 떨어진다 (10분 안에 가서 주울 수 있다, 은행에 맡긴 것은 그대로).
+ * 장비는 운이 없으면 하나 떨어뜨린다 (35%). 그 층의 휴식 마을에서 다시 일어난다
+ */
 function showHellDeath() {
   const L = t();
   closeMenus();
   document.querySelector('.bag-panel')?.remove();
   const h = hellState();
-  const lost = Math.floor(h.notes / 2);
-  h.notes -= lost;
+  const dropped = Math.floor(h.notes);
+  h.notes -= dropped;
+  // 운이 없으면 장비 하나: 끼고 있던 것 중 하나 (없으면 가방의 장비 중 하나)
+  let lost: string | null = null;
+  if (Math.random() < 0.35) {
+    const worn = Object.entries(state.equip ?? {}).filter(([, k]) => !!k) as [Slot, string][];
+    const bagGear = Object.keys(state.bag ?? {}).filter((k) => (state.bag![k] ?? 0) > 0 && isGearItem(itemByKey(k)));
+    if (worn.length) { const [slot, k] = worn[Math.floor(Math.random() * worn.length)]; lost = k; delete state.equip![slot]; }
+    else if (bagGear.length) lost = bagGear[Math.floor(Math.random() * bagGear.length)];
+    if (lost) { state.bag![lost] = Math.max(0, (state.bag![lost] ?? 1) - 1); world?.setGear(gear()); net.nudge(); }
+  }
+  if (world && !world.zone.interior) world.dropOnDeath(dropped, lost);
   state.hp = maxHp();
   save(state);
   const el = document.createElement('div');
@@ -1443,7 +1557,11 @@ function showHellDeath() {
   el.innerHTML = `<div class="death-box"><h1></h1><p class="cause"></p><p class="money"></p><button class="primary"></button></div>`;
   el.querySelector('h1')!.textContent = L.hellPlace.replace('{n}', String(h.floor)).replace('{name}', floorDef(h.floor).name[lang()]);
   el.querySelector('.cause')!.textContent = L.hellDeath;
-  el.querySelector('.money')!.textContent = lost > 0 ? L.hellDeathNotes.replace('{n}', lost.toLocaleString('en-US')) : '';
+  el.querySelector('.money')!.textContent = [
+    dropped > 0 ? L.hellDeathDrop.replace('{n}', dropped.toLocaleString('en-US')) : '',
+    lost ? L.hellDeathItem.replace('{item}', itemByKey(lost).name[lang()]) : '',
+    (h.bank ?? 0) > 0 ? L.hellDeathBank.replace('{n}', Math.floor(h.bank ?? 0).toLocaleString('en-US')) : '',
+  ].filter(Boolean).join(' ');
   const btn = el.querySelector('button')!;
   btn.textContent = L.hellRise;
   btn.onclick = () => {
@@ -1456,6 +1574,163 @@ function showHellDeath() {
   };
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add('show'));
+}
+
+// ───────────────────────── 지옥 마을: 은행 · 속죄의 회당 · 장사꾼 ─────────────────────────
+function panelAt(el: HTMLElement) {
+  document.body.appendChild(el);
+  const hudBottom = document.getElementById('hud')?.getBoundingClientRect().bottom ?? 56;
+  el.style.top = `${Math.round(hudBottom + 6)}px`;
+}
+/** 지옥 은행: 노전을 맡기고 찾는다 (맡긴 노전은 쓰러져도 남는다) */
+function openHellBank() {
+  closeMenus();
+  document.querySelector('.store-panel')?.remove();
+  const L = t();
+  const h = hellState();
+  const el = document.createElement('div');
+  el.className = 'store-panel shop-menu bank-panel';
+  el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close">✕</button></div>
+    <p class="store-line"></p>
+    <div class="bank-body">
+      <div class="bank-row"><span></span><b class="b-wallet"></b></div>
+      <div class="bank-row"><span></span><b class="b-bank"></b></div>
+      <input class="b-amt" type="number" inputmode="numeric" min="1" step="1">
+      <div class="bank-quick"></div>
+      <div class="bank-act"><button class="primary b-in"></button><button class="primary b-out"></button></div>
+    </div>`;
+  el.querySelector('.menu-head b')!.textContent = L.hbankTitle;
+  el.querySelector('.store-line')!.textContent = L.hbankLine;
+  const sp = el.querySelectorAll('.bank-row span');
+  sp[0].textContent = L.hbankHand; sp[1].textContent = L.hbankBook;
+  (el.querySelector('.b-in') as HTMLButtonElement).textContent = L.hbankIn;
+  (el.querySelector('.b-out') as HTMLButtonElement).textContent = L.hbankOut;
+  const amt = el.querySelector('.b-amt') as HTMLInputElement;
+  amt.placeholder = L.bankAmount;
+  (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
+  const draw = () => {
+    el.querySelector('.b-wallet')!.textContent = L.obolFmt.replace('{n}', Math.floor(h.notes).toLocaleString('en-US'));
+    el.querySelector('.b-bank')!.textContent = L.obolFmt.replace('{n}', Math.floor(h.bank ?? 0).toLocaleString('en-US'));
+  };
+  for (const n of [100, 1000, 10000]) { const b = document.createElement('button'); b.textContent = n.toLocaleString('en-US'); b.onclick = () => { amt.value = String(n); }; el.querySelector('.bank-quick')!.appendChild(b); }
+  { const b = document.createElement('button'); b.textContent = L.bankAll; b.onclick = () => { amt.value = String(Math.floor(h.notes)); }; el.querySelector('.bank-quick')!.appendChild(b); }
+  const move = (dir: 1 | -1) => {
+    const n = Math.floor(Number(amt.value));
+    if (!n || n <= 0) { toast(L.bankAmount); return; }
+    if (dir === 1 && n > Math.floor(h.notes)) { toast(L.hwNoMoney); return; }
+    if (dir === -1 && n > Math.floor(h.bank ?? 0)) { toast(L.bankShort); return; }
+    h.notes -= dir * n;
+    h.bank = (h.bank ?? 0) + dir * n;
+    save(state); updateHud(); draw();
+    toast((dir === 1 ? L.hbankDone : L.hbankTook).replace('{n}', n.toLocaleString('en-US')), 'good');
+  };
+  (el.querySelector('.b-in') as HTMLButtonElement).onclick = () => move(1);
+  (el.querySelector('.b-out') as HTMLButtonElement).onclick = () => move(-1);
+  draw();
+  panelAt(el);
+}
+
+/** 속죄의 회당: 층마다 바친 노전이 쌓인다. 목표(3층 31,000)를 채우면 위층으로 (1층은 지옥 로비 앞으로). 1,000닢마다 선행 */
+function openAtone() {
+  closeMenus();
+  document.querySelector('.store-panel')?.remove();
+  const L = t();
+  const h = hellState(), f = h.floor, goal = ATONE_GOAL[f] ?? 11000;
+  h.atone ??= {};
+  const el = document.createElement('div');
+  el.className = 'store-panel shop-menu bank-panel atone-panel';
+  el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close">✕</button></div>
+    <p class="store-line"></p><div class="bank-body"><i class="xpbar"><i></i></i><div class="bank-quick"></div><div class="bank-act"></div></div>`;
+  el.querySelector('.menu-head b')!.textContent = L.atoneTitle;
+  (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
+  const give = (n: number) => {
+    n = Math.min(n, Math.floor(h.notes), goal - (h.atone![f] ?? 0));
+    if (n <= 0) { toast(L.hwNoMoney); return; }
+    const before = Math.floor((h.atone![f] ?? 0) / 1000);
+    h.notes -= n;
+    h.atone![f] = (h.atone![f] ?? 0) + n;
+    const deeds = Math.floor(h.atone![f] / 1000) - before;
+    save(state); updateHud();
+    toast(L.atoneDone.replace('{n}', n.toLocaleString('en-US')), 'good');
+    for (let k = 0; k < deeds; k++) recordDeed('hellAtone');
+    draw();
+  };
+  const draw = () => {
+    const a = h.atone![f] ?? 0;
+    el.querySelector('.store-line')!.textContent = L.atoneLine.replace('{a}', a.toLocaleString('en-US')).replace('{g}', goal.toLocaleString('en-US'));
+    (el.querySelector('.xpbar > i') as HTMLElement).style.width = `${Math.min(100, (a / goal) * 100)}%`;
+    const q = el.querySelector('.bank-quick')!, act = el.querySelector('.bank-act')!;
+    q.innerHTML = ''; act.innerHTML = '';
+    if (a >= goal) {
+      const b = document.createElement('button');
+      b.className = 'primary';
+      b.textContent = f === 1 ? L.atoneGoLobby : L.atoneGo.replace('{n}', String(f - 1));
+      b.onclick = () => { el.remove(); h.atone![f] = 0; save(state); toast(L.atoneRise, 'good'); atoneRise(f); };
+      act.appendChild(b);
+      return;
+    }
+    for (const n of [100, 1000, 10000]) { const b = document.createElement('button'); b.textContent = L.atoneBtn.replace('{n}', n.toLocaleString('en-US')); b.onclick = () => give(n); q.appendChild(b); }
+    const all = document.createElement('button'); all.textContent = L.atoneAllBtn; all.onclick = () => give(Math.floor(h.notes)); q.appendChild(all);
+  };
+  draw();
+  panelAt(el);
+}
+/** 속죄가 차서 올라간다: 2·3층은 위층 아래 계단 머리로, 1층은 골목 끝 지옥 로비 앞으로 (손들이 붙잡는다) */
+function atoneRise(f: number) {
+  if (f > 1) { leaveInterior(); enterHell(f - 1, 'up'); return; }
+  leaveInterior();
+  const u = world?.zone.hell?.up;
+  if (!world || !u) return;
+  const fx = worldFade('heaven', false);
+  fx.covered.then(() => { world?.placeNear(u.i, u.j + 1, state.hp ?? maxHp()); fx.done(); setTimeout(() => rebirthGate(), 900); });
+}
+
+/** 마을 장사꾼: 고깃간(고기를 판다) · 넝마장수(헌 장비를 싸게 팔고, 가진 것을 산다) */
+function openHellStore(kind: 'butcher' | 'junk') {
+  closeMenus();
+  document.querySelector('.store-panel')?.remove();
+  const L = t();
+  const h = hellState();
+  const el = document.createElement('div');
+  el.className = 'store-panel shop-menu';
+  el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close">✕</button></div><p class="store-line"></p><div class="menu-list"></div>`;
+  el.querySelector('.menu-head b')!.textContent = kind === 'butcher' ? L.vendorButcher : L.vendorJunk;
+  el.querySelector('.store-line')!.textContent = kind === 'butcher' ? L.vendorButcherSub : L.vendorJunkSub;
+  (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
+  const list = el.querySelector('.menu-list')!;
+  // 넝마장수의 헌 물건: 날마다 층마다 바뀌는 네 가지 (값 7할)
+  const day = Math.floor(Date.now() / 86400000);
+  const used = ITEMS.filter((x) => x.hell && (x.cat === 'weapon' || x.cat === 'armor')).sort((a, b) => ((a.key.length * 7 + day * 13 + h.floor * 5 + a.price) % 11) - ((b.key.length * 7 + day * 13 + h.floor * 5 + b.price) % 11)).slice(0, 4);
+  const draw = () => {
+    list.innerHTML = '';
+    const stock: [ItemDef, number][] = kind === 'butcher' ? ITEMS.filter((x) => x.store === 'hmeat').map((x) => [x, x.price]) : used.map((x) => [x, Math.max(1, Math.round(x.price * 0.7))]);
+    for (const [it, price] of stock) {
+      const row = itemRow(it, priceText(price, true), () => {
+        if (h.notes < price) { toast(L.hwNoMoney); return; }
+        h.notes -= price;
+        addToBag(it);
+        save(state); updateHud(); renderQuick();
+        toast(L.bought.replace('{item}', it.name[lang()]));
+        draw();
+      }, h.notes < price);
+      const tag = document.createElement('span'); tag.className = 'act'; tag.textContent = L.buy; row.appendChild(tag); row.classList.add('has-act');
+      list.appendChild(row);
+    }
+    if (kind === 'junk') for (const it of sellable(true)) {
+      const p = sellPrice(it);
+      const row = itemRow(it, `×${state.bag![it.key]} · ${priceText(p, true)}`, () => {
+        state.bag![it.key] -= 1;
+        h.notes += p;
+        save(state); updateHud();
+        toast(L.sold.replace('{item}', it.name[lang()]).replace('{n}', '1').replace('{p}', priceText(p, true)));
+        draw();
+      });
+      const tag = document.createElement('span'); tag.className = 'act'; tag.textContent = L.sellBtn; row.appendChild(tag); row.classList.add('has-act');
+      list.appendChild(row);
+    }
+  };
+  draw();
+  panelAt(el);
 }
 
 // ───────────────────────── 상단 표시줄 ─────────────────────────

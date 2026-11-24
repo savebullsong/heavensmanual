@@ -11,7 +11,7 @@ export interface ItemDef {
   def?: number; // 방어력
   note?: 'rope' | 'needsAmmo' | 'ammo';
   name: Record<Lang, string>;
-  store?: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'talus'; // 우주새가 아니라 거리 가게(또는 지옥 2층 탈루스)에서 파는 것
+  store?: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'talus' | 'hmeat'; // 우주새가 아니라 거리 가게(또는 지옥 2층 탈루스)에서 파는 것
   now?: boolean; // 가게에서 바로 먹는다 (가방에 넣지 않음)
   hell?: boolean; // 지옥의 우주새(황혼)에서만, 노전으로 판다
   sprite?: string; // 몸에 그릴 때 쓰는 그림 (지옥 무기·방어구는 현실 그림을 빌려 쓴다)
@@ -73,6 +73,10 @@ export const ITEMS: ItemDef[] = [
   { key: 'ashcake', cat: 'goods', price: 6, heal: 130, hell: true, icon: 'cake', name: { ko: '재떡', th: 'ขนมเถ้า', en: 'Ash cake' } },
   { key: 'hbandage', cat: 'goods', price: 8, heal: 150, hell: true, icon: 'bandage', name: { ko: '검은 붕대', th: 'ผ้าพันแผลสีดำ', en: 'Black bandage' } },
   { key: 'bloodfruit', cat: 'goods', price: 12, heal: 260, hell: true, icon: 'choco', name: { ko: '피 열매', th: 'ผลไม้เลือด', en: 'Blood fruit' } },
+  // 지옥 마을 고깃간 (노전) — 무엇의 고기인지는 묻지 않는 게 좋다
+  { key: 'hjerky', cat: 'goods', price: 3, heal: 50, hell: true, store: 'hmeat', icon: 'chips', name: { ko: '말린 고기', th: 'เนื้อแห้ง', en: 'Dried meat' } },
+  { key: 'hskewer', cat: 'goods', price: 5, heal: 100, hell: true, store: 'hmeat', icon: 'ricebox', name: { ko: '고기 꼬치', th: 'เนื้อเสียบไม้', en: 'Meat skewer' } },
+  { key: 'hstew', cat: 'goods', price: 10, heal: 220, hell: true, store: 'hmeat', icon: 'noodle', name: { ko: '뼈국', th: 'ซุปกระดูก', en: 'Bone broth' } },
   // 음식점마다 실제 업종(지도의 cuisine)에 맞는 메뉴
   ...([
     ['pizza', 120, 140, '피자 한 조각', 'พิซซ่าหนึ่งชิ้น', 'Pizza slice'], ['pasta', 220, 190, '파스타', 'พาสต้า', 'Pasta'],
@@ -424,4 +428,19 @@ export function itemIcon(key: string): HTMLCanvasElement {
   for (const p of edge) { d[p * 4] = OUTLINE[0]; d[p * 4 + 1] = OUTLINE[1]; d[p * 4 + 2] = OUTLINE[2]; d[p * 4 + 3] = 255; }
   g.putImageData(im, 0, 0);
   return c;
+}
+
+/** 먹을 수 있는 지옥 물건 (2층 층주 구르마가 받아먹는다). 붕대는 먹지 않는다 */
+export const HELL_FOOD = ['lethe', 'ashcake', 'bloodfruit', 'bulgogichips', 'hjerky', 'hskewer', 'hstew'];
+/** 지옥 괴물이 드물게 떨어뜨리는 물건: 층이 깊을수록 좋은 것이 섞인다 [물건, 무게] */
+export const HELL_LOOT: Record<number, [string, number][]> = {
+  1: [['lethe', 30], ['ashcake', 26], ['hbandage', 18], ['hgloves', 8], ['hdagger', 7], ['hhelm', 6], ['hshin', 5]],
+  2: [['ashcake', 24], ['hbandage', 20], ['bloodfruit', 12], ['hhammer', 8], ['hboots', 8], ['hshin', 8], ['hhelm', 7], ['hgloves', 6], ['hspear', 4]],
+  3: [['bloodfruit', 22], ['hbandage', 20], ['hstew', 14], ['hspear', 9], ['hvest', 8], ['hboots', 8], ['hhammer', 8], ['hsword', 5], ['hhelm', 6]],
+};
+export function rollLoot(floor: number, rnd = Math.random): string {
+  const t = HELL_LOOT[Math.max(1, Math.min(3, floor))];
+  let s = t.reduce((a, [, w]) => a + w, 0) * rnd();
+  for (const [k, w] of t) { if ((s -= w) <= 0) return k; }
+  return t[0][0];
 }

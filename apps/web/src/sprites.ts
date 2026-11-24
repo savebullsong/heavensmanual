@@ -5,7 +5,7 @@ import { SKIN_COLORS, HAIR_COLORS, TOP_COLORS, BOTTOM_COLORS, HAIR_STYLES, AURA_
 
 /** 화면 기준 8방향. 대각선 넷은 모든 동작, 상하좌우 넷(s·e·n·w)은 서기·걷기만 구워져 있다 */
 export type Dir = 'se' | 'sw' | 'ne' | 'nw' | 's' | 'e' | 'n' | 'w';
-export type Anim = 'idle' | 'walk' | 'hit' | 'fall' | 'punch' | 'swing' | 'shoot';
+export type Anim = 'idle' | 'walk' | 'hit' | 'fall' | 'punch' | 'swing' | 'shoot' | 'heavy' | 'sit';
 export type Mode = 'u' | 'm' | 'g' | 'w';
 export const DIRS: Dir[] = ['se', 'sw', 'ne', 'nw', 's', 'e', 'n', 'w'];
 /** 상하좌우로 굽지 않은 동작(공격·맞음·쓰러짐)을 보여 줄 때 쓸 가까운 대각선 */
@@ -45,8 +45,8 @@ const PER_BUILD = new Set(['jacket', 'vest', 'workpants']);
 const COSTUMES = new Set(['raincoat', 'patient', 'parrot']);
 
 /** 동작 속도 (초당 장면 수)와 맞히는 장면 */
-export const ANIM_FPS: Record<Anim, number> = { idle: 1, walk: 9, hit: 16, fall: 11, punch: 22, swing: 21, shoot: 16 };
-export const IMPACT: Partial<Record<Anim, number>> = { punch: 2, swing: 3, shoot: 1 };
+export const ANIM_FPS: Record<Anim, number> = { idle: 1, walk: 9, hit: 16, fall: 11, punch: 22, swing: 21, shoot: 16, heavy: 15, sit: 1 };
+export const IMPACT: Partial<Record<Anim, number>> = { punch: 2, swing: 3, shoot: 1, heavy: 3 };
 
 /** 칸 좌표로 움직이는 방향(di, dj) → 바라보는 쪽.
  *  +i = 화면 오른쪽 아래(se), +i+j = 아래(s), +j = 왼쪽 아래(sw), -i+j = 왼쪽(w) … (칸 각도 45°마다 한 방향)

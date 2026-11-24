@@ -6,7 +6,8 @@ const TI = Object.fromEntries(TYPES.map((t, k) => [t, k])) as Record<TileType, n
 // generic = 이름·간판 없는 건물 (정부시설은 모두 이것으로 바뀐다)
 export type Category =
   | 'convenience' | 'pharmacy' | 'clinic' | 'restaurant' | 'bar' | 'cafe' | 'bank' | 'worship' | 'school'
-  | 'hotel' | 'laundry' | 'shop' | 'office' | 'condo' | 'ujusae' | 'loan' | 'generic';
+  | 'hotel' | 'laundry' | 'shop' | 'office' | 'condo' | 'ujusae' | 'loan' | 'generic'
+  | 'hbank' | 'atone' | 'rebirth'; // 지옥: 지옥 은행 · 속죄의 회당 · (1층 불탄 도시 골목 끝) 환생 로비 입구
 
 export interface Building {
   i0: number; j0: number; w: number; d: number; // 바닥 사각형 (타일)
@@ -18,11 +19,11 @@ export interface Building {
   hk?: HellBuildKind; // 지옥의 집·덩어리 종류
 }
 /** 지옥: 초가집 · 감옥 · 뼈집 · 대형 짐승 시체 · 뼈 무더기 · 내장 더미 */
-export type HellBuildKind = 'thatch' | 'prison' | 'bonehouse' | 'carcass' | 'bonepile' | 'guts';
+export type HellBuildKind = 'thatch' | 'prison' | 'bonehouse' | 'carcass' | 'bonepile' | 'guts' | 'butcher' | 'stall' | 'burnt';
 /** fence o: 0 = i 방향, 1 = j 방향, 2 = 모서리 기둥 */
 export interface Prop { i: number; j: number; kind: 'tree' | 'lamp' | 'pillar' | 'cart' | 'fence' | 'pole' | 'spirit' | 'moto' | 'plant' | 'bin' | 'stools' | 'pushcart' | HellDecorKind; o?: number }
 /** 지옥 소품: 경계 바위·성벽, 뼈, 해골 더미, 꼬챙이, 가마솥, 철창, 마을 불빛, 고문 장면(움직임) */
-export type HellDecorKind = 'crag' | 'bones' | 'skulls' | 'stake' | 'cauldron' | 'cage' | 'lantern' | 'bonfire' | 'torture' | 'htree' | 'rock' | 'crack' | 'dicetable' | 'campfire';
+export type HellDecorKind = 'crag' | 'bones' | 'skulls' | 'stake' | 'cauldron' | 'cage' | 'lantern' | 'bonfire' | 'torture' | 'htree' | 'rock' | 'crack' | 'dicetable' | 'campfire' | 'junk' | 'reeds';
 /** 차가 달리는 구간: j 행의 i0~i1, dir = +1 이면 +i 방향 */
 export interface Lane { j: number; i0: number; i1: number; dir: 1 | -1 }
 export interface Zone {
@@ -65,6 +66,16 @@ export interface HellInfo {
   pashar?: { i: number; j: number };
   talus?: { i: number; j: number }; // 2층 들판의 노름꾼 탈루스의 자리
   spawns: [number, number][]; // 괴물이 나오는 자리
+  /** 위층으로 가는 길의 모양: 1층 불탄 도시의 골목(끝에 환생 로비) · 2층 늪을 걸어 건너는 여울 · 3층 나루터 */
+  exit: 'alley' | 'ford' | 'ferry';
+  /** 마을 모양: 1층 둥근 성벽(가장 크다) · 2층 늪 위 널빤지 섬 · 3층 비좁은 네모 */
+  shape: 'round' | 'blob' | 'square';
+  /** 마을에 앉거나 누운 영혼들 (환생을 기다리며 지친 사람들) */
+  souls: { i: number; j: number; pose: 'sit' | 'lie' | 'stand'; d: number }[];
+  /** 장사꾼 자리: 고깃간 · 잡동사니 좌판 */
+  vendors: { i: number; j: number; kind: 'butcher' | 'junk' }[];
+  /** 문지기(경비병) 둘이 서는 곳 — 위층 길 들머리 */
+  posts: [number, number][];
 }
 
 export function tileAt(z: Zone, i: number, j: number): TileType {
@@ -79,7 +90,7 @@ export function finalize(z: Omit<Zone, 'blocked'>): Zone {
     // 빈 땅(주차장·공터·광장)은 걸을 수 있다. 건물·물·지도 바깥만 막는다
     blocked[k] = t === 'block' || t === 'void' || t === 'water' ? 1 : 0;
   }
-  for (const p of z.props) if (p.kind !== 'tree' && p.kind !== 'bones' && p.kind !== 'crack') blocked[p.j * z.W + p.i] = 1; // 나무·흩어진 뼈·땅의 자국은 밟고 지나간다
+  for (const p of z.props) if (p.kind !== 'tree' && p.kind !== 'bones' && p.kind !== 'crack' && p.kind !== 'reeds') blocked[p.j * z.W + p.i] = 1; // 나무·흩어진 뼈·땅의 자국은 밟고 지나간다
   // 건물 바닥은 막는다. 지도 변환에서 골목·보도가 건물 밑으로 그려진 곳이 많아 사람이 건물을 뚫고 다녔다
   // (큰길과 횡단보도만 남겨 길이 끊기지 않게 한다)
   for (const b of z.buildings)

@@ -219,6 +219,33 @@ export function hellDecor(kind: string, theme: Theme, v: number, o = 0): HPic {
     out = rock(theme, r);
   } else if (kind === 'crack') {
     out = groundMark(theme, r);
+  } else if (kind === 'junk') {
+    // 시장 쓰레기 더미: 부서진 궤짝·자루·깨진 항아리·누더기·뼈다귀, 파리 (깊은 층일수록 더 썩었다)
+    const p = pen(40, 34);
+    p.E(40, 60, 34, 8, theme === 'market' ? '#2a0806' : theme === 'swamp' ? '#1e2214' : '#1a1614');
+    const crate = (x: number, y: number, w: number, h: number) => { p.R(x, y, w, h, '#6a4a2a'); p.R(x, y, w, 2, '#8a6a42'); p.R(x + w - 3, y, 3, h, '#4a321c'); for (let k = 4; k < h; k += 6) p.R(x, y + k, w, 1, '#3a2614'); };
+    if (r(1) < 0.7) crate(14 + r(2) * 10, 26, 22, 18);
+    if (r(3) < 0.6) crate(40 + r(4) * 8, 34, 16, 14);
+    p.E(30 + r(5) * 20, 48, 12, 8, '#7a6a4a'); p.E(28 + r(5) * 20, 44, 6, 3, '#9a8a62'); p.R(26 + r(5) * 20, 38, 6, 3, '#4a3a22'); // 자루
+    for (let k = 0; k < 3; k++) { const x = 16 + r(10 + k) * 48, y = 46 + r(13 + k) * 10; p.E(x, y, 4, 3, k % 2 ? '#8a4a2a' : '#6a3a22'); p.R(x - 1, y - 4, 2, 2, '#4a2a18'); }
+    for (let k = 0; k < 4; k++) { const x = 10 + r(20 + k) * 58, y = 48 + r(24 + k) * 10; p.R(x, y, 8, 3, ['#4a443c', '#5a1a14', '#3a4a3a', '#5a4a3a'][k]); }
+    if (r(30) < 0.6) bone(p, 18 + r(31) * 20, 54, 34 + r(32) * 20, 52, 2.4);
+    if (r(33) < 0.4) skull(p, 50 + r(34) * 16, 50, 0.9, 1);
+    if (theme === 'swamp') for (let k = 0; k < 6; k++) p.R(12 + r(40 + k) * 56, 50 + r(46 + k) * 10, 4, 2, '#3e5a24');
+    p.finish();
+    for (let k = 0; k < 6; k++) p.R(14 + r(60 + k) * 52, 10 + r(66 + k) * 30, 1, 1, '#0a0606'); // 파리
+    out = { canvas: p.c, ax: 0.5, ay: 60 / 68 };
+  } else if (kind === 'reeds') {
+    // 늪 갈대 덤불: 물 위로 솟은 누런 줄기와 부들
+    const p = pen(26, 44);
+    for (let k = 0; k < 11; k++) {
+      const x0 = 12 + r(k) * 28, lean = (r(k + 20) - 0.5) * 14, h = 34 + r(k + 40) * 44;
+      p.L(x0, 84, x0 + lean, 84 - h, 1.6, k % 3 ? '#8a8a4a' : '#6a6a34');
+      if (k % 4 === 0) { p.R(x0 + lean - 1.5, 84 - h - 2, 3, 9, '#5a3a1e'); }
+    }
+    p.E(26, 85, 18, 3, '#2a3018');
+    p.finish([20, 22, 10]);
+    out = { canvas: p.c, ax: 0.5, ay: 84 / 88 };
   } else if (kind === 'bonfire') {
     // 1층 마을 한가운데 모닥불: 엇갈린 통나무, 높은 불길, 둘레의 돌
     const p = pen(60, 76);

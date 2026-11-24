@@ -411,12 +411,171 @@ function guts(b: Building, theme: Theme) {
   return { canvas: cv.c, x: cv.minX, y: cv.minY };
 }
 
+// ───────── 고깃간: 기둥 넷에 얹은 누더기 차양, 갈고리에 매단 고깃덩이, 피 밴 도마와 칼, 바닥의 핏물 ─────────
+function butcher(b: Building, theme: Theme) {
+  const Hw = b.h;
+  const cv = canvasFor(b, Hw + 12, 14);
+  const { g, P, poly, R, line, finish } = cv;
+  const { i0, j0, w, d } = b, i1 = i0 + w, j1 = j0 + d;
+  const seed = i0 * 37 + j0 * 91;
+  const cloth = theme === 'swamp' ? ['#5a5a3a', '#4a4a2e'] : theme === 'market' ? ['#6a1a14', '#4a100c'] : ['#5a4a3a', '#463a2e'];
+  // 바닥 핏물
+  g.globalAlpha = 0.75; g.fillStyle = '#3a0606'; { const [x, y] = P(i0 + w / 2, j1 + 0.15, 0); g.beginPath(); g.ellipse(x, y, 20, 6, 0, 0, Math.PI * 2); g.fill(); } g.globalAlpha = 1;
+  // 도마 상 (앞쪽): 두꺼운 나무 판 + 다리
+  const tz = 15;
+  for (const [x, y] of [[i0 + 0.1, j1 - 0.1], [i1 - 0.1, j1 - 0.1], [i1 - 0.1, j0 + 0.15]] as const) { const [sx, sy] = P(x, y, 0); R(sx - 1, sy - tz, 2, tz, '#2a1a10'); }
+  poly([P(i0, j0 + 0.1, tz), P(i1, j0 + 0.1, tz), P(i1, j1, tz), P(i0, j1, tz)], '#6a4a30');
+  poly([P(i0, j1, tz), P(i1, j1, tz), P(i1, j1, tz - 4), P(i0, j1, tz - 4)], '#4a3020');
+  poly([P(i1, j0 + 0.1, tz), P(i1, j1, tz), P(i1, j1, tz - 4), P(i1, j0 + 0.1, tz - 4)], '#3a2418');
+  // 도마 위: 고깃덩이·갈비·칼
+  for (let k = 0; k < 3; k++) {
+    const [x, y] = P(i0 + 0.35 + k * (w - 0.6) / 2, j0 + d * 0.55, tz);
+    g.fillStyle = '#8a2a22'; g.beginPath(); g.ellipse(x, y - 2, 6, 3, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#c84a3a'; g.beginPath(); g.ellipse(x - 1, y - 3, 3.5, 1.6, 0, 0, Math.PI * 2); g.fill();
+    R(x - 3, y - 3, 6, 1, '#e8d8c0');
+  }
+  { const [x, y] = P(i1 - 0.4, j1 - 0.2, tz); line([x - 8, y - 1], [x + 2, y - 4], 2, '#9aa0a8'); R(x + 2, y - 5, 3, 2, '#2a1a10'); }
+  // 차양 기둥 넷
+  const top = Hw;
+  for (const [x, y] of [[i0, j1], [i1, j1], [i1, j0], [i0, j0]] as const) { const [sx, sy] = P(x, y, 0); R(sx - 1, sy - top, 2, top, x === i0 && y === j0 ? '#1e140c' : '#3a2618'); }
+  // 가로대와 갈고리에 매단 고기 (뒤쪽 가로대)
+  line(P(i0, j0, top - 4), P(i1, j0, top - 4), 2, '#2a1a10');
+  for (let k = 0; k < Math.max(2, w * 2); k++) {
+    const [x, y] = P(i0 + 0.25 + k * ((w - 0.5) / Math.max(1, w * 2 - 1)), j0, top - 4);
+    R(x, y, 1, 4, '#8a8680');
+    const big = hash(k, 3, seed) < 0.4;
+    if (big) { // 갈비짝
+      g.fillStyle = '#7a1e18'; g.fillRect(Math.round(x) - 4, Math.round(y) + 4, 8, 16);
+      for (let r2 = 0; r2 < 5; r2++) R(x - 4, y + 6 + r2 * 3, 8, 1, '#e8d8c0');
+      R(x - 4, y + 4, 2, 16, '#a83a2a');
+    } else { g.fillStyle = hash(k, 4, seed) < 0.5 ? '#8a2a22' : '#6a1a16'; g.beginPath(); g.ellipse(x + 0.5, y + 11, 3.5, 7, 0, 0, Math.PI * 2); g.fill(); R(x - 1, y + 13, 2, 3, '#e8d8c0'); }
+    if (hash(k, 5, seed) < 0.6) R(x, y + 20, 1, 3 + Math.floor(hash(k, 6, seed) * 5), '#5a0606'); // 떨어지는 핏방울
+  }
+  // 누더기 차양 (구멍 난 천, 처진 가장자리)
+  const ov = 0.12;
+  const roof = [P(i0 - ov, j0 - ov, top + 2), P(i1 + ov, j0 - ov, top + 2), P(i1 + ov, j1 + ov, top - 3), P(i0 - ov, j1 + ov, top - 3)];
+  poly(roof, cloth[0]);
+  for (let k = 0; k < 14; k++) { const [x, y] = P(i0 + hash(k, 1, seed) * w, j0 + hash(k, 2, seed) * d, top); R(x, y, 2 + Math.floor(hash(k, 7, seed) * 3), 1, k % 3 ? cloth[1] : '#2a1a10'); }
+  for (let k = 0; k <= w * 6; k++) { const [x, y] = P(i0 - ov + k / 6, j1 + ov, top - 3); R(x, y, 1, 2 + (k % 3) + (hash(k, 9, seed) < 0.2 ? 4 : 0), cloth[1]); }
+  for (let k = 0; k <= d * 6; k++) { const [x, y] = P(i1 + ov, j1 + ov - k / 6, top - 3); R(x, y, 1, 2 + (k % 2), shade(cloth[1], 0.8)); }
+  // 파리
+  for (let k = 0; k < 8; k++) { const [x, y] = P(i0 + hash(k, 11, seed) * w, j0 + hash(k, 12, seed) * d, tz + 4 + hash(k, 13, seed) * 16); R(x, y, 1, 1, '#0a0606'); }
+  finish();
+  return { canvas: cv.c, x: cv.minX, y: cv.minY };
+}
+
+// ───────── 잡동사니 좌판: 궤짝 위 널판, 기운 천막, 쌓인 해골 잔·녹슨 쇠붙이·누더기·항아리 ─────────
+function stall(b: Building, theme: Theme) {
+  const Hw = b.h;
+  const cv = canvasFor(b, Hw + 10, 14);
+  const { g, P, poly, R, line, finish } = cv;
+  const { i0, j0, w, d } = b, i1 = i0 + w, j1 = j0 + d;
+  const seed = i0 * 53 + j0 * 29;
+  const cloth = theme === 'swamp' ? ['#4e5a3a', '#3a4428', '#6a6a44'] : theme === 'market' ? ['#7a3a1a', '#5a2a12', '#8a1a14'] : ['#5e544a', '#4a423a', '#7a6a52'];
+  const tz = 12;
+  // 궤짝 둘 위의 널판
+  for (const x of [i0 + 0.1, i1 - 0.45]) { poly([P(x, j1 - 0.05, 0), P(x + 0.35, j1 - 0.05, 0), P(x + 0.35, j1 - 0.05, tz - 2), P(x, j1 - 0.05, tz - 2)], '#5a4028'); line(P(x, j1 - 0.05, 2), P(x + 0.35, j1 - 0.05, tz - 4), 1, '#3a2818'); }
+  poly([P(i0, j0 + 0.15, tz), P(i1, j0 + 0.15, tz), P(i1, j1, tz), P(i0, j1, tz)], '#7a5a3a');
+  poly([P(i0, j1, tz), P(i1, j1, tz), P(i1, j1, tz - 2), P(i0, j1, tz - 2)], '#4a3424');
+  // 팔 것들
+  const goods = ['#ddd2b6', '#6a6660', '#8a4a2a', '#3a4a5a', '#a88a4a', '#5a1a14', '#c9a23e'];
+  for (let k = 0; k < w * 5; k++) {
+    const [x, y] = P(i0 + 0.12 + (k / (w * 5)) * (w - 0.2), j0 + 0.35 + hash(k, 1, seed) * (d - 0.5), tz);
+    const t = Math.floor(hash(k, 2, seed) * 5);
+    const c = goods[Math.floor(hash(k, 3, seed) * goods.length)];
+    if (t === 0) skull(cv, x, y - 3, 1);
+    else if (t === 1) { R(x - 2, y - 6, 4, 6, c); R(x - 3, y - 7, 6, 1, shade(c, 0.7)); } // 항아리
+    else if (t === 2) { line([x - 4, y - 1], [x + 4, y - 3], 1.5, '#7a7670'); } // 녹슨 쇠
+    else if (t === 3) { R(x - 3, y - 2, 6, 2, c); R(x - 2, y - 3, 4, 1, shade(c, 1.2)); } // 개킨 누더기
+    else { R(x - 1, y - 4, 2, 4, '#e8d8c0'); R(x - 2, y - 5, 4, 1, '#c9a23e'); } // 뼈 잔
+  }
+  // 기운 천막: 뒤쪽 기둥 둘이 높고 앞은 낮다, 천은 기운 조각
+  const hb = Hw, hf = Hw - 10;
+  for (const [x, y, hh] of [[i0, j0, hb], [i1, j0, hb], [i0, j1, hf], [i1, j1, hf]] as const) { const [sx, sy] = P(x, y, 0); R(sx - 1, sy - hh, 2, hh, '#2e2014'); }
+  const ov = 0.15;
+  const nP = 4;
+  for (let k = 0; k < nP; k++) {
+    const a = i0 - ov + (k / nP) * (w + 2 * ov), bb = a + (w + 2 * ov) / nP;
+    poly([P(a, j0 - ov, hb + 1), P(bb, j0 - ov, hb + 1), P(bb, j1 + ov, hf - 2), P(a, j1 + ov, hf - 2)], cloth[Math.floor(hash(k, 4, seed) * 3)]);
+  }
+  for (let k = 0; k <= (w + 2 * ov) * 5; k++) { const [x, y] = P(i0 - ov + k / 5, j1 + ov, hf - 2); R(x, y, 1, 1 + (k % 3), cloth[1]); }
+  // 끈에 매단 물건 (앞 처마)
+  for (let k = 0; k < w * 2; k++) { const [x, y] = P(i0 + 0.3 + k * 0.5, j1 + ov * 0.6, hf - 2); R(x, y, 1, 5, '#2a1a10'); if (k % 2) skull(cv, x, y + 7, 1); else { R(x - 1, y + 5, 3, 5, goods[k % goods.length]); } }
+  finish();
+  return { canvas: cv.c, x: cv.minX, y: cv.minY };
+}
+
+// ───────── 불탄 건물: 지붕이 무너지고 창이 뚫린 숯 검정 벽, 위로 갈수록 부서진 윤곽, 그을음과 남은 불씨 ─────────
+function burnt(b: Building, theme: Theme) {
+  const Hw = b.h;
+  const cv = canvasFor(b, Hw + 6, 8);
+  const { g, P, poly, R, finish } = cv;
+  const { i0, j0, w, d } = b, i1 = i0 + w, j1 = j0 + d;
+  const seed = i0 * 71 + j0 * 13 + Hw;
+  void theme;
+  // 위쪽 윤곽: 군데군데 무너져 내려앉았다 (칸마다 높이가 다르다)
+  const LW = w * (TW / 2), RWd = d * (TW / 2);
+  const hL = (u: number) => Hw - Math.floor(hash(Math.floor(u / 6), 1, seed) * Hw * 0.45) - (hash(Math.floor(u / 2), 2, seed) < 0.3 ? 3 : 0);
+  const hR = (u: number) => Hw - Math.floor(hash(Math.floor(u / 6), 3, seed) * Hw * 0.5) - (hash(Math.floor(u / 2), 4, seed) < 0.3 ? 3 : 0);
+  const floorH = 22;
+  const winAt = (face: number, u: number, z: number) => {
+    const span = face ? RWd : LW;
+    const cell = u % 16, story = Math.floor(z / floorH), zz = z % floorH;
+    return u > 4 && u < span - 4 && cell >= 4 && cell <= 11 && zz >= 7 && zz <= 17 && story >= 0 && hash(Math.floor(u / 16), story, seed + face) < 0.85;
+  };
+  // 안쪽: 무너진 윗선 너머로 보이는 뒤쪽 두 벽(그을린 속살)과 바닥의 잿더미
+  poly([P(i0, j0, 0), P(i1, j0, 0), P(i1, j1, 0), P(i0, j1, 0)], '#141110');
+  for (let k = 0; k < LW; k++) { const [sx, sy] = P(i0 + k / (TW / 2), j0, 0); for (let z = 0; z < Hw * 0.92; z++) R(sx, sy - z - 1, 1, 1, (z % floorH === 0 || winAt(0, k, z)) ? '#060504' : shade('#221e1c', 0.7 + hash(k >> 1, z >> 1, seed + 21) * 0.35)); }
+  for (let k = 0; k < RWd; k++) { const [sx, sy] = P(i0, j1 - k / (TW / 2), 0); for (let z = 0; z < Hw * 0.92; z++) R(sx, sy - z - 1, 1, 1, (z % floorH === 0 || winAt(1, k, z)) ? '#040303' : shade('#1a1716', 0.7 + hash(k >> 1, z >> 1, seed + 23) * 0.35)); }
+  for (let k = 0; k < LW; k++) {
+    const [sx, sy] = P(i0 + k / (TW / 2), j1, 0), top = hL(k);
+    for (let z = 0; z < top; z++) {
+      let c = shade('#2a2624', 0.75 + hash(k >> 1, z >> 1, seed) * 0.4);
+      if (z % floorH === 0) c = '#141110';
+      if (winAt(0, k, z)) c = (z % floorH) < 9 && hash(k, z, seed) < 0.25 ? '#3a1a0e' : '#060504';
+      if (z > top - 3 && hash(k, 5, seed) < 0.5) c = '#0e0c0b';
+      if (z < 10 && hash(k >> 2, z >> 2, seed) < 0.3) c = '#5a5650'; // 재 더미
+      R(sx, sy - z - 1, 1, 1, c);
+    }
+  }
+  for (let k = 0; k < RWd; k++) {
+    const [sx, sy] = P(i1, j1 - k / (TW / 2), 0), top = hR(k);
+    for (let z = 0; z < top; z++) {
+      let c = shade('#1e1b1a', 0.75 + hash(k >> 1, z >> 1, seed + 7) * 0.4);
+      if (z % floorH === 0) c = '#0e0c0b';
+      if (winAt(1, k, z)) c = '#040303';
+      if (z < 10 && hash(k >> 2, z >> 2, seed + 3) < 0.3) c = '#4a4642';
+      R(sx, sy - z - 1, 1, 1, c);
+    }
+  }
+  // 무너진 층 바닥 끝의 휜 철근
+  for (let k = 0; k < 5; k++) {
+    const u = hash(k, 8, seed) * LW, [sx, sy] = P(i0 + u / (TW / 2), j1, hL(u));
+    g.strokeStyle = '#5a4a3e'; g.lineWidth = 1; g.beginPath(); g.moveTo(sx, sy); g.lineTo(sx + (hash(k, 9, seed) - 0.5) * 8, sy - 4 - hash(k, 10, seed) * 6); g.stroke();
+  }
+  // 창 몇 곳에 아직 남은 불씨 (붉은 빛)
+  for (let k = 0; k < 4; k++) {
+    const u = 6 + hash(k, 11, seed) * (LW - 12), z = 6 + Math.floor(hash(k, 12, seed) * (Hw * 0.5));
+    if (!winAt(0, Math.floor(u), z)) continue;
+    const [sx, sy] = P(i0 + u / (TW / 2), j1, z);
+    R(sx - 1, sy - 2, 3, 2, '#ff6a1a'); R(sx, sy - 3, 1, 1, '#ffd26a');
+  }
+  // 벽 밑 잔해
+  for (let k = 0; k < 9; k++) { const [x, y] = P(i0 + hash(k, 14, seed) * w, j1 + 0.1 + hash(k, 15, seed) * 0.2, 0); R(x - 2, y - 2, 3 + Math.floor(hash(k, 16, seed) * 4), 2, k % 2 ? '#3a3632' : '#1a1614'); }
+  void poly;
+  finish();
+  return { canvas: cv.c, x: cv.minX, y: cv.minY };
+}
+
 /** 지옥의 집·덩어리 한 채 */
 export function drawHellBuild(b: Building, kind: HellBuildKind, theme: Theme): { canvas: HTMLCanvasElement; x: number; y: number } {
   if (kind === 'thatch') return thatch(b, theme);
   if (kind === 'prison') return prison(b, theme);
   if (kind === 'bonehouse') return bonehouse(b, theme);
   if (kind === 'carcass') return carcass(b, theme);
+  if (kind === 'butcher') return butcher(b, theme);
+  if (kind === 'stall') return stall(b, theme);
+  if (kind === 'burnt') return burnt(b, theme);
   if (kind === 'bonepile') return bonepile(b, theme);
   return guts(b, theme);
 }

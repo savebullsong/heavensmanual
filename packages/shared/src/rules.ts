@@ -93,6 +93,7 @@ export const DEED_TABLE = {
   donate100: { kind: 'good', points: 1, exp: 5, note: '병원·학교 기부 ฿100마다 (하루 20점까지)' },
   pray: { kind: 'good', points: 1, exp: 5, note: '종교시설 기도 (하루 3번)' },
   readScripture: { kind: 'good', points: 1, exp: 10, note: '종교시설에서 읽기 5분 (하루 1번)' },
+  hellAtone: { kind: 'good', points: 1, exp: 10, note: '지옥 속죄의 회당에 노전 1,000닢을 바칠 때마다' },
   // 악행
   firstStrike: { kind: 'evil', points: 2, exp: 10, note: '먼저 공격하기' },
   extort: { kind: 'evil', points: 3, exp: 30, note: '갈취 성공' },

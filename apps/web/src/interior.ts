@@ -18,6 +18,7 @@ export function canEnter(b: Building) {
 
 export function roomKind(b: Building): string {
   if (b.cat === 'loan') return 'loan'; // 지옥 3층 베스크 대부소
+  if (b.cat === 'hbank' || b.cat === 'atone' || b.cat === 'rebirth') return b.cat; // 지옥 은행 · 속죄의 회당 · 지옥 로비
   const k = kindOf(b);
   if (k === 'place_of_worship' || b.cat === 'worship') {
     const f = faithOf(b);
@@ -40,11 +41,12 @@ export function roomKind(b: Building): string {
 }
 
 /** 쉬는 곳: 종교시설·은행·병원·약국 (싸움 불가 · 빠른 회복) */
-export const REST_ROOMS = new Set(['temple', 'church', 'mosque', 'gurdwara', 'bank', 'clinic', 'pharmacy']);
+export const REST_ROOMS = new Set(['temple', 'church', 'mosque', 'gurdwara', 'bank', 'clinic', 'pharmacy', 'hbank', 'atone', 'rebirth']);
 
 const SIZE: Record<string, [number, number]> = {
   temple: [13, 11], church: [13, 11], mosque: [12, 11], gurdwara: [12, 11], bank: [12, 10], clinic: [12, 10], pharmacy: [9, 8],
   mart: [11, 9], food: [12, 10], cafe: [10, 9], bar: [10, 9], salon: [9, 8], massage: [10, 9], laundry: [9, 8], lobby: [11, 9], shop: [9, 8], loan: [10, 8],
+  hbank: [10, 8], atone: [11, 10], rebirth: [23, 17],
 };
 const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   temple: { floor: 'temple', wall: '#e9dcc0', trim: '#a8322a' }, church: { floor: 'stone', wall: '#e8e2d4', trim: '#6b4a30' },
@@ -56,6 +58,8 @@ const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   massage: { floor: 'wood', wall: '#e2d6c0', trim: '#6a4a2a' }, laundry: { floor: 'pale', wall: '#dce6ee', trim: '#3a6a9a' },
   lobby: { floor: 'marble', wall: '#e6ddd0', trim: '#8a6a3a' }, shop: { floor: 'wood', wall: '#e6e0d4', trim: '#5a5a5a' },
   loan: { floor: 'dark', wall: '#3a2420', trim: '#8a6a2a' },
+  hbank: { floor: 'dark', wall: '#34302c', trim: '#8a6a2a' }, atone: { floor: 'stone', wall: '#4a4440', trim: '#6a2a22' },
+  rebirth: { floor: 'marble', wall: '#dfe3e6', trim: '#56687a' },
 };
 
 /** 거리의 건물 k에 들어갈 때 방을 만든다 (같은 건물이면 늘 같은 방) */
@@ -150,6 +154,31 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
       F(1, 3, 1, 1, 18, 'coinsacks', 1); F(1, 4, 1, 1, 14, 'coinsacks', 2);
       F(x1, 4, 1, 1, 20, 'candle');
       break;
+    case 'hbank':
+      // 지옥 은행: 쇠창살 창구 · 쇠 금고 둘 · 노전 자루 · 촛대
+      F(2, 3, W - 4, 1, 28, 'teller'); clerk = { i: mid, j: 2 }; counter = { i: mid, j: 4 };
+      F(1, 1, 1, 1, 34, 'safe'); F(x1, 1, 1, 1, 34, 'safe'); F(2, 1, 1, 1, 18, 'coinsacks', 1); F(x1, 5, 1, 1, 22, 'candle'); F(1, 5, 1, 1, 14, 'coinsacks', 2);
+      break;
+    case 'atone':
+      // 속죄의 회당: 제단(금 간 후광) · 촛대 · 무릎 꿇는 긴 의자들 · 헌금함
+      F(mid - 1, 1, 3, 1, 22, 'altar', 3); clerk = { i: mid + 3, j: 2 }; counter = { i: mid + 2, j: 3 };
+      F(mid - 3, 1, 1, 1, 22, 'candle'); F(mid + 3, 1, 1, 1, 22, 'candle');
+      for (let jj = 4; jj < y1 - 1; jj += 2) { F(2, jj, mid - 3, 1, 12, 'pew'); F(mid + 2, jj, W - mid - 4, 1, 12, 'pew'); seats.push([3, jj + 1], [W - 3, jj + 1]); }
+      F(mid, 3, 1, 1, 16, 'offerbox');
+      break;
+    case 'rebirth': {
+      // 지옥 로비: 현대식 큰 홀. 뒤 벽을 따라 환생 상담 창구 다섯 (칸막이 사이 책상), 창구마다 줄을 세우는 기둥 줄, 아래쪽 대기 의자
+      for (let k = 0; k < 5; k++) {
+        const i0 = 2 + k * 4;
+        F(i0, 2, 3, 1, 24, 'cdesk', k);
+        if (k < 4) F(i0 + 3, 1, 1, 2, 44, 'partition');
+        F(i0, 4, 1, 4, 12, 'rope'); F(i0 + 2, 4, 1, 4, 12, 'rope');
+      }
+      clerk = { i: 11, j: 1 }; counter = { i: 11, j: 3 };
+      F(2, 11, 4, 1, 12, 'bench'); F(8, 12, 3, 1, 12, 'bench'); F(14, 12, 3, 1, 12, 'bench'); F(18, 11, 3, 1, 12, 'bench');
+      F(1, 1, 1, 1, 30, 'plant'); F(x1, 9, 1, 1, 30, 'plant'); F(1, 13, 1, 1, 30, 'plant');
+      break;
+    }
     default:
       F(W - 5, 2, 3, 1, 22, 'counter', 8); clerk = { i: W - 4, j: 1 }; counter = { i: W - 4, j: 3 };
       F(1, 1, W - 6, 1, 46, 'shelf', 8); F(2, 4, 2, 1, 20, 'display', 1); F(5, 4, 1, 2, 20, 'display', 2);
@@ -274,6 +303,24 @@ export function drawRoom(z: Zone, night: boolean): { canvas: HTMLCanvasElement; 
     for (let x = 2; x < W - 3; x += 2) onR(x + 0.1, x + 0.9, 30, 70, '#c8dce4');
   } else if (k === 'mart' || k === 'shop') {
     onR(W - 5, W - 2, 66, 76, info.trim);
+  } else if (k === 'rebirth') {
+    // 창구 위 번호판(붉은 숫자) · 가운데 큰 안내판 · 시계
+    for (let n = 0; n < 5; n++) {
+      const x0 = 2 + n * 4;
+      onR(x0 + 0.6, x0 + 2.4, 70, 84, '#20262c');
+      const [nx, ny] = P(x0 + 1.5, 1, 80);
+      g.fillStyle = n === 2 ? '#ff4a3a' : '#c8302a'; g.font = 'bold 9px monospace'; g.textAlign = 'center'; g.fillText(String(n + 1), nx, ny + 3);
+      onR(x0 + 0.3, x0 + 2.7, 56, 58, info.trim);
+    }
+    winL(2, 6, 30, 86, night ? '#2a3448' : '#cfe0ea'); winL(8, 12, 30, 86, night ? '#2a3448' : '#cfe0ea');
+    { const [cx, cy] = P(1, 14, 76); g.fillStyle = '#f4f4f0'; g.beginPath(); g.ellipse(cx, cy, 6, 7, 0, 0, Math.PI * 2); g.fill(); g.strokeStyle = '#2a2a2a'; g.lineWidth = 1; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx, cy - 5); g.moveTo(cx, cy); g.lineTo(cx + 3, cy + 1); g.stroke(); }
+  } else if (k === 'hbank') {
+    onR(2, W - 2, 56, 62, '#5a4a2a'); onR(2, W - 2, 64, 66, '#c9a23e');
+    for (let x = 2.5; x < W - 2; x += 2) { const [cx, cy] = P(x, 1, 74); g.fillStyle = '#b8902a'; g.beginPath(); g.ellipse(cx, cy, 5, 4, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#2a1a0c'; g.fillRect(Math.round(cx) - 1, Math.round(cy) - 1, 3, 2); }
+  } else if (k === 'atone') {
+    onR(mid, mid + 0.25, 30, 92, '#6a2a22');
+    { const [hx, hy] = P(mid + 0.12, 1, 78); g.strokeStyle = '#c9a23e'; g.lineWidth = 2; g.beginPath(); g.ellipse(hx, hy, 12, 8, 0, 0.4, Math.PI * 2 - 0.3); g.stroke(); }
+    for (let x = 2; x < W - 2; x += 3) for (let z = 20; z < 90; z += 4) onR(x, x + 0.06, z, z + 2, '#5a5650');
   } else if (k === 'lobby') {
     winL(2, 3, 0, 64, '#8a8a84'); winL(4, 5, 0, 64, '#8a8a84'); // 승강기 문
     onR(3, W - 3, 60, 66, '#c9a23e');
@@ -350,6 +397,7 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
     }
     case 'altar': {
       if (f.v === 1) { B3(i, j, i1, j1, 0, h, '#e8e2d4'); faceL(i + 0.2, i1 - 0.2, 4, h - 4, '#c9a23e'); B3(i + w / 2 - 0.1, j + 0.4, i + w / 2 + 0.1, j + 0.6, h, h + 12, '#c9a23e'); break; }
+      if (f.v === 3) { B3(i, j, i1, j1, 0, h, '#4a4440'); faceL(i + 0.2, i1 - 0.2, 4, h - 4, '#2a2420'); for (let n = 0; n < 5; n++) { const [cx, cy] = P(i + 0.4 + n * 0.5, j + 0.5, h); g.fillStyle = '#efe6d0'; g.fillRect(Math.round(cx) - 1, Math.round(cy) - 7, 2, 7); g.fillStyle = '#ffc04a'; g.fillRect(Math.round(cx) - 1, Math.round(cy) - 10, 2, 3); } break; }
       if (f.v === 2) { B3(i, j, i1, j1, 0, h, '#c9822a'); box(i, j, i1, j1, h + 36, h + 40, '#e8a23a', '#c9822a', '#a8621a'); for (const [x, y] of [[i, j1], [i1, j1], [i1, j]] as const) poly([P(x - 0.03, y, h), P(x + 0.03, y, h), P(x + 0.03, y, h + 36), P(x - 0.03, y, h + 36)], '#c9a23e'); break; }
       // 불단: 붉은·금빛 계단 + 금빛 불상
       B3(i, j, i1, j1, 0, h * 0.5, '#a8282a'); B3(i + 0.3, j + 0.2, i1 - 0.3, j1 - 0.2, h * 0.5, h, '#c9a23e');
@@ -409,6 +457,30 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       break;
     }
     case 'pew': B3(i, j + 0.3, i1, j1, 0, h, '#7a5232'); B3(i, j, i1, j + 0.3, 0, h + 14, '#6a4628'); break;
+    case 'cdesk': {
+      // 상담 책상: 흰 상판, 회색 앞판, 모니터·서류 더미·명패 (가운데 창구는 장부와 깃펜)
+      box(i + 0.05, j + 0.1, i1 - 0.05, j1 - 0.1, h - 3, h, '#f2f2ee', '#d8d8d4', '#c4c4c0');
+      B3(i + 0.1, j + 0.15, i1 - 0.1, j1 - 0.15, 0, h - 3, '#7a8088');
+      faceL(i + 0.2, i1 - 0.2, 6, h - 8, '#8a9098');
+      if (f.v === 2) {
+        box(i + 0.9, j + 0.25, i + 1.9, j + 0.75, h, h + 2, '#5a3a22', '#4a2e1a', '#3a2414'); // 펼친 낡은 장부
+        box(i + 1.0, j + 0.3, i + 1.8, j + 0.7, h + 2, h + 3, '#efe6cc', '#d8ccaa', '#c8b898');
+        { const [qx, qy] = P(i + 1.75, j + 0.4, h + 3); g.strokeStyle = '#e8e4dc'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(qx, qy); g.lineTo(qx + 6, qy - 12); g.stroke(); }
+      } else {
+        B3(i + 1.0, j + 0.35, i + 1.9, j + 0.5, h, h + 12, '#2a2e34'); faceL(i + 1.05, i + 1.85, h + 2, h + 11, night ? '#6ab8e8' : '#4a8ab8'); // 모니터
+        for (let n = 0; n < 4; n++) box(i + 0.3, j + 0.3, i + 0.8, j + 0.7, h + n, h + n + 1, n % 2 ? '#f4f4f0' : '#e8e8e2', '#d8d8d2', '#c8c8c2');
+      }
+      B3(i + 2.2, j + 0.7, i + 2.7, j + 0.85, h, h + 4, '#c9a23e'); // 명패
+      break;
+    }
+    case 'partition': B3(i + 0.4, j, i + 0.6, j1, 0, h, '#9aa4ac'); poly([P(i + 0.6, j, 8), P(i + 0.6, j1, 8), P(i + 0.6, j1, h - 4), P(i + 0.6, j, h - 4)], '#cfe0ea', 0.55); break;
+    case 'rope': {
+      // 줄 세우는 기둥: 은빛 기둥 사이 붉은 줄
+      for (let n = 0; n <= d; n++) { const y = j + Math.min(d - 0.15, n) + 0.15; B3(i + 0.42, y - 0.06, i + 0.58, y + 0.06, 0, h + 6, '#b8bcc0'); B3(i + 0.38, y - 0.1, i + 0.62, y + 0.1, 0, 2, '#8a8e92'); }
+      for (let n = 0; n < d; n++) { const ya = j + n + 0.15, yb = j + n + 1.15; const [ax, ay] = P(i + 0.5, ya, h + 4), [bx, by] = P(i + 0.5, Math.min(j1 - 0.15, yb), h + 4); g.strokeStyle = '#a8201a'; g.lineWidth = 2; g.beginPath(); g.moveTo(ax, ay); g.quadraticCurveTo((ax + bx) / 2, (ay + by) / 2 + 4, bx, by); g.stroke(); }
+      break;
+    }
+    case 'offerbox': box(i + 0.25, j + 0.25, i1 - 0.25, j1 - 0.25, 0, h, '#5a3a22', '#4a2e1a', '#3a2414'); faceL(i + 0.35, i1 - 0.35, h - 6, h - 4, '#c9a23e'); { const [sx, sy] = P(i + 0.5, j + 0.5, h); g.fillStyle = '#0c0806'; g.fillRect(Math.round(sx) - 3, Math.round(sy) - 1, 6, 2); } break;
     case 'minbar': B3(i, j, i1, j1, 0, h, '#8a6a3a'); for (let n = 1; n < 4; n++) B3(i, j + (n - 1) * d / 4, i1, j + (n * d) / 4, 0, (h * n) / 4, '#a07a4a'); break;
     case 'atm': B3(i + 0.15, j + 0.15, i1 - 0.15, j1 - 0.15, 0, h, '#5a6a7a'); faceL(i + 0.3, i1 - 0.3, h - 20, h - 8, night ? '#8adcff' : '#6ab8d8'); faceL(i + 0.3, i1 - 0.3, h - 28, h - 24, '#2a2a2a'); break;
     case 'salonchair': {
@@ -441,8 +513,13 @@ const STAFF: Record<string, [string, string]> = {
 };
 /** 대부업자 베스크: 붉은 피부·대머리·아주 뚱뚱·금 장신구·장부 */
 export const BESK_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'besk', cols: { 1: '#b8382a', 3: '#3a1410', 4: '#2a100c', 5: '#140a08', 6: '#e8c050', 9: '#3a1410', 10: '#e8dcc0', 12: '#f2d27a', 13: '#4a2a1a', 14: '#e0b437', 15: '#140e0c' } };
+/** 지옥 로비의 환생관 파샤르 (컨셉 아트: 잿빛 머리, 검은 망토 코트에 은 장식, 낡은 장부와 깃펜) */
+export const PASHAR_LOOK: Look = { sex: 'm', build: 0, skin: 0, hair: 1, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: '#e8d6c8', 10: '#e8d6c8', 2: '#9a9aa2', 3: '#1c1c22', 4: '#22222a', 9: '#1c1c22', 5: '#141418' } };
 export function clerkLook(kind: string, seed: number): Look {
   if (kind === 'loan') return BESK_LOOK;
+  if (kind === 'rebirth') return PASHAR_LOOK;
+  if (kind === 'hbank') return { sex: 'm', build: 0, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: '#9a948c', 10: '#9a948c', 2: '#2a2622', 3: '#1e1c1c', 4: '#1a1818', 9: '#1e1c1c', 5: '#0e0c0c' } }; // 잿빛 피부의 은행원
+  if (kind === 'atone') return { sex: 'f', build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'raincoat', cols: { 1: '#d8c8b8', 10: '#d8c8b8', 8: '#4a1a16', 3: '#2a1210', 4: '#2a1210', 5: '#1a0e0c' } }; // 붉은 두건의 속죄 수녀
   const [top, bottom] = STAFF[kind] ?? STAFF.shop;
   const sex = seed % 2 ? 'f' : 'm';
   const monk = kind === 'temple';
