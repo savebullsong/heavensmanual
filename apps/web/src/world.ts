@@ -16,6 +16,7 @@ import * as sfx from './sfx.ts';
 import { MONSTERS, GUARDS, floorDef, type MonsterDef, type GuardDef } from './hell.ts';
 import { drawHellGround, drawHellStructure, hellTint, hellProp, liquidInside, bloodLavaTile } from './hellgfx.ts';
 import { drawCosmicBird, COSMIC_TOP } from './ujusae.ts';
+import { drawYuhwang } from './yuhwang.ts';
 import { drawLoanHouse, LOAN_TOP } from './loanhouse.ts';
 import { portraitUrl } from './portraits.ts';
 
@@ -23,7 +24,7 @@ import { portraitUrl } from './portraits.ts';
 const BLD_ART: Record<string, HTMLCanvasElement> = {};
 let bldArtLoad: Promise<boolean> | null = null;
 function loadBuildingArt() {
-  bldArtLoad ??= Promise.all((['bld-ujusae', 'bld-ujusae-night', 'bld-loan'] as const).map(async (slot) => {
+  bldArtLoad ??= Promise.all((['bld-ujusae', 'bld-ujusae-night', 'bld-loan', 'bld-hell-1', 'bld-hell-2', 'bld-hell-3'] as const).map(async (slot) => {
     const u = await portraitUrl(slot).catch(() => null);
     if (!u) return false;
     const im = await new Promise<HTMLImageElement | null>((res) => { const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => res(i); i.onerror = () => res(null); i.src = u; });
@@ -174,6 +175,8 @@ const MELEE = 1.25;
 const RANGED = 5;
 
 const rand = (a: number, b: number) => a + Math.floor(Math.random() * (b - a + 1));
+/** 싸울 상대 위의 마우스 커서: 칼끝이 왼쪽 위를 가리키는 작은 검 (칼끝이 누르는 자리) */
+const SWORD_CURSOR = `url("data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><g stroke="#140e0a" stroke-width="1.4" stroke-linejoin="round"><path d="M2 2 L6.5 3.2 L17 13.7 L13.7 17 L3.2 6.5 Z" fill="#e8e4dc"/><path d="M3.2 3.2 L15.4 15.4" stroke="#9aa3ad" stroke-width="1"/><path d="M13 19.6 L19.6 13 L21.4 14.8 L14.8 21.4 Z" fill="#c9a23e"/><path d="M17.2 17.2 L22.6 22.6" stroke-width="3.6" stroke="#140e0a"/><path d="M17.2 17.2 L22.6 22.6" stroke-width="2" stroke="#6b4429"/><circle cx="23.4" cy="23.4" r="1.9" fill="#c9a23e"/></g></svg>')}") 2 2, crosshair`;
 
 export class WorldScene {
   readonly root = new Container();
@@ -627,9 +630,10 @@ export class WorldScene {
   private makeBuilding(b: Building): BView {
     if (!bldArtLoad && (b.cat === 'ujusae' || b.cat === 'loan')) loadBuildingArt().then((any) => { if (any && !this.root.destroyed) this.clearBuildings(); }); // 바꾼 건물 그림이 오면 다시 세운다
     const hellTheme = this.zone.hell ? floorDef(this.zone.hell.floor).theme : null;
-    let d = b.cat === 'ujusae' ? drawCosmicBird(b, this.night === 1) : b.cat === 'loan' ? drawLoanHouse(b) : hellTheme ? drawHellStructure(b, hellTheme, true) : kitOk ? drawBuildingKit(b, this.nameOf(b), this.night === 1, this.low) : drawBuilding(b, this.nameOf(b), this.night === 1);
+    const hf = this.zone.hell?.floor ?? 0;
+    let d = b.cat === 'ujusae' ? (hf ? drawYuhwang(b, hf) : drawCosmicBird(b, this.night === 1)) : b.cat === 'loan' ? drawLoanHouse(b) : hellTheme ? drawHellStructure(b, hellTheme, true) : kitOk ? drawBuildingKit(b, this.nameOf(b), this.night === 1, this.low) : drawBuilding(b, this.nameOf(b), this.night === 1);
     // 관리자가 갈아 끼운 그림 (같은 크기 또는 2배)
-    const art = b.cat === 'ujusae' ? (this.night === 1 ? BLD_ART['bld-ujusae-night'] ?? BLD_ART['bld-ujusae'] : BLD_ART['bld-ujusae']) : b.cat === 'loan' ? BLD_ART['bld-loan'] : undefined;
+    const art = b.cat === 'ujusae' && hf ? BLD_ART[`bld-hell-${hf}`] : b.cat === 'ujusae' ? (this.night === 1 ? BLD_ART['bld-ujusae-night'] ?? BLD_ART['bld-ujusae'] : BLD_ART['bld-ujusae']) : b.cat === 'loan' ? BLD_ART['bld-loan'] : undefined;
     const k = art ? (art.width === d.canvas.width * 2 && art.height === d.canvas.height * 2 ? 2 : art.width === d.canvas.width && art.height === d.canvas.height ? 1 : 0) : 0;
     if (art && k === 2) { const c1 = document.createElement('canvas'); c1.width = d.canvas.width; c1.height = d.canvas.height; const g1 = c1.getContext('2d')!; g1.imageSmoothingEnabled = false; g1.drawImage(art, 0, 0, c1.width, c1.height); d = { ...d, canvas: c1 }; }
     else if (art && k === 1) d = { ...d, canvas: art };
@@ -1511,6 +1515,42 @@ export class WorldScene {
     r.sprite.destroy();
     this.walkers.splice(k, 1);
   }
+  /** 영격이 올랐다: 발밑에서 금빛 기둥이 솟고 빛 알갱이가 떠오른다 (체력도 가득) */
+  private lvT = 0;
+  private lvMotes: { a: number; r: number; y: number; v: number }[] = [];
+  private lvG = new Graphics();
+  rankUpFx() {
+    this.lvT = 2.2;
+    this.lvMotes = Array.from({ length: 26 }, () => ({ a: Math.random() * Math.PI * 2, r: 4 + Math.random() * 14, y: Math.random() * 10, v: 30 + Math.random() * 50 }));
+    if (!this.lvG.parent) { this.lvG.blendMode = 'add'; this.lvG.eventMode = 'none'; this.objects.addChild(this.lvG); }
+    const p = this.player;
+    p.hp = p.maxHp;
+    this.hooks.hp(p.hp, p.maxHp);
+    this.shakeT = Math.max(this.shakeT, 0.25); this.shakeA = Math.max(this.shakeA, 2.5);
+  }
+  private drawRankUp(dt: number) {
+    const g = this.lvG;
+    if (this.lvT <= 0) { if (g.parent) g.clear(); return; }
+    this.lvT -= dt;
+    g.clear();
+    const p = this.player;
+    const [x, y] = iso(p.x, p.y);
+    const k = Math.max(0, this.lvT) / 2.2, a = Math.min(1, (1 - k) * 6) * Math.min(1, k * 2.2); // 빨리 솟고 천천히 사라진다
+    g.zIndex = p.x + p.y + 0.02;
+    // 바닥 고리 (퍼져 나간다)
+    const r = 8 + (1 - k) * 34;
+    g.ellipse(x, y, r, r / 2).stroke({ color: 0xffd36a, width: 2, alpha: a * 0.8 });
+    g.ellipse(x, y, r * 0.6, r * 0.3).stroke({ color: 0xfff1b8, width: 1, alpha: a * 0.6 });
+    // 빛기둥 (안쪽 밝게)
+    const H = 70 + (1 - k) * 40;
+    for (const [w, al] of [[16, 0.16], [9, 0.24], [4, 0.4]] as const) g.rect(x - w / 2, y - H, w, H).fill({ color: 0xffc94a, alpha: al * a });
+    // 떠오르는 빛 알갱이
+    for (const m of this.lvMotes) {
+      m.y += m.v * dt; m.a += dt * 2.4;
+      const mx = x + Math.cos(m.a) * m.r, my = y - m.y + Math.sin(m.a) * m.r * 0.4;
+      g.rect(Math.round(mx), Math.round(my), 2, 2).fill({ color: 0xfff1b8, alpha: a * Math.max(0, 1 - m.y / 120) });
+    }
+  }
   /** 먹거나 붕대를 감아 체력을 채운다 */
   heal(n: number) {
     const p = this.player;
@@ -1597,13 +1637,14 @@ export class WorldScene {
   }
 
   /** 고문하는 야크를 누르면: 고문을 멈추고 진짜 괴물이 되어 덤빈다 (누른 그 자리에서) */
-  private torturerAt(gx: number, gy: number): Walker | null {
+  private torturerAt(gx: number, gy: number, peek = false): Walker | null {
     if (!this.zone.hell) return null;
     const { wx, wy } = this.toWorld(gx, gy);
     for (const q of this.tortures) {
       if (q.free) continue;
       const [sx, sy] = iso(q.tx, q.ty);
       if (wx < sx - 13 || wx > sx + 13 || wy < sy - 50 || wy > sy + 4) continue;
+      if (peek) return this.player; // 살펴보기만 (마우스 커서)
       q.free = true;
       q.tor.destroy();
       const f = this.zone.hell.floor;
@@ -1663,7 +1704,9 @@ export class WorldScene {
   private onHover(gx: number, gy: number) {
     const w = this.walkerAt(gx, gy);
     this.hoverFor = w ? { kind: 'w', w } : null;
-    document.body.style.cursor = this.hoverFor || this.coinAt(gx, gy) || this.onDoorIcon(gx, gy) ? 'pointer' : '';
+    // 싸울 상대(괴물·불량배·대식자·경비병·고문하는 야크·나를 노리는 누구든) 위에서는 칼 모양
+    const foe = this.realm !== 'ghost' && ((w && w.down <= 0 && (w.kind === 'thug' || w.kind === 'suturer' || !!w.mdef || !!w.gdef || w.target === this.player)) || (!w && this.torturerAt(gx, gy, true)));
+    document.body.style.cursor = foe ? SWORD_CURSOR : this.hoverFor || this.coinAt(gx, gy) || this.onDoorIcon(gx, gy) ? 'pointer' : '';
   }
 
   /** 출입 아이콘을 눌렀나 (손가락 크기를 생각해 넉넉하게) */
@@ -2161,7 +2204,7 @@ export class WorldScene {
       return;
     }
     if (w.weak === 'shade') { w.down = 2.5; return; } // 그림자는 흩어질 뿐 남기는 게 없다
-    const amount = w.weak === 'drunk' ? rand(5, 30) : w.kind === 'thug' ? rand(60, 260) : rand(15, 90);
+    const amount = w.weak === 'drunk' ? rand(2, 10) : w.kind === 'thug' ? rand(8, 40) : rand(15, 70); // 불량배 한 명 ≈ 반 시간 일당 (시급 ฿50)
     this.dropCoin(w.x, w.y, amount, w.kind === 'passer');
   }
 
@@ -2986,6 +3029,7 @@ export class WorldScene {
 
   /** 타격 불꽃 */
   private drawSparks(dt: number) {
+    this.drawRankUp(dt);
     const g = this.sparkG;
     g.clear();
     for (let k = this.sparks.length - 1; k >= 0; k--) {

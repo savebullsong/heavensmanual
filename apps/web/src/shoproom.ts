@@ -5,7 +5,7 @@ import { parrotPixels, type Look } from './character.ts';
 import { toCanvas } from './raster.ts';
 import { iso } from './gfx.ts';
 import { MISS_HWANG, HWANGHON, charSet, frameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, type CharSet, type Dir, type Frame } from './sprites.ts';
-import { RW, RD, COUNTER, DOOR, ROOM_BOUNDS, PARROT_PERCH, drawRoomBackground, drawCounterPieces, drawLamp, nightFactor } from './shopgfx.ts';
+import { RW, RD, COUNTER, ROOM_BOUNDS, PARROT_PERCH, drawRoomBackground, drawCounterPieces, drawLamp, nightFactor } from './shopgfx.ts';
 import { bangkokClock } from './clock.ts';
 import { shopKitReady, counterStrips, type ShopKit } from './shopkit.ts';
 
@@ -23,9 +23,9 @@ async function loadPixel(u: string): Promise<Texture | null> {
 
 const HWANG = { x: 4.6, y: 1.55 };
 const TALK_TILE: [number, number] = [4, 3];
-const DOOR_TILE: [number, number] = [0, 6];
+const DOOR_TILE: [number, number] = [1, 7]; // 남서쪽(앞 왼쪽) 벽의 문 안쪽 매트 — 바깥 우주새의 문과 같은 쪽
 const START_FIRST: [number, number] = [4, 5];
-const START_BACK: [number, number] = [1, 6];
+const START_BACK: [number, number] = [2, 6];
 const SPEED = 2.3;
 /** 유황새: 바닥에 선 큰 앵무새 (사람 키쯤), 베스크 자리와 말 거는 칸 */
 const BIRD_START = { x: 7.5, y: 3.5 };
@@ -323,9 +323,10 @@ export class ShopRoom {
     this.player.alpha = on ? 0.55 : 1;
   }
 
-  setLook(look: Look) {
+  /** 몸과 입은 것: 방어구도 거리처럼 그린다 (안 주면 맨몸 — 처음 모습 고르기) */
+  setLook(look: Look, g?: { weapon: string | null; armor: string[] }) {
     const id = ++this.dressId;
-    charSet(look).then((cs) => {
+    charSet(look, g?.weapon ?? null, g?.armor ?? []).then((cs) => {
       if (id !== this.dressId) return;
       this.cs = cs;
       this.auraTex = look.aura ? auraFor(cs) : null;
@@ -405,9 +406,12 @@ export class ShopRoom {
       if (inSprite(this.bird, 4)) return 'parrot';
     } else if (inSprite(this.parrot, 6)) return 'parrot';
     if (inSprite(this.hwang)) return 'hwang';
-    // 왼쪽 벽(x = 0)의 문: 화면 좌표를 벽 위의 (y, z)로 바꿔 본다
-    const wy = -x / 32, wz = wy * 16 - y;
-    if (wy >= DOOR.y0 - 0.1 && wy <= DOOR.y1 + 0.1 && wz >= -6 && wz <= DOOR.h + 4) return 'door';
+    // 남서쪽 앞 벽(j = RD)의 문: 화면 좌표를 그 벽 위의 (i, 높이)로 바꿔 본다
+    const di = x / 32 + RD, dz = (di + RD) * 16 - y;
+    if (di >= 0.85 && di <= 2.35 && dz >= -14 && dz <= 36) return 'door';
+    // 문 안쪽 매트 칸을 눌러도 나간다
+    const fx = (x / 32 + y / 16) / 2, fy = (y / 16 - x / 32) / 2;
+    if (Math.floor(fx) === DOOR_TILE[0] && Math.floor(fy) === DOOR_TILE[1]) return 'door';
     return null;
   }
 
@@ -457,8 +461,8 @@ export class ShopRoom {
     if (t === 'hwang') { const [x, y] = iso(HWANG.x, HWANG.y); return [x, y - 48]; }
     if (t === 'parrot' && this.hellOn) { const [x, y] = iso(this.bx, this.by); return [x, y - 64]; }
     if (t === 'parrot') { const [x, y] = iso(PARROT_PERCH.x, PARROT_PERCH.y); return [x + 1, y - PARROT_PERCH.z - 20]; }
-    const [x, y] = iso(0, (DOOR.y0 + DOOR.y1) / 2);
-    return [x, y - DOOR.h - 12];
+    const [x, y] = iso(1.6, RD);
+    return [x, y - 36];
   }
 
   /** 큰 앵무새: 잠깐 서 있다가 빈 바닥 한 곳을 골라 걸어간다 (나와 베스크 자리는 피한다) */

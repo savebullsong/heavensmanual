@@ -1,4 +1,5 @@
 // 다국어: 방문자 기기 언어를 먼저 보여 준다 (한국어 · 태국어 · 영어)
+import { more16 } from './i18n16.ts';
 export type Lang = 'ko' | 'th' | 'en';
 export const LANGS: Lang[] = ['ko', 'th', 'en'];
 
@@ -436,7 +437,7 @@ const extra = {
   },
 };
 
-export type Dict = (typeof dict)['ko'] & (typeof extra)['ko'];
+export type Dict = (typeof dict)['ko'] & (typeof extra)['ko'] & (typeof more16)['ko'];
 
 function deviceLang(): Lang {
   const list = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language]) as string[];
@@ -456,5 +457,5 @@ export function setLang(l: Lang) {
 }
 const merged = {} as Record<Lang, Dict>;
 export function t(): Dict {
-  return (merged[current] ??= { ...dict[current], ...extra[current] } as Dict);
+  return (merged[current] ??= { ...dict[current], ...extra[current], ...more16[current] } as Dict);
 }

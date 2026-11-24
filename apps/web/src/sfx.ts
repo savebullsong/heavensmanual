@@ -238,3 +238,14 @@ export function chime() {
   [523, 659, 784, 1047, 1319].forEach((f, k) => tone(o, t + k * 0.16, 1.4, 'sine', f, f * 1.002, 0.22));
   noise(o, t, 1.6, 'highpass', 3000, 6000, 0.6, 0.12, 0.2);
 }
+
+/** 영격이 오를 때: 낮은 울림 위로 솟는 금빛 화음 (종 두 겹 + 반짝임) */
+export function rankUp() {
+  if (!ready()) return;
+  const t = ctx!.currentTime, o = out({ pan: 0, vol: 1 }, 1);
+  tone(o, t, 1.6, 'sine', 98, 96, 0.38);
+  noise(o, t, 0.9, 'lowpass', 600, 120, 0.7, 0.35, 0.05);
+  [392, 494, 587, 784].forEach((f, k) => { tone(o, t + 0.08 + k * 0.11, 1.5, 'triangle', f, f * 1.003, 0.16); tone(o, t + 0.08 + k * 0.11, 1.2, 'sine', f * 2, f * 2.004, 0.07); });
+  tone(o, t + 0.55, 2.0, 'sine', 1175, 1176, 0.12);
+  noise(o, t + 0.5, 1.4, 'highpass', 4000, 7000, 0.5, 0.1, 0.15);
+}

@@ -14,6 +14,10 @@ export interface Save {
   bank?: number;
   bag?: Record<string, number>;
   equip?: Partial<Record<Slot, string>>;
+  /** 마지막으로 있던 곳: 다시 열면 그 자리에서 (가게 안에서 일하던 중이면 계속 일한다) */
+  pos?: { w: 'real' | 'ghost' | 'hell' | 'heaven'; z: string; i: number; j: number; f?: number; k?: number; work?: boolean };
+  /** 빠른 칸에 끼운 소비품 (누르면 바로 먹기) */
+  quick?: string;
   ammo?: number;
   hp?: number;
   deeds?: { good: number; evil: number };

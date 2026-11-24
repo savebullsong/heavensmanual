@@ -173,16 +173,28 @@ def room(night):
     gbox(.0, .12, 3.78, 5.47, 28, 30, woodl)
     # 창 유리 자리는 벽을 비워야 한다 → 벽지 앞에 하늘 판을 붙인다 (밖이 보이는 것처럼)
     gbox(.0, .01, 3.9, 5.35, 30, 62, sky, bevel=0)
-    # 문 (j 5.9~7.1, 높이 56)
-    gbox(-.02, .05, 5.84, 7.16, 0, 58, dark)
-    door = mat('door', '#6b4429', .55, tex='noise', scale=16)
-    gbox(.05, .08, 5.9, 7.1, 0, 56, door)
-    gbox(.08, .1, 6.0, 7.0, 40, 52, sky, bevel=0)
-    gbox(.08, .1, 6.48, 6.52, 40, 52, dark, bevel=0)
-    for z0 in (8, 24):
-        gbox(.08, .1, 6.02, 6.48, z0, z0 + 12, mat('doorp', '#5a3822', .6)); gbox(.08, .1, 6.52, 6.98, z0, z0 + 12, mat('doorp', '#5a3822', .6))
-    ball(G(.12, 6.0, 30) + Vector((0, 0, 0)), .035, brass)
-    ball(G(.08, 6.5, 60), .05, brass)   # 문 위 종
+    # (문은 앞쪽 왼쪽 벽(남서, j = RD)으로 옮겼다 — 바깥 우주새의 문과 같은 쪽) 왼쪽 벽 그 자리엔 액자 하나
+    gbox(-.02, .05, 5.95, 7.05, 26, 58, dark)
+    gbox(.05, .07, 6.05, 6.95, 29, 55, mat('pic', '#2f3f4a', .8, tex='noise', scale=20), bevel=0)
+    ball(G(.08, 6.5, 42), .1, mat('picb', '#ece9e0', .8), (.3, 1, 1.3)); ball(G(.08, 6.5, 47.5), .05, mat('picc', '#e8c23a', .7), (.3, 1, 1))
+    # 앞쪽 두 벽(남서 j = RD · 남동 i = RW)은 잘라 낸 낮은 벽으로 (방 안이 보이게). 남서 벽에 문틀과 열린 문, 바깥 빛
+    low = 14
+    DX0, DX1 = 1.0, 2.2   # 문 자리 (i)
+    for (a0, a1) in ((-.12, DX0), (DX1, RW + .12)):
+        gbox(a0, a1, RD, RD + .14, -10, low, paper, bevel=0); gbox(a0, a1, RD - .02, RD + .16, low, low + 2.5, woodl)
+    gbox(RW, RW + .14, -.12, RD, -10, low, paper, bevel=0); gbox(RW - .02, RW + .16, -.12, RD + .16, low, low + 2.5, woodl)
+    for x in (DX0 - .06, DX1):   # 문설주 (잘린 높이보다 조금 높게)
+        gbox(x, x + .06, RD - .04, RD + .18, -10, low + 8, wood)
+    gbox(DX0, DX1, RD - .02, RD + .2, -1, .5, brass, bevel=0)   # 놋쇠 문턱
+    doorl = mat('door', '#6b4429', .55, tex='noise', scale=16)
+    gbox(DX0 + .02, DX0 + .1, RD - 1.1, RD - .02, 0, low + 6, doorl)   # 안으로 열린 문짝 (벽에 붙어 선다)
+    ball(G(DX0 + .12, RD - .9, 10), .03, brass)
+    sunlit = mat('sunlit', '#f2dca8', .9, emit=(0 if night else .35))
+    if not night: gbox(DX0 + .05, DX1 - .05, RD - .9, RD - .05, .05, .2, sunlit, bevel=0)   # 문으로 드는 햇빛
+    mat_c = mat('mat', '#7a2a26', .95, tex='noise', scale=12)
+    gbox(DX0 + .08, DX1 - .08, RD - 1.25, RD - .35, 0, .8, mat('matb', '#b08a3a', .9), bevel=0)
+    gbox(DX0 + .13, DX1 - .13, RD - 1.2, RD - .4, .8, 1.0, mat_c, bevel=0); gbox(DX0 + .3, DX1 - .3, RD - 1.02, RD - .58, 1.0, 1.15, mat('matd', '#4a1416', .95), bevel=0)
+    ball(G(1.6, RD - .05, low + 13), .045, brass)   # 문 위 종
     # 벽시계 (바늘은 게임에서 그린다)
     cylw(G(.04, 3.55, 68), 'X', .03, .16, brass); cylw(G(.06, 3.55, 68), 'X', .02, .13, mat('face', '#e8dcc0', .6))
     # 무기 걸이판 (j 0.7~3.1, 높이 28~76)
@@ -367,6 +379,7 @@ def lights(night):
     for (i, j) in ((2.4, 2.0), (6.6, 2.0)): add('POINT', G(i, j, 50), 300, (1, .82, .55), .1)
     add('AREA', G(4.5, 3.2, 72), 260, (1, .9, .75), 3, (math.radians(60), 0, math.radians(225)))
     if not night: add('AREA', G(-1.5, 4.6, 46), 420, (.85, .92, 1), 1.4, (0, -math.pi / 2, 0))
+    if not night: add('AREA', G(1.6, RD + 1.4, 34), 320, (1, .94, .82), 1.3, (math.radians(70), 0, 0))   # 남서 문으로 드는 햇빛
     add('POINT', G(4.5, 6.5, 70), 60 if not night else 30, (1, .85, .65), .5)
     # 진열장을 비추는 빛 (물건이 잘 보이게)
     add('AREA', G(4.6, 2.0, 46), 520 if not night else 420, (1, .93, .82), 6, (math.radians(90), 0, 0))
