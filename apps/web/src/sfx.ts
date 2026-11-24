@@ -6,7 +6,7 @@ export type HitKind = 'fist' | 'blunt' | 'blade' | 'gun';
 /** 맞는 쪽의 몸: 같은 무기라도 대상마다 소리가 다르다 */
 export type Body = 'flesh' | 'thug' | 'suturer' | 'monster' | 'player' | 'ash' | 'pret' | 'yak' | 'bones';
 
-const BLADES = new Set(['knife', 'dagger', 'sword', 'hatchet', 'needle']);
+const BLADES = new Set(['knife', 'dagger', 'sword', 'hatchet', 'needle', 'pickaxe', 'cleaver', 'hook', 'skewer', 'boathook']);
 export function hitKind(weapon: string | null | undefined, ranged = false): HitKind {
   if (ranged || weapon === 'pistol') return 'gun';
   if (!weapon) return 'fist';
@@ -201,6 +201,13 @@ export function gunshot(s: Spot) {
   noise(o, t, 0.28, 'highpass', jit(900), 300, 0.6, 1.0, 0.002);
   noise(o, t, 0.45, 'lowpass', 1800, 200, 0.7, 0.5, 0.002);
   tone(o, t, 0.2, 'sine', 95, 38, 0.9);
+}
+
+/** 뼈주사위가 나무 상자 위를 구르는 소리: 짧은 딸깍 여럿이 잦아든다 */
+export function dice() {
+  if (!ready()) return;
+  const t = ctx!.currentTime, o = out({ pan: 0, vol: 0.9 }, 1);
+  for (let k = 0; k < 7; k++) { const dt = k * 0.07 + k * k * 0.012; noise(o, t + dt, 0.03, 'bandpass', jit(2600), 1800, 4, 0.5 * (1 - k / 8), 0.001); tone(o, t + dt, 0.04, 'triangle', jit(900), 600, 0.12 * (1 - k / 8)); }
 }
 
 /** 쓰러지는 소리 */

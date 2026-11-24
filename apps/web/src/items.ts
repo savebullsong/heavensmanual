@@ -11,7 +11,7 @@ export interface ItemDef {
   def?: number; // 방어력
   note?: 'rope' | 'needsAmmo' | 'ammo';
   name: Record<Lang, string>;
-  store?: 'mart' | 'pharmacy' | 'food' | 'cafe'; // 우주새가 아니라 거리 가게에서 파는 것
+  store?: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'talus'; // 우주새가 아니라 거리 가게(또는 지옥 2층 탈루스)에서 파는 것
   now?: boolean; // 가게에서 바로 먹는다 (가방에 넣지 않음)
   hell?: boolean; // 지옥의 우주새(황혼)에서만, 노전으로 판다
   sprite?: string; // 몸에 그릴 때 쓰는 그림 (지옥 무기·방어구는 현실 그림을 빌려 쓴다)
@@ -21,6 +21,7 @@ export interface ItemDef {
 export const ITEMS: ItemDef[] = [
   // 소비품
   { key: 'chips', cat: 'goods', price: 30, heal: 25, name: { ko: '감자칩', th: 'มันฝรั่งทอด', en: 'Potato chips' } },
+  { key: 'bulgogichips', cat: 'goods', price: 3, heal: 35, store: 'talus', name: { ko: '불고기맛 과자', th: 'ขนมรสบุลโกกิ', en: 'Bulgogi-flavored snack' } }, // 탈루스가 노전 3닢에 판다
   { key: 'choco', cat: 'goods', price: 35, heal: 30, name: { ko: '초콜릿', th: 'ช็อกโกแลต', en: 'Chocolate' } },
   { key: 'cola', cat: 'goods', price: 17, heal: 15, name: { ko: '콜라', th: 'โคล่า', en: 'Cola' } },
   { key: 'water', cat: 'goods', price: 10, heal: 10, name: { ko: '물', th: 'น้ำเปล่า', en: 'Water' } },

@@ -36,6 +36,12 @@ jobs.append({'sex': 'm', 'build': 1, 'monster': 'b', 'occluder': 'cockatoo', 'se
 jobs.append({'sex': 'm', 'build': 1, 'monster': 'g', 'occluder': 'warden1', 'sets': [{'kind': 'base', 'outfit': 'warden1', 'mode': 'm'}, {'kind': 'weapon', 'weapon': 'knocker'}], 'tag': 'guard'})
 jobs.append({'sex': 'm', 'build': 1, 'monster': 'o', 'occluder': 'warden2', 'sets': [{'kind': 'base', 'outfit': 'warden2', 'mode': 'u'}], 'tag': 'guard'})
 jobs.append({'sex': 'm', 'build': 1, 'monster': 'w', 'occluder': 'warden3', 'sets': [{'kind': 'base', 'outfit': 'warden3', 'mode': 'm'}, {'kind': 'weapon', 'weapon': 'sealstaff'}], 'tag': 'guard'})
+# 지옥 괴물에게 무기 (거대한 층주는 그대로): 망자 몸 · 프렛 몸 · 해골 몸을 무기 든 자세(m)로 다시
+jobs.append({'sex': 'm', 'build': 1, 'monster': 'a', 'occluder': 'ash', 'sets': [{'kind': 'base', 'outfit': 'ash', 'mode': 'm'}] + [{'kind': 'weapon', 'weapon': w} for w in ('pickaxe', 'brand', 'boathook', 'cleaver')], 'tag': 'armed'})
+jobs.append({'sex': 'm', 'build': 1, 'monster': 'p', 'occluder': 'pret', 'sets': [{'kind': 'base', 'outfit': 'pret', 'mode': 'm'}] + [{'kind': 'weapon', 'weapon': w} for w in ('ladle', 'skewer')], 'tag': 'armed'})
+jobs.append({'sex': 'm', 'build': 1, 'monster': 's', 'occluder': 'bones', 'sets': [{'kind': 'base', 'outfit': 'bones', 'mode': 'm'}] + [{'kind': 'weapon', 'weapon': w} for w in ('femur', 'hook')], 'tag': 'armed'})
+# 지옥 2층 노름꾼 탈루스: 산탄총 든 자세(g)만
+jobs.append({'sex': 'm', 'build': 1, 'monster': 't', 'occluder': 'talus', 'sets': [{'kind': 'base', 'outfit': 'talus', 'mode': 'g'}, {'kind': 'weapon', 'weapon': 'shotgun'}], 'tag': 'talus'})
 args = sys.argv[2:]
 # --scale2: 같은 크기의 인물을 픽셀 두 배로 (게임에서는 반으로 줄여 같은 크기, 더 섬세)
 if '--scale2' in args:

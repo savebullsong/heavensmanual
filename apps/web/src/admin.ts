@@ -2,6 +2,9 @@
 import './admin.css';
 import { PORTRAIT_SLOTS, SPRITE_SLOTS, DEFAULT_PORTRAITS, type PortraitSlot } from './portraits.ts';
 import { charSet, frameOf, MISS_HWANG, HWANGHON, PX } from './sprites.ts';
+import { drawCosmicBird } from './ujusae.ts';
+import { drawLoanHouse } from './loanhouse.ts';
+import type { Building } from './zone.ts';
 
 const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   'miss-hwang': { name: '미스 황', where: '현실 · 우주새 점원' },
@@ -12,10 +15,14 @@ const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   pashar: { name: '파샤르', where: '지옥 1층 · 환생관' },
   'goat-king': { name: '염소대왕', where: '지옥 13층 · 최종 보스' },
   besk: { name: '베스크', where: '지옥 3층 · 베스크 대부소의 대부업자' },
+  talus: { name: '탈루스', where: '지옥 2층 들판 · 뼈주사위 노름꾼' },
   'sprite-miss-hwang': { name: '미스 황', where: '우주새 카운터 뒤에 서 있는 모습 (왼쪽 아래를 봄)' },
   'sprite-hwanghon': { name: '황혼', where: '유황새(지옥) 카운터 뒤에 서 있는 모습 (왼쪽 아래를 봄)' },
   'sprite-parrot': { name: '앵무새 · 볏 내림', where: '카운터 끝 횃대 · 평소 모습' },
   'sprite-parrot-up': { name: '앵무새 · 볏 세움', where: '가끔 머리깃을 세울 때 (비워 두면 볏 내림 그림을 그대로 씀)' },
+  'bld-ujusae': { name: '우주새 건물 · 낮', where: '전 세계 공통 우주새 (지옥의 유황새도 같은 그림) · 바닥 2×2칸' },
+  'bld-ujusae-night': { name: '우주새 건물 · 밤', where: '창에 불이 켜진 밤 모습 (비워 두면 낮 그림을 밤에도 씀)' },
+  'bld-loan': { name: '베스크 대부소', where: '지옥 3층 피의 시장 마을 · 바닥 3×2칸' },
 };
 
 type Tab = 'portraits' | 'sprites' | 'chars';
@@ -29,6 +36,12 @@ function dotSpec(slot: PortraitSlot): Promise<DotSpec | null> {
   if (p) return p;
   p = (async () => {
     try {
+      // 건물: 게임이 그리는 그림을 그대로 (그림의 왼쪽 위가 같은 자리에 놓인다)
+      if (slot === 'bld-ujusae' || slot === 'bld-ujusae-night' || slot === 'bld-loan') {
+        const b = { i0: 0, j0: 0, w: slot === 'bld-loan' ? 3 : 2, d: 2, h: 60, cat: slot === 'bld-loan' ? 'loan' : 'ujusae', color: '#000000' } as Building;
+        const d = slot === 'bld-loan' ? drawLoanHouse(b) : drawCosmicBird(b, slot === 'bld-ujusae-night');
+        return { canvas: d.canvas, w: d.canvas.width, h: d.canvas.height };
+      }
       if (slot === 'sprite-miss-hwang' || slot === 'sprite-hwanghon') {
         const cs = await charSet(slot === 'sprite-hwanghon' ? HWANGHON : MISS_HWANG);
         const f = frameOf(cs, 'idle', 'sw', 0);

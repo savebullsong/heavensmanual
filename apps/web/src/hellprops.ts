@@ -176,6 +176,43 @@ export function hellDecor(kind: string, theme: Theme, v: number, o = 0): HPic {
     out = { canvas: p.c, ax: 18.5 / 96, ay: 110 / 112 };
   } else if (kind === 'crag') {
     out = crag(theme, v, o, r);
+  } else if (kind === 'dicetable') {
+    // 탈루스의 노름판: 뒤집은 나무 상자 위 뼈주사위 둘·노전 더미·불고기맛 과자 봉지, 곁에 뼈 걸상
+    const p = pen(40, 34);
+    const cx = 40, by = 60;
+    p.E(cx, by + 3, 32, 6, '#140c0a');
+    // 상자 (왼쪽 면 · 오른쪽 면 · 윗면)
+    p.poly([[cx - 24, by - 12], [cx, by], [cx, by - 20], [cx - 24, by - 32]], '#5a4028');
+    p.poly([[cx, by], [cx + 24, by - 12], [cx + 24, by - 32], [cx, by - 20]], '#3e2c1a');
+    p.poly([[cx - 24, by - 32], [cx, by - 20], [cx + 24, by - 32], [cx, by - 44]], '#7a5a3a');
+    for (const y of [by - 22, by - 12]) { p.L(cx - 23, y - 10 + (y - by + 22) * 0, cx - 1, y + 2, 1, '#2a1c10'); }
+    p.L(cx + 1, by - 2, cx + 23, by - 14, 1, '#2a1c10');
+    // 뼈주사위 둘 (작은 육면체 + 눈)
+    for (const [dx, dy, pips] of [[-8, -34, 3], [4, -30, 4]] as [number, number, number][]) {
+      p.poly([[cx + dx - 4, dy + by - 0], [cx + dx, dy + by + 2], [cx + dx + 4, dy + by], [cx + dx, dy + by - 2]], BONE);
+      p.poly([[cx + dx - 4, dy + by], [cx + dx, dy + by + 2], [cx + dx, dy + by + 6], [cx + dx - 4, dy + by + 4]], BONE2);
+      p.poly([[cx + dx, dy + by + 2], [cx + dx + 4, dy + by], [cx + dx + 4, dy + by + 4], [cx + dx, dy + by + 6]], BONE3);
+      for (let k = 0; k < pips; k++) p.R(cx + dx - 2 + (k % 2) * 3, dy + by - 1 + Math.floor(k / 2) * 1.5, 1, 1, HOLE);
+    }
+    // 노전 더미와 과자 봉지
+    for (let k = 0; k < 5; k++) p.E(cx + 12 - k * 1.5, by - 34 - k * 1.6, 3.4, 1.6, k % 2 ? '#e8c86a' : '#c9a23e');
+    p.poly([[cx - 18, by - 36], [cx - 10, by - 40], [cx - 8, by - 28], [cx - 16, by - 24]], '#c8281e'); p.R(cx - 15, by - 34, 5, 3, '#f2cf3a'); p.R(cx - 14, by - 30, 3, 1, '#7a3a1a');
+    // 뼈 걸상
+    bone(p, cx + 30, by - 2, cx + 30, by - 14, 2.4); bone(p, cx + 24, by + 2, cx + 36, by - 6, 2);
+    p.E(cx + 30, by - 16, 7, 3, BONE2); p.E(cx + 29, by - 17, 5, 2, BONE);
+    p.finish();
+    out = { canvas: p.c, ax: 0.5, ay: 62 / 68 };
+  } else if (kind === 'campfire') {
+    // 작은 모닥불: 돌 둘레, 엇갈린 장작, 낮은 불길 (가로등이 아니라 사람의 불)
+    const p = pen(26, 30);
+    const cx = 26, by = 50;
+    p.E(cx, by + 2, 22, 5, '#120a08');
+    for (let k = 0; k < 7; k++) { const a = (k / 7) * Math.PI * 2; p.E(cx + Math.cos(a) * 15, by + Math.sin(a) * 4, 4, 2.6, k % 2 ? '#4a4440' : '#5e5852'); }
+    for (const [a, b2] of [[-14, 12], [12, -13]]) p.L(cx + a, by + 1, cx + b2, by - 8, 4, '#3a2416');
+    const fl = ['#fff0b0', '#ffd06a', '#ffa02a', '#f06a1a'];
+    for (let k = 0; k < 26; k++) { const x = cx - 10 + r(k) * 20, d2 = Math.abs(x - cx) / 11, h = (6 + r(k + 50) * 20) * (1 - d2 * d2); p.R(x, by - 6 - h, 2, h, fl[Math.min(3, Math.floor((r(k + 90) * 0.5 + d2 * 0.7) * 4))]); }
+    p.finish([30, 10, 6]);
+    out = { canvas: p.c, ax: 0.5, ay: 52 / 60, glow: [0, -14], glowTint: 0xff9a4a };
   } else if (kind === 'htree') {
     out = hellTree(theme, v, o, r);
   } else if (kind === 'rock') {

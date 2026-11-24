@@ -10,86 +10,178 @@ const hex = (h: string): RGB => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3
 const hash = (a: number, b: number, c = 0) => { let h = (a * 374761393 + b * 668265263 + c * 2147483647) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 const mix = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
-/** 바닥 무늬: (u, v) = 칸 안의 위치 0~1, n = 잡음 → 색 */
-type Painter = (u: number, v: number, x: number, y: number, n: number, k: number) => RGB;
-const P: Record<Theme, Partial<Record<TileType, Painter>>> = {
-  ash: {
-    lot: (_u, _v, x, y, n, k) => (hash(x, y, k) < 0.004 ? hex('#c9531a') : mix(hex('#47413d'), n > 0.6 ? hex('#5a524c') : hex('#38322f'), Math.abs(n - 0.5))),
-    park: (_u, _v, x, y, n, k) => (hash(x >> 1, y, k + 3) < 0.07 ? hex('#6a5a3a') : mix(hex('#4a4438'), hex('#3a3430'), n)),
-    walk: (u, v, _x, _y, n) => { const su = (u * 5) % 1, sv = (v * 5 + (Math.floor(u * 5) % 2) * 0.5) % 1; const edge = su < 0.12 || sv < 0.12; return edge ? hex('#1a1616') : mix(hex('#3a3434'), hex('#2a2626'), n); },
-    soi: (_u, _v, _x, _y, n) => mix(hex('#332e2c'), hex('#262220'), n),
-    water: (u, v, x, y, n, k) => { const vein = Math.abs(Math.sin(u * 9 + v * 5 + n * 3 + k)) < 0.12; return vein ? (hash(x, y) < 0.5 ? hex('#ffd26a') : hex('#ff8a2a')) : n > 0.72 ? hex('#5a1a10') : mix(hex('#c23a18'), hex('#8a2210'), n); },
-    cross: (u, _v, _x, _y, n) => ((u * 8) % 1 < 0.14 ? hex('#140e0a') : mix(hex('#3a2a1e'), hex('#2a1e16'), n)),
-    block: (_u, _v, _x, _y, n) => mix(hex('#24201e'), hex('#1a1716'), n),
-  },
-  swamp: {
-    lot: (_u, _v, _x, _y, n) => mix(hex('#3e3a2a'), hex('#2e2c20'), n),
-    park: (_u, _v, x, y, n, k) => (hash(x, y >> 1, k) < 0.1 ? hex('#5a6a3a') : mix(hex('#34402a'), hex('#283020'), n)),
-    walk: (u, _v, _x, _y, n) => ((u * 7) % 1 < 0.13 ? hex('#2a1e14') : mix(hex('#5a4630'), hex('#46362a'), n)),
-    soi: (_u, _v, _x, _y, n) => mix(hex('#3a3426'), hex('#2a261c'), n),
-    water: (u, v, _x, _y, n, k) => (Math.abs(Math.sin(u * 14 + k + v * 3)) < 0.08 ? hex('#3a4a3a') : mix(hex('#22302a'), hex('#18221e'), n)),
-    cross: (u, _v, _x, _y, n) => ((u * 7) % 1 < 0.13 ? hex('#1a140e') : mix(hex('#4e3e2a'), hex('#3e3022'), n)),
-    block: (_u, _v, _x, _y, n) => mix(hex('#22241c'), hex('#181a14'), n),
-  },
-  market: {
-    lot: (_u, _v, _x, _y, n) => mix(hex('#4a2a22'), hex('#3a201a'), n),
-    park: (_u, _v, _x, _y, n) => mix(hex('#3a2a22'), hex('#2e201a'), n),
-    walk: (u, v, _x, _y, n) => { const su = (u * 4) % 1, sv = (v * 4) % 1; return su < 0.08 || sv < 0.08 ? hex('#2a1210') : mix(hex('#6a3028'), hex('#56261e'), n); },
-    soi: (u, v, _x, _y, n) => { const su = (u * 6) % 1, sv = (v * 6 + (Math.floor(u * 6) % 2) * 0.5) % 1; return su < 0.12 || sv < 0.12 ? hex('#22140f') : mix(hex('#4a3430'), hex('#3a2824'), n); },
-    water: (u, v, _x, _y, n, k) => (Math.abs(Math.sin(u * 11 + v * 4 + k)) < 0.09 ? hex('#b02a1a') : mix(hex('#6a0a0a'), hex('#4a0606'), n)),
-    cross: (u, v) => ((u * 6) % 1 < 0.2 || (v * 6) % 1 < 0.2 ? hex('#4a4a4a') : hex('#151212')),
-    block: (_u, _v, _x, _y, n) => mix(hex('#2a1a18'), hex('#1e1412'), n),
-  },
-};
-
-const tileCache = new Map<string, HTMLCanvasElement>();
-function tileCanvas(theme: Theme, t: TileType, k: number): HTMLCanvasElement | null {
-  const key = `${theme}-${t}-${k}`;
-  let c = tileCache.get(key);
-  if (c) return c;
-  const pt = P[theme][t] ?? P[theme][t === 'road' || t === 'median' ? 'soi' : 'lot'];
-  if (!pt) return null;
-  c = document.createElement('canvas');
-  c.width = TW; c.height = TH;
-  const g = c.getContext('2d')!;
-  const im = g.createImageData(TW, TH);
-  for (let y = 0; y < TH; y++)
-    for (let x = 0; x < TW; x++) {
-      // 마름모 안쪽만
-      const dx = Math.abs(x + 0.5 - TW / 2) / (TW / 2), dy = Math.abs(y + 0.5 - TH / 2) / (TH / 2);
-      if (dx + dy > 1.02) continue;
-      // 칸 좌표 (u: +i 방향, v: +j 방향)
-      const sx = (x + 0.5 - TW / 2) / (TW / 2), sy = (y + 0.5) / (TH / 2);
-      const u = (sy + sx) / 2, v = (sy - sx) / 2;
-      const n = (hash(x >> 1, y >> 1, k * 31) * 0.6 + hash(x >> 2, y >> 2, k * 17 + 5) * 0.4);
-      const [r, gg, b] = pt(Math.max(0, Math.min(0.999, u)), Math.max(0, Math.min(0.999, v)), x, y, n, k);
-      const o = (y * TW + x) * 4;
-      im.data[o] = r; im.data[o + 1] = gg; im.data[o + 2] = b; im.data[o + 3] = 255;
+// ───────────────────────── 지옥 바닥 (점 하나하나를 땅의 연속된 무늬로) ─────────────────────────
+// 칸마다 같은 마름모 그림을 찍던 방식(격자가 보이고 경계가 네모)을 버리고, 화면의 점마다
+// ① 둘레 네 칸의 종류를 겹쳐 섞고 잡음을 더해 경계를 구불구불하게 (용암 강·늪 가장자리가 둥글게)
+// ② 칸을 넘어 이어지는 무늬(재 언덕·갈라진 금·자갈·진흙의 젖은 빛·풀·판자·벽돌)와
+// ③ 왼쪽 위에서 오는 빛의 높낮이 그림자로 살짝 입체감을 준다. 용암은 식은 껍질 조각 사이로 달아오른 금이 흐른다.
+const NS = 256;
+let NOISE: Float32Array | null = null;
+/** 이어 붙여도 이음매 없는 부드러운 잡음 (256×256, 여러 겹) */
+function noiseTex() {
+  if (NOISE) return NOISE;
+  const out = new Float32Array(NS * NS);
+  for (const [per, amp] of [[64, 0.5], [32, 0.25], [16, 0.15], [8, 0.1]] as const) {
+    const gN = NS / per;
+    const val = (gx: number, gy: number) => hash(((gx % gN) + gN) % gN, ((gy % gN) + gN) % gN, per * 7 + 1);
+    for (let y = 0; y < NS; y++) for (let x = 0; x < NS; x++) {
+      const fx = x / per, fy = y / per, x0 = Math.floor(fx), y0 = Math.floor(fy);
+      let tx = fx - x0, ty = fy - y0; tx = tx * tx * (3 - 2 * tx); ty = ty * ty * (3 - 2 * ty);
+      const a = val(x0, y0), b = val(x0 + 1, y0), c = val(x0, y0 + 1), d = val(x0 + 1, y0 + 1);
+      out[y * NS + x] += amp * ((a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty);
     }
-  g.putImageData(im, 0, 0);
-  tileCache.set(key, c);
-  return c;
+  }
+  NOISE = out;
+  return out;
 }
+const TYPE_IDX: TileType[] = ['void', 'lot', 'park', 'water', 'walk', 'soi', 'road', 'median', 'cross', 'block'];
+/** 땅의 종류 (칸 종류를 그림 종류로): 0 바닥 · 1 마른 모래/이끼 · 2 물(용암·늪·핏물) · 3 돌길·널빤지 · 4 골목 흙길 · 5 다리 · 6 바위 바닥 */
+const CLASS_OF: Record<TileType, number> = { void: 6, lot: 0, park: 1, water: 2, walk: 3, soi: 4, road: 4, median: 4, cross: 5, block: 6 };
 
-/** 지옥 바닥 한 덩어리 */
 export function drawHellGround(z: Zone, theme: Theme, i0: number, j0: number): { canvas: HTMLCanvasElement; x: number; y: number } | null {
+  const NZ = noiseTex();
+  const nz = (x: number, y: number) => NZ[((y & 255) << 8) | (x & 255)];
   const i1 = Math.min(z.W, i0 + CHUNK), j1 = Math.min(z.H, j0 + CHUNK);
   const minX = (i0 - j1) * (TW / 2), minY = (i0 + j0) * (TH / 2);
+  const W = (i1 - i0 + j1 - j0) * (TW / 2) + 2, H = (i1 - i0 + j1 - j0) * (TH / 2) + 2;
   const c = document.createElement('canvas');
-  c.width = (i1 - i0 + j1 - j0) * (TW / 2) + 2;
-  c.height = (i1 - i0 + j1 - j0) * (TH / 2) + 2;
+  c.width = W; c.height = H;
   const g = c.getContext('2d')!;
-  g.imageSmoothingEnabled = false;
-  for (let j = j0; j < j1; j++)
-    for (let i = i0; i < i1; i++) {
-      const t = tileAt(z, i, j);
-      if (t === 'void') continue;
-      const tc = tileCanvas(theme, t, Math.floor(hash(i, j) * 4));
-      if (!tc) continue;
-      const [x, y] = iso(i, j);
-      g.drawImage(tc, x - minX - TW / 2, y - minY);
+  const im = g.createImageData(W, H);
+  const D = im.data;
+  const tiles = z.tiles, ZW = z.W, ZH = z.H;
+  const cls = (i: number, j: number) => { const ii = i < 0 ? 0 : i >= ZW ? ZW - 1 : i, jj = j < 0 ? 0 : j >= ZH ? ZH - 1 : j; return CLASS_OF[TYPE_IDX[tiles[jj * ZW + ii]] ?? 'lot']; };
+  const sc = new Float32Array(7);
+  let r = 0, gg = 0, b = 0;
+  const set = (h: string) => { r = parseInt(h.slice(1, 3), 16); gg = parseInt(h.slice(3, 5), 16); b = parseInt(h.slice(5, 7), 16); };
+  const lerp = (h1: string, h2: string, t: number) => { const a = hex(h1), bb = hex(h2); t = t < 0 ? 0 : t > 1 ? 1 : t; r = a[0] + (bb[0] - a[0]) * t; gg = a[1] + (bb[1] - a[1]) * t; b = a[2] + (bb[2] - a[2]) * t; };
+  const shade = (k: number) => { r *= k; gg *= k; b *= k; };
+  for (let py = 0; py < H; py++) {
+    const Y = py + minY;
+    for (let px = 0; px < W; px++) {
+      const X = px + minX;
+      const fi = (X / (TW / 2) + Y / (TH / 2)) / 2, fj = (Y / (TH / 2) - X / (TW / 2)) / 2;
+      if (fi < i0 || fi >= i1 || fj < j0 || fj >= j1) continue;
+      // ① 둘레 네 칸을 섞고 잡음으로 흔든 점수 → 가장 큰 땅 / 두 번째 땅과의 차이(경계까지의 거리)
+      const ci = fi - 0.5, cj = fj - 0.5, ti = Math.floor(ci), tj = Math.floor(cj), ax = ci - ti, ay = cj - tj;
+      sc.fill(0);
+      sc[cls(ti, tj)] += (1 - ax) * (1 - ay); sc[cls(ti + 1, tj)] += ax * (1 - ay); sc[cls(ti, tj + 1)] += (1 - ax) * ay; sc[cls(ti + 1, tj + 1)] += ax * ay;
+      const Yp = Y * 2;
+      let best = 0, bv = -9, second = 0, sv = -9;
+      for (let k = 0; k < 7; k++) {
+        if (sc[k] <= 0) continue;
+        const v = sc[k] + (nz(X + k * 41, Yp + k * 67) - 0.5) * 0.62;
+        if (v > bv) { sv = bv; second = best; bv = v; best = k; } else if (v > sv) { sv = v; second = k; }
+      }
+      const edge = sv < -8 ? 1 : bv - sv; // 0에 가까울수록 경계
+      const n1 = nz(X, Yp), n2 = nz(X + 113, Yp + 71), n3 = nz((X >> 1) + 57, (Yp >> 1) + 191);
+      const grain = hash(X, Y, 3);
+      // ③ 높낮이 그림자: 왼쪽 위가 높으면 어둡고, 낮으면 밝다
+      const relief = (nz(X - 2, Yp - 3) - n1) * 2.6;
+      if (best === 2) {
+        // 물: 용암 · 늪물 · 핏물
+        if (theme === 'ash') {
+          const crack = Math.abs(n2 - 0.5), hot = n3;
+          if (edge < 0.05) set(edge < 0.025 ? '#ffd27a' : '#ff8a2a'); // 가장자리의 달아오른 테
+          else if (crack < 0.012) set('#ffe08a');
+          else if (crack < 0.03) set('#ff8a2a');
+          else if (hot > 0.6) lerp('#c8401a', '#ffa83a', (hot - 0.6) * 4);
+          else { lerp('#2e0c08', '#6a1a0c', n1 * 1.4); if (grain < 0.04) set('#8a2a10'); }
+        } else if (theme === 'swamp') {
+          lerp('#16201c', '#24302a', n1);
+          if (Math.abs(Math.sin(X * 0.09 + Yp * 0.05 + n2 * 9)) < 0.05) set('#3a4a40');
+          if (n3 > 0.66 && grain < 0.3) set('#2e3e26'); // 물이끼
+          if (edge < 0.05) set('#3a3424');
+        } else {
+          lerp('#3a0404', '#6a0a0a', n1 * 1.3);
+          if (n2 > 0.7 && grain < 0.5) set('#8a1410');
+          if (Math.abs(Math.sin(X * 0.11 + Yp * 0.04 + n3 * 8)) < 0.04) set('#b0281a');
+          if (edge < 0.05) set('#2a0606');
+        }
+      } else if (best === 3) {
+        // 돌길(1·3층) · 널빤지 길(2층): 칸을 셋으로 나눈 돌·판자에 모서리 빛과 그림자
+        if (theme === 'swamp') {
+          const u = fi * 4 + (Math.floor(fj * 1.5) % 2) * 0.5, pu = u - Math.floor(u), plank = Math.floor(u);
+          if (pu < 0.1) set('#1a1208');
+          else { lerp('#5e4a32', '#46362a', hash(plank, Math.floor(fj * 1.5), 9) * 0.8 + n2 * 0.4); if (Math.abs(Math.sin(fj * 40 + plank)) < 0.12) shade(0.86); if (pu < 0.2) shade(1.12); if (pu > 0.9) shade(0.8); }
+        } else {
+          const rowj = Math.floor(fj * 3), u = fi * (theme === 'market' ? 2 : 3) + (rowj % 2) * 0.5, v = fj * 3;
+          const cu = Math.floor(u), du = u - cu, dv = v - rowj;
+          const id = hash(cu, rowj, 5);
+          const e = Math.min(du, 1 - du, dv, 1 - dv);
+          if (e < 0.07 + n3 * 0.03) set(theme === 'market' ? '#1e0c0a' : '#141010');
+          else {
+            if (theme === 'market') lerp('#6a2e24', '#4e2018', id * 0.8 + n1 * 0.3); else lerp('#4a4440', '#36302c', id * 0.8 + n1 * 0.3);
+            if (du < 0.2 || dv < 0.2) shade(1.16); else if (du > 0.82 || dv > 0.8) shade(0.78);
+            if (grain < 0.02) shade(0.7);
+          }
+        }
+      } else if (best === 5) {
+        // 다리: 물 위의 판자 (틈으로 아래의 빛)
+        const u = fj * 5, pu = u - Math.floor(u);
+        if (pu < 0.14) set(theme === 'ash' ? '#a8321a' : theme === 'swamp' ? '#101814' : '#3a0404');
+        else { lerp('#4a3424', '#34241a', hash(Math.floor(u), 2, 3) + n1 * 0.3); if (pu < 0.26) shade(1.15); if (pu > 0.88) shade(0.75); }
+        if (theme === 'market' && ((fi * 6) % 1 < 0.18)) set('#3a3a3a'); // 쇠 창살 다리
+      } else if (best === 6) {
+        lerp(theme === 'swamp' ? '#20221a' : theme === 'market' ? '#2a1816' : '#221e1c', theme === 'swamp' ? '#16180f' : theme === 'market' ? '#1c100e' : '#161312', n1);
+      } else if (theme === 'ash') {
+        if (best === 1) {
+          // 그을린 모래: 바람에 쓸린 물결 무늬 + 검은 재 알갱이
+          lerp('#5a4a3c', '#40362e', n1);
+          if (Math.sin(X * 0.16 + Yp * 0.36 + n2 * 7) > 0.82) shade(1.12);
+          if (grain < 0.05) set('#2a2420');
+        } else if (best === 4) { lerp('#322c2a', '#24201e', n1); if (grain < 0.03) set('#4a4440'); }
+        else {
+          // 재 바닥: 낮은 재 언덕, 갈라진 금(가끔 속이 달아오름), 자갈, 불씨
+          lerp('#4c4641', '#332e2b', n1 * 1.2 - 0.1);
+          const crack = Math.abs(n2 - 0.5);
+          if (crack < 0.008) set(n3 > 0.66 ? '#b8401a' : '#1c1816');
+          else if (crack < 0.016) shade(0.82);
+          if (grain < 0.004) set('#d9632a');
+          else if (hash(X >> 1, Y >> 1, 11) < 0.012) set(hash(X, Y, 12) < 0.5 ? '#6e665e' : '#58504a');
+        }
+        if (second === 2 && edge < 0.22) { const k = 1 - edge / 0.22; r = r * (1 - k * 0.5) + 40 * k; gg *= 1 - k * 0.6; b *= 1 - k * 0.7; if (edge < 0.08 && grain < 0.25) set('#ff6a2a'); } // 용암 가의 그을린 땅
+      } else if (theme === 'swamp') {
+        if (best === 1) {
+          // 이끼·풀: 자란 풀잎(세로 점) 끝이 밝다
+          lerp('#2e3a24', '#222c1a', n1);
+          const blade = hash(X, Y >> 2, 21);
+          if (blade < 0.09) set(hash(X, Y, 22) < 0.5 ? '#4a6a34' : '#5e7e3a');
+          else if (blade < 0.16) shade(0.82);
+        } else if (best === 4) { lerp('#3e3424', '#2e2618', n1); if (Math.sin(X * 0.3 + Yp * 0.1) > 0.94) shade(0.8); }
+        else {
+          // 진흙: 젖어 번들거리는 곳, 고인 물웅덩이, 발자국 같은 패임
+          lerp('#3c3626', '#28241a', n1 * 1.2 - 0.1);
+          if (n2 > 0.7) { lerp('#4e4832', '#5e5838', (n2 - 0.7) * 3); if (grain < 0.05) set('#8a845a'); }
+          if (n3 > 0.72) { set('#1c2420'); if (grain < 0.06) set('#3a4a40'); }
+        }
+        if (second === 2 && edge < 0.2) shade(0.65 + edge * 1.6); // 물가는 축축하게 어둡다
+      } else {
+        if (best === 1) { lerp('#3e2620', '#2e1c18', n1); if (n2 > 0.66) shade(0.75); }
+        else if (best === 4) {
+          const u = fi * 4 + (Math.floor(fj * 4) % 2) * 0.5, du = u - Math.floor(u), dv = fj * 4 - Math.floor(fj * 4);
+          if (du < 0.1 || dv < 0.12) set('#1c0e0c'); else { lerp('#4a3430', '#3a2824', hash(Math.floor(u), Math.floor(fj * 4), 4) + n1 * 0.3); if (du < 0.24 || dv < 0.26) shade(1.12); }
+        } else {
+          // 붉은 흙: 핏자국 얼룩, 발에 다져진 자국, 작은 돌
+          lerp('#4c2c24', '#36201a', n1 * 1.2 - 0.1);
+          if (n2 > 0.72) lerp('#5a0e0a', '#3a0806', (n2 - 0.72) * 3);
+          if (hash(X >> 1, Y >> 1, 13) < 0.01) set('#6a4a40');
+        }
+        if (second === 2 && edge < 0.2) shade(0.6 + edge * 2);
+      }
+      if (best !== 2) { const k = 1 + relief; r *= k; gg *= k; b *= k; } // 높낮이
+      const o = (py * W + px) * 4;
+      D[o] = r < 0 ? 0 : r > 255 ? 255 : r; D[o + 1] = gg < 0 ? 0 : gg > 255 ? 255 : gg; D[o + 2] = b < 0 ? 0 : b > 255 ? 255 : b; D[o + 3] = 255;
     }
+  }
+  g.putImageData(im, 0, 0);
   return { canvas: c, x: minX, y: minY };
+}
+
+/** 물(용암·늪·핏물) 칸인가: 흐르는 빛을 덧그릴 자리 (가장자리는 빼고 안쪽만) */
+export function liquidInside(z: Zone, i: number, j: number) {
+  const w = (a: number, b2: number) => tileAt(z, a, b2) === 'water';
+  return w(i, j) && w(i + 1, j) && w(i - 1, j) && w(i, j + 1) && w(i, j - 1);
 }
 
 /** 지옥 구조물: 재의 문턱 = 부서진 돌 폐허, 굶주림의 늪 = 판잣집, 피의 시장 = 붉은 천막 가게. 유황새는 검붉은 돌집 */

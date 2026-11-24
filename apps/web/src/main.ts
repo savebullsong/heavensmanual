@@ -19,6 +19,7 @@ import { interiorZone } from './interior.ts';
 import { buildingName } from './names.ts';
 import { bangkokClock } from './clock.ts';
 import { unlockAudio, isMuted, setMuted, plunge, chime } from './sfx.ts';
+import * as sfx from './sfx.ts';
 import { bgmMode, setBgmMode, setIndoor, type BgmMode } from './bgm.ts';
 import { applyDeed, addSoulExp, judge, prayerAnswerChance, restRegenPerMinute, isDanger, DEED_TABLE, newStats, soulExpToNext, maxHp as maxHpFor, POINTS_PER_RANK, STAT_KEYS, STAT_MAX, type DeedKey, type StatKey } from '../../../packages/shared/src/rules.ts';
 
@@ -221,6 +222,7 @@ function worldFade(kind: 'hell' | 'heaven', long: boolean) {
   };
 }
 
+const hintedFloors = new Set<number>();
 async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | 'shop' | 'resume') {
   const fx = how === 'fall' || how === 'drop' || how === 'down' ? hellFall(how !== 'down') : null;
   if (fx) await fx.covered;
@@ -260,6 +262,8 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
   renderHud();
   showStance(true);
   if (how !== 'shop' && how !== 'resume') showPlace(t().hellPlace.replace('{n}', String(f)).replace('{name}', floorDef(f).name[lang()]), floorDef(f).sin[lang()]);
+  // 층주를 아직 못 쓰러뜨린 층: 위로 가는 길을 한 번 알려 준다 (세션마다 층당 한 번)
+  if (!h.cleared.includes(f) && how !== 'shop' && !hintedFloors.has(f)) { hintedFloors.add(f); setTimeout(() => toast(t().hellHint.replace('{boss}', MONSTERS[floorDef(f).boss].name[lang()])), 2600); }
   joinNet(w);
   fx?.done();
 }
@@ -520,11 +524,12 @@ function clerkTalk() {
 }
 
 // ───────────────────────── 지옥: 계단 · 구덩이 · 파샤르 ─────────────────────────
-function hellAct(kind: 'up' | 'down' | 'pashar') {
+function hellAct(kind: 'up' | 'down' | 'pashar' | 'talus') {
   if (!inHell() || busy || dlg.isOpen) return;
   const L = t();
   const h = hellState();
   if (kind === 'pashar' || (kind === 'up' && h.floor === 1)) { talkToPashar(); return; }
+  if (kind === 'talus') { talkToTalus(); return; }
   if (kind === 'up') {
     if (!h.cleared.includes(h.floor)) { toast(L.hellLocked); return; }
     enterHell(h.floor - 1, 'up');
@@ -532,6 +537,44 @@ function hellAct(kind: 'up' | 'down' | 'pashar') {
   }
   if (h.floor + 1 > OPEN_FLOORS) { toast(L.hellDeeper); return; }
   enterHell(h.floor + 1, 'down');
+}
+
+/** 지옥 2층 들판의 노름꾼 탈루스: 뼈주사위 두 개의 합이 홀인지 짝인지 노전을 건다 (맞히면 건 만큼 더, 틀리면 잃음). 불고기맛 과자도 판다 */
+const TALUS_SNACK = 3;
+async function talkToTalus() {
+  if (busy) return;
+  busy = true;
+  shop.lock(true);
+  const L = t();
+  const h = hellState();
+  dlg.open({ name: L.talus, portrait: 'talus' });
+  await dlg.say(L.talusGreet);
+  for (;;) {
+    const c = await dlg.choose([L.talusOdd, L.talusEven, L.talusSnack.replace('{n}', String(TALUS_SNACK)), L.talusBye]);
+    if (c === 3 || c < 0) break;
+    if (c === 2) {
+      if (h.notes < TALUS_SNACK) { await dlg.say(L.talusPoor); continue; }
+      h.notes -= TALUS_SNACK;
+      state.bag = state.bag ?? {};
+      state.bag.bulgogichips = (state.bag.bulgogichips ?? 0) + 1;
+      save(state); renderHud();
+      await dlg.say(L.talusSnackBought);
+      continue;
+    }
+    if (h.notes <= 0) { await dlg.say(L.talusPoor); continue; }
+    const amounts = [5, 10, 25].filter((n) => n <= h.notes);
+    if (!amounts.length) amounts.push(h.notes);
+    const ci = await dlg.choose([...amounts.map((n) => L.talusBet.replace('{n}', String(n))), L.talusBack]);
+    if (ci < 0 || ci >= amounts.length) continue;
+    const bet = amounts[ci];
+    const d1 = 1 + Math.floor(Math.random() * 6), d2 = 1 + Math.floor(Math.random() * 6), sum = d1 + d2, odd = sum % 2 === 1;
+    sfx.dice();
+    await dlg.say(L.talusRoll.replace('{a}', String(d1)).replace('{b}', String(d2)).replace('{s}', String(sum)).replace('{r}', odd ? L.talusOddW : L.talusEvenW));
+    if (odd === (c === 0)) { h.notes += bet; await dlg.say(L.talusWin.replace('{n}', String(bet))); }
+    else { h.notes -= bet; await dlg.say(L.talusLose.replace('{n}', String(bet))); }
+    save(state); renderHud();
+  }
+  endTalk();
 }
 
 /** 지옥 1층 환생관: 층주(아쉬갈)를 쓰러뜨렸으면 현실로 다시 태어나게 해 준다 */

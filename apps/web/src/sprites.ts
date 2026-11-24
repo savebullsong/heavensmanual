@@ -142,9 +142,12 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
   if ((o as string) === 'suturer') return { base: 'b-m1-suturer-m', hair: null, weapon: 'w-m-needle', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   if ((o as string) === 'stitched') return { base: 'b-x-stitched-m', hair: null, weapon: 'w-x-needle', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   // 지옥 괴물: 망자(맨손) · 프렛(맨손) · 야크(몽둥이)
-  if (o === 'ash') return { base: 'b-a-ash-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
-  if (o === 'pret') return { base: 'b-p-pret-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
-  if (o === 'bones') return { base: 'b-s-bones-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
+  // 무기를 든 괴물은 무기 자세(m)의 몸 + 그 몸에 맞춘 무기 층 (지옥 무기는 사람 무기와 따로)
+  if (o === 'ash' || o === 'pret' || o === 'bones') {
+    const mk = o === 'ash' ? 'a' : o === 'pret' ? 'p' : 's';
+    return { base: `b-${mk}-${o}-${weapon ? 'm' : 'u'}`, hair: null, weapon: weapon ? `w-${mk}-${weapon}` : null, armor: [] as { key: string; piece: string }[], mode: (weapon ? 'm' : 'u') as Mode };
+  }
+  if (o === 'talus') return { base: 'b-t-talus-g', hair: null, weapon: 'w-t-shotgun', armor: [] as { key: string; piece: string }[], mode: 'g' as Mode };
   if (o === 'besk') return { base: 'b-k-besk-m', hair: null, weapon: 'w-k-ledger', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   if (o === 'cockatoo') return { base: 'b-b-cockatoo-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
   // 휴식 마을 경비병: 재문지기(뼈 곤봉) · 빈그릇귀(맨손·사발) · 봉랍귀(인장 지팡이)
@@ -157,20 +160,21 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
   let mode: Mode = w === 'pistol' ? 'g' : w ? 'm' : 'u';
   const sex = look.sex;
   const build = Math.max(0, Math.min(2, look.build ?? 1));
+  // 우비·환자복·앵무새 옷 차림이라도 몸 방어구(재킷·조끼·작업 바지)를 입으면 그 옷 대신 방어구가 보인다
+  const costume = COSTUMES.has(o) && !(!child && armor.some((p) => PER_BUILD.has(p)));
   let base: string;
   if (child) { base = 'b-c-casual-w'; mode = 'w'; }
   else if (o === 'apron' && sex === 'f' && !w) { base = 'b-f1-apron-w'; mode = 'w'; }
-  else if (COSTUMES.has(o)) base = `b-${sex}1-${o}-${mode}`;
+  else if (costume) base = `b-${sex}1-${o}-${mode}`;
   else base = `b-${sex}${build}-casual-${mode}`;
   const style = HAIR_STYLES[look.hair] ?? 'short';
-  const hair = COSTUMES.has(o) ? null : child ? `h-c-${style}` : `h-${sex}-${style}`;
+  const hair = costume ? null : child ? `h-c-${style}` : `h-${sex}-${style}`;
   const arm: { key: string; piece: string }[] = [];
   if (mode !== 'w') {
-    const ab = COSTUMES.has(o) ? 1 : build;
+    const ab = costume ? 1 : build;
     for (const piece of [...ARMOR_ORDER, 'helmet']) {
       if (!armor.includes(piece)) continue;
-      if (COSTUMES.has(o) && PER_BUILD.has(piece)) continue; // 우비·환자복 위에는 옷 방어구를 겹치지 않는다
-      if (piece === 'helmet' && COSTUMES.has(o) && o !== 'patient') continue;
+      if (piece === 'helmet' && costume && o !== 'patient') continue; // 우비 모자·앵무새 머리 위에는 헬멧을 씌우지 않는다
       arm.push({ key: `a-${sex}${PER_BUILD.has(piece) ? ab : 1}-${piece}-${mode}`, piece });
     }
   }
