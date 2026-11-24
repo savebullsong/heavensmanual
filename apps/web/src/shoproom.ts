@@ -28,7 +28,10 @@ const START_FIRST: [number, number] = [4, 5];
 const START_BACK: [number, number] = [1, 6];
 const SPEED = 2.3;
 /** 유황새: 바닥에 선 큰 앵무새 (사람 키쯤), 베스크 자리와 말 거는 칸 */
-const BIG_BIRD = { x: 7.6, y: 3.55, k: 2.9 };
+const BIRD_START = { x: 7.5, y: 3.5 };
+const BIRD_SPEED = 1.15;
+/** 유황새의 앵무새: 사람 키로 자라 두 발로 걷는 유황앵무 (사람 NPC처럼 가게 안을 돌아다닌다) */
+const BIRD_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'cockatoo', cols: { 5: '#8a8078', 6: '#141010', 11: '#efede4', 12: '#efc63a', 15: '#2a2624' } };
 const BESK = { x: 1.55, y: 3.5 };
 const BESK_TILE: [number, number] = [2, 4];
 const BESK_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'besk', cols: { 1: '#b8382a', 3: '#3a1410', 4: '#2a100c', 5: '#140a08', 6: '#e8c050', 9: '#3a1410', 10: '#e8dcc0', 12: '#f2d27a', 13: '#4a2a1a', 14: '#e0b437', 15: '#140e0c' } };
@@ -44,7 +47,7 @@ let hellRoom = false; // 유황새: 바닥에 선 큰 앵무새와 대부업자 
 function blocked(i: number, j: number) {
   if (i < 0 || j < 0 || i >= RW || j >= RD) return true;
   if (j <= 2) return true;
-  if (hellRoom && ((i === 7 && j === 3) || (i === 1 && j === 3))) return true;
+  if (hellRoom && i === 1 && j === 3) return true;
   if (i === 0 && (j === 4 || j === 5 || j === 7)) return true;
   if (i === 8 && j === 4) return true;
   return false;
@@ -99,8 +102,16 @@ export class ShopRoom {
   private hwang: Sprite;
   private parrot: Sprite;
   private parrotTex: Texture[];
-  /** 유황새의 앵무새: 사람만큼 커져 바닥에 서 있다 */
-  private bigParrot: Sprite;
+  /** 유황새의 앵무새: 사람만큼 커져 가게 안을 걸어 다닌다 */
+  private bird = new Sprite();
+  private birdShadow = new Graphics();
+  private birdCS: CharSet | null = null;
+  private bx = BIRD_START.x;
+  private by = BIRD_START.y;
+  private bdir: Dir = 'sw';
+  private bpath: [number, number][] = [];
+  private bwait = 1.5;
+  private banim = 0;
   private besk = new Sprite();
   private beskShadow = new Graphics();
   private hellOn = false;
@@ -166,15 +177,10 @@ export class ShopRoom {
     this.parrot.position.set(ax + 1, ay - PARROT_PERCH.z);
     this.parrot.zIndex = PARROT_PERCH.x + PARROT_PERCH.y + 1;
     this.objects.addChild(this.parrot);
-    // 유황새: 같은 앵무새가 사람 키만큼 자라 카운터 오른쪽 바닥에 서 있다
-    this.bigParrot = new Sprite(this.parrotTex[0]);
-    this.bigParrot.anchor.set(0.5, 16 / 18);
-    this.bigParrot.scale.set(BIG_BIRD.k);
-    const [bx, by] = iso(BIG_BIRD.x, BIG_BIRD.y);
-    this.bigParrot.position.set(bx, by);
-    this.bigParrot.zIndex = BIG_BIRD.x + BIG_BIRD.y;
-    this.bigParrot.visible = false;
-    this.objects.addChild(this.bigParrot);
+    // 유황새: 같은 앵무새가 사람 키만큼 자라 두 발로 가게 안을 걷는다
+    this.birdShadow.ellipse(0, 0, 11, 4.5).fill({ color: 0x000000, alpha: 0.3 });
+    this.bird.visible = this.birdShadow.visible = false;
+    this.objects.addChild(this.birdShadow, this.bird);
     // 유황새 왼쪽 구석: 장부를 든 대부업자 베스크
     const [kx, ky] = iso(BESK.x, BESK.y);
     this.beskShadow.ellipse(0, 0, 15, 6).fill({ color: 0x000000, alpha: 0.35 });
@@ -316,7 +322,8 @@ export class ShopRoom {
     this.dressKeeper(r === 'hell');
     this.hellOn = hellRoom = r === 'hell';
     this.parrot.visible = !this.hellOn;
-    this.bigParrot.visible = this.besk.visible = this.beskShadow.visible = this.hellOn;
+    this.bird.visible = this.birdShadow.visible = this.besk.visible = this.beskShadow.visible = this.hellOn;
+    if (this.hellOn && !this.birdCS) charSet(BIRD_LOOK).then((cs) => { this.birdCS = cs; });
     if (this.hellOn && !this.beskReady) {
       this.beskReady = true;
       charSet(BESK_LOOK).then((cs) => applyFrame(this.besk, frameOf(cs, 'idle', 'se', 0)));
@@ -415,7 +422,7 @@ export class ShopRoom {
     };
     if (this.hellOn) {
       if (inSprite(this.besk, 4)) return 'besk';
-      if (inSprite(this.bigParrot, 4)) return 'parrot';
+      if (inSprite(this.bird, 4)) return 'parrot';
     } else if (inSprite(this.parrot, 6)) return 'parrot';
     if (inSprite(this.hwang)) return 'hwang';
     // 왼쪽 벽(x = 0)의 문: 화면 좌표를 벽 위의 (y, z)로 바꿔 본다
@@ -436,7 +443,12 @@ export class ShopRoom {
     const t = this.hit(gx, gy);
     if (t) {
       this.showLabel(t, 2.2);
-      if (t === 'parrot') { this.crestT = 0.8; return; }
+      if (t === 'parrot') {
+        this.crestT = 0.8;
+        // 걷던 앵무새는 멈춰 서서 나를 돌아본다
+        if (this.hellOn) { this.bpath = []; this.bwait = 3; this.bdir = dirFromTile(this.px - this.bx, this.py - this.by, this.bdir); }
+        return;
+      }
       this.goTo(t);
       return;
     }
@@ -463,11 +475,46 @@ export class ShopRoom {
   }
   private labelAnchor(t: ShopTarget): [number, number] {
     if (t === 'hwang') { const [x, y] = iso(HWANG.x, HWANG.y); return [x, y - 48]; }
-    if (t === 'parrot' && this.hellOn) { const [x, y] = iso(BIG_BIRD.x, BIG_BIRD.y); return [x, y - 18 * BIG_BIRD.k - 6]; }
+    if (t === 'parrot' && this.hellOn) { const [x, y] = iso(this.bx, this.by); return [x, y - 64]; }
     if (t === 'besk') { const [x, y] = iso(BESK.x, BESK.y); return [x, y - 62]; }
     if (t === 'parrot') { const [x, y] = iso(PARROT_PERCH.x, PARROT_PERCH.y); return [x + 1, y - PARROT_PERCH.z - 20]; }
     const [x, y] = iso(0, (DOOR.y0 + DOOR.y1) / 2);
     return [x, y - DOOR.h - 12];
+  }
+
+  /** 큰 앵무새: 잠깐 서 있다가 빈 바닥 한 곳을 골라 걸어간다 (나와 베스크 자리는 피한다) */
+  private updateBird(dt: number) {
+    let moving = false;
+    if (this.bpath.length) {
+      const [ti, tj] = this.bpath[0];
+      const tx = ti + 0.5, ty = tj + 0.5, dx = tx - this.bx, dy = ty - this.by, d = Math.hypot(dx, dy);
+      // 내가 그 칸에 서 있으면 기다린다
+      if (Math.floor(this.px) === ti && Math.floor(this.py) === tj) { this.bpath = []; this.bwait = 1.2; }
+      else {
+        this.bdir = dirFromTile(dx, dy, this.bdir);
+        const step = BIRD_SPEED * dt;
+        if (d <= step) { this.bx = tx; this.by = ty; this.bpath.shift(); if (!this.bpath.length) this.bwait = 2 + Math.random() * 4; }
+        else { this.bx += (dx / d) * step; this.by += (dy / d) * step; }
+        moving = true;
+      }
+    } else if ((this.bwait -= dt) <= 0) {
+      const si = Math.floor(this.bx), sj = Math.floor(this.by);
+      for (let k = 0; k < 12; k++) {
+        const ti = Math.floor(Math.random() * RW), tj = 3 + Math.floor(Math.random() * (RD - 3));
+        if (blocked(ti, tj) || (ti === Math.floor(this.px) && tj === Math.floor(this.py)) || Math.hypot(ti - si, tj - sj) < 2) continue;
+        const p = roomPath(si, sj, ti, tj);
+        if (p && p.length <= 9) { this.bpath = p; break; }
+      }
+      this.bwait = 1.5;
+      if (!this.bpath.length && Math.random() < 0.5) this.bdir = dirFromTile(this.px - this.bx, this.py - this.by, this.bdir);
+    }
+    this.banim = moving ? this.banim + dt * BIRD_SPEED * 7.5 : 0;
+    if (this.birdCS) applyFrame(this.bird, frameOf(this.birdCS, moving ? 'walk' : 'idle', this.bdir, moving ? Math.floor(this.banim) % (this.birdCS.counts.walk ?? 8) : 0));
+    const [x, y] = iso(this.bx, this.by);
+    this.bird.position.set(Math.round(x), Math.round(y));
+    this.birdShadow.position.set(Math.round(x), Math.round(y));
+    this.bird.zIndex = this.bx + this.by + 0.008;
+    this.birdShadow.zIndex = this.bx + this.by - 0.3;
   }
 
   private update(dt: number) {
@@ -518,20 +565,7 @@ export class ShopRoom {
       this.parrot.position.set(pp.x, pp.y);
     } else this.parrot.texture = this.customParrot?.[ci] ?? this.parrotTex[ci];
     if (this.hellOn) {
-      // 큰 앵무새: 미리 구운 2배 그림 (없으면 작은 그림을 키운다). 숨 쉬듯 조금씩 들썩인다
-      const bp = this.kit?.bigParrot?.[ci];
-      const breath = 1 + Math.sin(this.time * 1.7) * 0.012;
-      if (bp) {
-        this.bigParrot.texture = bp.tex;
-        this.bigParrot.anchor.set(0, 1);
-        this.bigParrot.position.set(bp.x, bp.y + bp.h);
-        this.bigParrot.scale.set(0.5, 0.5 * breath);
-      } else {
-        this.bigParrot.texture = this.customParrot?.[ci] ?? this.parrotTex[ci];
-        const cw = this.bigParrot.texture.width;
-        const k = BIG_BIRD.k * (cw > 20 ? 16 / cw : 1);
-        this.bigParrot.scale.set(k, k * breath);
-      }
+      this.updateBird(dt);
       this.besk.y = iso(BESK.x, BESK.y)[1] + Math.round(Math.sin(this.time * 1.2) * 0.6);
     }
     // 이름표

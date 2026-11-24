@@ -223,3 +223,11 @@ export function plunge(long = true) {
   tone(o, t + 0.1, dur * 0.8, 'sine', 120, 40, 0.4);
   if (long) noise(o, t + dur - 0.2, 0.5, 'lowpass', 500, 90, 0.8, 0.8, 0.01); // 바닥에 닿는 소리
 }
+
+/** 천국으로 떠오를 때: 위로 올라가는 맑은 종소리 */
+export function chime() {
+  if (!ready()) return;
+  const t = ctx!.currentTime, o = out({ pan: 0, vol: 0.8 }, 1);
+  [523, 659, 784, 1047, 1319].forEach((f, k) => tone(o, t + k * 0.16, 1.4, 'sine', f, f * 1.002, 0.22));
+  noise(o, t, 1.6, 'highpass', 3000, 6000, 0.6, 0.12, 0.2);
+}

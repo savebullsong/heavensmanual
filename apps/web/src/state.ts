@@ -23,7 +23,9 @@ export interface Save {
   streetSecs?: number;
   called?: boolean;
   // 2단계: 지금 있는 세계와 지옥에서의 걸음
-  realm?: 'real' | 'ghost' | 'hell';
+  realm?: 'real' | 'ghost' | 'hell' | 'heaven';
+  /** 천국: 환생할 때 받을 선행 보너스 (영혼 경험치) */
+  heaven?: { bonus: number; met?: boolean };
   /** 지옥: 지금 층, 이번 지옥행에서 쓰러뜨린 층주, 노전(영혼에 붙어 다음 지옥행에도 남는다) */
   hell?: { floor: number; cleared: number[]; notes: number; met?: boolean };
   /** 베스크에게 진 빚 (노전). 0이 되면 미납귀가 돌아간다 */

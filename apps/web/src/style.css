@@ -316,3 +316,9 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 .signup[data-tab="login"] .linkish { display: inline; }
 .signup[data-tab="forgot"] .pw-row, .signup[data-tab="forgot"] .pw2-row, .signup[data-tab="forgot"] .r-id { display: none; }
 .signup .err.info { color: #d8c8a8; }
+/* 천국으로 떠오르는 장면: 흰 빛과 금빛 줄기가 아래로 스친다 (떠오르는 느낌) */
+.hell-fall.heaven .hf-dark { background: radial-gradient(ellipse at 50% -10%, #fffbea 0%, #f6ecd0 45%, #e8dcc0 80%); }
+.hell-fall.heaven .hf-streaks i { bottom: auto; top: -30%; background: linear-gradient(to bottom, rgba(255, 240, 190, 0), rgba(255, 226, 140, 0.85) 60%, rgba(255, 255, 240, 0.95)); animation-name: hf-sink; }
+@keyframes hf-sink { from { transform: translateY(0); } to { transform: translateY(460%); } }
+.hell-fall.heaven .hf-text { color: #8a6a1a; text-shadow: 0 0 12px #fff6d0; }
+.hell-fall.heaven.show { animation: none; }

@@ -18,7 +18,7 @@ const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   'sprite-parrot-up': { name: '앵무새 · 볏 세움', where: '가끔 머리깃을 세울 때 (비워 두면 볏 내림 그림을 그대로 씀)' },
 };
 
-type Tab = 'portraits' | 'sprites';
+type Tab = 'portraits' | 'sprites' | 'chars';
 const isSprite = (s: PortraitSlot) => (SPRITE_SLOTS as readonly string[]).includes(s);
 
 /** 도트 칸의 지금 기본 그림 (게임이 구운 그림 그대로) */
@@ -119,30 +119,82 @@ async function loadOverrides() {
   }
 }
 
-async function showSlots(tab: Tab = location.hash === '#sprites' ? 'sprites' : 'portraits') {
+async function showSlots(tab: Tab = location.hash === '#sprites' ? 'sprites' : location.hash === '#chars' ? 'chars' : 'portraits') {
   await loadOverrides();
   root.innerHTML = '';
   const head = h('header');
   const tabs = h('nav', 'tabs');
-  for (const [k, label] of [['portraits', '인물 그림 (대화창)'], ['sprites', '도트 그림 (게임 속)']] as [Tab, string][]) {
+  for (const [k, label] of [['portraits', '인물 그림 (대화창)'], ['sprites', '도트 그림 (게임 속)'], ['chars', '관리자 캐릭터']] as [Tab, string][]) {
     const b = h('button', k === tab ? 'tab on' : 'tab', label);
     b.onclick = () => { history.replaceState(null, '', `#${k}`); showSlots(k); };
     tabs.append(b);
   }
   head.append(h('h1', '', "Heaven's Manual 관리자"), tabs,
-    h('p', 'sub', tab === 'portraits'
+    h('p', 'sub', tab === 'chars'
+      ? '아이디를 넣으면 그 계정이 관리자 캐릭터가 됩니다. 게임 안 영혼 설정에서 투명해질 수 있습니다(몹이 알아보지 못하고 다른 사람에게 보이지 않음, 지도 확인용). 투명한 동안은 싸울 수 없고, 환생·죽음·돈은 다른 사람과 똑같은 절차를 따릅니다. 다음 접속(또는 새로고침)부터 적용됩니다.'
+      : tab === 'portraits'
       ? '대화할 때 크게 서는 그림입니다. 세로로 긴 상반신 그림(약 2:3)이 잘 어울립니다. 저장하면 1분 안에 게임에 반영됩니다.'
       : '게임 화면 속 작은 도트 그림입니다. 지금 그림을 내려받아 그 위에 손질한 뒤, 같은 크기의 투명 PNG로 올려 주세요. 크기가 1px이라도 다르면 받지 않습니다 (발 위치와 다른 그림과의 비율이 어긋나기 때문).'));
   const out = h('button', '', '나가기');
   out.onclick = () => { sessionStorage.removeItem(KEY_STORE); key = ''; showLogin(); };
   head.appendChild(out);
   root.appendChild(head);
+  if (tab === 'chars') { root.appendChild(adminChars()); return; }
   const grid = h('div', tab === 'sprites' ? 'grid dots' : 'grid');
   for (const slot of PORTRAIT_SLOTS) {
     if (isSprite(slot) !== (tab === 'sprites')) continue;
     grid.appendChild(isSprite(slot) ? dotCard(slot) : slotCard(slot));
   }
   root.appendChild(grid);
+}
+
+/** 관리자 캐릭터: 아이디로 지정·해제, 지금 지정된 계정 목록 */
+function adminChars() {
+  const card = h('section', 'card chars');
+  card.append(h('h2', '', '관리자 캐릭터 지정'));
+  const row = h('div', 'actions');
+  const input = h('input');
+  input.placeholder = '아이디 (영문 소문자·숫자·밑줄 4~16자)';
+  input.autocapitalize = 'none';
+  input.spellcheck = false;
+  const on = h('button', 'primary', '관리자로 지정');
+  const off = h('button', '', '해제');
+  row.append(input, on, off);
+  const status = h('p', 'status');
+  const list = h('ul', 'admin-list');
+  card.append(row, status, h('h2', '', '지금 관리자 캐릭터'), list);
+  const load = async () => {
+    list.innerHTML = '';
+    try {
+      const r = await fetch('api/admins', { headers: { 'x-admin-key': key } });
+      if (r.status === 401) { showLogin('다시 로그인해 주세요.'); return; }
+      const j = await r.json();
+      const arr = (j.admins ?? []) as { username: string; name: string | null }[];
+      if (!arr.length) list.append(h('li', 'muted', '아직 없습니다.'));
+      for (const a of arr) list.append(h('li', '', a.name ? `${a.username} · ${a.name}` : a.username));
+    } catch {
+      list.append(h('li', 'muted', '목록을 불러오지 못했습니다.'));
+    }
+  };
+  const set = async (v: boolean) => {
+    const u = input.value.trim().toLowerCase();
+    if (!/^[a-z0-9_]{4,16}$/.test(u)) { status.textContent = '아이디 형식이 아닙니다.'; return; }
+    on.disabled = off.disabled = true;
+    status.textContent = '저장하는 중…';
+    try {
+      const r = await fetch('api/admins', { method: 'POST', headers: { 'x-admin-key': key, 'content-type': 'application/json' }, body: JSON.stringify({ username: u, on: v }) });
+      const j = await r.json().catch(() => ({}));
+      status.textContent = j.ok ? (v ? `${u} 계정을 관리자 캐릭터로 지정했습니다.` : `${u} 계정의 관리자 지정을 풀었습니다.`) : j.error === 'no_user' ? '그런 아이디가 없습니다.' : `실패했습니다 (${j.error ?? r.status}).`;
+      if (j.ok) { input.value = ''; await load(); }
+    } catch {
+      status.textContent = '서버에 연결할 수 없습니다.';
+    }
+    on.disabled = off.disabled = false;
+  };
+  on.onclick = () => set(true);
+  off.onclick = () => set(false);
+  void load();
+  return card;
 }
 
 /** 도트 칸: 지금 그림(확대) · 정확한 크기 · 밑그림 내려받기 · 같은 크기 PNG만 올리기 */
@@ -239,7 +291,10 @@ function dotCard(slot: PortraitSlot) {
     const f = file.files?.[0];
     file.value = '';
     if (!f || !spec) return;
-    if (f.type !== 'image/png') { status.textContent = 'PNG 파일만 올릴 수 있습니다 (투명 배경이 필요해서).'; return; }
+    // 휴대폰에서 고르면 파일 종류가 비어 오기도 해서, 이름표 대신 파일 첫머리(PNG 서명)로 확인한다
+    const sig = new Uint8Array(await f.slice(0, 8).arrayBuffer());
+    const isPng = sig[0] === 0x89 && sig[1] === 0x50 && sig[2] === 0x4e && sig[3] === 0x47;
+    if (!isPng) { status.textContent = `PNG 파일만 올릴 수 있습니다 (투명 배경이 필요해서). 이 파일은 ${f.type || '종류를 알 수 없는 파일'}입니다. 사진 앱이 JPEG로 바꿔 보냈다면 '파일'에서 원본 PNG를 골라 주세요.`; return; }
     let c: HTMLCanvasElement;
     try { c = await asCanvas(f); } catch { status.textContent = '이 파일은 열 수 없습니다.'; return; }
     const k = c.width === spec.w && c.height === spec.h ? 1 : c.width === spec.w * 2 && c.height === spec.h * 2 ? 2 : 0;
@@ -247,7 +302,7 @@ function dotCard(slot: PortraitSlot) {
       status.textContent = `크기가 다릅니다: 올린 그림 ${c.width}×${c.height}px, 필요한 크기 ${spec.w}×${spec.h}px 또는 ${spec.w * 2}×${spec.h * 2}px`;
       return;
     }
-    pending = f;
+    pending = f.type === "image/png" ? f : new Blob([f], { type: "image/png" });
     paint(c, c.width, c.height);
     status.textContent = `미리보기 · ${c.width}×${c.height}px · 크기 맞음${k === 2 ? ' (2배)' : ''}`;
     actions.innerHTML = '';

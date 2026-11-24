@@ -9,7 +9,7 @@ const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi
 const sb = createClient(URL, KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 
 const ACC = 'heavensmanual.account';
-export interface Account { token: string; username: string; name?: string }
+export interface Account { token: string; username: string; name?: string; admin?: boolean }
 export function account(): Account | null {
   try { return JSON.parse(localStorage.getItem(ACC) ?? 'null'); } catch { return null; }
 }
@@ -61,12 +61,12 @@ export async function logout() {
 export async function loadServer() {
   const a = account();
   if (!a) return null;
-  const r = await rpc<{ username: string; name: string | null; save: unknown; profile: { intro?: string; contact?: string }; email: string | null; email_verified: boolean; error?: Err }>('hm_load', { p_token: a.token });
+  const r = await rpc<{ username: string; name: string | null; save: unknown; profile: { intro?: string; contact?: string }; email: string | null; email_verified: boolean; admin?: boolean; error?: Err }>('hm_load', { p_token: a.token });
   if ('error' in r && r.error === 'session') setAccount(null);
   if ('error' in r && r.error) return null;
-  const ok = r as { username: string; name: string | null; save: unknown; profile: { intro?: string; contact?: string }; email: string | null; email_verified: boolean };
-  // 게임 속 이름은 기기에도 적어 둔다 (다른 사람에게 보이는 이름)
-  if ((ok.name ?? undefined) !== a.name) setAccount({ ...a, name: ok.name ?? undefined });
+  const ok = r as { username: string; name: string | null; save: unknown; profile: { intro?: string; contact?: string }; email: string | null; email_verified: boolean; admin?: boolean };
+  // 게임 속 이름과 관리자 지정은 기기에도 적어 둔다
+  if ((ok.name ?? undefined) !== a.name || !!ok.admin !== !!a.admin) setAccount({ ...a, name: ok.name ?? undefined, admin: !!ok.admin || undefined });
   return ok;
 }
 let lastSaved = '';

@@ -40,7 +40,7 @@ export function hellFloor(ratio: number): number {
 }
 
 /** 천국행 보너스 영혼 경험치 환산 비율 — 미정 (기획서 15장). 임시값 */
-export const HEAVEN_BONUS_PER_GOOD = 1;
+export const HEAVEN_BONUS_PER_GOOD = 10; // 천국에서 환생할 때 선행 1점 = 영혼 경험치 10 (11월 24일)
 
 /** 사후 판정: 기록 없음·정확히 50% → 귀신, 50% 미만 → 천국, 50% 초과 → 지옥 */
 export function judge(d: Deeds): Afterlife {
@@ -86,6 +86,8 @@ export const DEED_TABLE = {
   // 선행
   counterWin: { kind: 'good', points: 2, exp: 20, note: '선제공격 없이 반격만 해서 싸움을 끝냄' },
   thugDown: { kind: 'good', points: 3, exp: 30, note: '불량배·건달 처치' },
+  drunkDown: { kind: 'good', points: 1, exp: 10, note: '시비 거는 취객 제압 (약한 적)' },
+  shadeDown: { kind: 'good', points: 1, exp: 8, note: '천국의 그림자(미련)를 흩음 (약한 적)' },
   gangDown: { kind: 'good', points: 5, exp: 50, note: '범죄조직원 처치' },
   criminalUserDown: { kind: 'good', points: 8, exp: 80, note: '범죄 표시가 된 유저 처치' },
   donate100: { kind: 'good', points: 1, exp: 5, note: '병원·학교 기부 ฿100마다 (하루 20점까지)' },
@@ -95,7 +97,7 @@ export const DEED_TABLE = {
   firstStrike: { kind: 'evil', points: 2, exp: 10, note: '먼저 공격하기' },
   extort: { kind: 'evil', points: 3, exp: 30, note: '갈취 성공' },
   rob: { kind: 'evil', points: 4, exp: 40, note: '쓰러뜨리고 돈을 빼앗기' },
-  suturerHit: { kind: 'evil', points: 4, exp: 40, note: '봉합자 공격' },
+  suturerHit: { kind: 'evil', points: 4, exp: 40, note: '대식자 공격' },
   murder: { kind: 'evil', points: 10, exp: 100, note: '유저 살해 (밀쳐서 일으킨 사고사 포함)' },
   angelAssault: { kind: 'evil', points: 5, exp: 0, note: '천사 공격·유혹 — 현실로 강제 환생' },
   hellSoulHit: { kind: 'evil', points: 2, exp: 20, note: '지옥에서 다른 영혼 공격' },

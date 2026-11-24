@@ -2,7 +2,7 @@
 import { Rectangle, Texture } from 'pixi.js';
 
 export interface ShopPiece { tex: Texture; x: number; y: number; w: number; h: number }
-export interface ShopKit { day: ShopPiece; night: ShopPiece; counter: ShopPiece; parrot: [ShopPiece, ShopPiece]; lamp: ShopPiece; bigParrot?: [ShopPiece, ShopPiece] }
+export interface ShopKit { day: ShopPiece; night: ShopPiece; counter: ShopPiece; parrot: [ShopPiece, ShopPiece]; lamp: ShopPiece }
 
 function loadImg(src: string) {
   return new Promise<HTMLImageElement>((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; });
@@ -19,15 +19,7 @@ export const shopKitReady: Promise<ShopKit | null> = (async () => {
       return { tex, x, y, w, h };
     };
     const [day, night, counter, p0, p1, lamp] = await Promise.all(['shop-room-day', 'shop-room-night', 'shop-counter', 'shop-parrot-0', 'shop-parrot-1', 'shop-lamp'].map(piece));
-    // 유황새의 큰 앵무새 (2배 밀도: 자리·크기는 반으로)
-    let bigParrot: [ShopPiece, ShopPiece] | undefined;
-    try {
-      const fine = Math.min(2, window.devicePixelRatio || 1) >= 2 ? 'nearest' : 'linear';
-      const [b0, b1] = await Promise.all(['shop-bigparrot-0', 'shop-bigparrot-1'].map(piece));
-      for (const b of [b0, b1]) { b.tex.source.scaleMode = fine; b.x /= 2; b.y /= 2; b.w /= 2; b.h /= 2; }
-      bigParrot = [b0, b1];
-    } catch { /* 없으면 작은 그림을 키워 쓴다 */ }
-    return { day, night, counter, parrot: [p0, p1], lamp, bigParrot };
+    return { day, night, counter, parrot: [p0, p1], lamp };
   } catch {
     return null;
   }

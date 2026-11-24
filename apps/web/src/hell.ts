@@ -1,6 +1,6 @@
 // 지옥 (2단계): 1~3층. 층마다 새 지도·일반 괴물·층주 1명. 휴식 공간 = 울타리 마을 안 황혼의 유황새.
 // 지도는 층 번호로 정해진 씨앗에서 만든다 (모두에게 같은 지도).
-import { TYPES, finalize, type Zone, type Building, type Prop, type TileType } from './zone.ts';
+import { TYPES, finalize, type Zone, type Building, type HellBuildKind, type Prop, type TileType } from './zone.ts';
 import type { Lang } from './i18n.ts';
 
 export const OPEN_FLOORS = 3; // 지금 열린 층 (4~13층은 하나씩 업데이트)
@@ -133,8 +133,9 @@ export function hellZone(floor: number): Zone {
   buildings.push(shop);
   const door = { i: shop.i0 + 1, j: shop.j0 + shop.d };
   const hutCol: Record<Theme, string> = { ash: '#4a3e36', swamp: '#4a4230', market: '#5a3228' };
+  // 마을 안 집은 초가집 (사람이 사는 곳)
   for (const [di, dj, w, d] of [[-8, -8, 3, 2], [5, -9, 2, 3], [-9, 4, 2, 3], [5, 5, 3, 2], [-9, -3, 2, 2]] as const)
-    buildings.push({ i0: C.i + di, j0: C.j + dj, w, d, h: 30, cat: 'generic', color: hutCol[def.theme], hut: true });
+    buildings.push({ i0: C.i + di, j0: C.j + dj, w, d, h: 30, cat: 'generic', color: hutCol[def.theme], hk: 'thatch' });
   for (const b of buildings) for (let j = b.j0; j < b.j0 + b.d; j++) for (let i = b.i0; i < b.i0 + b.w; i++) set(i, j, 'block');
   const occupied = (i0: number, j0: number, w: number, d: number) => {
     for (let j = j0 - 1; j <= j0 + d; j++) for (let i = i0 - 1; i <= i0 + w; i++) {
@@ -144,15 +145,30 @@ export function hellZone(floor: number): Zone {
     }
     return buildings.some((b) => i0 < b.i0 + b.w + 1 && i0 + w + 1 > b.i0 && j0 < b.j0 + b.d + 1 && j0 + d + 1 > b.j0);
   };
-  const nB = def.theme === 'market' ? 140 : def.theme === 'ash' ? 55 : 26;
-  const colors: Record<Theme, string[]> = { ash: ['#3a3532', '#2e2a28', '#4a423c'], swamp: ['#3a3a2a', '#4a3e2a', '#2e3326'], market: ['#5a2a24', '#6a3a2a', '#4a2a2a', '#3a2622'] };
-  for (let n = 0, tries = 0; n < nB && tries < 4000; tries++) {
-    const w = 2 + Math.floor(r() * (def.theme === 'market' ? 4 : 3)), d = 2 + Math.floor(r() * (def.theme === 'market' ? 4 : 3));
-    const i0 = 4 + Math.floor(r() * (W - 8 - w)), j0 = 4 + Math.floor(r() * (H - 8 - d));
-    if (occupied(i0, j0, w, d)) continue;
-    const h = def.theme === 'market' ? 30 + Math.floor(r() * 50) : def.theme === 'ash' ? 14 + Math.floor(r() * 40) : 18 + Math.floor(r() * 16);
-    buildings.push({ i0, j0, w, d, h, cat: 'generic', color: colors[def.theme][Math.floor(r() * colors[def.theme].length)] });
-    n++;
+  // 마을 밖: 집은 초가집·감옥·뼈집, 그보다 많은 것은 대형 짐승 시체·뼈 무더기·내장 더미
+  // 층마다 비율이 다르다: 1층 감옥과 뼈 · 2층(굶주림) 내장과 초가 · 3층(피의 시장) 뼈집과 감옥이 빽빽하게
+  const mixes: Record<Theme, [HellBuildKind, number][]> = {
+    ash: [['prison', 12], ['bonehouse', 12], ['thatch', 6], ['carcass', 12], ['bonepile', 18], ['guts', 6]],
+    swamp: [['thatch', 10], ['bonehouse', 5], ['prison', 4], ['carcass', 8], ['bonepile', 8], ['guts', 16]],
+    market: [['bonehouse', 30], ['prison', 22], ['thatch', 24], ['carcass', 12], ['bonepile', 16], ['guts', 12]],
+  };
+  const sizeOf = (k: HellBuildKind): [number, number, number] => {
+    const a = r() < 0.5;
+    if (k === 'carcass') return a ? [4, 2, 50 + Math.floor(r() * 14)] : [2, 4, 50 + Math.floor(r() * 14)];
+    if (k === 'bonepile') return r() < 0.3 ? [3, 3, 40] : [2, 2, 28 + Math.floor(r() * 8)];
+    if (k === 'guts') return r() < 0.3 ? [3, 3, 22] : [2, 2, 16 + Math.floor(r() * 6)];
+    if (k === 'prison') return [2 + Math.floor(r() * 3), 2 + Math.floor(r() * 2), 38 + Math.floor(r() * 10)];
+    if (k === 'bonehouse') return [2 + Math.floor(r() * 2), 2 + Math.floor(r() * 2), 26 + Math.floor(r() * 8)];
+    return [2 + Math.floor(r() * 2), 2 + Math.floor(r() * 2), 28 + Math.floor(r() * 6)];
+  };
+  for (const [kind, n0] of mixes[def.theme]) {
+    for (let n = 0, tries = 0; n < n0 && tries < 900; tries++) {
+      const [w, d, h] = sizeOf(kind);
+      const i0 = 6 + Math.floor(r() * (W - 12 - w)), j0 = 6 + Math.floor(r() * (H - 12 - d));
+      if (occupied(i0, j0, w, d)) continue;
+      buildings.push({ i0, j0, w, d, h, cat: 'generic', color: hutCol[def.theme], hk: kind });
+      n++;
+    }
   }
   // 소품: 마을 울타리, 죽은 나무, 화로(밤 불빛), 부러진 기둥, 시장 좌판
   const props: Prop[] = [];

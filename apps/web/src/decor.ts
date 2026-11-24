@@ -1,7 +1,7 @@
 // 거리 꾸밈 (지도 파일에 넣지 않고, 존을 불러올 때 위치마다 같은 결과가 나오게 만든다)
-// 전봇대와 전선 · 산프라품 · 세워 둔 오토바이 · 가게 앞 화분 · 쓰레기통. 걸음을 막지 않는다
+// 전봇대와 전선 · 산프라품 · 세워 둔 오토바이 · 가게 앞 화분 · 식당 앞 플라스틱 의자 · 노점 손수레 · 쓰레기통. 걸음을 막지 않는다
 import { tileAt, type Zone, type Prop, type Building } from './zone.ts';
-import { mainPoi } from './names.ts';
+import { mainPoi, kindOf } from './names.ts';
 
 export interface Decor { props: Prop[]; wires: [number, number, number, number][] }
 
@@ -78,8 +78,20 @@ export function decorOf(z: Zone): Decor {
     }
     // 화분
     if (r3 < 0.25) put(fi + si * Math.max(0, len - 1), fj + sj * Math.max(0, len - 1), 'plant', 0, 0);
+    // 먹는 가게 앞: 빨간 플라스틱 의자와 쇠 탁자 (방콕 골목 식당의 바깥 자리)
+    const t = kindOf(b);
+    if (['restaurant', 'fast_food', 'food_court', 'cafe', 'bar', 'pub'].includes(t) && r2 > 0.4) {
+      const m = Math.max(0, Math.floor(len / 2));
+      put(fi + si * m + (sj ? 1 : 0), fj + sj * m + (si ? 1 : 0), 'stools', si ? 0 : 1, 0);
+    }
   });
-  // 3) 쓰레기통: 보도 드문드문
+  // 3) 노점 손수레: 유리 진열장·가스통 (양산 없이). 큰길 보도에 드문드문
+  for (let j = 1; j < z.H - 1; j++)
+    for (let i = 1; i < z.W - 1; i++) {
+      if (tileAt(z, i, j) !== 'walk' || h01(i, j, 5) > 0.006) continue;
+      put(i, j, 'pushcart', h01(j, i, 6) < 0.5 ? 0 : 1, 2);
+    }
+  // 4) 쓰레기통: 보도 드문드문
   for (let j = 1; j < z.H - 1; j++)
     for (let i = 1; i < z.W - 1; i++) {
       if (tileAt(z, i, j) !== 'walk' || h01(i, j, 3) > 0.012) continue;

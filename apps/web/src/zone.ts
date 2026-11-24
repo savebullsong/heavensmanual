@@ -14,10 +14,13 @@ export interface Building {
   cat: Category;
   sign?: 'left' | 'right'; // 간판 면: left = +j 면, right = +i 면
   color: string;
-  hut?: boolean; // 지옥 마을의 오두막 (지붕이 있다)
+  hut?: boolean; // (예전) 지옥 마을의 오두막
+  hk?: HellBuildKind; // 지옥의 집·덩어리 종류
 }
+/** 지옥: 초가집 · 감옥 · 뼈집 · 대형 짐승 시체 · 뼈 무더기 · 내장 더미 */
+export type HellBuildKind = 'thatch' | 'prison' | 'bonehouse' | 'carcass' | 'bonepile' | 'guts';
 /** fence o: 0 = i 방향, 1 = j 방향, 2 = 모서리 기둥 */
-export interface Prop { i: number; j: number; kind: 'tree' | 'lamp' | 'pillar' | 'cart' | 'fence' | 'pole' | 'spirit' | 'moto' | 'plant' | 'bin' | HellDecorKind; o?: number }
+export interface Prop { i: number; j: number; kind: 'tree' | 'lamp' | 'pillar' | 'cart' | 'fence' | 'pole' | 'spirit' | 'moto' | 'plant' | 'bin' | 'stools' | 'pushcart' | HellDecorKind; o?: number }
 /** 지옥 소품: 경계 바위·성벽, 뼈, 해골 더미, 꼬챙이, 가마솥, 철창, 마을 불빛, 고문 장면(움직임) */
 export type HellDecorKind = 'crag' | 'bones' | 'skulls' | 'stake' | 'cauldron' | 'cage' | 'lantern' | 'bonfire' | 'torture';
 /** 차가 달리는 구간: j 행의 i0~i1, dir = +1 이면 +i 방향 */

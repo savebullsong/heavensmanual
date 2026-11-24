@@ -18,7 +18,7 @@ import { hellZone, OPEN_FLOORS, floorDef, MONSTERS } from './hell.ts';
 import { interiorZone } from './interior.ts';
 import { buildingName } from './names.ts';
 import { bangkokClock } from './clock.ts';
-import { unlockAudio, isMuted, setMuted, plunge } from './sfx.ts';
+import { unlockAudio, isMuted, setMuted, plunge, chime } from './sfx.ts';
 import { bgmMode, setBgmMode, setIndoor, type BgmMode } from './bgm.ts';
 import { applyDeed, addSoulExp, judge, prayerAnswerChance, restRegenPerMinute, isDanger, DEED_TABLE, newStats, soulExpToNext, maxHp as maxHpFor, POINTS_PER_RANK, STAT_KEYS, STAT_MAX, type DeedKey, type StatKey } from '../../../packages/shared/src/rules.ts';
 
@@ -72,6 +72,9 @@ const zoneReady: Promise<Zone> = fetch(ZONE_URL)
 
 const shopLabels = () => ({ hwang: state.realm === 'hell' ? t().hwanghon : t().clerk, parrot: t().parrot, door: t().doorLabel, besk: t().besk });
 const realm = () => state.realm ?? 'real';
+/** 관리자 캐릭터의 투명 모드 (관리자로 지정된 계정만) */
+const INVIS_KEY = 'heavensmanual.invisible';
+const invisible = () => !!net.account()?.admin && localStorage.getItem(INVIS_KEY) === '1';
 /** 노자돈 환율: ฿10 = 노전 1닢 */
 const OBOL_RATE = 10;
 const inHell = () => realm() === 'hell';
@@ -116,7 +119,7 @@ async function boot() {
   app.stage.addChild(shop.root);
   preloadPortrait('miss-hwang');
   if (realm() === 'hell') enterHell(hellState().floor, 'resume');
-  else if (realm() === 'ghost') enterWorld();
+  else if (realm() === 'ghost' || realm() === 'heaven') enterWorld(realm() === 'heaven' ? 'door' : undefined);
   else enterShop(false);
   setInterval(updateHud, 1000);
   setInterval(() => save(state), 4000);
@@ -143,7 +146,7 @@ function enterShop(fromStreet: boolean) {
   closeMenus();
   world?.stop();
   if (world) world.root.visible = false;
-  shop.setRealm(realm());
+  { const r = realm(); shop.setRealm(r === 'heaven' ? 'real' : r); }
   shop.setLabels(shopLabels());
   if (inHell()) preloadPortrait('hwanghon');
   shop.setLook(bodyLook());
@@ -169,7 +172,7 @@ async function enterWorld(at: 'door' | [number, number] = 'door') {
   ui.hidden = true;
   ui.textContent = '';
   ui.className = '';
-  const want = realm() === 'ghost' ? 'ghost' : 'real';
+  const want = realm() === 'ghost' ? 'ghost' : realm() === 'heaven' ? 'heaven' : 'real';
   if (world && (world.zone.hell || world.realm !== want)) { world.destroy(); world = null; }
   if (!world) {
     world = new WorldScene(app, zone, bodyLook(), () => enterShop(true), hooks, state.hp ?? maxHp(), { realm: want });
@@ -182,9 +185,10 @@ async function enterWorld(at: 'door' | [number, number] = 'door') {
   if (at === 'door') world.placeAtDoor(state.hp ?? maxHp());
   else world.placeNear(at[0], at[1], state.hp ?? maxHp());
   world.setStance(stance);
+  world.setInvisible(invisible());
   world.start();
   renderHud();
-  showStance(want === 'real');
+  showStance(want !== 'ghost');
   if (want === 'ghost') { net.leaveZone(); return; } // 귀신은 산 사람들 사이에 보이지 않는다
   joinNet(world);
 }
@@ -192,16 +196,20 @@ async function enterWorld(at: 'door' | [number, number] = 'door') {
 /** 지옥 n층으로: 떨어짐(죽음·악업) · 계단 · 구덩이 · 황혼의 가게에서 나옴 · 다시 열기 */
 /** 지옥으로 떨어지는 장면: 화면이 꺼지고 붉은 빛줄기가 위로 스쳐 간다 (떨어지는 느낌). 덮인 뒤 세계를 바꾸고 걷힌다 */
 function hellFall(long: boolean) {
+  return worldFade('hell', long);
+}
+/** 세계를 건너는 장면: 지옥은 붉은 어둠 속으로 떨어지고, 천국은 흰 빛 속으로 떠오른다 */
+function worldFade(kind: 'hell' | 'heaven', long: boolean) {
   const el = document.createElement('div');
-  el.className = 'hell-fall' + (long ? ' long' : '');
+  el.className = 'hell-fall' + (long ? ' long' : '') + (kind === 'heaven' ? ' heaven' : '');
   const streaks = Array.from({ length: long ? 26 : 14 }, () => {
     const l = (Math.random() * 100).toFixed(1), d = (Math.random() * (long ? 1.6 : 0.7)).toFixed(2), s = (0.35 + Math.random() * 0.5).toFixed(2), w = Math.random() < 0.25 ? 3 : 1;
     return `<i style="left:${l}%;animation-delay:${d}s;animation-duration:${s}s;width:${w}px"></i>`;
   }).join('');
   el.innerHTML = `<div class="hf-dark"></div><div class="hf-streaks">${streaks}</div><p class="hf-text"></p>`;
-  if (long) el.querySelector('.hf-text')!.textContent = t().fallingHell;
+  if (long) el.querySelector('.hf-text')!.textContent = kind === 'heaven' ? t().risingHeaven : t().fallingHell;
   document.body.appendChild(el);
-  plunge(long);
+  if (kind === 'hell') plunge(long); else chime();
   requestAnimationFrame(() => el.classList.add('show'));
   const covered = new Promise<void>((r) => setTimeout(r, long ? 900 : 380));
   const minEnd = Date.now() + (long ? 2300 : 1000);
@@ -258,7 +266,8 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
 
 function joinNet(w: WorldScene) {
   w.myNetId = net.myId();
-  net.joinZone(w.zone.id, () => (scene === 'world' && world ? { info: myInfo(), pos: world.netPos() } : null), (id, info, pos) => w.upsertRemote(id, info, pos), (id) => w.removeRemote(id), {
+  // 천국은 같은 지도라도 다른 세계: 천국에 있는 사람끼리만 보인다
+  net.joinZone(w.realm === 'heaven' ? `${w.zone.id}~heaven` : w.zone.id, () => (scene === 'world' && world ? { info: myInfo(), pos: world.netPos() } : null), (id, info, pos) => w.upsertRemote(id, info, pos), (id) => w.removeRemote(id), {
     hit: (from, dmg, crit, kind) => w.pvpHit(from, dmg, crit, kind),
     down: (victim, by, cash, crim) => w.pvpDown(victim, by, cash, crim),
   });
@@ -284,7 +293,11 @@ const hooks: WorldHooks = {
     updateHpBar(hp, max);
   },
   died(cause) {
+    if (realm() === 'heaven') { heavenFaint(); return; }
     showDeath(cause);
+  },
+  heavenAct(what) {
+    heavenAct(what);
   },
   menu(title, sub, options, x, y) {
     openTargetMenu(title, sub, options, x, y);
@@ -543,7 +556,8 @@ async function talkToPashar() {
 }
 
 /** 현실로 다시 태어난다 (지옥에서 파샤르를 거쳐, 또는 귀신이 앵무새를 만나) */
-function rebirthFrom(from: 'hell' | 'ghost') {
+function rebirthFrom(from: 'hell' | 'ghost' | 'heaven') {
+  if (from === 'heaven') delete state.heaven;
   if (from === 'hell') {
     seal('hell');
     hellState().cleared = [];
@@ -638,7 +652,8 @@ async function talkToHwang() {
       break;
     }
     const name = picked.name[lang()];
-    const line = picked.cat === 'weapon' ? L.pickWeapon : picked.cat === 'armor' ? L.pickArmor : L.pickGoods;
+    // 지옥에서 무기를 사는 건 당연한 일: '그걸로 뭘 하시려고요'는 현실에서만
+    const line = picked.cat === 'weapon' ? (hell ? L.pickGoods : L.pickWeapon) : picked.cat === 'armor' ? L.pickArmor : L.pickGoods;
     await dlg.say(line.replace('{item}', name).replace('{iyo}', iyo(name)));
     if (money() >= picked.price) {
       if (hell) hellState().notes -= picked.price;
@@ -861,7 +876,7 @@ function gear() {
 function myInfo(): RemoteInfo {
   const g = gear();
   const acc = net.account();
-  return { name: acc?.username ?? '', nick: acc?.name, look: bodyLook(), weapon: g.weapon, armor: g.armor, member: !!acc };
+  return { name: acc?.username ?? '', nick: acc?.name, look: bodyLook(), weapon: g.weapon, armor: g.armor, member: !!acc, hidden: invisible() || undefined };
 }
 
 function toggleBag() {
@@ -1020,19 +1035,98 @@ function showDeath(cause: 'car' | 'beaten' | 'hell') {
       enterWorld(here ? [Math.floor(here.x), Math.floor(here.y)] : 'door');
     };
   } else {
-    closed.textContent = L.judgeClosed;
-    btn.textContent = L.reborn;
+    // 3단계: 천국이 열렸다. 쌓은 선행은 환생할 때 영혼 경험치로 돌려받는다 (환생관에게)
+    closed.textContent = '';
+    btn.textContent = L.toHeaven;
     btn.onclick = () => {
       el.remove();
-      newLife();
+      state.heaven = { bonus: j.world === 'heaven' ? j.bonusSoulExp : 0, met: state.heaven?.met };
+      state.realm = 'heaven';
+      state.hp = maxHp();
       save(state);
-      world?.revive(bodyLook());
-      world?.setGear(gear());
-      enterShop(false);
+      const fx = worldFade('heaven', true);
+      fx.covered.then(async () => {
+        world?.revive(bodyLook());
+        await enterWorld('door');
+        fx.done();
+      });
     };
   }
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add('show'));
+}
+
+// ───────────────────────── 천국 (3단계) ─────────────────────────
+function heavenAct(what: 'officer' | 'yellowwing' | 'shop' | 'assault') {
+  if (busy || dlg.isOpen) return;
+  if (what === 'officer') talkToOfficer();
+  else if (what === 'yellowwing') talkToYellowWing();
+  else if (what === 'shop') npcSay(t().shopLabel, t().heavenShopEmpty);
+  else heavenAssault();
+}
+/** 천국의 환생관: 언제든 다시 태어날 수 있다. 쌓은 선행만큼 영혼 경험치를 얹어 준다 */
+async function talkToOfficer() {
+  const L = t();
+  busy = true;
+  const bonus = state.heaven?.bonus ?? 0;
+  dlg.open({ name: L.officer, portrait: 'luen' });
+  await dlg.say(L.offGreet);
+  await dlg.say(L.offAsk.replace('{n}', bonus.toLocaleString('en-US')));
+  const c = await dlg.choose([L.offYes, L.offNo]);
+  if (c === 1) { await dlg.say(L.offStay); dlg.close(); busy = false; return; }
+  dlg.close();
+  busy = false;
+  if (bonus > 0) {
+    const soul = state.soul ?? { rank: 1, exp: 0 };
+    const up = addSoulExp(soul.rank, soul.exp, bonus);
+    state.soul = { ...soul, rank: up.rank, exp: up.exp };
+    toast(L.offBonus.replace('{n}', bonus.toLocaleString('en-US')) + (up.rank > soul.rank ? ` · ${L.rankUp.replace('{n}', String(up.rank))}` : ''), 'good');
+  }
+  rebirthFrom('heaven');
+}
+/** 황색날개: 미스 황과 같은 얼굴이지만 스스로는 다른 사람이라 여긴다. 천국의 물건은 공짜 */
+const HEAVEN_GIFTS = ['water', 'cola', 'choco', 'chips', 'bandage'];
+async function talkToYellowWing() {
+  const L = t();
+  busy = true;
+  dlg.open({ name: L.yellowWing, portrait: 'yellow-wing' });
+  if (!state.heaven?.met) { state.heaven = { bonus: state.heaven?.bonus ?? 0, met: true }; save(state); await dlg.say(L.ywFirst); }
+  else await dlg.say(L.ywLines[Math.floor(Math.random() * L.ywLines.length)]);
+  await dlg.say(L.ywGreet);
+  const gifts = HEAVEN_GIFTS.map((k) => ITEMS.find((i) => i.key === k)!).filter(Boolean);
+  const c = await dlg.choose([...gifts.map((i) => i.name[lang()]), L.ywNo]);
+  if (c < gifts.length) {
+    const it = gifts[c];
+    state.bag ??= {};
+    state.bag[it.key] = (state.bag[it.key] ?? 0) + 1;
+    save(state);
+    await dlg.say(L.ywGot.replace('{item}', it.name[lang()]));
+  }
+  dlg.close();
+  busy = false;
+  renderHud();
+}
+/** 천국에서 손을 들면: 악행이 기록되고 현실로 떨어진다 (선행 보너스는 받지 못한다) */
+async function heavenAssault() {
+  const L = t();
+  busy = true;
+  recordDeed('angelAssault');
+  dlg.open({ name: L.officer, portrait: 'luen' });
+  await dlg.say(L.heavenAssault);
+  await dlg.say(L.heavenFall);
+  dlg.close();
+  busy = false;
+  const fx = worldFade('hell', false);
+  fx.covered.then(() => { rebirthFrom('heaven'); fx.done(); });
+}
+/** 천국에서 쓰러지면: 잃는 것 없이 환생관 곁에서 깨어난다 */
+function heavenFaint() {
+  if (!world) return;
+  state.hp = maxHp();
+  save(state);
+  world.revive(bodyLook());
+  world.placeAtDoor(state.hp);
+  toast(t().heavenFaint);
 }
 
 /** 지옥에서 쓰러지면: 들고 있던 노전 절반을 잃고, 그 층의 휴식처에서 다시 일어난다 */
@@ -1124,7 +1218,8 @@ function renderSettings() {
       <div class="set-row"><span class="lbl l-sfx"></span><div class="seg s-sfx"></div></div>
     </section>
     <section class="set-sec"><h4 class="h-lang"></h4><div class="seg s-lang wide"></div></section>
-    <section class="set-sec set-acc"><h4 class="h-acc"></h4><div class="acc"></div></section>`;
+    <section class="set-sec set-acc"><h4 class="h-acc"></h4><div class="acc"></div></section>
+    ${net.account()?.admin ? `<section class="set-sec set-admin"><h4 class="h-admin"></h4><div class="set-row"><span class="lbl l-inv"></span><div class="seg s-inv"></div></div><p class="note n-admin"></p></section>` : ''}`;
   el.querySelector('.menu-head b')!.textContent = L.settings;
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
   el.querySelector('.set-sec h4')!.textContent = L.setSound;
@@ -1150,6 +1245,17 @@ function renderSettings() {
   seg(el.querySelector('.s-sfx')!, ['on', 'off'], L.onOff, () => (isMuted() ? 'off' : 'on'), (v) => setMuted(v === 'off'));
   seg(el.querySelector('.s-lang')!, LANGS, LANGS.map((l) => (l === 'ko' ? '한국어' : l === 'th' ? 'ไทย' : 'English')), lang, (v) => { changeLang(v); renderSettings(); });
   renderAccountSettings(el.querySelector('.acc')!);
+  if (el.querySelector('.set-admin')) {
+    el.querySelector('.h-admin')!.textContent = L.setAdmin;
+    el.querySelector('.l-inv')!.textContent = L.adminInvisible;
+    el.querySelector('.n-admin')!.textContent = L.adminNote;
+    seg(el.querySelector('.s-inv')!, ['off', 'on'], L.adminOpts, () => (invisible() ? 'on' : 'off'), (v) => {
+      localStorage.setItem(INVIS_KEY, v === 'on' ? '1' : '0');
+      world?.setInvisible(v === 'on');
+      net.nudge();
+      toast(v === 'on' ? L.invisibleOn : L.invisibleOff);
+    });
+  }
   document.body.appendChild(el);
   const hudBottom = document.getElementById('hud')?.getBoundingClientRect().bottom ?? 56;
   el.style.top = `${Math.round(hudBottom + 6)}px`;
@@ -1254,7 +1360,7 @@ function placeName() {
   if (world?.zone.interior) return world.zone.interior.name;
   if (r === 'hell') { const f = hellState().floor; return L.hellPlace.replace('{n}', String(f)).replace('{name}', floorDef(f).name[lang()]); }
   const z = L.zones[world?.zone.id ?? ''] ?? '';
-  return r === 'ghost' ? L.ghostPlace.replace('{zone}', z) : z;
+  return r === 'ghost' ? L.ghostPlace.replace('{zone}', z) : r === 'heaven' ? L.heavenPlace.replace('{zone}', z) : z;
 }
 
 let hudNarrow = false;

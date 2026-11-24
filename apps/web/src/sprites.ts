@@ -35,7 +35,7 @@ export interface CharSet {
 /** 미스 황의 겉모습 (우주새 카운터 뒤, 관리자 페이지 도트 칸에서도 쓴다) */
 export const MISS_HWANG: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 3, top: 0, bottom: 0, outfit: 'apron' };
 /** 유황새(지옥)의 황혼: 미스 황과는 다른 사람이라고 스스로 믿는다. 검붉은 긴 머리, 핏빛 옷, 창백한 피부 */
-export const HWANGHON: Look = { sex: 'f', build: 1, skin: 0, hair: 5, hairColor: 0, top: 0, bottom: 0, outfit: 'apron', cols: { 1: '#ead2c4', 2: '#3a0e12', 3: '#5a0e18', 4: '#2a0a10', 5: '#0c0808', 6: '#1a1210', 7: '#140a0c', 9: '#5a0e18', 10: '#ead2c4' } };
+export const HWANGHON: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'apron', cols: { 1: '#ead2c4', 2: '#3a0e12', 3: '#5a0e18', 4: '#2a0a10', 5: '#0c0808', 6: '#1a1210', 7: '#140a0c', 9: '#5a0e18', 10: '#ead2c4' } };
 
 export const MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle'];
 /** 방어구 겉모습: 그리는 순서와 색 (구역 3 = 본색, 구역 5 = 신발) */
@@ -119,11 +119,6 @@ function ramp(h: string): Uint8ClampedArray {
 }
 function palette(look: Look): Uint8ClampedArray[] {
   const o = look.outfit ?? 'casual';
-  if (look.cols) {
-    const pal: Uint8ClampedArray[] = [];
-    for (let k = 0; k < 16; k++) pal.push(ramp(look.cols[k] ?? FIXED[k] ?? '#ff00ff'));
-    return pal;
-  }
   const shoe = o === 'raincoat' ? '#2d342e' : o === 'patient' ? '#d6d2c8' : o === 'apron' ? '#3a2418' : o === 'parrot' ? '#8f7f70' : '#3a332e';
   const cols: Record<number, string> = {
     ...FIXED,
@@ -132,6 +127,8 @@ function palette(look: Look): Uint8ClampedArray[] {
     3: o === 'apron' ? '#e6e1d6' : TOP_COLORS[look.top] ?? TOP_COLORS[0],
     4: o === 'apron' ? '#3a2f28' : BOTTOM_COLORS[look.bottom] ?? BOTTOM_COLORS[0],
     5: shoe,
+    // 몇 구역만 정해 준 모습(취객의 붉은 얼굴, 천국의 흰 옷 등)은 나머지를 기본색으로 채운다
+    ...(look.cols ?? {}),
   };
   const pal: Uint8ClampedArray[] = [];
   for (let k = 0; k < 16; k++) pal.push(ramp(cols[k] ?? '#ff00ff'));
@@ -149,6 +146,7 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
   if (o === 'pret') return { base: 'b-p-pret-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
   if (o === 'bones') return { base: 'b-s-bones-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
   if (o === 'besk') return { base: 'b-k-besk-m', hair: null, weapon: 'w-k-ledger', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
+  if (o === 'cockatoo') return { base: 'b-b-cockatoo-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
   if (o === 'yak') return { base: 'b-y-yak-m', hair: null, weapon: weapon === null ? null : 'w-y-club', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   const child = !!look.child;
   const w = child ? null : weapon && (MELEE.includes(weapon) || weapon === 'pistol') ? weapon : null;

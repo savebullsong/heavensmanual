@@ -52,9 +52,11 @@ BODY = {'x': dict(h=1.28, shoulder=.22, hipw=.105, arm=1.4, leg=1.12),   # 변�
         'y': dict(h=1.26, shoulder=.25, hipw=.12, arm=1.55, leg=1.3),
         # 해골 · 대부업자 베스크
         's': dict(h=1.0, shoulder=.17, hipw=.09, arm=.9, leg=.9),
-        'k': dict(h=1.04, shoulder=.23, hipw=.15, arm=1.35, leg=1.35)}
-MONSTER_BW = {'x': None, 'a': .8, 'p': .68, 'y': 1.32, 's': .42, 'k': 1.7}
-MONSTER_HK = {'x': 1.0, 'a': 1.05, 'p': .86, 'y': 1.12, 's': 1.0, 'k': 1.2}
+        'k': dict(h=1.04, shoulder=.23, hipw=.15, arm=1.35, leg=1.35),
+        # 유황새의 앵무새: 사람 키로 자라 두 발로 걷는 유황앵무
+        'b': dict(h=.96, shoulder=.17, hipw=.085, arm=1.0, leg=.8)}
+MONSTER_BW = {'x': None, 'a': .8, 'p': .68, 'y': 1.32, 's': .42, 'k': 1.7, 'b': 1.0}
+MONSTER_HK = {'x': 1.0, 'a': 1.05, 'p': .86, 'y': 1.12, 's': 1.0, 'k': 1.2, 'b': 1.0}
 BUILD = [.9, 1.0, 1.14]   # 마름 · 보통 · 건장 (뼈 위치는 같고 굵기만 다르다 → 머리·무기 층을 함께 쓴다)
 
 class Doll:
@@ -257,7 +259,7 @@ class Doll:
             for (x, y, z, r) in ((.08, -.12, 1.22, .07), (-.1, -.11, 1.0, .06), (.12, .08, 1.3, .07), (-.06, .1, .95, .06)):
                 blob(P, self.V(x, y, z), (r * s, r * .6 * s, r * s), patch, None, segs=8, rings=5)
             ob = finish(P); bind(ob, self.arm, lambda co: {'head': 1.0} if co.z > 1.5 * s else {'spine': 1.0}); self.add(g, ob)
-        elif name in ('ash', 'pret', 'yak', 'bones', 'besk'):
+        elif name in ('ash', 'pret', 'yak', 'bones', 'besk', 'cockatoo'):
             self.hell_body(name)
         elif name == 'parrot':
             pw = rmat('parrot', .95, .05); cr = rmat('crest', .8, .1); dk = rmat('dark', .5, .3); ft = rmat('shoe', .8, .1)
@@ -296,6 +298,8 @@ class Doll:
             self.bones_body(g); return
         if name == 'besk':
             self.besk_body(g); return
+        if name == 'cockatoo':
+            self.cockatoo_body(g); return
         if name == 'ash':
             # 잿빛 망자: 마르고 그을린 몸, 갈라진 틈으로 불씨가 비치고, 허리에 해진 천
             def gaunt(rings):
@@ -430,6 +434,68 @@ class Doll:
         for k in range(6):
             x = (k - 2.5) * .011
             blob(P, hc + Vector((x * s, -.098 * s, -.058 * s)), (.005 * s, .004 * s, .007 * s), dark, None, segs=4, rings=3)
+        ob = finish(P); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
+
+    # ── 유황새의 앵무새: 사람만 한 유황앵무가 두 발로 선다. 흰 깃털 몸, 접은 날개, 노란 볏, 검은 부리, 회색 비늘 다리 ──
+    def cockatoo_body(self, g):
+        s = self.s; V = self.V
+        fw = rmat('parrot', .85, .15); crest = rmat('crest', .7, .25); beak = rmat('dark', .45, .45); leg = rmat('shoe', .75, .2); eye = rmat('eye', .25, .7)
+        wt = lambda co: {'spine': smooth(co.z, .98 * s, 1.12 * s), 'hips': 1 - smooth(co.z, .98 * s, 1.12 * s)}
+        P = Part(g + '.body')
+        blob(P, V(0, -.03, 1.13), (.19 * s, .19 * s, .3 * s), fw, None, segs=18, rings=12)   # 가슴이 불룩한 몸
+        blob(P, V(0, .01, .93), (.16 * s, .16 * s, .15 * s), fw, None, segs=16, rings=10)    # 배
+        for k in range(5):   # 가슴 깃 겹 (아래로 갈수록 작게)
+            blob(P, V(0, -.16 + k * .012, 1.28 - k * .07), (.13 * s - k * .008, .04 * s, .05 * s), fw, None, segs=10, rings=6)
+        # 꼬리: 엉덩이에서 뒤아래로 넓게 펴진 깃
+        for sx in (-1, 0, 1):
+            limb(P, V(sx * .03, .12, .98), V(sx * .07, .34, .58), [(0, .06 * s, .03 * s), (.6, .07 * s, .02 * s), (1, .045 * s, .012 * s)], fw, None, segs=8)
+        ob = finish(P); bind(ob, self.arm, wt); self.add(g, ob)
+        # 날개: 어깨에서 접혀 몸 옆을 덮고, 끝깃이 엉덩이 아래까지
+        for k, sx in (('L', 1), ('R', -1)):
+            b = self.bones
+            sh, el = b[f'upper_arm.{k}'][0], b[f'upper_arm.{k}'][1]
+            wr, hd = b[f'forearm.{k}'][1], b[f'hand.{k}'][1]
+            P = Part(f'{g}.wing.{k}')
+            limb(P, sh + Vector((0, .02, .02)), el, [(0, .07 * s, .09 * s), (1, .055 * s, .1 * s)], fw, None, segs=10)
+            limb(P, el, wr, [(0, .055 * s, .1 * s), (1, .04 * s, .08 * s)], fw, None, segs=10)
+            limb(P, wr, hd + (hd - wr) * 1.6, [(0, .04 * s, .07 * s), (1, .012 * s, .03 * s)], fw, None, segs=8)   # 끝깃
+            for t in (.3, .6):   # 깃 끝선 (아래쪽 노란 기운)
+                limb(P, el + (wr - el) * t + Vector((sx * .03, .03, -.02)), el + (wr - el) * t + Vector((sx * .035, .06, -.12)), [(0, .016, .016), (1, .006, .006)], crest, None, segs=5)
+            ob = finish(P); bind(ob, self.arm, autow(self.bones, ['spine', f'upper_arm.{k}', f'forearm.{k}', f'hand.{k}'], power=5)); self.add(g, ob)
+        # 다리: 허벅지는 깃털 바지, 정강이부터 회색 비늘, 발가락은 앞 둘 · 뒤 둘
+        for k in 'LR':
+            b = self.bones
+            hp, kn = b[f'thigh.{k}'][0], b[f'thigh.{k}'][1]
+            an = b[f'shin.{k}'][1]
+            P = Part(f'{g}.leg.{k}')
+            limb(P, hp + Vector((0, 0, .04)), kn + Vector((0, 0, .04)), [(0, .1 * s, .1 * s), (.6, .085 * s, .085 * s), (1, .05 * s, .05 * s)], fw, None, segs=12)
+            limb(P, kn, an + Vector((0, 0, .02)), [(0, .03 * s, .03 * s), (1, .024 * s, .024 * s)], leg, None, segs=8)
+            for r in range(5): limb(P, kn + (an - kn) * (r / 5 + .08), kn + (an - kn) * (r / 5 + .12), [(0, .033 * s, .033 * s), (1, .031 * s, .031 * s)], leg, None, segs=8)
+            ob = finish(P); bind(ob, self.arm, autow(self.bones, ['hips', f'thigh.{k}', f'shin.{k}'], power=5)); self.add(g, ob)
+            P = Part(f'{g}.toes.{k}')
+            base = Vector((an.x, an.y, .03 * s))
+            for dx, dy in ((-.035, -.11), (.035, -.11), (-.03, .08), (.03, .08)):
+                tip = base + Vector((dx * s, dy * s, -.015 * s))
+                limb(P, base, tip, [(0, .018 * s, .018 * s), (1, .01 * s, .01 * s)], leg, None, segs=6)
+                blob(P, tip + Vector((0, (-.012 if dy < 0 else .012) * s, -.006 * s)), (.008 * s, .014 * s, .008 * s), beak, None, segs=6, rings=4)   # 발톱
+            ob = finish(P); bind(ob, self.arm, autow(self.bones, [f'shin.{k}', f'foot.{k}'], power=8)); self.add(g, ob)
+        # 목과 머리: 둥근 흰 머리, 갈고리 부리, 검은 눈, 뒤로 솟은 노란 볏
+        P = Part(g + '.neck')
+        limb(P, V(0, -.01, 1.36), V(0, -.02, 1.56), [(0, .11 * s, .11 * s), (1, .085 * s, .085 * s)], fw, None, segs=12)
+        ob = finish(P); bind(ob, self.arm, lambda co: {'neck': 1.0}); self.add(g, ob)
+        hc = V(0, -.03, 1.63)
+        P = Part(g + '.head')
+        blob(P, hc, (.105 * s, .115 * s, .11 * s), fw, None, segs=16, rings=11)
+        blob(P, hc + Vector((0, -.1 * s, -.025 * s)), (.045 * s, .05 * s, .055 * s), beak, None, segs=10, rings=7)   # 윗부리
+        limb(P, hc + Vector((0, -.13 * s, -.03 * s)), hc + Vector((0, -.15 * s, -.085 * s)), [(0, .025 * s, .025 * s), (1, .006 * s, .006 * s)], beak, None, segs=6)   # 갈고리
+        blob(P, hc + Vector((0, -.09 * s, -.07 * s)), (.032 * s, .035 * s, .02 * s), beak, None, segs=8, rings=5)   # 아랫부리
+        for sx in (1, -1):
+            blob(P, hc + Vector((sx * .062 * s, -.055 * s, .02 * s)), (.016 * s, .014 * s, .017 * s), eye, None, segs=8, rings=5)
+        for k in range(7):   # 볏: 머리 위에서 뒤로 휘어 솟는 노란 깃
+            a = (k - 3) * .022
+            base = hc + Vector((a * s, .0 + k * .006, .09 * s))
+            tip = base + Vector((a * 1.6 * s, (.1 + abs(k - 3) * .012) * s, (.17 - abs(k - 3) * .02) * s))
+            limb(P, base, tip, [(0, .02 * s, .012 * s), (1, .004 * s, .004 * s)], crest, None, segs=5)
         ob = finish(P); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
 
     # ── 대부업자 베스크: 붉은 피부, 대머리, 아주 뚱뚱한 몸, 금 장신구 가득, 손에 장부 ──

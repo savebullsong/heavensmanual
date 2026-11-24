@@ -384,26 +384,6 @@ def save(name, arr, ax, ay):
     meta[name] = [int(x0 - ax), int(y0 - ay), int(x1 - x0), int(y1 - y0)]
 
 ONLY_PARROT = '--parrot' in sys.argv
-if '--bigparrot' in sys.argv:
-    # 유황새의 앵무새: 사람 키만큼 커져 카운터 오른쪽 바닥(7.6, 3.55)에 선다. 2배 밀도로 굽는다
-    meta.update(json.load(open(f'{OUT}/shop.json')))
-    lights(False)
-    BX, BY, K = 7.6, 3.55, 4.4
-    sx, sy = (BX - BY) * 32, (BX + BY) * 16
-    W, H = 110, 150; ax, ay = W / 2 - sx, H - 14 - sy
-    for up in (False, True):
-        objs = new_objs(lambda: parrot(up))
-        pc = G(*PERCH); dst = G(BX, BY, 0) + Vector((0, 0, .1 * K))
-        bpy.context.view_layer.update()
-        for o in objs: o.matrix_world = Matrix.Translation(dst) @ Matrix.Scale(K, 4) @ Matrix.Translation(-pc) @ o.matrix_world
-        frame(W, H, ax, ay)
-        sc.render.resolution_x = W * 2 * SS; sc.render.resolution_y = H * 2 * SS
-        sc.render.filepath = f'{TMP}/big{int(up)}.png'; bpy.ops.render.render(write_still=True)
-        save(f'shop-bigparrot-{int(up)}', color_decode(f'{TMP}/big{int(up)}.png'), ax * 2, ay * 2)
-        for o in objs: bpy.data.objects.remove(o, do_unlink=True)
-    json.dump(meta, open(f'{OUT}/shop.json', 'w'))
-    print('[shop] bigparrot', {k: v for k, v in meta.items() if 'big' in k}, flush=True)
-    sys.exit(0)
 room_objs = [] if ONLY_PARROT else new_objs(lambda: room(False))
 for night in (() if ONLY_PARROT else (False, True)):
     if night:
