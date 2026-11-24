@@ -32,9 +32,6 @@ const BIRD_START = { x: 7.5, y: 3.5 };
 const BIRD_SPEED = 1.15;
 /** 유황새의 앵무새: 사람 키로 자라 두 발로 걷는 유황앵무 (사람 NPC처럼 가게 안을 돌아다닌다) */
 const BIRD_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'cockatoo', cols: { 5: '#8a8078', 6: '#141010', 11: '#efede4', 12: '#efc63a', 15: '#2a2624' } };
-const BESK = { x: 1.55, y: 3.5 };
-const BESK_TILE: [number, number] = [2, 4];
-const BESK_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'besk', cols: { 1: '#b8382a', 3: '#3a1410', 4: '#2a100c', 5: '#140a08', 6: '#e8c050', 9: '#3a1410', 10: '#e8dcc0', 12: '#f2d27a', 13: '#4a2a1a', 14: '#e0b437', 15: '#140e0c' } };
 
 function tex(c: HTMLCanvasElement): Texture {
   const t = Texture.from(c);
@@ -78,13 +75,12 @@ function roomPath(si: number, sj: number, ti: number, tj: number): [number, numb
   return path;
 }
 
-export type ShopTarget = 'hwang' | 'parrot' | 'door' | 'besk';
+export type ShopTarget = 'hwang' | 'parrot' | 'door';
 
 export interface ShopLabels {
   hwang: string;
   parrot: string;
   door: string;
-  besk: string;
 }
 
 export class ShopRoom {
@@ -112,10 +108,7 @@ export class ShopRoom {
   private bpath: [number, number][] = [];
   private bwait = 1.5;
   private banim = 0;
-  private besk = new Sprite();
-  private beskShadow = new Graphics();
   private hellOn = false;
-  private beskReady = false;
   private px = START_FIRST[0] + 0.5;
   private py = START_FIRST[1] + 0.5;
   private path: [number, number][] = [];
@@ -181,15 +174,7 @@ export class ShopRoom {
     this.birdShadow.ellipse(0, 0, 11, 4.5).fill({ color: 0x000000, alpha: 0.3 });
     this.bird.visible = this.birdShadow.visible = false;
     this.objects.addChild(this.birdShadow, this.bird);
-    // 유황새 왼쪽 구석: 장부를 든 대부업자 베스크
-    const [kx, ky] = iso(BESK.x, BESK.y);
-    this.beskShadow.ellipse(0, 0, 15, 6).fill({ color: 0x000000, alpha: 0.35 });
-    this.beskShadow.position.set(kx, ky);
-    this.beskShadow.zIndex = BESK.x + BESK.y - 0.2;
-    this.besk.position.set(kx, ky);
-    this.besk.zIndex = BESK.x + BESK.y;
-    this.besk.visible = this.beskShadow.visible = false;
-    this.objects.addChild(this.beskShadow, this.besk);
+    // (대부업자 베스크는 3층 피의 시장의 자기 대부소로 옮겼다)
     // 매달린 등 두 개와 불빛
     this.glow = new Sprite(tex(glowCanvas()));
     for (const [gx2, gy2] of [[2.4, 2.0], [6.6, 2.0]] as const) {
@@ -322,12 +307,8 @@ export class ShopRoom {
     this.dressKeeper(r === 'hell');
     this.hellOn = hellRoom = r === 'hell';
     this.parrot.visible = !this.hellOn;
-    this.bird.visible = this.birdShadow.visible = this.besk.visible = this.beskShadow.visible = this.hellOn;
+    this.bird.visible = this.birdShadow.visible = this.hellOn;
     if (this.hellOn && !this.birdCS) charSet(BIRD_LOOK).then((cs) => { this.birdCS = cs; });
-    if (this.hellOn && !this.beskReady) {
-      this.beskReady = true;
-      charSet(BESK_LOOK).then((cs) => applyFrame(this.besk, frameOf(cs, 'idle', 'se', 0)));
-    }
     if (r === 'real') { this.camera.filters = []; this.setGhost(false); return; }
     const cm = new ColorMatrixFilter();
     if (r === 'ghost') cm.desaturate();
@@ -401,7 +382,7 @@ export class ShopRoom {
 
   /** 지정한 대상 앞으로 걸어간다 */
   goTo(t: ShopTarget) {
-    const [ti, tj] = t === 'door' ? DOOR_TILE : t === 'besk' ? BESK_TILE : TALK_TILE;
+    const [ti, tj] = t === 'door' ? DOOR_TILE : TALK_TILE;
     const si = Math.floor(this.px), sj = Math.floor(this.py);
     this.pending = t;
     if (si === ti && sj === tj) { this.path = []; return; }
@@ -421,7 +402,6 @@ export class ShopRoom {
       return gx >= b.x - pad && gx <= b.x + b.width + pad && gy >= b.y - pad && gy <= b.y + b.height + pad;
     };
     if (this.hellOn) {
-      if (inSprite(this.besk, 4)) return 'besk';
       if (inSprite(this.bird, 4)) return 'parrot';
     } else if (inSprite(this.parrot, 6)) return 'parrot';
     if (inSprite(this.hwang)) return 'hwang';
@@ -476,7 +456,6 @@ export class ShopRoom {
   private labelAnchor(t: ShopTarget): [number, number] {
     if (t === 'hwang') { const [x, y] = iso(HWANG.x, HWANG.y); return [x, y - 48]; }
     if (t === 'parrot' && this.hellOn) { const [x, y] = iso(this.bx, this.by); return [x, y - 64]; }
-    if (t === 'besk') { const [x, y] = iso(BESK.x, BESK.y); return [x, y - 62]; }
     if (t === 'parrot') { const [x, y] = iso(PARROT_PERCH.x, PARROT_PERCH.y); return [x + 1, y - PARROT_PERCH.z - 20]; }
     const [x, y] = iso(0, (DOOR.y0 + DOOR.y1) / 2);
     return [x, y - DOOR.h - 12];
@@ -536,7 +515,6 @@ export class ShopRoom {
       const t = this.pending;
       this.pending = null;
       if (t === 'hwang') this.dir = 'ne';
-      if (t === 'besk') this.dir = 'nw';
       this.onArrive(t);
     }
     this.anim = moving ? this.anim + dt * SPEED * 8.5 : 0;
@@ -566,7 +544,6 @@ export class ShopRoom {
     } else this.parrot.texture = this.customParrot?.[ci] ?? this.parrotTex[ci];
     if (this.hellOn) {
       this.updateBird(dt);
-      this.besk.y = iso(BESK.x, BESK.y)[1] + Math.round(Math.sin(this.time * 1.2) * 0.6);
     }
     // 이름표
     if (this.labelT > 0) { this.labelT -= dt; if (this.labelT <= 0) this.hideLabel(); }

@@ -16,6 +16,7 @@ import * as sfx from './sfx.ts';
 import { MONSTERS, GUARDS, floorDef, type MonsterDef, type GuardDef } from './hell.ts';
 import { drawHellGround, drawHellStructure, hellTint, hellProp } from './hellgfx.ts';
 import { drawCosmicBird, COSMIC_TOP } from './ujusae.ts';
+import { drawLoanHouse, LOAN_TOP } from './loanhouse.ts';
 import { streetProp, type PropPic } from './propgfx.ts';
 import { decorOf } from './decor.ts';
 import { canEnter, drawRoom, drawFurn, clerkLook } from './interior.ts';
@@ -368,7 +369,7 @@ export class WorldScene {
     for (const p of this.zone.props) {
       const v = (p.i * 7 + p.j * 3) % 4;
       if (p.kind === 'torture') { this.addTorture(p.i, p.j, p.o ?? 0); continue; }
-      const decor = p.kind === 'fence' || p.kind === 'crag' || p.kind === 'bones' || p.kind === 'skulls' || p.kind === 'stake' || p.kind === 'cauldron' || p.kind === 'cage' || p.kind === 'bonfire' || (p.kind === 'lantern' && theme !== 'ash');
+      const decor = p.kind === 'fence' || p.kind === 'crag' || p.kind === 'htree' || p.kind === 'rock' || p.kind === 'crack' || p.kind === 'bones' || p.kind === 'skulls' || p.kind === 'stake' || p.kind === 'cauldron' || p.kind === 'cage' || p.kind === 'bonfire' || (p.kind === 'lantern' && theme !== 'ash');
       if (decor) {
         const vv = Math.floor(((p.i * 73856093) ^ (p.j * 19349663)) >>> 0) % (p.kind === 'crag' ? 8 : 6);
         const hp = hellDecor(p.kind === 'fence' ? 'wallfence' : p.kind, theme, vv, p.o ?? 0);
@@ -567,7 +568,11 @@ export class WorldScene {
 
   /** 건물 간판 이름 */
   private nameOf(b: Building) {
-    return b.cat === 'ujusae' ? '' : buildingName(b, lang());
+    return b.cat === 'ujusae' ? '' : b.cat === 'loan' ? t().beskHouse : buildingName(b, lang());
+  }
+  /** 건물 이름 아래 한 줄 */
+  private subOf(b: Building) {
+    return b.cat === 'loan' ? t().beskHouseSub : buildingSub(b, lang());
   }
 
   /**
@@ -595,11 +600,11 @@ export class WorldScene {
 
   private makeBuilding(b: Building): BView {
     const hellTheme = this.zone.hell ? floorDef(this.zone.hell.floor).theme : null;
-    const d = b.cat === 'ujusae' ? drawCosmicBird(b, this.night === 1) : hellTheme ? drawHellStructure(b, hellTheme, true) : kitOk ? drawBuildingKit(b, this.nameOf(b), this.night === 1, this.low) : drawBuilding(b, this.nameOf(b), this.night === 1);
+    const d = b.cat === 'ujusae' ? drawCosmicBird(b, this.night === 1) : b.cat === 'loan' ? drawLoanHouse(b) : hellTheme ? drawHellStructure(b, hellTheme, true) : kitOk ? drawBuildingKit(b, this.nameOf(b), this.night === 1, this.low) : drawBuilding(b, this.nameOf(b), this.night === 1);
     const base = tex(d.canvas);
     const W = d.canvas.width, H = d.canvas.height;
     const parts = this.strips(base, d.x, d.y, b.i0, b.j0, b.w, b.d);
-    const top = b.cat === 'ujusae' ? COSMIC_TOP : hellTheme ? b.h : kitOk ? buildingTop(b, this.low) : buildingHeight(b.h);
+    const top = b.cat === 'ujusae' ? COSMIC_TOP : b.cat === 'loan' ? LOAN_TOP : hellTheme ? b.h : kitOk ? buildingTop(b, this.low) : buildingHeight(b.h);
     const [lx] = iso(b.i0 + b.w / 2, b.j0 + b.d / 2);
     const id = d.canvas.getContext('2d')!.getImageData(0, 0, W, H).data;
     const alpha = new Uint8Array(W * H);
@@ -890,7 +895,7 @@ export class WorldScene {
     const info = this.zone.interior!;
     // 밤이면 창밖이 어둡고 실내등이 따뜻하다 (들어갈 때의 방콕 시각)
     const { h: hh, m: mm } = bangkokClock();
-    const nightIn = nightFactor(hh, mm) > 0.5;
+    const nightIn = this.realm === 'hell' || nightFactor(hh, mm) > 0.5;
     const room = drawRoom(this.zone, nightIn);
     const rs = new Sprite(tex(room.canvas));
     rs.position.set(room.x, room.y);
@@ -1568,11 +1573,12 @@ export class WorldScene {
       const b = this.zone.buildings[kb];
       const { wx } = this.toWorld(gx, gy);
       const isShop = b.cat === 'ujusae';
+      const loan = b.cat === 'loan';
       if (isShop) this.hooks.place(t().shopLabel, '');
-      else if (interactive(b)) { const n = this.nameOf(b); if (n) this.hooks.place(n, buildingSub(b, lang())); }
+      else if (interactive(b) || loan) { const n = this.nameOf(b); if (n) this.hooks.place(n, this.subOf(b)); }
       this.cancelActs();
       let spot = this.baseSpot(b, wx);
-      const door = isShop ? [this.zone.door.i, this.zone.door.j] as [number, number] : interactive(b) ? this.frontCached(kb) : null;
+      const door = isShop ? [this.zone.door.i, this.zone.door.j] as [number, number] : interactive(b) || loan ? this.frontCached(kb) : null;
       if (door && (!spot || Math.hypot(spot[0] - door[0], spot[1] - door[1]) <= 3)) spot = door;
       if (spot && this.walkTo(spot[0], spot[1])) { this.rippleAt(spot[0], spot[1]); return; }
     }
@@ -1644,6 +1650,7 @@ export class WorldScene {
       return;
     }
     const b = this.zone.buildings[k];
+    if (b.cat === 'loan') { this.goEnter(k); return; } // 지옥 3층 베스크 대부소
     const opts: { label: string; act: () => void }[] = [];
     if (canEnter(b) && this.realm === 'real') opts.push({ label: L.goInside, act: () => this.goEnter(k) });
     else {
@@ -1752,7 +1759,7 @@ export class WorldScene {
   }
   private npcName(w: Walker) {
     const L = t();
-    if (w.kind === 'clerk') return this.zone.interior?.name ?? '';
+    if (w.kind === 'clerk') return this.zone.interior?.kind === 'loan' ? L.besk : this.zone.interior?.name ?? '';
     if (w.mdef) return w.mdef.name[lang()];
     if (w.gdef) return w.gdef.name[lang()];
     if (w.kind === 'pashar') return L.pashar;
@@ -2811,9 +2818,9 @@ export class WorldScene {
           if (d < fd + 0.4) { fd = d; found = code; }
         }
       }
-      if (!this.zone.hell && this.realm !== 'ghost') for (const k of this.bViews.keys()) {
+      if (this.realm !== 'ghost') for (const k of this.bViews.keys()) {
         const b = this.zone.buildings[k];
-        if (b.cat === 'ujusae' || !interactive(b) || (!canEnter(b) && !storeOf(b) && !canWork(b) && !hasBank(b))) continue;
+        if (b.cat !== 'loan' && (this.zone.hell || b.cat === 'ujusae' || !interactive(b) || (!canEnter(b) && !storeOf(b) && !canWork(b) && !hasBank(b)))) continue;
         const f = this.frontCached(k);
         if (!f) continue;
         const d = Math.hypot(f[0] + 0.5 - p.x, f[1] + 0.5 - p.y);
@@ -2836,7 +2843,7 @@ export class WorldScene {
           const f = this.frontCached(found)!;
           if (b.sign === 'right') { fx = b.i0 + b.w; fy = f[1] + 0.5; } else { fx = f[0] + 0.5; fy = b.j0 + b.d; }
           const n = this.nameOf(b);
-          if (n) this.hooks.place(n, buildingSub(b, lang()));
+          if (n) this.hooks.place(n, this.subOf(b));
         }
         if (found === -1) this.hooks.place(this.zone.hell ? t().hellShop : t().shopLabel, '');
         const [x, y] = iso(fx, fy);

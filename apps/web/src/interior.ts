@@ -17,6 +17,7 @@ export function canEnter(b: Building) {
 }
 
 export function roomKind(b: Building): string {
+  if (b.cat === 'loan') return 'loan'; // 지옥 3층 베스크 대부소
   const k = kindOf(b);
   if (k === 'place_of_worship' || b.cat === 'worship') {
     const f = faithOf(b);
@@ -43,7 +44,7 @@ export const REST_ROOMS = new Set(['temple', 'church', 'mosque', 'gurdwara', 'ba
 
 const SIZE: Record<string, [number, number]> = {
   temple: [13, 11], church: [13, 11], mosque: [12, 11], gurdwara: [12, 11], bank: [12, 10], clinic: [12, 10], pharmacy: [9, 8],
-  mart: [11, 9], food: [12, 10], cafe: [10, 9], bar: [10, 9], salon: [9, 8], massage: [10, 9], laundry: [9, 8], lobby: [11, 9], shop: [9, 8],
+  mart: [11, 9], food: [12, 10], cafe: [10, 9], bar: [10, 9], salon: [9, 8], massage: [10, 9], laundry: [9, 8], lobby: [11, 9], shop: [9, 8], loan: [10, 8],
 };
 const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   temple: { floor: 'temple', wall: '#e9dcc0', trim: '#a8322a' }, church: { floor: 'stone', wall: '#e8e2d4', trim: '#6b4a30' },
@@ -54,6 +55,7 @@ const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   bar: { floor: 'dark', wall: '#3a2e2a', trim: '#7a2a5a' }, salon: { floor: 'checker', wall: '#f0e8ea', trim: '#c96a8a' },
   massage: { floor: 'wood', wall: '#e2d6c0', trim: '#6a4a2a' }, laundry: { floor: 'pale', wall: '#dce6ee', trim: '#3a6a9a' },
   lobby: { floor: 'marble', wall: '#e6ddd0', trim: '#8a6a3a' }, shop: { floor: 'wood', wall: '#e6e0d4', trim: '#5a5a5a' },
+  loan: { floor: 'dark', wall: '#3a2420', trim: '#8a6a2a' },
 };
 
 /** 거리의 건물 k에 들어갈 때 방을 만든다 (같은 건물이면 늘 같은 방) */
@@ -139,6 +141,14 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
     case 'lobby':
       F(3, 2, W - 6, 1, 24, 'counter', 7); clerk = { i: mid, j: 1 }; counter = { i: mid, j: 3 };
       F(1, 5, 1, 2, 14, 'sofa'); F(x1, 5, 1, 2, 14, 'sofa'); F(1, 1, 1, 1, 30, 'plant'); seats.push([2, 5]);
+      break;
+    case 'loan':
+      // 베스크의 장부 책상 · 장부가 빽빽한 서가 · 쇠 금고 · 노전 자루 · 촛대
+      F(W - 6, 2, 4, 1, 22, 'ledgerdesk'); clerk = { i: W - 4, j: 1 }; counter = { i: W - 4, j: 3 };
+      F(1, 1, W - 7, 1, 58, 'ledgers', 3);
+      F(x1, 1, 1, 1, 34, 'safe');
+      F(1, 3, 1, 1, 18, 'coinsacks', 1); F(1, 4, 1, 1, 14, 'coinsacks', 2);
+      F(x1, 4, 1, 1, 20, 'candle');
       break;
     default:
       F(W - 5, 2, 3, 1, 22, 'counter', 8); clerk = { i: W - 4, j: 1 }; counter = { i: W - 4, j: 3 };
@@ -352,6 +362,47 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       for (const x of [i + 0.3, i1 - 0.3]) { const [fx, fy] = P(x, j1 - 0.2, h * 0.5); g.fillStyle = '#f2a03a'; g.beginPath(); g.ellipse(fx, fy - 4, 4, 4, 0, 0, Math.PI * 2); g.fill(); }
       break;
     }
+    case 'ledgerdesk': {
+      // 검붉은 책상, 펼친 장부와 깃펜, 쌓인 노전, 앞판의 금 테
+      box(i + 0.05, j + 0.1, i1 - 0.05, j1 - 0.1, 0, h, '#4a1e16', '#3a1410', '#2a0e0a');
+      faceL(i + 0.15, i1 - 0.15, h - 6, h - 4, '#c9a23e'); faceL(i + 0.15, i1 - 0.15, 4, 6, '#c9a23e');
+      box(i + 0.6, j + 0.25, i + 1.6, j + 0.75, h, h + 2, '#efe6cc', '#d8ccaa', '#c8b898'); // 펼친 장부
+      { const [lx, ly] = P(i + 1.1, j + 0.5, h + 2); g.fillStyle = '#b8a888'; g.fillRect(Math.round(lx), Math.round(ly) - 4, 1, 8); g.fillStyle = '#5a3a2a'; for (let n = 0; n < 4; n++) g.fillRect(Math.round(lx) - 12 + n * 2, Math.round(ly) - 3 + n, 8, 1); }
+      { const [qx, qy] = P(i + 1.55, j + 0.4, h + 2); g.strokeStyle = '#f2ece0'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(qx, qy); g.lineTo(qx + 6, qy - 12); g.stroke(); }
+      for (let n = 0; n < 3; n++) for (let m = 0; m < 3 + n; m++) { const [cx, cy] = P(i1 - 0.9 + n * 0.22, j + 0.5, h + m * 2); g.fillStyle = m % 2 ? '#e8c86a' : '#c9a23e'; g.fillRect(Math.round(cx) - 3, Math.round(cy) - 1, 6, 2); }
+      break;
+    }
+    case 'ledgers': {
+      // 장부 서가: 검은 나무 칸마다 붉은·갈색 장부 등, 금 띠, 사슬로 묶은 칸
+      B3(i, j, i1, j1, 0, h, '#2a1612');
+      const spine = ['#6a1a14', '#4a2a1a', '#7a3a1a', '#3a1a14', '#8a2a1a'];
+      for (let z = 6; z < h - 4; z += 12) {
+        for (let x = i + 0.05; x < i1 - 0.1; x += 0.14) { faceL(x, x + 0.11, z, z + 9 - (Math.floor(x * 31) % 3), spine[Math.floor(x * 17 + z) % 5]); faceL(x, x + 0.11, z + 6, z + 6.8, '#c9a23e'); }
+        faceL(i, i1, z - 1.5, z, '#1a0c0a');
+      }
+      for (const x of [i + w * 0.3, i + w * 0.72]) for (let z = 10; z < h - 8; z += 3) faceL(x, x + 0.04, z, z + 2, '#7a7670');
+      break;
+    }
+    case 'safe': {
+      // 쇠 금고: 리벳, 금 자물쇠
+      box(i + 0.1, j + 0.1, i1 - 0.1, j1 - 0.1, 0, h, '#5a5652', '#3a3632', '#2a2622');
+      faceL(i + 0.18, i1 - 0.18, 4, h - 4, '#2e2a26');
+      for (const z of [6, h - 8]) for (const x of [i + 0.22, i1 - 0.26]) faceL(x, x + 0.04, z, z + 2, '#8a8680');
+      { const [sx, sy] = P(i + 0.5, j1 - 0.1, h * 0.55); g.fillStyle = '#c9a23e'; g.beginPath(); g.arc(sx, sy, 5, 0, Math.PI * 2); g.fill(); g.fillStyle = '#2a2622'; g.beginPath(); g.arc(sx, sy, 2, 0, Math.PI * 2); g.fill(); g.fillStyle = '#e8c86a'; g.fillRect(Math.round(sx) - 1, Math.round(sy) - 7, 2, 3); }
+      break;
+    }
+    case 'coinsacks': {
+      // 노전 자루: 묶인 삼베 자루와 흘러나온 동전
+      for (let n = 0; n < (f.v === 1 ? 3 : 2); n++) {
+        const [cx, cy] = P(i + 0.3 + n * 0.25, j + 0.5 + (n % 2) * 0.15, 0);
+        g.fillStyle = '#8a6a42'; g.beginPath(); g.ellipse(cx, cy - 7, 8, 8, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#a8865a'; g.beginPath(); g.ellipse(cx - 2, cy - 9, 4, 4, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#5a3a22'; g.fillRect(Math.round(cx) - 3, Math.round(cy) - 16, 6, 2);
+        g.fillStyle = '#8a6a42'; g.fillRect(Math.round(cx) - 2, Math.round(cy) - 19, 4, 3);
+      }
+      for (let n = 0; n < 6; n++) { const [cx, cy] = P(i + 0.2 + n * 0.12, j1 - 0.1, 0); g.fillStyle = n % 2 ? '#e8c86a' : '#c9a23e'; g.fillRect(Math.round(cx), Math.round(cy) - 2, 3, 2); }
+      break;
+    }
     case 'candle': {
       B3(i + 0.35, j + 0.35, i1 - 0.35, j1 - 0.35, 0, h, '#c9a23e');
       for (let n = 0; n < 3; n++) { const [cx, cy] = P(i + 0.38 + n * 0.12, j + 0.5, h); g.fillStyle = '#f2ece0'; g.fillRect(Math.round(cx) - 1, Math.round(cy) - 8, 2, 8); g.fillStyle = '#ffc04a'; g.fillRect(Math.round(cx) - 1, Math.round(cy) - 11, 2, 3); }
@@ -388,7 +439,10 @@ const STAFF: Record<string, [string, string]> = {
   food: ['#e8e2d6', '#3a2a22'], cafe: ['#4a3022', '#2a2a30'], bar: ['#1e1c22', '#1e1c22'], salon: ['#c96a8a', '#2a2a30'],
   massage: ['#6a3a5a', '#4a2a3a'], laundry: ['#3a6a9a', '#34455f'], lobby: ['#5a4630', '#2a2a30'], shop: ['#5a5a5a', '#34455f'],
 };
+/** 대부업자 베스크: 붉은 피부·대머리·아주 뚱뚱·금 장신구·장부 */
+export const BESK_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'besk', cols: { 1: '#b8382a', 3: '#3a1410', 4: '#2a100c', 5: '#140a08', 6: '#e8c050', 9: '#3a1410', 10: '#e8dcc0', 12: '#f2d27a', 13: '#4a2a1a', 14: '#e0b437', 15: '#140e0c' } };
 export function clerkLook(kind: string, seed: number): Look {
+  if (kind === 'loan') return BESK_LOOK;
   const [top, bottom] = STAFF[kind] ?? STAFF.shop;
   const sex = seed % 2 ? 'f' : 'm';
   const monk = kind === 'temple';

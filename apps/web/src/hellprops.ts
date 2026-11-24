@@ -73,7 +73,7 @@ function ribs(p: Pen, cx: number, cy: number, s: number) {
 }
 
 const cache = new Map<string, HPic>();
-/** kind: crag(경계) · bones · skulls · stake · cauldron · cage · lantern · bonfire · wallfence(마을 울타리, o = 방향) */
+/** kind: crag(경계) · bones · skulls · stake · cauldron · cage · lantern · bonfire · wallfence(마을 울타리, o = 방향) · htree(지옥 나무, o = 종류) · rock(바위) · crack(땅의 용암 금·진흙 거품·핏물 웅덩이) */
 export function hellDecor(kind: string, theme: Theme, v: number, o = 0): HPic {
   const key = `${kind}-${theme}-${v}-${o}`;
   const hit = cache.get(key);
@@ -176,6 +176,12 @@ export function hellDecor(kind: string, theme: Theme, v: number, o = 0): HPic {
     out = { canvas: p.c, ax: 18.5 / 96, ay: 110 / 112 };
   } else if (kind === 'crag') {
     out = crag(theme, v, o, r);
+  } else if (kind === 'htree') {
+    out = hellTree(theme, v, o, r);
+  } else if (kind === 'rock') {
+    out = rock(theme, r);
+  } else if (kind === 'crack') {
+    out = groundMark(theme, r);
   } else if (kind === 'bonfire') {
     // 1층 마을 한가운데 모닥불: 엇갈린 통나무, 높은 불길, 둘레의 돌
     const p = pen(60, 76);
@@ -358,4 +364,208 @@ function villageFence(theme: Theme, v: number, o: number, r: (k: number) => numb
   }
   p.finish();
   return { canvas: p.c, ax: 0.5, ay: oy / 144 };
+}
+
+/**
+ * 지옥의 나무 (o = 종류)
+ * 1층 재: 0 숯 나무(갈라진 틈마다 불씨가 흐르고 가지 끝은 재로 하얗다) · 1 뼈나무(등뼈 줄기, 긴 뼈 가지, 힘줄에 매달린 해골 열매)
+ * 2층 늪: 0 부푼 썩은 나무(물 위로 휜 뿌리, 입처럼 벌어진 구멍, 늘어진 이끼, 병든 버섯 빛) · 1 손 덤불(진흙에서 뻗어 나온 마른 팔들)
+ * 3층 시장: 0 가시 나무(비틀린 붉은 줄기, 가시, 핏빛 잎, 사슬에 매단 동전 추와 값표) · 1 피 묻은 뼈나무
+ */
+function hellTree(theme: Theme, v: number, o: number, r: (k: number) => number): HPic {
+  if (theme === 'swamp' && o === 1) return handBush(r);
+  if (o === 1) return boneTree(theme, r);
+  if (theme === 'swamp') return rotTree(r);
+  if (theme === 'market') return thornTree(r);
+  return emberTree(r);
+}
+function emberTree(r: (k: number) => number): HPic {
+  const p = pen(60, 104);
+  const bx = 60, by = 200, bark = '#1a1412', hi = '#3a2e28';
+  p.E(bx, by + 2, 34, 7, '#2a2420'); p.E(bx - 4, by, 24, 4.5, '#4a443e'); p.E(bx - 8, by - 1, 10, 2, '#6a645c');
+  const tx = bx + (r(1) - 0.5) * 18, ty = 96;
+  for (const sd of [-1, 1]) { p.L(bx, by - 6, bx + sd * (18 + r(sd + 5) * 10), by + 1, 7, bark, 3); }
+  p.L(bx, by - 2, tx, ty, 17, bark, 9);
+  p.L(bx - 6, by - 4, tx - 4, ty, 4, hi, 2);
+  const tips: [number, number, number][] = [];
+  for (let k = 0; k < 6; k++) {
+    const y0 = ty + 4 + k * 7, d = k % 2 ? 1 : -1;
+    const x1 = tx + d * (18 + r(k + 3) * 28), y1 = y0 - 28 - r(k + 9) * 38;
+    p.L(tx, y0, x1, y1, 7, bark, 2.5);
+    p.L(x1, y1, x1 + d * 9, y1 - 14, 2.5, bark, 1);
+    if (r(k + 20) < 0.6) p.L((tx + x1) / 2, (y0 + y1) / 2, (tx + x1) / 2 - d * 8, (y0 + y1) / 2 - 16, 2, bark, 1);
+    tips.push([x1 + d * 9, y1 - 14, d]);
+  }
+  p.L(tx, ty, tx + (r(2) - 0.5) * 16, 18, 8, bark, 2);
+  // 불씨가 흐르는 틈 (줄기를 따라 지그재그)
+  for (const [ox, seed] of [[-3, 40], [4, 60]] as [number, number][]) {
+    let cx = bx + ox, cy = by - 12;
+    while (cy > ty + 10) {
+      const t = (by - cy) / (by - ty), nx = bx + (tx - bx) * t + ox * (1 - t * 0.5) + (r(seed + cy) - 0.5) * 5, ny = cy - 7 - r(seed + cy + 1) * 5;
+      p.L(cx, cy, nx, ny, 2.2, '#c23a18'); p.L(cx, cy, nx, ny, 1, '#ffb04a');
+      cx = nx; cy = ny;
+    }
+  }
+  for (const [x, y, d] of tips) { p.R(x - 1, y - 1, 4, 3, '#b8b0a4'); p.R(x - d * 3, y + 3, 3, 2, '#8a847a'); }
+  p.finish([10, 6, 5]);
+  for (let k = 0; k < 7; k++) p.R(bx - 40 + r(k + 90) * 80, 30 + r(k + 95) * 120, 2, 2, k % 2 ? '#ffb04a' : '#ff7a2a');
+  return { canvas: p.c, ax: 0.5, ay: 200 / 208 };
+}
+function boneTree(theme: Theme, r: (k: number) => number): HPic {
+  // 마른 나무 꼴: 등뼈 줄기가 둘로 갈라지고, 가지는 가는 긴 뼈, 끝마다 힘줄에 매달린 작은 해골
+  const p = pen(56, 104);
+  const bx = 56, by = 198;
+  p.E(bx, by + 4, 26, 5, '#140c0a');
+  for (let k = 0; k < 3; k++) { const a = Math.PI * (0.15 + k * 0.35), ex = bx + Math.cos(a) * 24 * (k === 1 ? 0.4 : 1), ey = by + 3; bone(p, bx, by - 4, ex, ey, 2.2); }
+  const spine = (x0: number, y0: number, x1: number, y1: number, w0: number, w1: number) => {
+    const n = Math.max(2, Math.round(Math.hypot(x1 - x0, y1 - y0) / 7.5));
+    for (let k = 0; k <= n; k++) {
+      const t = k / n, x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t, w = w0 + (w1 - w0) * t;
+      p.E(x, y, w, 3, BONE3); p.E(x - 0.6, y - 0.7, w - 1, 2.1, BONE2); p.E(x - 1.4, y - 1.2, w * 0.4, 1, BONE);
+    }
+  };
+  const fx = bx + (r(1) - 0.5) * 10, fy = 112; // 갈라지는 곳
+  spine(bx, by - 6, fx, fy, 6.5, 4.5);
+  const tips: [number, number][] = [];
+  for (const d of [-1, 1]) {
+    const ex = fx + d * (16 + r(d + 3) * 10), ey = 52 + r(d + 5) * 16;
+    spine(fx, fy, ex, ey, 4.2, 2.6);
+    // 가는 뼈 가지 둘씩
+    for (let m = 0; m < 2; m++) {
+      const t = 0.45 + m * 0.4, sx = fx + (ex - fx) * t, sy = fy + (ey - fy) * t;
+      const x1 = sx + d * (14 + r(m + d * 7 + 10) * 14), y1 = sy - 10 - r(m + d * 7 + 14) * 16;
+      bone(p, sx, sy, x1, y1, 1.8);
+      tips.push([x1, y1]);
+    }
+    tips.push([ex, ey]);
+  }
+  for (const [k, [x, y]] of tips.entries()) {
+    if (r(k + 40) < 0.55) { p.L(x, y + 2, x + 0.5, y + 10, 1, '#6a2a20'); skull(p, x + 0.5, y + 15, 0.62, x < bx ? -1 : 1, 0.4); }
+  }
+  if (theme === 'market') for (let k = 0; k < 6; k++) { const t = r(k + 60), x = bx + (fx - bx) * t, y = by - 6 + (fy - by + 6) * t; p.R(x - 2 + r(k + 70) * 4, y, 2, 5 + r(k + 80) * 10, '#7a0a0a'); }
+  p.finish([30, 22, 18]);
+  return { canvas: p.c, ax: 0.5, ay: 200 / 208 };
+}
+function rotTree(r: (k: number) => number): HPic {
+  const p = pen(64, 100);
+  const bx = 64, by = 192, bark = '#2a2818', hi = '#424028', moss = ['#4a5a2a', '#5e6e34', '#3a4820'];
+  p.E(bx, by + 2, 46, 8, '#1a1810'); p.E(bx, by, 38, 5, '#2a2618');
+  for (let k = 0; k < 5; k++) p.E(bx - 30 + k * 15, by + 1, 5, 1.2, '#4a4630');
+  // 물 위로 휜 뿌리
+  for (let k = 0; k < 6; k++) {
+    const d = k < 3 ? -1 : 1, reach = 16 + (k % 3) * 12 + r(k + 3) * 6, top = 150 - (k % 3) * 6;
+    let px = bx + d * 6, py = top;
+    for (let t = 1; t <= 10; t++) { const a = t / 10, nx = bx + d * (6 + reach * a), ny = top + (by - top) * a * a - Math.sin(a * Math.PI) * 8; p.L(px, py, nx, ny, 6 - a * 2.5, bark); px = nx; py = ny; }
+  }
+  // 부푼 줄기와 목
+  p.E(bx, 136, 24, 34, bark); p.E(bx - 8, 130, 11, 26, hi); p.E(bx + 12, 142, 8, 22, '#1e1c10');
+  p.L(bx + 2, 108, bx - 4 + (r(1) - 0.5) * 10, 46, 16, bark, 6); p.L(bx - 3, 108, bx - 8, 50, 4, hi, 2);
+  // 입처럼 벌어진 구멍 (가시 같은 이빨)
+  p.E(bx + 4, 132, 8, 12, '#0a0806'); p.E(bx + 4, 136, 5, 6, '#140e08');
+  for (let k = 0; k < 4; k++) { p.R(bx - 2 + k * 3.5, 120, 1.5, 4 + (k % 2) * 2, '#8a8a6a'); p.R(bx - 1 + k * 3.5, 142 - (k % 2) * 2, 1.5, 4, '#7a7a5a'); }
+  // 늘어진 가지 (버드나무처럼) + 이끼 줄
+  const tx = bx - 4 + (r(1) - 0.5) * 10;
+  for (let k = 0; k < 6; k++) {
+    const d = k % 2 ? 1 : -1, y0 = 50 + k * 9, x1 = tx + d * (22 + r(k + 10) * 24), y1 = y0 - 16 - r(k + 15) * 14, x2 = x1 + d * 10, y2 = y1 + 10;
+    p.L(tx, y0, x1, y1, 5, bark, 2.5); p.L(x1, y1, x2, y2, 2.5, bark, 1.5);
+    for (let m = 0; m < 5; m++) { const mx = tx + (x2 - tx) * (0.35 + m * 0.15), my = y0 + (y1 - y0) * (0.35 + m * 0.15); p.R(mx, my, 1.5, 10 + r(k * 7 + m) * 18, moss[(k + m) % 3]); }
+  }
+  // 병든 버섯 빛
+  for (let k = 0; k < 6; k++) { const x = bx - 18 + r(k + 50) * 34, y = 116 + r(k + 55) * 44; p.E(x, y, 2.6, 1.5, '#c8f08a'); p.R(x - 1, y + 1, 2, 2, '#6a8a3a'); }
+  p.finish([8, 10, 6]);
+  return { canvas: p.c, ax: 0.5, ay: 194 / 200 };
+}
+function handBush(r: (k: number) => number): HPic {
+  const p = pen(44, 66);
+  const cx = 44, by = 120;
+  p.E(cx, by, 38, 9, '#1e1a10'); p.E(cx, by - 1, 32, 6.5, '#2a2618'); p.E(cx + 4, by - 2, 20, 3, '#3a3624');
+  const n = 4 + Math.floor(r(1) * 3);
+  for (let k = 0; k < n; k++) {
+    const x0 = cx - 24 + (k / (n - 1)) * 48 + (r(k + 3) - 0.5) * 6, y0 = by - 2;
+    const lean = (x0 - cx) / 24, len = 46 + r(k + 8) * 46;
+    const ex = x0 + lean * 10 + (r(k + 12) - 0.5) * 10, ey = y0 - len * 0.55;   // 팔꿈치
+    const hx = ex + lean * 14 + (r(k + 16) - 0.5) * 12, hy = y0 - len;          // 손목
+    const skin = r(k + 20) < 0.3 ? BONE2 : '#8a927a', dk = '#5a6250';
+    p.L(x0, y0, ex, ey, 6, skin, 4.5); p.L(x0 + 1.5, y0, ex + 1.5, ey, 1.5, dk);
+    p.L(ex, ey, hx, hy, 4.5, skin, 3.5); p.E(ex, ey, 3.2, 3, skin);
+    // 손: 손바닥 + 마른 손가락 넷 + 엄지 (하늘을 움켜쥐려 한다)
+    p.E(hx, hy - 3, 4.5, 4, skin);
+    for (let f = 0; f < 4; f++) { const a = -Math.PI / 2 + (f - 1.5) * 0.32 + lean * 0.3, l = 9 + (f === 1 || f === 2 ? 3 : 0); p.L(hx + (f - 1.5) * 2.2, hy - 6, hx + (f - 1.5) * 2.2 + Math.cos(a) * l, hy - 6 + Math.sin(a) * l, 1.6, skin, 1.1); }
+    p.L(hx - 4, hy - 2, hx - 10, hy - 7, 1.6, skin, 1.1);
+    // 팔에 묻은 진흙
+    p.R(x0 - 3, y0 - 10, 6, 8, '#3a3624');
+  }
+  p.finish([12, 12, 8]);
+  return { canvas: p.c, ax: 0.5, ay: 122 / 132 };
+}
+function thornTree(r: (k: number) => number): HPic {
+  const p = pen(58, 104);
+  const bx = 58, by = 200, bark = '#3a0e0c', hi = '#5a1a14', thorn = '#1e0605';
+  p.E(bx, by + 3, 32, 7, '#2a0604'); p.E(bx + 6, by + 2, 18, 4, '#5a0806');
+  // 비틀린 줄기: 좌우로 꼬이며 오른다
+  let px = bx, py = by;
+  const spine: [number, number][] = [[px, py]];
+  for (let k = 1; k <= 9; k++) { const nx = bx + Math.sin(k * 1.3 + r(1) * 3) * 9, ny = by - k * 13; p.L(px, py, nx, ny, 15 - k * 0.9, bark); p.L(px - 4, py, nx - 4, ny, 3, hi); spine.push([nx, ny]); px = nx; py = ny; }
+  for (const sd of [-1, 1]) p.L(bx, by - 6, bx + sd * 24, by + 2, 6, bark, 2.5);
+  const hang: [number, number][] = [];
+  for (let k = 0; k < 6; k++) {
+    const [x0, y0] = spine[3 + k] ?? spine[spine.length - 1], d = k % 2 ? 1 : -1;
+    const x1 = x0 + d * (22 + r(k + 3) * 24), y1 = y0 - 10 - r(k + 8) * 24;
+    p.L(x0, y0, x1, y1, 5.5, bark, 2);
+    for (let m = 1; m < 5; m++) { const t = m / 5, sx = x0 + (x1 - x0) * t, sy = y0 + (y1 - y0) * t; p.L(sx, sy, sx + (m % 2 ? 3 : -3), sy - 5, 1.4, thorn, 0.8); }
+    for (let m = 0; m < 3; m++) p.E(x1 + (r(k * 5 + m) - 0.5) * 12, y1 - 4 + (r(k * 5 + m + 2) - 0.5) * 8, 3.5, 2.4, m % 2 ? '#8a1a14' : '#b8281e');
+    if (r(k + 30) < 0.65) hang.push([x0 + (x1 - x0) * 0.7, y0 + (y1 - y0) * 0.7]);
+  }
+  // 사슬에 매단 동전 추 · 값표
+  hang.forEach(([x, y], k) => {
+    const l = 16 + r(k + 40) * 22;
+    for (let yy = y + 2; yy < y + l; yy += 3) p.R(x, yy, 1.5, 2, k % 2 ? '#7a7670' : '#5a5650');
+    if (k % 2) { p.E(x + 1, y + l + 4, 4.2, 4.2, '#a8862a'); p.E(x, y + l + 3, 3, 3, '#e8c86a'); p.R(x, y + l + 2, 1, 3, '#8a6a1a'); }
+    else { p.R(x - 4, y + l, 9, 11, '#e8dcc0'); p.R(x - 4, y + l, 9, 2, '#c8b898'); p.R(x - 2, y + l + 4, 5, 1, '#8a1a14'); p.R(x - 2, y + l + 7, 3, 1, '#8a1a14'); }
+  });
+  p.finish([16, 4, 4]);
+  return { canvas: p.c, ax: 0.5, ay: 202 / 208 };
+}
+/** 바위 무더기: 1층 현무암(틈의 용암 빛) · 2층 이끼 낀 바위 · 3층 붉은 사암과 핏자국 */
+function rock(theme: Theme, r: (k: number) => number): HPic {
+  const p = pen(52, 40);
+  const pal: Record<Theme, [string, string, string]> = { ash: ['#2e2a28', '#4a4440', '#161210'], swamp: ['#3a3e30', '#565c46', '#1e2018'], market: ['#5a2a22', '#7e4234', '#2e1410'] };
+  const [base, lit, dark] = pal[theme];
+  p.E(52, 70, 46, 9, '#0e0a08');
+  const n = 2 + Math.floor(r(1) * 2);
+  for (let k = 0; k < n; k++) {
+    const cx = 52 + (k - (n - 1) / 2) * 30 + (r(k + 2) - 0.5) * 8, cy = 60 - (k === Math.floor(n / 2) ? 10 : 0), rw = 20 + r(k + 5) * 12, rh = 18 + r(k + 8) * 18 + (k === Math.floor(n / 2) ? 10 : 0);
+    const pts: [number, number][] = [];
+    for (let m = 0; m < 9; m++) { const a = Math.PI + (m / 8) * Math.PI, j = 0.75 + r(k * 9 + m + 11) * 0.3; pts.push([cx + Math.cos(a) * rw * j, cy + Math.sin(a) * rh * j]); }
+    pts.push([cx + rw * 0.95, cy + 6], [cx - rw * 0.95, cy + 6]);
+    p.poly(pts, base);
+    p.poly([pts[1], pts[2], pts[3], pts[4], [cx - rw * 0.1, cy - rh * 0.25], [cx - rw * 0.6, cy - rh * 0.05]], lit);
+    p.poly([pts[6], pts[7], pts[8], [cx + rw * 0.95, cy + 6], [cx + rw * 0.3, cy + 4], [cx + rw * 0.35, cy - rh * 0.3]], dark);
+    if (theme === 'ash' && r(k + 30) < 0.7) { const x = cx + (r(k + 31) - 0.5) * rw; p.L(x, cy - rh * 0.5, x + 3, cy, 1.6, '#c23a18'); p.L(x, cy - rh * 0.5, x + 3, cy, 0.8, '#ffb04a'); }
+    if (theme === 'swamp') for (let m = 0; m < 7; m++) p.E(cx - rw * 0.6 + m * rw * 0.18, cy - rh * 0.8 + Math.abs(m - 3) * rh * 0.12, 4, 2.5, m % 2 ? '#4a5a2a' : '#5e6e34');
+    if (theme === 'market' && r(k + 40) < 0.6) { const x = cx - rw * 0.3; p.L(x, cy - rh * 0.7, x - 1, cy + 2, 2, '#6a0a08'); }
+  }
+  p.finish([10, 8, 7]);
+  return { canvas: p.c, ax: 0.5, ay: 68 / 80 };
+}
+/** 땅의 자국 (밟고 지나간다): 1층 용암이 흐르는 금 · 2층 거품 이는 진흙 웅덩이 · 3층 끌린 핏자국과 웅덩이 */
+function groundMark(theme: Theme, r: (k: number) => number): HPic {
+  const p = pen(50, 26);
+  if (theme === 'ash') {
+    let x = 12 + r(1) * 10, y = 22 + r(2) * 10;
+    const seg: [number, number, number, number][] = [];
+    while (x < 88) { const nx = x + 6 + r(x) * 8, ny = Math.max(8, Math.min(44, y + (r(x + 1) - 0.5) * 14)); seg.push([x, y, nx, ny]); if (r(x + 2) < 0.25) seg.push([nx, ny, nx + 6, ny + (r(x + 3) < 0.5 ? -8 : 8)]); x = nx; y = ny; }
+    for (const [a, b, c, d] of seg) p.L(a, b, c, d, 5, '#1a0e0a');
+    for (const [a, b, c, d] of seg) p.L(a, b, c, d, 2.6, '#c23a18');
+    for (const [a, b, c, d] of seg) p.L(a, b, c, d, 1, '#ffd08a');
+  } else if (theme === 'swamp') {
+    p.E(50, 28, 34, 11, '#1e1a10'); p.E(50, 27, 28, 8, '#3a3420'); p.E(46, 25, 14, 3.5, '#4e4628');
+    for (let k = 0; k < 5; k++) { const x = 30 + r(k + 5) * 40, y = 24 + r(k + 9) * 8, s = 2 + r(k + 13) * 3; p.E(x, y, s, s * 0.7, '#5a5232'); p.E(x - s * 0.3, y - s * 0.3, s * 0.4, s * 0.3, '#8a8458'); }
+  } else {
+    p.E(56, 30, 30, 10, '#3a0604'); p.E(56, 29, 24, 7, '#6a0a08'); p.E(52, 27, 10, 2.5, '#9a1a12');
+    for (let k = 0; k < 4; k++) p.L(30 - k * 5, 26 + k * 3, 8 - k * 2, 22 + k * 5, 3 - k * 0.5, '#5a0806');
+    for (let k = 0; k < 5; k++) p.E(70 + r(k + 3) * 20, 16 + r(k + 7) * 24, 1.6, 1.2, '#6a0a08');
+  }
+  p.finish(theme === 'ash' ? [16, 8, 6] : theme === 'swamp' ? [12, 10, 6] : [24, 4, 4]);
+  return { canvas: p.c, ax: 0.5, ay: 0.55, flat: true };
 }

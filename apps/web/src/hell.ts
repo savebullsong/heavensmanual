@@ -139,6 +139,12 @@ export function hellZone(floor: number): Zone {
     for (let i = 4; i < W - 4; i++) if (i % 5 !== 0 && free(i, 40, 1)) set(i, 40, 'water');
     for (let j = 4; j < H - 4; j++) if (j % 5 !== 0 && free(62, j, 1)) set(62, j, 'water');
   }
+  // 들판의 웅덩이: 1층 용암 · 3층 핏물 (늪은 이미 물웅덩이가 많다)
+  if (def.theme !== 'swamp') for (let n = 0, t = 0; n < (def.theme === 'ash' ? 16 : 12) && t < 400; t++) {
+    const i = 8 + Math.floor(r() * (W - 16)), j = 8 + Math.floor(r() * (H - 16)), rad = 1 + Math.floor(r() * 2);
+    if (!free(i, j, rad + 3)) continue;
+    disc(i, j, rad, 'water'); n++;
+  }
   border(); // 강·늪이 경계를 덮지 않게 다시
   // 길: 휴식 공간 ↔ 층주 ↔ 올라가는 계단, 휴식 공간 ↔ 내려가는 계단 (물 위는 다리)
   const pathTile: TileType = def.theme === 'market' ? 'walk' : 'walk';
@@ -173,8 +179,12 @@ export function hellZone(floor: number): Zone {
   const door = { i: shop.i0 + 1, j: shop.j0 + shop.d };
   const hutCol: Record<Theme, string> = { ash: '#4a3e36', swamp: '#4a4230', market: '#5a3228' };
   // 마을 안 집은 초가집 (사람이 사는 곳)
-  for (const [di, dj, w, d] of [[-8, -8, 3, 2], [5, -9, 2, 3], [-9, 4, 2, 3], [5, 5, 3, 2], [-9, -3, 2, 2]] as const)
+  for (const [di, dj, w, d] of [[-8, -8, 3, 2], [5, -9, 2, 3], [-9, 4, 2, 3], [5, 5, 3, 2], [-9, -3, 2, 2]] as const) {
+    if (def.theme === 'market' && di === 5 && dj === -9) continue; // 그 자리는 베스크 대부소
     buildings.push({ i0: C.i + di, j0: C.j + dj, w, d, h: 30, cat: 'generic', color: hutCol[def.theme], hk: 'thatch' });
+  }
+  // 층마다 고유한 사람: 3층 피의 시장에는 대부업자 베스크의 대부소 (1·2층에는 없다)
+  if (def.theme === 'market') buildings.push({ i0: C.i + 4, j0: C.j - 8, w: 3, d: 2, h: 62, cat: 'loan', sign: 'left', color: '#3a1a14' });
   for (const b of buildings) for (let j = b.j0; j < b.j0 + b.d; j++) for (let i = b.i0; i < b.i0 + b.w; i++) set(i, j, 'block');
   const occupied = (i0: number, j0: number, w: number, d: number) => {
     for (let j = j0 - 1; j <= j0 + d; j++) for (let i = i0 - 1; i <= i0 + w; i++) {
@@ -184,12 +194,12 @@ export function hellZone(floor: number): Zone {
     }
     return buildings.some((b) => i0 < b.i0 + b.w + 1 && i0 + w + 1 > b.i0 && j0 < b.j0 + b.d + 1 && j0 + d + 1 > b.j0);
   };
-  // 마을 밖: 집은 초가집·감옥·뼈집, 그보다 많은 것은 대형 짐승 시체·뼈 무더기·내장 더미
-  // 층마다 비율이 다르다: 1층 감옥과 뼈 · 2층(굶주림) 내장과 초가 · 3층(피의 시장) 뼈집과 감옥이 빽빽하게
+  // 마을 밖: 집(초가집·감옥·뼈집)은 몇 채만, 대신 대형 짐승 시체·뼈 무더기·내장 더미와 지옥의 나무·바위·땅의 자국
+  // 층마다 비율이 다르다: 1층 뼈와 시체 · 2층(굶주림) 내장 · 3층(피의 시장) 뼈집과 감옥이 조금 더
   const mixes: Record<Theme, [HellBuildKind, number][]> = {
-    ash: [['prison', 12], ['bonehouse', 12], ['thatch', 6], ['carcass', 12], ['bonepile', 18], ['guts', 6]],
-    swamp: [['thatch', 10], ['bonehouse', 5], ['prison', 4], ['carcass', 8], ['bonepile', 8], ['guts', 16]],
-    market: [['bonehouse', 30], ['prison', 22], ['thatch', 24], ['carcass', 12], ['bonepile', 16], ['guts', 12]],
+    ash: [['prison', 2], ['bonehouse', 2], ['carcass', 8], ['bonepile', 10], ['guts', 3]],
+    swamp: [['thatch', 2], ['bonehouse', 1], ['carcass', 6], ['bonepile', 4], ['guts', 9]],
+    market: [['bonehouse', 5], ['prison', 4], ['thatch', 3], ['carcass', 7], ['bonepile', 7], ['guts', 5]],
   };
   const sizeOf = (k: HellBuildKind): [number, number, number] => {
     const a = r() < 0.5;
@@ -221,26 +231,31 @@ export function hellZone(floor: number): Zone {
   // 마을 불빛: 1층 광장 모닥불과 화로 · 2층 도깨비불 장대 · 3층 붉은 등롱
   const vLight: Prop['kind'] = def.theme === 'ash' ? 'lamp' : 'lantern';
   props.push({ i: C.i + 2, j: C.j + 1, kind: def.theme === 'ash' ? 'bonfire' : 'lantern' });
-  for (const g of gates) for (const s2 of def.theme === 'ash' ? [-2, 2] : [2]) props.push(g.i === C.i ? { i: g.i + s2, j: g.j + (g.j < C.j ? 1 : -1), kind: vLight } : { i: g.i + (g.i < C.i ? 1 : -1), j: g.j + s2, kind: vLight });
+  for (const g of gates) for (const s2 of [2]) props.push(g.i === C.i ? { i: g.i + s2, j: g.j + (g.j < C.j ? 1 : -1), kind: vLight } : { i: g.i + (g.i < C.i ? 1 : -1), j: g.j + s2, kind: vLight });
   if (def.theme === 'market') for (const [di, dj] of [[3, 3], [-4, 2]]) props.push({ i: C.i + di, j: C.j + dj, kind: 'skulls' }); // 광장의 해골 더미 (촛불)
   const empty = (i: number, j: number) => (at(i, j) === TI.lot || at(i, j) === TI.park) && free(i, j) && !buildings.some((b) => i >= b.i0 - 1 && i <= b.i0 + b.w && j >= b.j0 - 1 && j <= b.j0 + b.d) && !props.some((p) => Math.abs(p.i - i) + Math.abs(p.j - j) < 2);
   const scatter = (kind: Prop['kind'], n: number) => { for (let k = 0, t = 0; k < n && t < n * 30; t++) { const i = 4 + Math.floor(r() * (W - 8)), j = 4 + Math.floor(r() * (H - 8)); if (empty(i, j)) { props.push({ i, j, kind }); k++; } } };
-  scatter('tree', def.theme === 'swamp' ? 150 : def.theme === 'ash' ? 70 : 10);
-  scatter('pillar', def.theme === 'ash' ? 18 : 4);
+  const scatterO = (kind: Prop['kind'], n: number, o: (k: number) => number, sep = 0) => {
+    for (let k = 0, t = 0; k < n && t < n * 40; t++) {
+      const i = 5 + Math.floor(r() * (W - 10)), j = 5 + Math.floor(r() * (H - 10));
+      if (!empty(i, j) || (sep && props.some((q) => q.kind === kind && Math.hypot(q.i - i, q.j - j) < sep))) continue;
+      props.push({ i, j, kind, o: o(k) }); k++;
+    }
+  };
+  // 지옥의 나무: 1층 숯 나무·뼈나무 · 2층 부푼 썩은 나무·손 덤불 · 3층 가시 나무·피 묻은 뼈나무
+  scatterO('htree', def.theme === 'swamp' ? 70 : def.theme === 'ash' ? 56 : 58, (k) => (k % 10 < (def.theme === 'swamp' ? 6 : 7) ? 0 : 1), 3);
+  scatter('tree', def.theme === 'swamp' ? 70 : def.theme === 'ash' ? 30 : 6); // 잎 없는 검은 나무 (예전 것)
+  scatterO('rock', def.theme === 'ash' ? 60 : def.theme === 'swamp' ? 36 : 46, () => 0, 3);
+  scatterO('crack', def.theme === 'ash' ? 60 : def.theme === 'market' ? 56 : 40, () => 0, 4);
+  if (def.theme === 'ash') scatter('pillar', 5); // 무너진 돌기둥 몇 개만
   if (def.theme === 'market') {
-    for (let k = 0, t = 0; k < 16 && t < 3000; t++) { // 노점은 드문드문 (예전 70은 파라솔 숲이었다)
+    for (let k = 0, t = 0; k < 8 && t < 3000; t++) { // 노점은 드문드문 (예전 70은 파라솔 숲이었다)
       const i = 4 + Math.floor(r() * (W - 8)), j = 4 + Math.floor(r() * (H - 8));
       const nearSoi = at(i + 1, j) === TI.soi || at(i - 1, j) === TI.soi || at(i, j + 1) === TI.soi || at(i, j - 1) === TI.soi;
       if (nearSoi && empty(i, j)) { props.push({ i, j, kind: 'cart' }); k++; }
     }
   }
-  // 화로·등: 길을 따라 (2층은 도깨비불 장대, 3층은 등롱과 화로가 섞인다)
-  for (let j = 4; j < H - 4; j++) for (let i = 4; i < W - 4; i++) {
-    if (at(i, j) !== TI.walk && at(i, j) !== TI.soi) continue;
-    if ((i * 13 + j * 7) % 23 !== 0) continue;
-    const kind: Prop['kind'] = def.theme === 'swamp' ? 'lantern' : def.theme === 'market' && (i + j) % 3 ? 'lantern' : 'lamp';
-    for (const [di, dj] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) if (empty(i + di, j + dj)) { props.push({ i: i + di, j: j + dj, kind }); break; }
-  }
+  // 길가의 화로·등은 두지 않는다 (지옥에 가로등은 인위적이다). 불빛은 마을 안과 용암·버섯·촛불 해골·가마솥뿐
   // 처절함: 고문 장면 · 가마솥 · 철창 · 꼬챙이 · 해골 더미 · 흩어진 뼈 (길에서 보이는 곳에 먼저)
   const nearRoad = (i: number, j: number, d: number) => { for (let b = -d; b <= d; b++) for (let a = -d; a <= d; a++) { const t = at(i + a, j + b); if (t === TI.walk || t === TI.soi) return true; } return false; };
   const place = (kind: Prop['kind'], n: number, road: number, extra?: (i: number, j: number) => boolean, o?: (k: number) => number, sep = 6) => {

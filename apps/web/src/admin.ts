@@ -11,7 +11,7 @@ const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   luen: { name: '루엔', where: '천국 · 환생관' },
   pashar: { name: '파샤르', where: '지옥 1층 · 환생관' },
   'goat-king': { name: '염소대왕', where: '지옥 13층 · 최종 보스' },
-  besk: { name: '베스크', where: '지옥 · 유황새 안의 대부업자' },
+  besk: { name: '베스크', where: '지옥 3층 · 베스크 대부소의 대부업자' },
   'sprite-miss-hwang': { name: '미스 황', where: '우주새 카운터 뒤에 서 있는 모습 (왼쪽 아래를 봄)' },
   'sprite-hwanghon': { name: '황혼', where: '유황새(지옥) 카운터 뒤에 서 있는 모습 (왼쪽 아래를 봄)' },
   'sprite-parrot': { name: '앵무새 · 볏 내림', where: '카운터 끝 횃대 · 평소 모습' },

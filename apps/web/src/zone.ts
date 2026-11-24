@@ -6,7 +6,7 @@ const TI = Object.fromEntries(TYPES.map((t, k) => [t, k])) as Record<TileType, n
 // generic = 이름·간판 없는 건물 (정부시설은 모두 이것으로 바뀐다)
 export type Category =
   | 'convenience' | 'pharmacy' | 'clinic' | 'restaurant' | 'bar' | 'cafe' | 'bank' | 'worship' | 'school'
-  | 'hotel' | 'laundry' | 'shop' | 'office' | 'condo' | 'ujusae' | 'generic';
+  | 'hotel' | 'laundry' | 'shop' | 'office' | 'condo' | 'ujusae' | 'loan' | 'generic';
 
 export interface Building {
   i0: number; j0: number; w: number; d: number; // 바닥 사각형 (타일)
@@ -22,7 +22,7 @@ export type HellBuildKind = 'thatch' | 'prison' | 'bonehouse' | 'carcass' | 'bon
 /** fence o: 0 = i 방향, 1 = j 방향, 2 = 모서리 기둥 */
 export interface Prop { i: number; j: number; kind: 'tree' | 'lamp' | 'pillar' | 'cart' | 'fence' | 'pole' | 'spirit' | 'moto' | 'plant' | 'bin' | 'stools' | 'pushcart' | HellDecorKind; o?: number }
 /** 지옥 소품: 경계 바위·성벽, 뼈, 해골 더미, 꼬챙이, 가마솥, 철창, 마을 불빛, 고문 장면(움직임) */
-export type HellDecorKind = 'crag' | 'bones' | 'skulls' | 'stake' | 'cauldron' | 'cage' | 'lantern' | 'bonfire' | 'torture';
+export type HellDecorKind = 'crag' | 'bones' | 'skulls' | 'stake' | 'cauldron' | 'cage' | 'lantern' | 'bonfire' | 'torture' | 'htree' | 'rock' | 'crack';
 /** 차가 달리는 구간: j 행의 i0~i1, dir = +1 이면 +i 방향 */
 export interface Lane { j: number; i0: number; i1: number; dir: 1 | -1 }
 export interface Zone {
@@ -78,7 +78,7 @@ export function finalize(z: Omit<Zone, 'blocked'>): Zone {
     // 빈 땅(주차장·공터·광장)은 걸을 수 있다. 건물·물·지도 바깥만 막는다
     blocked[k] = t === 'block' || t === 'void' || t === 'water' ? 1 : 0;
   }
-  for (const p of z.props) if (p.kind !== 'tree') blocked[p.j * z.W + p.i] = 1;
+  for (const p of z.props) if (p.kind !== 'tree' && p.kind !== 'bones' && p.kind !== 'crack') blocked[p.j * z.W + p.i] = 1; // 나무·흩어진 뼈·땅의 자국은 밟고 지나간다
   // 건물 바닥은 막는다. 지도 변환에서 골목·보도가 건물 밑으로 그려진 곳이 많아 사람이 건물을 뚫고 다녔다
   // (큰길과 횡단보도만 남겨 길이 끊기지 않게 한다)
   for (const b of z.buildings)

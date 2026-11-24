@@ -70,7 +70,7 @@ const zoneReady: Promise<Zone> = fetch(ZONE_URL)
   .then((j) => decodeZone(j))
   .catch(() => sukhumvitTestZone());
 
-const shopLabels = () => ({ hwang: state.realm === 'hell' ? t().hwanghon : t().clerk, parrot: t().parrot, door: t().doorLabel, besk: t().besk });
+const shopLabels = () => ({ hwang: state.realm === 'hell' ? t().hwanghon : t().clerk, parrot: t().parrot, door: t().doorLabel });
 const realm = () => state.realm ?? 'real';
 /** 관리자 캐릭터의 투명 모드 (관리자로 지정된 계정만) */
 const INVIS_KEY = 'heavensmanual.invisible';
@@ -383,14 +383,14 @@ function enterInterior(k: number, out: { i: number; j: number }, chaser: { monst
   if (!world || world.zone.interior || busy) return;
   const outer = world;
   const b = outer.zone.buildings[k];
-  const z = interiorZone(b, k, out, buildingName(b, lang()));
+  const z = interiorZone(b, k, out, b.cat === 'loan' ? t().beskHouse : buildingName(b, lang()));
   closeMenus();
   document.querySelector('.store-panel')?.remove();
   outer.stop();
   outer.root.visible = false;
   street = outer;
   net.leaveZone(); // 방 안은 혼자
-  const w = new WorldScene(app, z, bodyLook(), () => enterShop(true), hooks, state.hp ?? maxHp(), { realm: 'real', chaser, work: work ? z.interior!.name : undefined });
+  const w = new WorldScene(app, z, bodyLook(), () => enterShop(true), hooks, state.hp ?? maxHp(), { realm: realm() === 'hell' ? 'hell' : 'real', chaser, work: work ? z.interior!.name : undefined });
   w.crimeT = outer.crimeT;
   world = w;
   app.stage.addChild(w.root);
@@ -461,6 +461,7 @@ function clerkTalk() {
   if (!info) return;
   const L = t();
   const sub = L.clerkSub[info.kind as keyof typeof L.clerkSub] ?? '';
+  if (info.kind === 'loan') { talkToBesk(); return; } // 3층 피의 시장: 베스크 대부소
   if (info.store === 'bank') { openBank(info.name); return; }
   if (info.store === 'mart' || info.store === 'pharmacy' || info.store === 'food' || info.store === 'cafe') { openStore(info.store, info.name, info.cuisine); return; }
   const opts: { label: string; danger?: boolean; act: () => void }[] = [];
@@ -606,7 +607,6 @@ function onShopArrive(target: ShopTarget) {
   if (busy) return;
   if (realm() === 'ghost' && target !== 'door') { ghostParrot(); return; }
   if (target === 'hwang') talkToHwang();
-  else if (target === 'besk') talkToBesk();
   else if (target === 'door') goOut();
 }
 
