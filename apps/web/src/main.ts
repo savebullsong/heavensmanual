@@ -572,12 +572,13 @@ function rebirthFrom(from: 'hell' | 'ghost' | 'heaven') {
 }
 
 /** 행위를 기록하고 영혼 경험치를 더한다 */
-function recordDeed(key: DeedKey, opt: { floor?: number } = {}) {
+function recordDeed(key: DeedKey, opt: { floor?: number; share?: number } = {}) {
   const L = t();
   const res = applyDeed(state.deeds ?? { good: 0, evil: 0 }, key, opt);
   state.deeds = res.deeds;
   const rule = DEED_TABLE[key];
   const parts: string[] = [];
+  if (opt.share !== undefined) parts.push(L.guardAssist.replace('{p}', String(Math.round(opt.share * 100))));
   if (rule.kind === 'good') parts.push(L.toastGood.replace('{n}', String(rule.points)));
   if (rule.kind === 'evil') parts.push(L.toastEvil.replace('{n}', String(rule.points)));
   if (res.exp) {

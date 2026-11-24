@@ -113,9 +113,11 @@ export const SAME_TARGET_COOLDOWN_MIN = 60;
 export const DONATION_DAILY_CAP = 20;
 
 /** 행위 하나를 기록에 더한다. 지옥 괴물은 층수를 곱한다 */
-export function applyDeed(d: Deeds, key: DeedKey, opt: { floor?: number } = {}): { deeds: Deeds; exp: number } {
+export function applyDeed(d: Deeds, key: DeedKey, opt: { floor?: number; share?: number } = {}): { deeds: Deeds; exp: number } {
   const rule: DeedRule = DEED_TABLE[key];
-  const exp = key === 'hellMonster' ? rule.exp * Math.max(1, opt.floor ?? 1) : rule.exp;
+  const full = key === 'hellMonster' ? rule.exp * Math.max(1, opt.floor ?? 1) : rule.exp;
+  // share: 함께 싸우다 경비병이 마무리한 괴물은 내가 준 피해만큼만 (0~1)
+  const exp = opt.share !== undefined ? Math.round(full * Math.max(0, Math.min(1, opt.share))) : full;
   const deeds = { ...d };
   if (rule.kind === 'good') deeds.good += rule.points;
   else if (rule.kind === 'evil') deeds.evil += rule.points;

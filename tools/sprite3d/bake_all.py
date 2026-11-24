@@ -32,6 +32,10 @@ jobs.append({'sex': 'm', 'build': 1, 'monster': 's', 'occluder': 'bones', 'sets'
 jobs.append({'sex': 'm', 'build': 1, 'monster': 'k', 'occluder': 'besk', 'sets': [{'kind': 'base', 'outfit': 'besk', 'mode': 'm'}, {'kind': 'weapon', 'weapon': 'ledger'}], 'only': ['idle'], 'tag': 'hell2'})
 # 유황새의 앵무새: 사람 키, 두 발로 서고 걷기만
 jobs.append({'sex': 'm', 'build': 1, 'monster': 'b', 'occluder': 'cockatoo', 'sets': [{'kind': 'base', 'outfit': 'cockatoo', 'mode': 'u'}], 'only': ['idle', 'walk'], 'tag': 'bird'})
+# 지옥 휴식 마을의 경비병 (설정집 B01~B03)
+jobs.append({'sex': 'm', 'build': 1, 'monster': 'g', 'occluder': 'warden1', 'sets': [{'kind': 'base', 'outfit': 'warden1', 'mode': 'm'}, {'kind': 'weapon', 'weapon': 'knocker'}], 'tag': 'guard'})
+jobs.append({'sex': 'm', 'build': 1, 'monster': 'o', 'occluder': 'warden2', 'sets': [{'kind': 'base', 'outfit': 'warden2', 'mode': 'u'}], 'tag': 'guard'})
+jobs.append({'sex': 'm', 'build': 1, 'monster': 'w', 'occluder': 'warden3', 'sets': [{'kind': 'base', 'outfit': 'warden3', 'mode': 'm'}, {'kind': 'weapon', 'weapon': 'sealstaff'}], 'tag': 'guard'})
 args = sys.argv[2:]
 # --scale2: 같은 크기의 인물을 픽셀 두 배로 (게임에서는 반으로 줄여 같은 크기, 더 섬세)
 if '--scale2' in args:

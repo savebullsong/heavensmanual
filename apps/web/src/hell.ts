@@ -6,13 +6,52 @@ import type { Lang } from './i18n.ts';
 export const OPEN_FLOORS = 3; // 지금 열린 층 (4~13층은 하나씩 업데이트)
 
 export type Theme = 'ash' | 'swamp' | 'market';
-export interface FloorDef { floor: number; theme: Theme; name: Record<Lang, string>; sin: Record<Lang, string>; monsters: string[]; boss: string }
+export interface FloorDef { floor: number; theme: Theme; name: Record<Lang, string>; sin: Record<Lang, string>; monsters: string[]; boss: string; guard?: string }
 export const FLOORS: FloorDef[] = [
-  { floor: 1, theme: 'ash', name: { ko: '재의 문턱', th: 'ธรณีแห่งเถ้าถ่าน', en: 'Threshold of Ash' }, sin: { ko: '경미한 잘못, 책임 회피', th: 'ความผิดเล็กน้อย การหนีความรับผิดชอบ', en: 'Petty wrongs, evading responsibility' }, monsters: ['ashen', 'ember', 'bonewalker', 'gateyak'], boss: 'ashgal' },
-  { floor: 2, theme: 'swamp', name: { ko: '굶주림의 늪', th: 'บึงแห่งความหิวโหย', en: 'Swamp of Hunger' }, sin: { ko: '탐욕', th: 'ความโลภ', en: 'Greed' }, monsters: ['pret', 'bogdead', 'gluttonyak'], boss: 'gurma' },
-  { floor: 3, theme: 'market', name: { ko: '피의 시장', th: 'ตลาดเลือด', en: 'Blood Market' }, sin: { ko: '사기, 기만', th: 'การฉ้อโกง การหลอกลวง', en: 'Fraud and deceit' }, monsters: ['haggler', 'debtbones', 'bloodpret', 'merchantyak'], boss: 'serane' },
+  { floor: 1, theme: 'ash', name: { ko: '재의 문턱', th: 'ธรณีแห่งเถ้าถ่าน', en: 'Threshold of Ash' }, sin: { ko: '경미한 잘못, 책임 회피', th: 'ความผิดเล็กน้อย การหนีความรับผิดชอบ', en: 'Petty wrongs, evading responsibility' }, monsters: ['ashen', 'ember', 'bonewalker', 'gateyak'], boss: 'ashgal', guard: 'ashwarden' },
+  { floor: 2, theme: 'swamp', name: { ko: '굶주림의 늪', th: 'บึงแห่งความหิวโหย', en: 'Swamp of Hunger' }, sin: { ko: '탐욕', th: 'ความโลภ', en: 'Greed' }, monsters: ['pret', 'bogdead', 'gluttonyak'], boss: 'gurma', guard: 'hollowbowl' },
+  { floor: 3, theme: 'market', name: { ko: '피의 시장', th: 'ตลาดเลือด', en: 'Blood Market' }, sin: { ko: '사기, 기만', th: 'การฉ้อโกง การหลอกลวง', en: 'Fraud and deceit' }, monsters: ['haggler', 'debtbones', 'bloodpret', 'merchantyak'], boss: 'serane', guard: 'waxseal' },
 ];
 export const floorDef = (f: number) => FLOORS[Math.max(1, Math.min(FLOORS.length, f)) - 1];
+
+/**
+ * 휴식 마을의 경비병 (「지옥 13층 경비병 설정집」 B01~B03). 층주의 휴전 협약에 따라 마을을 지키는 중립 NPC.
+ * 순찰 → 감지 → 개입 → 복귀. 마을과 둘레(완충 경계)에 다가온 괴물을 잡고, 그 안에서 싸움을 건 사람은 경고 뒤 체력 1까지 제압해 마을 밖으로 내보낸다.
+ * 일반 괴물보다 강하다. 쓰러뜨려도 보상·카르마·영격은 없다.
+ */
+export interface GuardDef {
+  key: string; body: 'warden1' | 'warden2' | 'warden3'; weapon: string | null;
+  name: Record<Lang, string>; line: Record<Lang, string>; look: Record<Lang, string>;
+  cols: Record<number, string>; hp: number; dmg: [number, number]; atk: number; speed: number;
+  /** push = 곤봉으로 내려쳐 밀어냄 · mud = 진흙 파문으로 느리게 · seal = 붉은 봉인 낙인 */
+  special: 'push' | 'mud' | 'seal';
+}
+export const GUARDS: Record<string, GuardDef> = {
+  ashwarden: {
+    key: 'ashwarden', body: 'warden1', weapon: 'knocker',
+    name: { ko: '재문지기', th: 'ผู้เฝ้าประตูเถ้า', en: 'Ash Warden' },
+    line: { ko: '이 문 앞에서는 더 이상 누구도 다치지 않는다.', th: 'หน้าประตูนี้ จะไม่มีใครต้องเจ็บอีกแล้ว', en: 'Before this gate, no one is hurt anymore.' },
+    look: { ko: '재가 묻은 해골. 낡은 회색 망토에 문고리 모양의 뼈 곤봉, 허리엔 작은 돌문 열쇠.', th: 'โครงกระดูกเปื้อนเถ้า สวมผ้าคลุมสีเทาเก่า ถือกระบองกระดูกรูปห่วงประตู มีกุญแจประตูหินห้อยเอว', en: 'An ash-dusted skeleton in an old grey cloak, holding a bone club shaped like a door knocker. A small stone-gate key hangs at its waist.' },
+    cols: { 1: '#cfc6b0', 3: '#6a6662', 4: '#56524e', 10: '#d8ccb0', 14: '#6a5a3a', 15: '#1a1614', 12: '#ff7a2a', 6: '#ff7a2a' },
+    hp: 1600, dmg: [22, 32], atk: 1.05, speed: 0.55, special: 'push',
+  },
+  hollowbowl: {
+    key: 'hollowbowl', body: 'warden2', weapon: null,
+    name: { ko: '빈그릇귀', th: 'ผีชามกลวง', en: 'Hollow Bowl' },
+    line: { ko: '굶주림은 핑계가 될 수 없다.', th: 'ความหิวไม่ใช่ข้ออ้าง', en: 'Hunger is no excuse.' },
+    look: { ko: '갈비뼈가 휜 배가 텅 빈 그릇처럼 패였다. 한쪽 팔에 진흙으로 빚은 큰 사발을 달았다.', th: 'ท้องที่ซี่โครงโค้งเว้าลึกเหมือนชามเปล่า แขนข้างหนึ่งผูกชามดินเผาใบใหญ่ไว้', en: 'Its rib-curved belly is hollowed like an empty bowl. A large clay bowl is strapped to one arm.' },
+    cols: { 1: '#4e6a46', 3: '#2e3a26', 4: '#2e3a26', 10: '#a8b890', 13: '#8a6a4a', 12: '#c8f08a', 15: '#141a10', 6: '#c8f08a' },
+    hp: 2000, dmg: [24, 34], atk: 1.15, speed: 0.5, special: 'mud',
+  },
+  waxseal: {
+    key: 'waxseal', body: 'warden3', weapon: 'sealstaff',
+    name: { ko: '봉랍귀', th: 'ผีตราครั่ง', en: 'Waxseal' },
+    line: { ko: '서명은 자유다. 칼은 아니다.', th: 'จะลงนามก็ได้ตามใจ แต่ไม่ใช่มีด', en: 'Signing is free. The blade is not.' },
+    look: { ko: '붉은 봉랍처럼 굳은 얼굴, 검은 상인복, 붉은 밀랍 인장이 달린 긴 지팡이.', th: 'ใบหน้าแข็งเหมือนครั่งแดง ชุดพ่อค้าสีดำ ไม้เท้ายาวติดตราครั่งสีแดง', en: 'A face hardened like red sealing wax, a black merchant coat, and a long staff topped with a red wax seal.' },
+    cols: { 1: '#a8281e', 3: '#1e1818', 4: '#141010', 14: '#c9a23e', 13: '#3a2418', 12: '#c8281e', 6: '#ffd08a', 15: '#0e0a0a', 10: '#a8281e' },
+    hp: 2400, dmg: [28, 38], atk: 1.0, speed: 0.6, special: 'seal',
+  },
+};
 
 /** 괴물: 몸(망자·프렛·야크·해골) + 색 */
 export type MonsterBody = 'ash' | 'pret' | 'yak' | 'bones';

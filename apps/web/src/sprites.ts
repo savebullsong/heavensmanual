@@ -147,6 +147,10 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
   if (o === 'bones') return { base: 'b-s-bones-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
   if (o === 'besk') return { base: 'b-k-besk-m', hair: null, weapon: 'w-k-ledger', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   if (o === 'cockatoo') return { base: 'b-b-cockatoo-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
+  // 휴식 마을 경비병: 재문지기(뼈 곤봉) · 빈그릇귀(맨손·사발) · 봉랍귀(인장 지팡이)
+  if (o === 'warden1') return { base: 'b-g-warden1-m', hair: null, weapon: 'w-g-knocker', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
+  if (o === 'warden2') return { base: 'b-o-warden2-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
+  if (o === 'warden3') return { base: 'b-w-warden3-m', hair: null, weapon: 'w-w-sealstaff', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   if (o === 'yak') return { base: 'b-y-yak-m', hair: null, weapon: weapon === null ? null : 'w-y-club', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   const child = !!look.child;
   const w = child ? null : weapon && (MELEE.includes(weapon) || weapon === 'pistol') ? weapon : null;

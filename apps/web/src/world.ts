@@ -13,7 +13,7 @@ import { t, lang } from './i18n.ts';
 import { bangkokClock, nightFactor } from './clock.ts';
 import { buildingName, buildingSub, interactive, canWork, hasBank, cuisineOf, storeOf, type StoreKind } from './names.ts';
 import * as sfx from './sfx.ts';
-import { MONSTERS, floorDef, type MonsterDef } from './hell.ts';
+import { MONSTERS, GUARDS, floorDef, type MonsterDef, type GuardDef } from './hell.ts';
 import { drawHellGround, drawHellStructure, hellTint, hellProp } from './hellgfx.ts';
 import { drawCosmicBird, COSMIC_TOP } from './ujusae.ts';
 import { streetProp, type PropPic } from './propgfx.ts';
@@ -27,7 +27,7 @@ function tex(c: HTMLCanvasElement): Texture {
   return tx;
 }
 
-export type NpcKind = 'passer' | 'thug' | 'suturer' | 'monster' | 'pashar' | 'clerk' | 'angel' | 'yellowwing' | 'officer';
+export type NpcKind = 'passer' | 'thug' | 'suturer' | 'monster' | 'pashar' | 'clerk' | 'angel' | 'yellowwing' | 'officer' | 'guard';
 export type Realm = 'real' | 'ghost' | 'hell' | 'heaven';
 export type Stance = 'talk' | 'hostile' | 'all';
 /** name = 아이디(프로필·신고에 쓰는 열쇠), nick = 게임 속 이름(보이는 이름) */
@@ -71,6 +71,13 @@ interface Walker {
   wings?: Sprite; // 천사·황색날개의 날개
   aggroCool?: number;
   mdef?: MonsterDef; // 지옥 괴물
+  gdef?: GuardDef; // 휴식 마을 경비병
+  post?: number; // 경비병 번호 (순찰로)
+  patrolK?: number; // 순찰로에서 다음에 갈 곳
+  warnT?: number; // 경비병: 경고하고 기다리는 시간
+  pdmg?: number; // 괴물: 내가 준 피해 (경비병이 마무리하면 이만큼 나눠 받는다)
+  slowT?: number; // 진흙 파문: 느려진 남은 시간
+  sealT?: number; // 붉은 봉인 낙인: 남은 시간
   size?: number; // 그림 배율 (층주는 크게)
   lingerT?: number; // 싸우다 나간 사람의 몸이 남아 있는 시간
   barT: number;
@@ -91,7 +98,7 @@ type LabelRef = { kind: 'shop' } | { kind: 'b'; k: number } | { kind: 'w'; w: Wa
 /** main.ts 가 받는 일들 */
 export interface WorldHooks {
   money(n: number): void;
-  deed(key: DeedKey, opt?: { floor?: number }): void;
+  deed(key: DeedKey, opt?: { floor?: number; share?: number }): void;
   hp(hp: number, max: number): void;
   died(cause: 'car' | 'beaten' | 'hell'): void;
   menu(title: string, sub: string, options: { label: string; danger?: boolean; act: () => void }[], x: number, y: number): void;
@@ -209,7 +216,8 @@ export class WorldScene {
   private press: { id: number; x: number; y: number; sx: number; sy: number; t0: number; hold: boolean; next: number } | null = null;
   private skipTap = false;
   private label = new Container();
-  private labelText = new Text({ text: '', style: { fontFamily: 'system-ui, sans-serif', fontSize: 13, fontWeight: '600', fill: '#fff6d8' } });
+  // 이름표: 네모칸 없이 글자만 (어두운 테두리로 읽히게) — 싸우는 장면을 가리지 않도록
+  private labelText = new Text({ text: '', style: { fontFamily: 'system-ui, sans-serif', fontSize: 13, fontWeight: '700', fill: '#fff6d8', stroke: { color: '#140e0a', width: 3, join: 'round' } } });
   private labelBg = new Graphics();
   private labelT = 0;
   private labelFor: LabelRef = null;
@@ -240,6 +248,14 @@ export class WorldScene {
   private embers: { x: number; y: number; vx: number; vy: number; t: number }[] = [];
   private emberG = new Graphics();
   private featureG = new Graphics();
+  /** 경비병 기술 효과: 곤봉 내려치기 먼지 고리 · 진흙 파문 (바닥) / 봉인 낙인 (머리 위) */
+  private gfxLow = new Graphics();
+  private gfxTop = new Graphics();
+  private gfx: { kind: 'slam' | 'mud'; x: number; y: number; t: number }[] = [];
+  /** 내가 마을 둘레에서 마지막으로 싸움을 건 때 (경비병 적대는 3초 뒤 풀린다) */
+  private guardHostAt = -99;
+  /** 경비병이 잡은 괴물 수 (그만큼 바로 다시 채운다) */
+  guardKills = 0;
   constructor(private app: Application, readonly zone: Zone, look: Look, private onEnterShop: () => void, private hooks: WorldHooks, hp = PLAYER_MAX_HP, opts: { realm?: Realm; bossDown?: boolean; chaser?: { monster: boolean; hp: number } | null; work?: string } = {}) {
     this.realm = opts.realm ?? (zone.hell ? 'hell' : 'real');
     this.bossDown = !!opts.bossDown;
@@ -301,7 +317,7 @@ export class WorldScene {
     this.labelText.anchor.set(0.5, 1);
     this.label.addChild(this.labelBg, this.labelText);
     this.label.visible = false;
-    this.label.alpha = 0.62; // 이름표는 반투명 (뒤의 길·사람이 비쳐 보이게)
+    this.label.alpha = 0.92; // 칸이 없으니 글자는 또렷하게
     this.label.eventMode = 'none';
     this.label.zIndex = 1e6;
     this.bars.zIndex = 1e6 - 1;
@@ -995,6 +1011,162 @@ export class WorldScene {
     this.featureG.zIndex = 0;
     this.objects.addChild(this.featureG);
     this.drawFeatures();
+    this.gfxLow.zIndex = 0.6;
+    this.gfxTop.zIndex = 1e6 - 6;
+    this.objects.addChild(this.gfxLow, this.gfxTop);
+    const gk = floorDef(h.floor).guard;
+    if (gk && GUARDS[gk]) for (let k = 0; k < 2; k++) this.walkers.push(this.makeGuard(GUARDS[gk], k));
+  }
+
+  /** 경비병 순찰로: 마을 가운데(모닥불·공동 식탁·등불 가게 앞) ↔ 문 안쪽. 둘이 네 문을 나눠 돈다 */
+  private patrolOf(post: number): [number, number][] {
+    const r = this.zone.hell!.rest;
+    const C: [number, number] = [r.i, r.j], In = r.r - 1;
+    const pts: [number, number][] = post === 0
+      ? [[C[0] + 2, C[1] + 2], [C[0], C[1] - In], [C[0] - 1, C[1] - 1], [C[0] - In, C[1]]]
+      : [[C[0] - 2, C[1] + 2], [C[0] + In, C[1]], [C[0] + 1, C[1] + 1], [C[0], C[1] + In]];
+    return pts.map(([i, j]) => (walkable(this.zone, i, j) ? [i, j] : randomWalkTileNear(this.zone, i, j, 3, ['walk', 'lot', 'park', 'soi']) ?? [C[0], C[1]]) as [number, number]);
+  }
+  private makeGuard(g: GuardDef, post: number): Walker {
+    const look: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: g.body, cols: g.cols };
+    const [i, j] = this.patrolOf(post)[0];
+    const w = this.makeWalker(look, i, j, 'guard', g.weapon);
+    w.gdef = g;
+    w.size = 1.14; // 마을 괴물보다 한 뼘 크다
+    w.post = post;
+    w.patrolK = 1;
+    w.maxHp = w.hp = g.hp;
+    w.speed = g.speed;
+    w.voice = 0.7 + Math.random() * 0.15;
+    w.wait = 1 + Math.random() * 2;
+    return w;
+  }
+  /** 휴식 마을 둘레 (울타리 안 + 바깥 extra칸까지의 정사각형) */
+  private nearRest(x: number, y: number, extra: number) {
+    const r = this.zone.hell?.rest;
+    return !!r && Math.max(Math.abs(x - (r.i + 0.5)), Math.abs(y - (r.j + 0.5))) < r.r + extra;
+  }
+  /** 내가 마을 둘레에서 싸움을 걸었다: 가까운 경비병이 1초쯤 경고하고 제압하러 온다. 맞은 경비병은 바로 */
+  private guardAlarm(hitGuard: Walker | null) {
+    const L = t();
+    const p = this.player;
+    this.guardHostAt = this.time;
+    for (const g of this.walkers) {
+      if (!g.gdef || g.down > 0 || g.target === p) continue;
+      if (g === hitGuard) { g.target = p; g.warnT = 0; this.bubble(g, L.guardWarn[Math.floor(Math.random() * L.guardWarn.length)]); continue; }
+      if (Math.hypot(g.x - p.x, g.y - p.y) > 20 || (g.warnT ?? 0) > 0) continue;
+      g.warnT = 1;
+      g.path = [];
+      g.dir = dirFromTile(p.x - g.x, p.y - g.y, g.dir);
+      this.bubble(g, L.guardWarn[Math.floor(Math.random() * L.guardWarn.length)]);
+    }
+  }
+  /** 체력 1까지 제압된 영혼을 마을 둘레 바깥으로 내던진다 */
+  private evict(by: Walker) {
+    const p = this.player, r = this.zone.hell!.rest;
+    const L = t();
+    this.guardHostAt = -99;
+    for (const g of this.walkers) if (g.gdef && g.target === p) { g.target = null; g.warnT = 0; }
+    this.cancelActs();
+    const dx = p.x - (r.i + 0.5), dy = p.y - (r.j + 0.5), d = Math.hypot(dx, dy) || 1;
+    const far = r.r + 9;
+    let spot: [number, number] | null = null;
+    for (let n = 0; n < 8 && !spot; n++) {
+      const s = randomWalkTileNear(this.zone, Math.floor(r.i + 0.5 + (dx / d) * far), Math.floor(r.j + 0.5 + (dy / d) * far), 3 + n, ['walk', 'lot', 'park', 'soi']);
+      if (s && !this.nearRest(s[0] + 0.5, s[1] + 0.5, 7)) spot = s;
+    }
+    this.bubble(by, by.gdef!.line[lang()]);
+    if (!spot) return;
+    p.x = spot[0] + 0.5; p.y = spot[1] + 0.5; p.path = []; p.kb = undefined;
+    p.act = { anim: 'hit', t: 0 }; p.pend = null;
+    this.rippleAt(spot[0], spot[1]);
+    this.shakeT = Math.max(this.shakeT, 0.3); this.shakeA = Math.max(this.shakeA, 5);
+    this.hooks.say(by.gdef!.name[lang()], L.guardEvict);
+  }
+  /** 경비병의 기술: 재문지기 = 곤봉으로 내려쳐 크게 밀어냄 · 빈그릇귀 = 진흙 파문으로 비틀거리고 느려짐 · 봉랍귀 = 붉은 봉인 낙인 */
+  private guardSpecial(g: Walker, to: Walker) {
+    const sp = g.gdef!.special;
+    if (sp === 'push') {
+      const dx = to.x - g.x, dy = to.y - g.y, d = Math.hypot(dx, dy) || 1;
+      to.kb = { dx: (dx / d) * 1.5, dy: (dy / d) * 1.5, t: 0.26 };
+      this.gfx.push({ kind: 'slam', x: g.x + (dx / d) * 0.8, y: g.y + (dy / d) * 0.8, t: 0 });
+    } else if (sp === 'mud') {
+      to.slowT = 2.6;
+      to.atkT = Math.max(to.atkT, 0.7); // 비틀거리는 동안 바로 치지 못한다
+      this.gfx.push({ kind: 'mud', x: to.x, y: to.y, t: 0 });
+    } else to.sealT = 5;
+  }
+  /** 경비병 효과 그리기 */
+  private drawGuardFx(dt: number) {
+    const lo = this.gfxLow, top = this.gfxTop;
+    lo.clear(); top.clear();
+    for (const e of this.gfx) e.t += dt;
+    this.gfx = this.gfx.filter((e) => e.t < 0.7);
+    for (const e of this.gfx) {
+      const a = e.t / 0.7, [x, y] = iso(e.x, e.y);
+      if (e.kind === 'slam') {
+        const r = 10 + a * 46;
+        lo.ellipse(x, y, r, r / 2).stroke({ color: 0xd8ccb0, width: 3 * (1 - a) + 1, alpha: 1 - a });
+        lo.ellipse(x, y, r * 0.6, r * 0.3).fill({ color: 0x6a5a4a, alpha: 0.35 * (1 - a) });
+        for (let k = 0; k < 6; k++) { const an = k * 1.05 + 0.3; lo.moveTo(x, y).lineTo(x + Math.cos(an) * r * 0.7, y + Math.sin(an) * r * 0.35).stroke({ color: 0x2a2018, width: 1.5, alpha: 1 - a }); }
+      } else {
+        for (const k of [0, 0.35]) { const b = Math.max(0, a - k) / (1 - k); if (b <= 0) continue; const r = 8 + b * 34; lo.ellipse(x, y, r, r / 2).stroke({ color: 0x6a5232, width: 3, alpha: 0.85 * (1 - b) }); }
+        lo.ellipse(x, y, 16, 7).fill({ color: 0x4a3a22, alpha: 0.5 * (1 - a) });
+      }
+    }
+    for (const w of this.walkers) {
+      if (w.down > 0) { w.slowT = 0; w.sealT = 0; continue; }
+      if (w.slowT && w.slowT > 0) {
+        w.slowT -= dt;
+        const [x, y] = iso(w.x, w.y);
+        lo.ellipse(x, y + 1, 13, 5).fill({ color: 0x4a3a22, alpha: 0.6 });
+        lo.ellipse(x - 4, y, 3, 1.5).fill({ color: 0x8a6a42, alpha: 0.7 });
+      }
+      if (w.sealT && w.sealT > 0) {
+        w.sealT -= dt;
+        const [x, y0] = iso(w.x, w.y), y = y0 - 58 * (w.size ?? 1), sp = this.time * 2.2;
+        top.circle(x, y, 8).fill(0x8a1a12).stroke({ color: 0xc9a23e, width: 1.5 });
+        top.circle(x, y, 5).stroke({ color: 0xff5a3a, width: 1 });
+        for (let k = 0; k < 4; k++) { const an = sp + k * Math.PI / 2; top.moveTo(x, y).lineTo(x + Math.cos(an) * 4.5, y + Math.sin(an) * 4.5).stroke({ color: 0xffb08a, width: 1 }); }
+        for (let k = 0; k < 5; k++) { const an = -sp * 0.6 + k * 1.2566; top.circle(x + Math.cos(an) * 11, y + Math.sin(an) * 11, 1.2).fill({ color: 0xc9a23e, alpha: 0.8 }); }
+      }
+    }
+  }
+  /** 경비병의 평소 행동: 순찰 → 감지 → 개입 → 복귀 */
+  private thinkGuard(w: Walker, moving: boolean, dt: number) {
+    const p = this.player, L = t();
+    if (w.hp < w.maxHp && !w.target) w.hp = Math.min(w.maxHp, w.hp + w.maxHp * 0.03 * dt);
+    // 경고 중: 1초 동안 노려보다가, 그동안에도 싸움이 이어졌으면 제압하러 간다
+    if (w.warnT && w.warnT > 0) {
+      w.warnT -= dt;
+      w.dir = dirFromTile(p.x - w.x, p.y - w.y, w.dir);
+      if (w.warnT <= 0 && this.time - this.guardHostAt < 3 && !this.dead) w.target = p;
+      return;
+    }
+    // 사람에 대한 적대는 마지막 싸움 뒤 3초면 풀린다
+    if (w.target === p && (this.time - this.guardHostAt > 3 || this.dead)) {
+      w.target = null;
+      this.bubble(w, L.guardCalm[Math.floor(Math.random() * L.guardCalm.length)]);
+    }
+    // 마을과 둘레(울타리 밖 6칸)에 들어온 괴물을 잡는다
+    if (!w.target && Math.random() < dt * 5) {
+      let best: Walker | null = null, bd = 15;
+      for (const m of this.walkers) {
+        if (!m.mdef || m.down > 0 || !this.nearRest(m.x, m.y, 6)) continue;
+        const d = Math.hypot(m.x - w.x, m.y - w.y);
+        if (d < bd) { bd = d; best = m; }
+      }
+      if (best) { w.target = best; w.repathT = 0; if (Math.random() < 0.6) this.bubble(w, L.guardShout[Math.floor(Math.random() * L.guardShout.length)]); }
+    }
+    if (w.target || moving) return;
+    w.wait -= dt;
+    if (w.wait > 0) return;
+    w.wait = 2.5 + Math.random() * 3;
+    const pts = this.patrolOf(w.post ?? 0);
+    const k = (w.patrolK ?? 0) % pts.length;
+    w.patrolK = k + 1;
+    const path = findPath(this.zone, Math.floor(w.x), Math.floor(w.y), pts[k][0], pts[k][1]);
+    if (path) w.path = path;
   }
 
   /** 계단 그림: 올라가는 돌계단(빛) · 내려가는 구덩이(붉은 빛) */
@@ -1028,8 +1200,9 @@ export class WorldScene {
     const h = this.zone.hell!;
     const p = this.player;
     const def = floorDef(h.floor);
-    const near = h.spawns.filter(([i, j]) => { const d = Math.hypot(i - p.x, j - p.y); return d > 10 && d < 30; });
-    const pool = near.length ? near : h.spawns;
+    const field = h.spawns.filter(([i, j]) => !this.nearRest(i + 0.5, j + 0.5, 8)); // 경비병 둘레 밖 들판
+    const near = field.filter(([i, j]) => { const d = Math.hypot(i - p.x, j - p.y); return d > 10 && d < 30; });
+    const pool = near.length ? near : field.length ? field : h.spawns;
     const [i, j] = pool[Math.floor(Math.random() * pool.length)];
     const m = MONSTERS[def.monsters[Math.floor(Math.random() * def.monsters.length)]];
     if (existing) this.removeWalker(existing);
@@ -1374,10 +1547,10 @@ export class WorldScene {
       this.showLabel({ kind: 'w', w }, 2);
       const [sx, sy] = iso(w.x, w.y);
       const opts: { label: string; danger?: boolean; act: () => void }[] = [];
-      if (w.kind === 'thug' || w.kind === 'suturer' || w.mdef) opts.push({ label: L.act.attack, act: () => this.attack(w) });
+      if (w.kind === 'thug' || w.kind === 'suturer' || w.mdef || (w.gdef && w.target === this.player)) opts.push({ label: L.act.attack, act: () => this.attack(w) });
       if (!w.mdef) opts.push({ label: L.act.talk, act: () => this.approach(w, 'talk') });
       opts.push({ label: L.act.look, act: () => this.approach(w, 'look') });
-      if (w.kind === 'passer' || w.kind === 'angel' || w.kind === 'yellowwing' || w.kind === 'officer') opts.push({ label: L.act.force, danger: true, act: () => (this.realm === 'heaven' ? this.hooks.heavenAct('assault') : this.attack(w)) });
+      if (w.kind === 'passer' || w.kind === 'angel' || w.kind === 'yellowwing' || w.kind === 'officer' || (w.gdef && w.target !== this.player)) opts.push({ label: L.act.force, danger: true, act: () => (this.realm === 'heaven' ? this.hooks.heavenAct('assault') : this.attack(w)) });
       this.hooks.menu(this.npcName(w), this.npcSub(w), opts, sx + this.camera.x, sy - 44 + this.camera.y);
       return;
     }
@@ -1543,6 +1716,13 @@ export class WorldScene {
       w.target = this.player; w.firstBy ??= w;
       return;
     }
+    if (w.gdef) {
+      const r1 = w.hp / w.maxHp;
+      if (pd.kind === 'look') { this.hooks.say(this.npcName(w), `${w.gdef.look[lang()]} ${L.guardLookTail} ${L.hpWords[r1 > 0.85 ? 0 : r1 > 0.5 ? 1 : r1 > 0.25 ? 2 : 3]}`); return; }
+      w.path = []; w.wait = 4; w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir);
+      this.hooks.say(this.npcName(w), w.gdef.line[lang()]);
+      return;
+    }
     const kind = w.kind as NpcKind;
     const r = w.hp / w.maxHp;
     if (w.mdef) {
@@ -1574,6 +1754,7 @@ export class WorldScene {
     const L = t();
     if (w.kind === 'clerk') return this.zone.interior?.name ?? '';
     if (w.mdef) return w.mdef.name[lang()];
+    if (w.gdef) return w.gdef.name[lang()];
     if (w.kind === 'pashar') return L.pashar;
     if (w.weak === 'drunk') return L.drunk;
     if (w.weak === 'shade') return L.shade;
@@ -1588,6 +1769,7 @@ export class WorldScene {
     if (w.kind === 'clerk') return L.clerkSub[(this.zone.interior?.kind ?? 'shop') as keyof typeof L.clerkSub] ?? '';
     if (w.mdef) return w.mdef.boss ? L.hellBoss.replace('{n}', String(this.zone.hell?.floor ?? 1)) : L.hellMonster;
     if (w.kind === 'pashar') return L.pasharSub;
+    if (w.gdef) return L.guardSub;
     if (w.weak === 'drunk') return L.drunkSub;
     if (w.weak === 'shade') return L.shadeSub;
     if (w.kind === 'yellowwing') return L.yellowWingSub;
@@ -1666,6 +1848,8 @@ export class WorldScene {
     if (to.down > 0 || this.dead) return;
     if (to.isPlayer && Math.random() * 100 < dodgeChance(this.stats.agi)) { this.float(to, t().miss, '#d8e8ff'); return; }
     if (to.isPlayer) this.lastHitBy = from.kind === 'remote' ? (from.rid ?? null) : null;
+    // 마을과 둘레에서 다른 영혼이나 경비병을 치면 경비병이 나선다
+    if (from.isPlayer && this.zone.hell && (to.gdef || (to.kind === 'remote' && this.nearRest(to.x, to.y, 6)))) this.guardAlarm(to.gdef ? to : null);
     if (kind) sfx.impact(kind, this.spotOf(to), crit, this.bodyOf(to), (to.voice ??= 0.85 + Math.random() * 0.3));
     this.impactFx(from, to, crit, kind);
     // 다른 사람(실시간): 체력은 그 사람 기기가 계산한다. 몸만 남은 사람은 여기서 계산
@@ -1689,6 +1873,11 @@ export class WorldScene {
       if (to.hp <= 0) { to.down = 999; to.act = { anim: 'fall', t: 0 }; sfx.thud(this.spotOf(to)); if (from.isPlayer) { this.player.target = null; this.hooks.deed(to.rpos?.c ? 'criminalUserDown' : 'murder'); } }
       return;
     }
+    if (from.gdef) {
+      this.guardSpecial(from, to);
+      if (to.isPlayer) dmg = Math.min(dmg, Math.max(0, to.hp - 1)); // 경비병은 죽이지 않는다: 체력 1까지 제압
+    }
+    if (from.isPlayer && to.mdef) to.pdmg = (to.pdmg ?? 0) + Math.min(dmg, Math.max(0, to.hp));
     to.hp -= dmg;
     to.hurtT = 0.18;
     if (!to.act || to.act.anim === 'hit') { to.act = { anim: 'hit', t: 0 }; to.pend = null; }
@@ -1698,6 +1887,7 @@ export class WorldScene {
     if (to.isPlayer) {
       this.stopWork();
       this.hooks.hp(Math.max(0, to.hp), to.maxHp);
+      if (from.gdef && to.hp <= 1) { this.evict(from); return; }
       if (to.hp <= 0) this.die('beaten');
       return;
     }
@@ -1723,6 +1913,7 @@ export class WorldScene {
 
   /** 맞은 몸의 재질 → 타격음이 달라진다 */
   private bodyOf(w: Walker): sfx.Body {
+    if (w.gdef) return w.gdef.body === 'warden1' ? 'bones' : w.gdef.body === 'warden2' ? 'pret' : 'suturer';
     if (w.mdef) return w.mdef.body === 'yak' ? 'yak' : w.mdef.body === 'pret' ? 'pret' : w.mdef.body === 'bones' ? 'bones' : 'ash';
     if (w.kind === 'suturer') return w.monster ? 'monster' : 'suturer';
     if (w.kind === 'thug') return 'thug';
@@ -1772,12 +1963,25 @@ export class WorldScene {
       }
     }
     if (w.kind === 'suturer') { w.down = 4; return; }
+    // 경비병: 쓰러뜨려도 보상·카르마·영격 없음. 잠시 뒤 자리로 돌아온다
+    if (w.gdef) { w.down = 25; w.warnT = 0; if (by.isPlayer) this.float(w, t().guardNoReward, '#c9c0b0'); return; }
     if (w.mdef) {
       const f = this.zone.hell?.floor ?? 1;
+      const mult = f * (w.mdef.boss ? 6 : 1);
+      let share = 1;
       w.down = 5;
-      if (by.isPlayer) this.hooks.deed('hellMonster', { floor: f * (w.mdef.boss ? 6 : 1) });
+      if (by.isPlayer) this.hooks.deed('hellMonster', { floor: mult });
+      else if (by.gdef) {
+        // 내가 싸우던 괴물을 경비병이 마무리: 내가 준 피해만큼(25~80%) 영격과 노전을 나눠 받는다
+        const pd = w.pdmg ?? 0;
+        share = pd > 0 ? Math.max(0.25, Math.min(0.8, pd / w.maxHp)) : 0;
+        if (share > 0 && !this.dead) this.hooks.deed('hellMonster', { floor: mult, share });
+        // 경비병이 잡은 만큼 곧바로 다시 채운다 (몸이 빨리 사라지고 바깥 들판에 새 괴물)
+        if (!w.mdef.boss) w.down = 1.2;
+        this.guardKills++;
+      }
       if (w.mdef.boss) { this.bossDown = true; this.drawFeatures(); this.hooks.bossDown(f); }
-      this.dropCoin(w.x, w.y, rand(w.mdef.notes[0], w.mdef.notes[1]) * (w.mdef.boss ? 1 : f), false, true);
+      if (share > 0) this.dropCoin(w.x, w.y, Math.max(1, Math.round(rand(w.mdef.notes[0], w.mdef.notes[1]) * (w.mdef.boss ? 1 : f) * share)), false, true);
       return;
     }
     if (w.weak === 'shade') { w.down = 2.5; return; } // 그림자는 흩어질 뿐 남기는 게 없다
@@ -2044,6 +2248,12 @@ export class WorldScene {
       w.path = path ?? [];
       return;
     }
+    // 경비병: 마을 둘레(울타리 밖 10칸)를 넘어서까지 쫓지 않는다
+    if (w.gdef && !this.nearRest(tg.x, tg.y, 10)) {
+      w.target = null; w.path = [];
+      if (tg.isPlayer) this.guardHostAt = -99;
+      return;
+    }
     if (dist > reach) {
       w.repathT -= dt;
       if (w.repathT <= 0 || !w.path.length) {
@@ -2066,9 +2276,9 @@ export class WorldScene {
       if (crit) dmg *= CRIT_MULTIPLIER;
       this.startAttack(w, tg, dmg, crit);
     } else {
-      w.atkT = w.mdef ? w.mdef.atk : w.kind === 'suturer' ? (w.monster ? 0.68 : 0.8) : w.weak ? 1.25 : 0.85;
+      w.atkT = w.gdef ? w.gdef.atk : w.mdef ? w.mdef.atk : w.kind === 'suturer' ? (w.monster ? 0.68 : 0.8) : w.weak ? 1.25 : 0.85;
       const f = this.zone.hell?.floor ?? 1;
-      const base = w.mdef ? rand(w.mdef.dmg[0], w.mdef.dmg[1]) * (w.mdef.boss ? 1 : 1 + 0.25 * (f - 1)) : w.kind === 'suturer' ? rand(10, 18) * (w.monster ? 1.6 : 1) : w.weak ? rand(1, 4) : rand(4, 9) + (w.weapon ? 3 : 0);
+      const base = w.gdef ? (tg.isPlayer ? Math.max(rand(w.gdef.dmg[0], w.gdef.dmg[1]) * 0.6, tg.maxHp * 0.12) : rand(w.gdef.dmg[0], w.gdef.dmg[1])) * (tg.sealT && tg.sealT > 0 ? 1.5 : 1) : w.mdef ? rand(w.mdef.dmg[0], w.mdef.dmg[1]) * (w.mdef.boss ? 1 : 1 + 0.25 * (f - 1)) * (w.sealT && w.sealT > 0 ? 0.5 : 1) : w.kind === 'suturer' ? rand(10, 18) * (w.monster ? 1.6 : 1) : w.weak ? rand(1, 4) : rand(4, 9) + (w.weapon ? 3 : 0);
       const dmg = Math.max(1, Math.round(base) - (tg.isPlayer ? this.gear.def : 0));
       this.startAttack(w, tg, dmg);
     }
@@ -2119,6 +2329,8 @@ export class WorldScene {
     if (w.kind === 'thug' && w.target) speed = w.weak ? 1.05 : 1.7;
     else if (w.kind === 'thug' && w.stalk) speed = w.weak ? 0.85 : 1.3;
     if (w.mdef && w.target) speed = w.mdef.speed * 1.35;
+    if (w.gdef && w.target) speed = w.gdef.speed * 2.4;
+    if (w.slowT && w.slowT > 0) speed *= 0.5;
     // 괴물은 휴식 공간에 들어오지 못한다
     if (w.mdef && this.inRest(tx, ty)) { w.path = []; return false; }
     const step = speed * dt;
@@ -2130,7 +2342,7 @@ export class WorldScene {
   private update(dt: number, realDt = dt) {
     const p = this.player;
     this.drawSparks(realDt);
-    if (this.zone.hell) { this.drawEmbers(realDt); this.updateHound(dt); this.updateTorture(dt); }
+    if (this.zone.hell) { this.drawEmbers(realDt); this.updateHound(dt); this.updateTorture(dt); this.drawGuardFx(dt); }
     if (this.realm === 'heaven') this.updateHeaven(realDt);
     this.time += dt;
     if (this.stun > 0) { this.stun -= dt; p.path = []; }
@@ -2171,6 +2383,7 @@ export class WorldScene {
           if (w.down <= 0) {
             if (w.kind === 'suturer') { this.removeWalker(w); continue; }
             if (w.mdef) { if (w.mdef.boss) this.removeWalker(w); else this.spawnMonster(w); continue; }
+            if (w.gdef) { const g = this.makeGuard(w.gdef, w.post ?? 0); this.removeWalker(w); this.walkers.push(g); continue; }
             this.spawnNpc(w.kind as NpcKind, w);
           }
         }
@@ -2198,7 +2411,7 @@ export class WorldScene {
       if (w.kb) {
         const k = Math.min(1, dt / w.kb.t);
         const nx = w.x + w.kb.dx * k, ny = w.y + w.kb.dy * k;
-        if (walkable(this.zone, Math.floor(nx), Math.floor(ny))) { w.x = nx; w.y = ny; }
+        if (walkable(this.zone, Math.floor(nx), Math.floor(ny)) && !(w.mdef && this.inRest(nx, ny))) { w.x = nx; w.y = ny; }
         w.kb.dx *= 1 - k; w.kb.dy *= 1 - k; w.kb.t -= dt;
         if (w.kb.t <= 0) w.kb = undefined;
       }
@@ -2351,6 +2564,7 @@ export class WorldScene {
   /** 행인·불량배의 평소 행동 */
   private think(w: Walker, moving: boolean, dt: number, nf: number) {
     const p = this.player;
+    if (w.kind === 'guard') { this.thinkGuard(w, moving, dt); return; }
     if (w.kind !== 'pashar' && w.kind !== 'clerk' && w.kind !== 'officer' && w.kind !== 'yellowwing' && !w.mdef?.boss && Math.hypot(w.x - p.x, w.y - p.y) > 34) { if (w.kind === 'suturer') this.removeWalker(w); else if (w.mdef) this.spawnMonster(w); else this.spawnNpc(w.kind as NpcKind, w); return; }
     if (w.flee > 0) {
       w.flee -= dt;
@@ -2674,8 +2888,7 @@ export class WorldScene {
     }
     if (this.labelText.text !== text) {
       this.labelText.text = text;
-      const w = Math.ceil(this.labelText.width) + 14, h = 20;
-      this.labelBg.clear().roundRect(-w / 2, -h + 2, w, h, 4).fill({ color: 0x140e0a, alpha: 0.82 }).stroke({ color: 0xc9a23e, width: 1, alpha: 0.9 });
+      this.labelBg.clear();
       this.labelText.position.set(0, -2);
     }
     this.label.position.set(Math.round(x), Math.round(y));
