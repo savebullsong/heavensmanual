@@ -38,7 +38,17 @@ const TYPE_IDX: TileType[] = ['void', 'lot', 'park', 'water', 'walk', 'soi', 'ro
 /** 땅의 종류 (칸 종류를 그림 종류로): 0 바닥 · 1 마른 모래/이끼 · 2 물(용암·늪·핏물) · 3 돌길·널빤지 · 4 골목 흙길 · 5 다리 · 6 바위 바닥 */
 const CLASS_OF: Record<TileType, number> = { void: 6, lot: 0, park: 1, water: 2, walk: 3, soi: 4, road: 4, median: 4, cross: 5, block: 6 };
 
+/** 바닥 한 덩어리를 그리는 일: 한 번에 다 그리면 휴대폰에서 0.2초 넘게 멈춘다 → 줄 단위로 나눠 프레임마다 몇 ms씩 */
+export interface GroundJob { canvas: HTMLCanvasElement; x: number; y: number; done: boolean; step(ms: number): boolean }
 export function drawHellGround(z: Zone, theme: Theme, i0: number, j0: number): { canvas: HTMLCanvasElement; x: number; y: number } | null {
+  const job = hellGroundJob(z, theme, i0, j0);
+  job.step(Infinity);
+  return job;
+}
+/** 색 글자 → 숫자 (점마다 다시 풀지 않게 한 번만) */
+const HC = new Map<string, RGB>();
+const hexc = (h: string): RGB => { let v = HC.get(h); if (!v) { v = hex(h); HC.set(h, v); } return v; };
+export function hellGroundJob(z: Zone, theme: Theme, i0: number, j0: number): GroundJob {
   const NZ = noiseTex();
   const nz = (x: number, y: number) => NZ[((y & 255) << 8) | (x & 255)];
   const i1 = Math.min(z.W, i0 + CHUNK), j1 = Math.min(z.H, j0 + CHUNK);
@@ -53,8 +63,8 @@ export function drawHellGround(z: Zone, theme: Theme, i0: number, j0: number): {
   const cls = (i: number, j: number) => { const ii = i < 0 ? 0 : i >= ZW ? ZW - 1 : i, jj = j < 0 ? 0 : j >= ZH ? ZH - 1 : j; return CLASS_OF[TYPE_IDX[tiles[jj * ZW + ii]] ?? 'lot']; };
   const sc = new Float32Array(7);
   let r = 0, gg = 0, b = 0;
-  const set = (h: string) => { r = parseInt(h.slice(1, 3), 16); gg = parseInt(h.slice(3, 5), 16); b = parseInt(h.slice(5, 7), 16); };
-  const lerp = (h1: string, h2: string, t: number) => { const a = hex(h1), bb = hex(h2); t = t < 0 ? 0 : t > 1 ? 1 : t; r = a[0] + (bb[0] - a[0]) * t; gg = a[1] + (bb[1] - a[1]) * t; b = a[2] + (bb[2] - a[2]) * t; };
+  const set = (h: string) => { const v = hexc(h); r = v[0]; gg = v[1]; b = v[2]; };
+  const lerp = (h1: string, h2: string, t: number) => { const a = hexc(h1), bb = hexc(h2); t = t < 0 ? 0 : t > 1 ? 1 : t; r = a[0] + (bb[0] - a[0]) * t; gg = a[1] + (bb[1] - a[1]) * t; b = a[2] + (bb[2] - a[2]) * t; };
   const shade = (k: number) => { r *= k; gg *= k; b *= k; };
   const bloodLava = (_X: number, _Yp: number, a1: number, a2: number, a3: number, gr: number) => {
     const crack = Math.abs(a2 - 0.5);
@@ -63,8 +73,9 @@ export function drawHellGround(z: Zone, theme: Theme, i0: number, j0: number): {
     else if (a3 > 0.6) lerp('#a8100c', '#ff4a2a', (a3 - 0.6) * 4);
     else { lerp('#2a0404', '#5a0808', a1 * 1.4); if (gr < 0.04) set('#7a0e0a'); }
   };
-  for (let py = 0; py < H; py++) {
+  const row = (py: number) => {
     const Y = py + minY;
+    // 이 줄에서 마름모 안에 드는 x 범위만 (밖의 점은 건너뛴다)
     for (let px = 0; px < W; px++) {
       const X = px + minX;
       const fi = (X / (TW / 2) + Y / (TH / 2)) / 2, fj = (Y / (TH / 2) - X / (TW / 2)) / 2;
@@ -179,9 +190,23 @@ export function drawHellGround(z: Zone, theme: Theme, i0: number, j0: number): {
       const o = (py * W + px) * 4;
       D[o] = r < 0 ? 0 : r > 255 ? 255 : r; D[o + 1] = gg < 0 ? 0 : gg > 255 ? 255 : gg; D[o + 2] = b < 0 ? 0 : b > 255 ? 255 : b; D[o + 3] = 255;
     }
-  }
-  g.putImageData(im, 0, 0);
-  return { canvas: c, x: minX, y: minY };
+  };
+  let py = 0;
+  const job: GroundJob = {
+    canvas: c, x: minX, y: minY, done: false,
+    step(ms: number) {
+      if (job.done) return true;
+      const t0 = performance.now();
+      while (py < H) {
+        row(py++);
+        if ((py & 7) === 0 && performance.now() - t0 > ms) return false;
+      }
+      g.putImageData(im, 0, 0);
+      job.done = true;
+      return true;
+    },
+  };
+  return job;
 }
 
 /** 지도 밖까지 이어지는 피의 용암 바다 (3층): 이음매 없이 반복되는 256×128 한 장 */

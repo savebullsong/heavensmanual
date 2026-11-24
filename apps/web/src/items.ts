@@ -16,6 +16,7 @@ export interface ItemDef {
   hell?: boolean; // 지옥의 우주새(황혼)에서만, 노전으로 판다
   sprite?: string; // 몸에 그릴 때 쓰는 그림 (지옥 무기·방어구는 현실 그림을 빌려 쓴다)
   icon?: string; // 아이콘 그림 (없으면 key)
+  two?: boolean; // 양손 무기: 두 손으로 내려찍는다 (느리지만 묵직하다)
 }
 
 export const ITEMS: ItemDef[] = [
@@ -36,6 +37,9 @@ export const ITEMS: ItemDef[] = [
   { key: 'hatchet', cat: 'weapon', price: 950, atk: 7, name: { ko: '손도끼', th: 'ขวานมือ', en: 'Hatchet' } },
   { key: 'dagger', cat: 'weapon', price: 1800, atk: 8, name: { ko: '단검', th: 'มีดสั้น', en: 'Dagger' } },
   { key: 'sword', cat: 'weapon', price: 7500, atk: 12, name: { ko: '장검', th: 'ดาบยาว', en: 'Longsword' } },
+  // 양손 무기 (16차)
+  { key: 'sledge', cat: 'weapon', price: 2600, atk: 10, two: true, name: { ko: '오함마', th: 'ค้อนปอนด์', en: 'Sledgehammer' } },
+  { key: 'fireaxe', cat: 'weapon', price: 5200, atk: 13, two: true, name: { ko: '소방 도끼', th: 'ขวานดับเพลิง', en: 'Fire axe' } },
   { key: 'pistol', cat: 'weapon', price: 45000, atk: 20, note: 'needsAmmo', name: { ko: '권총', th: 'ปืนพก', en: 'Pistol' } },
   { key: 'ammo', cat: 'weapon', price: 600, note: 'ammo', name: { ko: '권총탄 12발', th: 'กระสุนปืนพก 12 นัด', en: 'Pistol rounds ×12' } },
   // 방어구
@@ -64,6 +68,8 @@ export const ITEMS: ItemDef[] = [
   { key: 'hhammer', cat: 'weapon', price: 70, atk: 8, hell: true, sprite: 'hammer', name: { ko: '뼈 망치', th: 'ค้อนกระดูก', en: 'Bone hammer' } },
   { key: 'hspear', cat: 'weapon', price: 110, atk: 9, hell: true, sprite: 'pipe', name: { ko: '쇠사슬 창', th: 'หอกโซ่', en: 'Chain spear' } },
   { key: 'hsword', cat: 'weapon', price: 200, atk: 12, hell: true, sprite: 'sword', name: { ko: '흑철 검', th: 'ดาบเหล็กดำ', en: 'Black-iron sword' } },
+  { key: 'hmaul', cat: 'weapon', price: 260, atk: 15, hell: true, two: true, sprite: 'maul', name: { ko: '가시 철퇴', th: 'กระบองหนาม', en: 'Spiked maul' } },
+  { key: 'hgreatsword', cat: 'weapon', price: 360, atk: 17, hell: true, two: true, sprite: 'greatsword', name: { ko: '흑철 대검', th: 'ดาบใหญ่เหล็กดำ', en: 'Black-iron greatsword' } },
   { key: 'hhelm', cat: 'armor', price: 45, def: 3, hell: true, sprite: 'helmet', icon: 'helmet', name: { ko: '그을린 투구', th: 'หมวกเกราะไหม้เกรียม', en: 'Scorched helm' } },
   { key: 'hvest', cat: 'armor', price: 150, def: 6, hell: true, sprite: 'vest', icon: 'vest', name: { ko: '망자의 가죽 조끼', th: 'เสื้อหนังของผู้ตาย', en: 'Dead man’s leather vest' } },
   { key: 'hgloves', cat: 'armor', price: 20, def: 1, hell: true, sprite: 'gloves', icon: 'gloves', name: { ko: '사슬 장갑', th: 'ถุงมือโซ่', en: 'Chain gloves' } },
@@ -139,10 +145,10 @@ export const STORES: Record<'mart' | 'pharmacy' | 'food' | 'cafe', { key: string
   cafe: [{ key: 'coffee', price: 65 }, { key: 'thaitea', price: 45 }, { key: 'cake', price: 80 }, { key: 'water', price: 10 }],
 };
 
-const EFFECT: Record<Lang, { heal: string[]; atk: string[]; def: string[]; rope: string; needsAmmo: string; ammo: string }> = {
-  ko: { heal: ['조금 회복', '회복', '많이 회복', '크게 회복'], atk: ['가벼움', '묵직함', '날카로움', '위험함', '치명적'], def: ['얇음', '튼튼함', '단단함'], rope: '추락을 한 번 막아 줌', needsAmmo: '탄약 필요', ammo: '권총에 넣는 탄약' },
-  th: { heal: ['ฟื้นฟูเล็กน้อย', 'ฟื้นฟู', 'ฟื้นฟูมาก', 'ฟื้นฟูมหาศาล'], atk: ['เบา', 'หนักมือ', 'คม', 'อันตราย', 'ถึงตาย'], def: ['บาง', 'ทนทาน', 'แข็งแรง'], rope: 'กันตกจากที่สูงได้หนึ่งครั้ง', needsAmmo: 'ต้องใช้กระสุน', ammo: 'กระสุนสำหรับปืนพก' },
-  en: { heal: ['Heals a little', 'Heals', 'Heals a lot', 'Heals greatly'], atk: ['Light', 'Heavy', 'Sharp', 'Dangerous', 'Deadly'], def: ['Thin', 'Sturdy', 'Solid'], rope: 'Saves you from one fall', needsAmmo: 'Needs ammo', ammo: 'Rounds for the pistol' },
+const EFFECT: Record<Lang, { heal: string[]; atk: string[]; def: string[]; rope: string; needsAmmo: string; ammo: string; two: string }> = {
+  ko: { heal: ['조금 회복', '회복', '많이 회복', '크게 회복'], atk: ['가벼움', '묵직함', '날카로움', '위험함', '치명적'], def: ['얇음', '튼튼함', '단단함'], rope: '추락을 한 번 막아 줌', needsAmmo: '탄약 필요', ammo: '권총에 넣는 탄약', two: '양손 · 느리지만 묵직하게 내려찍음' },
+  th: { heal: ['ฟื้นฟูเล็กน้อย', 'ฟื้นฟู', 'ฟื้นฟูมาก', 'ฟื้นฟูมหาศาล'], atk: ['เบา', 'หนักมือ', 'คม', 'อันตราย', 'ถึงตาย'], def: ['บาง', 'ทนทาน', 'แข็งแรง'], rope: 'กันตกจากที่สูงได้หนึ่งครั้ง', needsAmmo: 'ต้องใช้กระสุน', ammo: 'กระสุนสำหรับปืนพก', two: 'สองมือ · ช้าแต่ฟาดลงหนักหน่วง' },
+  en: { heal: ['Heals a little', 'Heals', 'Heals a lot', 'Heals greatly'], atk: ['Light', 'Heavy', 'Sharp', 'Dangerous', 'Deadly'], def: ['Thin', 'Sturdy', 'Solid'], rope: 'Saves you from one fall', needsAmmo: 'Needs ammo', ammo: 'Rounds for the pistol', two: 'Two-handed · slow, crushing overhead blows' },
 };
 
 export function effectText(it: ItemDef, l: Lang): string {
@@ -151,6 +157,7 @@ export function effectText(it: ItemDef, l: Lang): string {
   if (it.heal) parts.push(E.heal[it.heal <= 30 ? 0 : it.heal <= 80 ? 1 : it.heal <= 160 ? 2 : 3]);
   if (it.atk) parts.push(E.atk[it.atk <= 4 ? 0 : it.atk <= 6 ? 1 : it.atk <= 8 ? 2 : it.atk <= 12 ? 3 : 4]);
   if (it.def) parts.push(E.def[it.def <= 2 ? 0 : it.def <= 4 ? 1 : 2]);
+  if (it.two) parts.push(E.two);
   if (it.note) parts.push(E[it.note]);
   return parts.join(' · ');
 }
@@ -269,6 +276,24 @@ export function itemIcon(key: string): HTMLCanvasElement {
     case 'sword':
       P([[9, 21], [27, 3], [30, 2], [29, 5], [11, 23]], '#dfe4ea'); Ln(10, 21, 28, 3, 1, '#f6f9fc');
       Ln(5, 17, 15, 27, 2, '#8a6a2a'); Ln(3, 29, 9, 23, 3, '#3a2418'); E(3, 29, 2, 2, '#8a6a2a');
+      break;
+    case 'sledge':
+      Ln(3, 30, 22, 11, 3, '#8a6238'); Ln(4, 28, 21, 11, 1, '#b08a52');
+      P([[16, 9], [24, 1], [31, 8], [23, 16]], '#4a505a'); P([[24, 1], [27, 1], [31, 5], [31, 8]], '#7c8492'); Ln(17, 9, 23, 15, 1, '#2e323a');
+      break;
+    case 'fireaxe':
+      Ln(3, 30, 22, 11, 3, '#8a6238'); Ln(4, 28, 21, 11, 1, '#b08a52');
+      P([[18, 9], [25, 2], [31, 9], [27, 15], [22, 13]], '#b8282a'); P([[27, 15], [31, 9], [31, 13], [29, 16]], '#d9dde2');
+      P([[18, 9], [14, 6], [12, 8], [16, 12]], '#b8282a');
+      break;
+    case 'greatsword':
+      P([[8, 20], [26, 2], [31, 1], [30, 6], [12, 24]], '#3a3e46'); Ln(9, 20, 27, 2, 1, '#8a929e'); Ln(11, 21, 28, 4, 1, '#1e2228');
+      Ln(4, 15, 17, 28, 2, '#5a5e66'); Ln(1, 31, 9, 23, 3, '#2a1c14'); E(2, 30, 2, 2, '#5a5e66');
+      break;
+    case 'maul':
+      Ln(3, 30, 20, 13, 3, '#2e2a28'); Ln(4, 28, 19, 13, 1, '#5a5652');
+      E(23, 9, 7, 7, '#4a505a'); E(21, 7, 3, 3, '#7c8492');
+      for (const [x, y] of [[23, 0], [31, 9], [23, 18], [15, 9], [29, 3], [29, 15], [17, 3]] as [number, number][]) R(x - 1, y, 2, 2, '#9aa3ad');
       break;
     case 'pistol':
       P([[4, 9], [28, 9], [28, 15], [13, 15], [12, 26], [5, 26], [7, 15], [4, 15]], '#25272b');
@@ -435,8 +460,8 @@ export const HELL_FOOD = ['lethe', 'ashcake', 'bloodfruit', 'bulgogichips', 'hje
 /** 지옥 괴물이 드물게 떨어뜨리는 물건: 층이 깊을수록 좋은 것이 섞인다 [물건, 무게] */
 export const HELL_LOOT: Record<number, [string, number][]> = {
   1: [['lethe', 30], ['ashcake', 26], ['hbandage', 18], ['hgloves', 8], ['hdagger', 7], ['hhelm', 6], ['hshin', 5]],
-  2: [['ashcake', 24], ['hbandage', 20], ['bloodfruit', 12], ['hhammer', 8], ['hboots', 8], ['hshin', 8], ['hhelm', 7], ['hgloves', 6], ['hspear', 4]],
-  3: [['bloodfruit', 22], ['hbandage', 20], ['hstew', 14], ['hspear', 9], ['hvest', 8], ['hboots', 8], ['hhammer', 8], ['hsword', 5], ['hhelm', 6]],
+  2: [['ashcake', 24], ['hbandage', 20], ['bloodfruit', 12], ['hhammer', 8], ['hboots', 8], ['hshin', 8], ['hhelm', 7], ['hgloves', 6], ['hspear', 4], ['hmaul', 2]],
+  3: [['bloodfruit', 22], ['hbandage', 20], ['hstew', 14], ['hspear', 9], ['hvest', 8], ['hboots', 8], ['hhammer', 8], ['hsword', 5], ['hhelm', 6], ['hmaul', 3], ['hgreatsword', 2]],
 };
 export function rollLoot(floor: number, rnd = Math.random): string {
   const t = HELL_LOOT[Math.max(1, Math.min(3, floor))];

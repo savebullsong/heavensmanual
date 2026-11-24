@@ -1,12 +1,14 @@
 """한 사람의 모든 부품을 만든다: 몸(체형 3가지), 차림 5가지, 머리 모양 6가지, 무기 9가지.
 부품마다 '구역 번호'가 있는 재질을 쓴다. 렌더 1번은 흰 재질로 음영만, 렌더 2번은 구역 번호 색으로."""
 from rig import *
+import hellbodies
 
 REG = {'void': 0, 'skin': 1, 'hair': 2, 'top': 3, 'bottom': 4, 'shoe': 5, 'eye': 6, 'apron': 7, 'raincoat': 8,
        'gown': 9, 'bandage': 10, 'parrot': 11, 'crest': 12, 'wood': 13, 'metal': 14, 'dark': 15}
 HAIRS = ['short', 'swept', 'bob', 'long', 'ponytail', 'buzz']
 OUTFITS = ['casual', 'apron', 'raincoat', 'patient', 'parrot']
 MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle']
+TWO = ['sledge', 'fireaxe', 'greatsword', 'maul']   # 16차 양손 무기 (heavy 동작)
 ARMOR = ['helmet', 'jacket', 'vest', 'gloves', 'workpants', 'shinguard', 'boots']
 WEAPONS = MELEE + ['pistol']
 
@@ -62,9 +64,19 @@ BODY = {'x': dict(h=1.28, shoulder=.22, hipw=.105, arm=1.4, leg=1.12),   # 변�
         # 지옥 2층 들판의 노름꾼 탈루스 (뼈주사위·산탄총)
         't': dict(h=1.1, shoulder=.19, hipw=.092, arm=1.05, leg=1.04),
         # 3층 층주 세라네: 피의 시장 끝에 도사린 거대한 살덩이 애벌레 (이빨 가득한 아가리)
-        'r': dict(h=1.25, shoulder=.3, hipw=.16, arm=1.25, leg=.7)}
-MONSTER_BW = {'x': None, 'a': .8, 'p': .68, 'y': 1.32, 's': .42, 'k': 1.7, 'b': 1.0, 'g': .42, 'o': 1.08, 'w': .95, 't': .5, 'r': 1.0}
-MONSTER_HK = {'x': 1.0, 'a': 1.05, 'p': .86, 'y': 1.12, 's': 1.0, 'k': 1.2, 'b': 1.0, 'g': 1.0, 'o': .9, 'w': 1.0, 't': 1.0, 'r': 1.0}
+        'r': dict(h=1.25, shoulder=.3, hipw=.16, arm=1.25, leg=.7),
+        # 16차: 층마다 다른 괴물과 층주 (hellbodies.py)
+        'h': dict(h=1.22, shoulder=.28, hipw=.13, arm=1.7, leg=1.45),           # 1층 층주 아쉬갈: 숯이 된 바위 거인
+        'u': dict(h=1.3, shoulder=.15, hipw=.085, arm=1.0, leg=.8, neck=.2),    # 2층 층주 구르마: 산 같은 배, 바늘 목
+        'n': dict(h=.97, shoulder=.17, hipw=.088, arm=.9, leg=.88),             # 1층 불씨 망자
+        'l': dict(h=1.0, shoulder=.19, hipw=.1, arm=1.15, leg=1.05),            # 2층 늪 망자 (불어 터질 듯한 시체)
+        'e': dict(h=1.14, shoulder=.24, hipw=.13, arm=1.45, leg=1.25),          # 2층 탐식귀 (두꺼비 거구)
+        'v': dict(h=1.12, shoulder=.17, hipw=.088, arm=1.0, leg=1.05, neck=.05), # 3층 흥정꾼 (가면 상인)
+        'd': dict(h=1.0, shoulder=.17, hipw=.09, arm=.9, leg=.9)}               # 3층 빚쟁이 해골 (멍에·족쇄)
+MONSTER_BW = {'x': None, 'a': .8, 'p': .68, 'y': 1.32, 's': .42, 'k': 1.7, 'b': 1.0, 'g': .42, 'o': 1.08, 'w': .95, 't': .5, 'r': 1.0,
+              'h': 1.45, 'u': .62, 'n': .8, 'l': 1.05, 'e': 1.3, 'v': .85, 'd': .42}
+MONSTER_HK = {'x': 1.0, 'a': 1.05, 'p': .86, 'y': 1.12, 's': 1.0, 'k': 1.2, 'b': 1.0, 'g': 1.0, 'o': .9, 'w': 1.0, 't': 1.0, 'r': 1.0,
+              'h': 1.2, 'u': .9, 'n': 1.05, 'l': 1.0, 'e': 1.0, 'v': 1.0, 'd': 1.0}
 BUILD = [.9, 1.0, 1.14]   # 마름 · 보통 · 건장 (뼈 위치는 같고 굵기만 다르다 → 머리·무기 층을 함께 쓴다)
 
 class Doll:
@@ -272,7 +284,7 @@ class Doll:
             for (x, y, z, r) in ((.08, -.12, 1.22, .07), (-.1, -.11, 1.0, .06), (.12, .08, 1.3, .07), (-.06, .1, .95, .06)):
                 blob(P, self.V(x, y, z), (r * s, r * .6 * s, r * s), patch, None, segs=8, rings=5)
             ob = finish(P); bind(ob, self.arm, lambda co: {'head': 1.0} if co.z > 1.5 * s else {'spine': 1.0}); self.add(g, ob)
-        elif name in ('ash', 'pret', 'yak', 'bones', 'besk', 'cockatoo', 'warden1', 'warden2', 'warden3', 'talus', 'serane'):
+        elif name in ('ash', 'pret', 'yak', 'bones', 'besk', 'cockatoo', 'warden1', 'warden2', 'warden3', 'talus', 'serane', 'debtor') or name in hellbodies.NEW:
             self.hell_body(name)
         elif name == 'parrot':
             pw = rmat('parrot', .95, .05); cr = rmat('crest', .8, .1); dk = rmat('dark', .5, .3); ft = rmat('shoe', .8, .1)
@@ -313,6 +325,12 @@ class Doll:
             self.besk_body(g); return
         if name == 'cockatoo':
             self.cockatoo_body(g); return
+        if name == 'warden1':   # 16차: 재의 문지기 (얼굴 없는 두건 · 재 망토 · 불씨)
+            hellbodies.ashwraith(self, g); return
+        if name in hellbodies.NEW:
+            hellbodies.NEW[name](self, g); return
+        if name == 'debtor':
+            hellbodies.debtor(self, g); return
         if name in ('warden1', 'warden2', 'warden3'):
             self.warden_body(g, name); return
         if name == 'talus':
@@ -965,7 +983,7 @@ class Doll:
             limb(P, grip + d * .95, grip + d * 1.02, [(0, .05, .05), (1, .018, .018)], metal, None, segs=8)
         elif name == 'knocker':
             # 재문지기의 뼈 곤봉: 굵은 넓적다리뼈 끝에 문고리(둥근 고리)가 달렸다
-            bone = rmat('bandage', .7, .15)
+            bone = rmat('bandage', .7, .15, tag='wpn')
             limb(P, grip - d * .12, grip + d * .82, [(0, .034, .034), (.5, .028, .028), (1, .04, .04)], bone, None, segs=8)
             blob(P, grip + d * .84, (.06, .06, .06), bone, None, segs=10, rings=7)
             blob(P, grip - d * .13, (.05, .05, .05), bone, None, segs=10, rings=7)
@@ -989,7 +1007,7 @@ class Doll:
             # 두꺼운 장부: 가죽 표지 + 금 모서리 + 종이 단면
             c0 = grip + d * .14
             limb(P, c0 - d * .17, c0 + d * .17, [(0, .13, .06), (1, .13, .06)], wood, None, segs=4)
-            limb(P, c0 - d * .155, c0 + d * .155, [(0, .12, .07), (1, .12, .07)], rmat('bandage', .6, .2), None, segs=4)   # 종이 단면
+            limb(P, c0 - d * .155, c0 + d * .155, [(0, .12, .07), (1, .12, .07)], rmat('bandage', .6, .2, tag='wpn'), None, segs=4)   # 종이 단면
             for t in (-.16, .16):
                 limb(P, c0 + d * (t - .015), c0 + d * (t + .015), [(0, .14, .065), (1, .14, .065)], metal, None, segs=4)   # 금 모서리
         # ── 지옥 괴물의 무기 (층마다·괴물마다 다르게) ──
@@ -1021,9 +1039,9 @@ class Doll:
         elif name == 'skewer':   # 피 프렛: 살덩이 꿴 쇠꼬챙이
             limb(P, grip - d * .08, grip + d * 1.0, [(0, .009, .009), (.92, .008, .008), (1, .001, .001)], metal, None, segs=6)
             for t, r in ((.48, .042), (.64, .036), (.8, .03)):
-                blob(P, grip + d * t, (r, r * .9, r * 1.1), rmat('bandage', .7, .15), None, segs=9, rings=6)
+                blob(P, grip + d * t, (r, r * .9, r * 1.1), rmat('bandage', .7, .15, tag='wpn'), None, segs=9, rings=6)
         elif name == 'femur':   # 걷는 해골: 거인의 넓적다리뼈
-            bonem = rmat('bandage', .7, .15)
+            bonem = rmat('bandage', .7, .15, tag='wpn')
             limb(P, grip - d * .1, grip + d * .78, [(0, .028, .028), (.5, .022, .022), (1, .03, .03)], bonem, None, segs=8)
             for sg in (1, -1):
                 blob(P, grip + d * .82 + side * sg * .03, (.04, .04, .045), bonem, None, segs=10, rings=7)
@@ -1046,5 +1064,47 @@ class Doll:
             fwd = Vector((0, -1, 0))
             limb(P, grip + Vector((0, .01, .04)), grip + Vector((0, -.01, -.06)), [(0, .016, .026), (1, .016, .026)], dark, None, segs=6)
             limb(P, grip + Vector((0, .03, .07)), grip + Vector((0, .03, .07)) + fwd * .19, [(0, .015, .022), (1, .015, .022)], dark, None, segs=6)
-        ob = finish(P); bind(ob, self.arm, rigid('hand.R'), subsurf=0)
+        # ── 16차: 양손 무기 (현실 오함마·소방 도끼 · 지옥 대검·철퇴) — 손잡이가 손 뒤로도 길게 뻗어 왼손이 함께 쥔다 ──
+        elif name == 'sledge':   # 오함마: 긴 나무 자루 + 네모난 쇠머리
+            limb(P, grip - d * .32, grip + d * .8, [(0, .02, .02), (1, .018, .018)], wood, None, segs=8)
+            h = grip + d * .84
+            limb(P, h - up * .1, h + up * .1, [(0, .055, .055), (.15, .06, .06), (.85, .06, .06), (1, .055, .055)], metal, None, segs=4)
+        elif name == 'fireaxe':   # 소방 도끼: 붉은 쇠날 + 뒤쪽 뾰족한 갈고리
+            red = rmat('crest', .45, .4)
+            limb(P, grip - d * .3, grip + d * .82, [(0, .019, .019), (1, .017, .017)], wood, None, segs=8)
+            h = grip + d * .78
+            limb(P, h - up * .02, h + up * .17, [(0, .01, .06), (.7, .008, .085), (1, .005, .1)], red, None, segs=6)
+            limb(P, h + up * .15, h + up * .18, [(0, .006, .1), (1, .003, .1)], metal, None, segs=4)   # 벼린 날
+            limb(P, h - up * .02, h - up * .16 + d * .03, [(0, .02, .03), (1, .003, .004)], red, None, segs=6)
+        elif name == 'greatsword':   # 지옥 흑철 대검: 넓은 날, 긴 손잡이, 뿔 같은 코등이
+            limb(P, grip - d * .3, grip + d * .08, [(0, .02, .02), (1, .019, .019)], dark, None, segs=8)
+            blob(P, grip - d * .32, (.032, .032, .032), metal, None, segs=8, rings=5)
+            for sg in (1, -1):
+                limb(P, grip + d * .08, grip + d * .03 + side * sg * .16, [(0, .022, .022), (1, .006, .006)], metal, None, segs=6)
+            limb(P, grip + d * .09, grip + d * 1.18, [(0, .009, .05), (.85, .008, .044), (1, .002, .004)], metal, None, segs=6)
+            limb(P, grip + d * .12, grip + d * .9, [(0, .011, .008), (1, .01, .006)], dark, None, segs=4)   # 피 홈
+        elif name == 'maul':   # 지옥 철퇴: 긴 쇠자루 끝에 가시 박힌 쇠공
+            limb(P, grip - d * .3, grip + d * .78, [(0, .018, .018), (1, .017, .017)], dark, None, segs=8)
+            c0 = grip + d * .88
+            blob(P, c0, (.085, .085, .085), metal, None, segs=12, rings=8)
+            for k in range(14):
+                a = k * 2.39996; zz = 1 - 2 * (k + .5) / 14; r = math.sqrt(1 - zz * zz)
+                n = side * math.cos(a) * r + up * math.sin(a) * r + d * zz
+                limb(P, c0 + n * .07, c0 + n * .14, [(0, .018, .018), (1, .002, .002)], metal, None, segs=5)
+        elif name == 'gatebar':   # 아쉬갈: 불탄 성문에서 뽑은 쇠 빗장 (사슬이 감기고 끝이 달아올랐다)
+            glowm = rmat('crest', .3, .75)
+            limb(P, grip - d * .2, grip + d * 1.15, [(0, .04, .04), (.5, .045, .045), (1, .05, .05)], metal, None, segs=6)
+            limb(P, grip + d * 1.15, grip + d * 1.3, [(0, .05, .05), (1, .045, .045)], glowm, None, segs=6)
+            for t in (.25, .55, .85):   # 박힌 큰 징
+                for sg in (1, -1):
+                    blob(P, grip + d * t + up * sg * .05, (.025, .025, .025), dark, None, segs=6, rings=4)
+            for k in range(9):   # 감긴 사슬
+                t = .35 + k * .07
+                blob(P, grip + d * t + side * (.055 if k % 2 else -.055), (.02, .015, .028), metal, None, segs=6, rings=4)
+        ob = finish(P)
+        # 16차: 작은 현실 무기는 화면에서 잘 보이게 키운다 (손 쥔 자리를 기준으로)
+        k = {'knife': 1.45, 'dagger': 1.45, 'hammer': 1.45, 'hatchet': 1.45, 'pipe': 1.15, 'bat': 1.15, 'sword': 1.15}.get(name, 1.0)
+        if k != 1.0:
+            for v in ob.data.vertices: v.co = grip + (v.co - grip) * k
+        bind(ob, self.arm, rigid('hand.R'), subsurf=0)
         return self.add(g, ob)

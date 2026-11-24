@@ -104,11 +104,16 @@ def idmode(keep):
         rid = int(m['rid'])
         region = [k for k, v in body.REG.items() if v == rid][0]
         if keep == 'armor': ok = m.get('tag', '') == 'armor'
-        else: ok = keep is None or (region in keep and m.get('tag', '') != 'armor')
+        else: ok = keep is None or ((region in keep or ('wpn' in keep and m.get('tag', '') == 'wpn')) and m.get('tag', '') != 'armor')
         if keep is None and m.get('tag', '') == 'armor': ok = False
         m.diffuse_color = body.id_color(rid if ok else 0)
 
 def frames_for(spec):
+    A = _frames_for(spec)
+    for k in spec.get('extra', []): A[k] = poses.EXTRA[k]   # 16차: heavy(양손 무기) · sit(앉기)
+    return A
+
+def _frames_for(spec):
     if spec['kind'] == 'base':
         A = poses.anims('u' if spec['mode'] == 'w' else spec['mode'])
         if spec['mode'] == 'w': A = {k: A[k] for k in ('idle', 'walk')}
@@ -195,7 +200,7 @@ for spec in job['sets']:
     elif spec['kind'] == 'armor':
         groups = {'a.' + spec['piece'], OCC}; keep = 'armor'
     else:
-        groups = {'w.' + spec['weapon'], OCC}; keep = {'wood', 'metal', 'dark', 'crest'}
+        groups = {'w.' + spec['weapon'], OCC}; keep = {'wood', 'metal', 'dark', 'crest', 'wpn'}
     show(groups)
     A = frames_for(spec)
     if job.get('only'): A = {k: v for k, v in A.items() if k in job['only']}

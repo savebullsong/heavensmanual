@@ -6,11 +6,11 @@ import type { Lang } from './i18n.ts';
 export const OPEN_FLOORS = 3; // 지금 열린 층 (4~13층은 하나씩 업데이트)
 
 export type Theme = 'ash' | 'swamp' | 'market';
-export interface FloorDef { floor: number; theme: Theme; name: Record<Lang, string>; sin: Record<Lang, string>; monsters: string[]; boss: string; guard?: string }
+export interface FloorDef { floor: number; theme: Theme; name: Record<Lang, string>; sin: Record<Lang, string>; monsters: string[]; boss: string; guard?: string; /** 고문 장면의 고문자 (그 층의 큰 괴물이 몽둥이를 든다) */ torturer: string }
 export const FLOORS: FloorDef[] = [
-  { floor: 1, theme: 'ash', name: { ko: '재의 문턱', th: 'ธรณีแห่งเถ้าถ่าน', en: 'Threshold of Ash' }, sin: { ko: '경미한 잘못, 책임 회피', th: 'ความผิดเล็กน้อย การหนีความรับผิดชอบ', en: 'Petty wrongs, evading responsibility' }, monsters: ['ashen', 'ember', 'bonewalker', 'gateyak'], boss: 'ashgal', guard: 'ashwarden' },
-  { floor: 2, theme: 'swamp', name: { ko: '굶주림의 늪', th: 'บึงแห่งความหิวโหย', en: 'Swamp of Hunger' }, sin: { ko: '탐욕', th: 'ความโลภ', en: 'Greed' }, monsters: ['pret', 'bogdead', 'gluttonyak'], boss: 'gurma', guard: 'hollowbowl' },
-  { floor: 3, theme: 'market', name: { ko: '피의 시장', th: 'ตลาดเลือด', en: 'Blood Market' }, sin: { ko: '사기, 기만', th: 'การฉ้อโกง การหลอกลวง', en: 'Fraud and deceit' }, monsters: ['haggler', 'debtbones', 'bloodpret', 'merchantyak'], boss: 'serane', guard: 'waxseal' },
+  { floor: 1, theme: 'ash', name: { ko: '재의 문턱', th: 'ธรณีแห่งเถ้าถ่าน', en: 'Threshold of Ash' }, sin: { ko: '경미한 잘못, 책임 회피', th: 'ความผิดเล็กน้อย การหนีความรับผิดชอบ', en: 'Petty wrongs, evading responsibility' }, monsters: ['ashen', 'ember', 'bonewalker', 'gateyak'], boss: 'ashgal', guard: 'ashwarden', torturer: 'gateyak' },
+  { floor: 2, theme: 'swamp', name: { ko: '굶주림의 늪', th: 'บึงแห่งความหิวโหย', en: 'Swamp of Hunger' }, sin: { ko: '탐욕', th: 'ความโลภ', en: 'Greed' }, monsters: ['pret', 'bogdead', 'glutton'], boss: 'gurma', guard: 'hollowbowl', torturer: 'glutton' },
+  { floor: 3, theme: 'market', name: { ko: '피의 시장', th: 'ตลาดเลือด', en: 'Blood Market' }, sin: { ko: '사기, 기만', th: 'การฉ้อโกง การหลอกลวง', en: 'Fraud and deceit' }, monsters: ['haggler', 'debtbones', 'broker'], boss: 'serane', guard: 'waxseal', torturer: 'broker' },
 ];
 export const floorDef = (f: number) => FLOORS[Math.max(1, Math.min(FLOORS.length, f)) - 1];
 
@@ -31,8 +31,8 @@ export const GUARDS: Record<string, GuardDef> = {
     key: 'ashwarden', body: 'warden1', weapon: 'knocker',
     name: { ko: '재문지기', th: 'ผู้เฝ้าประตูเถ้า', en: 'Ash Warden' },
     line: { ko: '이 문 앞에서는 더 이상 누구도 다치지 않는다.', th: 'หน้าประตูนี้ จะไม่มีใครต้องเจ็บอีกแล้ว', en: 'Before this gate, no one is hurt anymore.' },
-    look: { ko: '재가 묻은 해골. 낡은 회색 망토에 문고리 모양의 뼈 곤봉, 허리엔 작은 돌문 열쇠.', th: 'โครงกระดูกเปื้อนเถ้า สวมผ้าคลุมสีเทาเก่า ถือกระบองกระดูกรูปห่วงประตู มีกุญแจประตูหินห้อยเอว', en: 'An ash-dusted skeleton in an old grey cloak, holding a bone club shaped like a door knocker. A small stone-gate key hangs at its waist.' },
-    cols: { 1: '#cfc6b0', 3: '#6a6662', 4: '#56524e', 10: '#d8ccb0', 14: '#6a5a3a', 15: '#1a1614', 12: '#ff7a2a', 6: '#ff7a2a' },
+    look: { ko: '얼굴이 있어야 할 자리에 어둠만 고인 깊은 두건. 재가 엉겨 붙은 누더기 망토 사이로 불씨가 숨 쉬고, 어깨에서는 재가 부스러져 흩날린다. 뼈만 남은 손에 문고리 달린 뼈 곤봉.', th: 'ผ้าคลุมหัวลึกที่มีเพียงความมืดแทนใบหน้า ถ่านไฟหายใจอยู่ในผ้าขี้ริ้วที่เถ้าเกาะ ไหล่ร่วงเป็นเถ้าปลิว มือที่เหลือแต่กระดูกถือกระบองห่วงประตู', en: 'A deep hood with only darkness where a face should be. Embers breathe between ash-caked rags, and its shoulders crumble away as drifting ash. Skeletal hands grip a bone club topped with a door knocker.' },
+    cols: { 1: '#2a2624', 3: '#5c5853', 4: '#403c38', 10: '#c8bea8', 14: '#6a5a3a', 15: '#050303', 12: '#ff7a2a', 6: '#ff7a2a' },
     hp: 2400, dmg: [22, 32], atk: 1.05, speed: 0.55, special: 'push', // 층주 아쉬갈만큼
   },
   hollowbowl: {
@@ -53,33 +53,38 @@ export const GUARDS: Record<string, GuardDef> = {
   },
 };
 
-/** 괴물: 몸(망자·프렛·야크·해골) + 색. 일반 괴물은 모두 무기를 든다 (망자 곡괭이·낙인 쇠·쇠갈고리 장대·고기 칼, 프렛 국자·꼬챙이, 해골 넓적다리뼈·빚 갈고리, 야크 몽둥이). 거대한 층주 구르마는 맨손 */
-export type MonsterBody = 'ash' | 'pret' | 'yak' | 'bones' | 'serane';
+/** 괴물: 몸 + 색. 일반 괴물은 모두 무기를 든다. 16차부터 층마다 몸이 다르다:
+ *  1층 잿빛 망자(곡괭이) · 불씨 망자(머리가 타오르는 숯 몸, 낙인 쇠) · 걷는 해골 · 문지기 야크 / 층주 아쉬갈(숯 바위 거인, 성문 빗장)
+ *  2층 프렛(국자) · 늪 망자(불어 터진 시체, 쇠갈고리 장대) · 탐식귀(두꺼비 거구, 몽둥이) / 층주 구르마(산 같은 배, 맨손)
+ *  3층 흥정꾼(웃는 가면 상인, 고기 칼) · 빚쟁이 해골(멍에·족쇄, 빚 갈고리) · 살점 거간꾼(뚱뚱한 금붙이 상인, 고기 칼) / 층주 세라네 */
+export type MonsterBody = 'ash' | 'pret' | 'yak' | 'bones' | 'serane' | 'ashgal' | 'gurma' | 'cinder' | 'bloat' | 'glutton' | 'hawker' | 'debtor' | 'broker';
 export interface MonsterDef {
   key: string; body: MonsterBody; name: Record<Lang, string>;
   skin: string; cloth: string; glow: string; // 살·옷·빛나는 곳 색
   hp: number; dmg: [number, number]; speed: number; notice: number; atk: number; scale: number; notes: [number, number];
   boss?: boolean; weapon?: string | null;
+  /** 몸 구역 색 덮어쓰기 (가면·금붙이·뿔처럼 살·옷·빛 셋으로 모자란 곳) */
+  cols?: Record<number, string>;
 }
 const M = (key: string, body: MonsterBody, ko: string, th: string, en: string, skin: string, cloth: string, glow: string, hp: number, dmg: [number, number], speed: number, notice: number, atk: number, scale: number, notes: [number, number], extra: Partial<MonsterDef> = {}): MonsterDef =>
   ({ key, body, name: { ko, th, en }, skin, cloth, glow, hp, dmg, speed, notice, atk, scale, notes, ...extra });
 export const MONSTERS: Record<string, MonsterDef> = Object.fromEntries([
   // 1층 재의 문턱
   M('ashen', 'ash', '잿빛 망자', 'ผีเถ้า', 'Ashen dead', '#6e6a66', '#3a3430', '#d9632a', 260, [8, 14], 1.0, 6, 1.0, 1, [3, 8], { weapon: 'pickaxe' }),
-  M('ember', 'ash', '불씨 망자', 'ผีถ่านไฟ', 'Ember dead', '#4a403a', '#2a2220', '#ffb02a', 210, [10, 16], 1.5, 7, 0.8, 1, [4, 9], { weapon: 'brand' }),
+  M('ember', 'cinder', '불씨 망자', 'ผีถ่านไฟ', 'Ember dead', '#2e2622', '#241c1a', '#ffb02a', 210, [10, 16], 1.5, 7, 0.8, 1, [4, 9], { weapon: 'brand' }),
   M('bonewalker', 'bones', '걷는 해골', 'โครงกระดูกเดินได้', 'Walking bones', '#d8cfb8', '#3a3026', '#ff6a2a', 230, [9, 15], 1.2, 7, 0.9, 1, [4, 9], { weapon: 'femur' }),
   M('gateyak', 'yak', '문지기 야크', 'ยักษ์เฝ้าประตู', 'Gate yak', '#5a6e8a', '#3a2a22', '#e0b437', 520, [14, 22], 0.9, 5, 1.15, 1.12, [10, 18], { weapon: 'club' }),
-  M('ashgal', 'yak', '아쉬갈', 'อัชกัล', 'Ashgal', '#8a8580', '#2a2220', '#ff6a1a', 2400, [22, 32], 1.0, 9, 1.0, 1.45, [120, 160], { boss: true, weapon: 'club' }),
+  // 아쉬갈: 숯이 된 바위 거인. 갈라진 틈으로 용암이 흐르고 숫양 뿔이 말렸다. 불탄 성문의 쇠 빗장을 휘두른다
+  M('ashgal', 'ashgal', '아쉬갈', 'อัชกัล', 'Ashgal', '#4a4440', '#2a2220', '#ff6a1a', 2400, [22, 32], 1.0, 9, 1.15, 1.45, [120, 160], { boss: true, weapon: 'gatebar', cols: { 13: '#3a2a1e', 14: '#5a5652', 15: '#120c0a' } }),
   // 2층 굶주림의 늪
   M('pret', 'pret', '프렛', 'เปรต', 'Phi Pret', '#9aa08a', '#4a4232', '#c9d26a', 300, [10, 18], 0.8, 6, 1.0, 1, [5, 11], { weapon: 'ladle' }),
-  M('bogdead', 'ash', '늪 망자', 'ผีบึง', 'Bog dead', '#5a6a4a', '#3a3a22', '#8ad06a', 320, [11, 17], 0.9, 6, 1.0, 1, [5, 10], { weapon: 'boathook' }),
-  M('gluttonyak', 'yak', '탐식 야크', 'ยักษ์ตะกละ', 'Glutton yak', '#4f7a4a', '#4a3a22', '#e0b437', 640, [16, 25], 0.85, 5, 1.15, 1.15, [12, 22], { weapon: 'club' }),
-  M('gurma', 'pret', '구르마', 'กูร์มา', 'Gurma', '#7a8a5a', '#3a3222', '#e8f06a', 3200, [26, 36], 0.85, 9, 1.05, 1.55, [240, 300], { boss: true }),
+  M('bogdead', 'bloat', '늪 망자', 'ผีบึง', 'Bog dead', '#7e8c6e', '#34401e', '#c8f08a', 320, [11, 17], 0.9, 6, 1.0, 1, [5, 10], { weapon: 'boathook', cols: { 4: '#2e2a1c' } }),
+  M('glutton', 'glutton', '탐식귀', 'ผีตะกละ', 'Glutton', '#5f7a4a', '#c9b27a', '#e0b437', 640, [16, 25], 0.85, 5, 1.15, 1.1, [12, 22], { weapon: 'club', cols: { 4: '#3a2a1a' } }),
+  M('gurma', 'gurma', '구르마', 'กูร์มา', 'Gurma', '#8a8a6a', '#4a3a26', '#e8f06a', 3200, [26, 36], 0.85, 9, 1.05, 1.45, [240, 300], { boss: true, weapon: null }),
   // 3층 피의 시장
-  M('haggler', 'ash', '흥정꾼 망자', 'ผีพ่อค้าต่อราคา', 'Haggler dead', '#6a5a52', '#8a1a1a', '#f2c84a', 380, [13, 20], 1.1, 6, 0.95, 1, [7, 14], { weapon: 'cleaver' }),
-  M('debtbones', 'bones', '빚진 해골', 'โครงกระดูกติดหนี้', 'Indebted bones', '#c9b89a', '#5a1a1a', '#f2c84a', 360, [13, 21], 1.2, 7, 0.9, 1, [7, 13], { weapon: 'hook' }),
-  M('bloodpret', 'pret', '피 프렛', 'เปรตเลือด', 'Blood pret', '#a06a62', '#5a1a1a', '#ff4a3a', 420, [14, 22], 0.9, 6, 1.0, 1.05, [8, 15], { weapon: 'skewer' }),
-  M('merchantyak', 'yak', '장사치 야크', 'ยักษ์พ่อค้า', 'Merchant yak', '#a0302a', '#2a1a12', '#f2c84a', 800, [19, 29], 0.9, 5, 1.1, 1.15, [15, 26], { weapon: 'club' }),
+  M('haggler', 'hawker', '가면 흥정꾼', 'พ่อค้าหน้ากาก', 'Masked haggler', '#6a5a52', '#1a1414', '#c8281e', 380, [13, 20], 1.1, 6, 0.95, 1, [7, 14], { weapon: 'cleaver', cols: { 10: '#efe8dc', 14: '#c9a23e', 4: '#120e0e' } }),
+  M('debtbones', 'debtor', '빚쟁이 해골', 'โครงกระดูกลูกหนี้', 'Debtor bones', '#c9b89a', '#6a5a3a', '#f2c84a', 360, [13, 21], 1.2, 7, 0.9, 1, [7, 13], { weapon: 'hook', cols: { 10: '#e8dcc0' } }),
+  M('broker', 'broker', '살점 거간꾼', 'นายหน้าเนื้อ', 'Flesh broker', '#8a5a4a', '#2a1a12', '#f2c84a', 800, [19, 29], 0.9, 5, 1.1, 1.1, [15, 26], { weapon: 'cleaver', cols: { 14: '#c9a23e' } }),
   // 세라네: 피의 시장 끝 나루터 앞에 도사린 거대한 살덩이 애벌레. 세로로 찢어진 아가리에 이빨이 세 겹 (맨손 = 발톱 팔)
   M('serane', 'serane', '세라네', 'เซราเน', 'Serane', '#5e1a20', '#360a0e', '#e0281e', 4200, [30, 42], 0.8, 6, 1.0, 1.85, [380, 460], { boss: true, weapon: null }),
 ].map((m) => [m.key, m]));
@@ -98,6 +103,21 @@ const cache = new Map<number, Zone>();
 /** 위층 통행세와 속죄의 회당 목표 (노전). 층주를 피해 지나가는 값은 아주 비싸다 */
 export const TOLL: Record<number, number> = { 1: 10000, 2: 20000, 3: 30000 };
 export const ATONE_GOAL: Record<number, number> = { 1: 11000, 2: 21000, 3: 31000 };
+/**
+ * 4층부터: 마을의 결계(보호)가 주기적으로 걷힌다. 그동안 괴물이 마을로 몰려들고, 경비병은 휴전 협약대로 움직이지 않는다.
+ * 모두에게 같은 시각에 일어나도록 실제 시계로 정한다 (층마다 어긋나게). 매 15분 중 2분.
+ */
+export const RAID = { from: 4, every: 15 * 60, length: 2 * 60 };
+/** 시험용: true/false 로 강제 (null = 시계대로) */
+export let raidForce: boolean | null = null;
+export const setRaidForce = (v: boolean | null) => { raidForce = v; };
+export function raidState(floor: number, nowMs = Date.now()): { on: boolean; left: number } {
+  if (raidForce !== null) return { on: raidForce, left: raidForce ? RAID.length : RAID.every };
+  if (floor < RAID.from) return { on: false, left: Infinity };
+  const t = (Math.floor(nowMs / 1000) + floor * 211) % RAID.every;
+  const start = RAID.every - RAID.length;
+  return t >= start ? { on: true, left: RAID.every - t } : { on: false, left: start - t };
+}
 /** 2층 층주 구르마가 배불러 잠드는 먹이 수 */
 export const GURMA_FULL = 100;
 

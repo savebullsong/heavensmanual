@@ -5,7 +5,7 @@ import { wingTexture, cloudTexture, heavenVignette } from './heavengfx.ts';
 import { hellDecor } from './hellprops.ts';
 import { Application, ColorMatrixFilter, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture, TilingSprite } from 'pixi.js';
 import { type Look } from './character.ts';
-import { MISS_HWANG, charSet, frameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, ANIM_FPS, IMPACT, type CharSet, type Dir, type Anim, type Frame } from './sprites.ts';
+import { MISS_HWANG, charSet, frameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, ANIM_FPS, IMPACT, TWO, type CharSet, type Dir, type Anim, type Frame } from './sprites.ts';
 import { type Zone, type Building, type Lane, type Prop, findPath, walkable, randomWalkTileNear, tileAt } from './zone.ts';
 import { iso, TW, TH, drawBuilding, drawGroundChunk, buildingHeight } from './gfx.ts';
 import { drawBuildingKit, drawGroundKit, buildingTop, upperFloors, carSprite, propSprite, CAR_MODELS, CHUNK, kitOk } from './street.ts';
@@ -13,11 +13,11 @@ import { t, lang } from './i18n.ts';
 import { bangkokClock, nightFactor } from './clock.ts';
 import { buildingName, buildingSub, interactive, canWork, hasBank, cuisineOf, storeOf, type StoreKind } from './names.ts';
 import * as sfx from './sfx.ts';
-import { MONSTERS, GUARDS, floorDef, GURMA_FULL, fordWob, type MonsterDef, type GuardDef } from './hell.ts';
+import { MONSTERS, GUARDS, floorDef, GURMA_FULL, fordWob, type MonsterDef, type GuardDef, raidState } from './hell.ts';
 import { rollLoot, ITEMS, iconFor } from './items.ts';
 import { drawHellBank, drawAtone, drawRebirthGate } from './hellhalls.ts';
 import { SKIN_COLORS } from './character.ts';
-import { drawHellGround, drawHellStructure, hellTint, hellProp, liquidInside, bloodLavaTile } from './hellgfx.ts';
+import { drawHellGround, hellGroundJob, type GroundJob, drawHellStructure, hellTint, hellProp, liquidInside, bloodLavaTile } from './hellgfx.ts';
 import { drawCosmicBird, COSMIC_TOP } from './ujusae.ts';
 import { drawYuhwang } from './yuhwang.ts';
 import { drawLoanHouse, LOAN_TOP } from './loanhouse.ts';
@@ -102,6 +102,7 @@ interface Walker {
   shotT?: number; // 탈루스: 다시 쏠 수 있을 때까지
   sealT?: number; // 붉은 봉인 낙인: 남은 시간
   size?: number; // 그림 배율 (층주는 크게)
+  raider?: boolean; // 4층부터의 습격 때 마을로 몰려든 괴물
   still?: 'sit' | 'lie'; // 마을의 지친 영혼: 앉아 있거나 누워 있다
   vend?: 'butcher' | 'junk'; // 마을 장사꾼
   beg?: boolean; // 2층 층주 구르마: 먹을 것을 든 영혼에게는 싸우지 않고 조른다
@@ -130,6 +131,8 @@ export interface WorldHooks {
   died(cause: 'car' | 'beaten' | 'hell'): void;
   menu(title: string, sub: string, options: { label: string; danger?: boolean; act: () => void }[], x: number, y: number): void;
   say(name: string, text: string): void;
+  /** 막지 않는 짧은 알림 (위쪽에 잠깐) */
+  notice(text: string): void;
   work(state: { name: string; earned: number } | null): void;
   useAmmo(): boolean;
   store(kind: StoreKind, name: string, cuisine?: string): void;
@@ -240,6 +243,8 @@ export class WorldScene {
   private night = -1;
   private wantShop = false;
   private streamT = 0;
+  /** 나눠 그리는 중인 지옥 바닥 덩어리 */
+  private gjob: { key: string; vis: boolean; job: GroundJob } | null = null;
   private ring = new Graphics();
   private arrow = new Graphics();
   private aura = makeAuraSprite();
@@ -542,14 +547,16 @@ export class WorldScene {
     return this._glow;
   }
 
-  private visibleRange() {
+  /** margin = false 면 화면에 실제로 보이는 칸만 */
+  private visibleRange(margin = true) {
     const sw = this.app.screen.width, sh = this.app.screen.height;
     const pts = [[0, 0], [sw, 0], [0, sh], [sw, sh]].map(([sx, sy]) => {
       const wx = sx - this.camera.x, wy = sy - this.camera.y;
       return [(wx / (TW / 2) + wy / (TH / 2)) / 2, (wy / (TH / 2) - wx / (TW / 2)) / 2];
     });
     const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
-    return { i0: Math.min(...xs) - 4, i1: Math.max(...xs) + 16, j0: Math.min(...ys) - 4, j1: Math.max(...ys) + 16 };
+    const a = margin ? 4 : 0, b = margin ? 16 : 2;
+    return { i0: Math.min(...xs) - a, i1: Math.max(...xs) + b, j0: Math.min(...ys) - a, j1: Math.max(...ys) + b };
   }
 
   private stream(all: boolean) {
@@ -559,10 +566,22 @@ export class WorldScene {
     const d0 = Math.floor(Math.max(0, r.j0) / CHUNK), d1 = Math.floor(Math.min(this.zone.H - 1, r.j1) / CHUNK);
     let budget = all ? 1e9 : 3;
     const want = new Set<string>();
+    const sr = this.visibleRange(false);
+    const cx = (sr.i0 + sr.i1) / 2, cy = (sr.j0 + sr.j1) / 2;
+    let pick: { key: string; ci: number; cj: number; d: number; vis: boolean } | null = null;
     for (let cj = d0; cj <= d1; cj++)
       for (let ci = c0; ci <= c1; ci++) {
         const key = `${ci},${cj}`;
         want.add(key);
+        if (!this.chunks.has(key) && this.zone.hell && !all) {
+          // 지옥 바닥은 점마다 계산해 무겁다: 한 덩어리씩, 프레임마다 몇 ms씩 나눠 그린다 (멈칫거림 없이)
+          // 화면 가운데에 가까운 덩어리부터. 화면 안에 비어 보이는 덩어리는 더 빨리(프레임당 14ms)
+          if (!this.gjob) {
+            const d = Math.hypot((ci + 0.5) * CHUNK - cx, (cj + 0.5) * CHUNK - cy);
+            if (!pick || d < pick.d) pick = { key, ci, cj, d, vis: ci * CHUNK < sr.i1 && (ci + 1) * CHUNK > sr.i0 && cj * CHUNK < sr.j1 && (cj + 1) * CHUNK > sr.j0 };
+          }
+          continue;
+        }
         if (!this.chunks.has(key) && budget > 0) {
           budget--;
           const ch = this.zone.hell ? drawHellGround(this.zone, floorDef(this.zone.hell.floor).theme, ci * CHUNK, cj * CHUNK) : kitOk ? drawGroundKit(this.zone, ci * CHUNK, cj * CHUNK) : drawGroundChunk(this.zone, ci * CHUNK, cj * CHUNK);
@@ -572,6 +591,8 @@ export class WorldScene {
           this.chunks.set(key, s);
         }
       }
+    if (pick && !this.gjob) this.gjob = { key: pick.key, vis: pick.vis, job: hellGroundJob(this.zone, floorDef(this.zone.hell!.floor).theme, pick.ci * CHUNK, pick.cj * CHUNK) };
+    if (this.gjob && !want.has(this.gjob.key)) this.gjob = null;
     for (const [key, s] of this.chunks) if (!want.has(key)) { s.destroy({ texture: s.texture !== Texture.EMPTY, textureSource: s.texture !== Texture.EMPTY }); this.chunks.delete(key); }
     for (const key of want) if (!this.dViews.has(key) && (this.dIndex.has(key) || this.wIndex.has(key))) this.dViews.set(key, this.makeDecor(key));
     for (const [key, v] of this.dViews) if (!want.has(key)) { for (const s of v.sprites) s.destroy(); v.wires?.destroy(); this.dViews.delete(key); }
@@ -1407,6 +1428,7 @@ export class WorldScene {
   /** 경비병의 평소 행동: 순찰 → 감지 → 개입 → 복귀 */
   private thinkGuard(w: Walker, moving: boolean, dt: number) {
     const p = this.player, L = t();
+    if (this.raid && !w.target) { w.path = []; return; } // 습격 중: 휴전 협약대로 지켜보기만 한다 (자기를 친 자에게만 맞선다)
     if (w.hp < w.maxHp && !w.target) w.hp = Math.min(w.maxHp, w.hp + w.maxHp * 0.03 * dt);
     // 경고 중: 1초 동안 노려보다가, 그동안에도 싸움이 이어졌으면 제압하러 간다
     if (w.warnT && w.warnT > 0) {
@@ -1641,8 +1663,12 @@ export class WorldScene {
     const b = this.makeMonster(m, h.boss.i, h.boss.j);
     this.walkers.push(b);
   }
+  /** 괴물 겉모습: 살·옷·빛 세 색 + 괴물마다 덮어쓰는 구역 색. 무기 쇠는 녹슨 쇳빛 (층주만 금빛) */
+  private monsterLook(m: MonsterDef): Look {
+    return { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: m.body, cols: { 1: m.skin, 3: m.cloth, 4: m.cloth, 5: '#1a1410', 6: m.glow, 9: m.cloth, 10: m.skin, 12: m.glow, 13: '#4a3422', 14: m.boss ? '#c9a23e' : '#7e7468', 15: '#140e0c', ...(m.cols ?? {}) } };
+  }
   private makeMonster(m: MonsterDef, i: number, j: number): Walker {
-    const look: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: m.body, cols: { 1: m.skin, 3: m.cloth, 4: m.cloth, 5: '#1a1410', 6: m.glow, 9: m.cloth, 10: m.skin, 12: m.glow, 13: '#4a3422', 14: m.boss ? '#c9a23e' : '#7e7468', 15: '#140e0c' } }; // 무기 쇠는 녹슨 쇳빛 (층주만 금빛)
+    const look = this.monsterLook(m);
     const w = this.makeWalker(look, i, j, 'monster', m.weapon === undefined ? null : m.weapon ?? null);
     const f = this.zone.hell!.floor;
     w.mdef = m;
@@ -1655,7 +1681,41 @@ export class WorldScene {
   /** 휴식 공간 안인가 (싸움 불가, 괴물은 못 들어옴) */
   private inRest(x: number, y: number) {
     const r = this.zone.hell?.rest;
+    if (this.raid) return false; // 4층부터: 결계가 걷힌 동안은 마을도 들판과 같다
     return !!r && Math.abs(x - (r.i + 0.5)) < r.r && Math.abs(y - (r.j + 0.5)) < r.r;
+  }
+  /** 4층부터의 습격: 결계가 걷힌 동안 (raidState 가 정한다) */
+  private raid = false;
+  private raidT = 0;
+  private updateRaid(dt: number) {
+    const h = this.zone.hell;
+    if (!h || this.zone.interior) return;
+    this.raidT -= dt;
+    if (this.raidT > 0) return;
+    this.raidT = 1;
+    const on = raidState(h.floor).on;
+    if (on === this.raid) return;
+    this.raid = on;
+    const L = t();
+    this.hooks.notice(on ? L.raidStart : L.raidEnd);
+    if (on) {
+      // 마을 둘레에서 괴물 떼가 몰려든다 (그 층 괴물 여섯)
+      const def = floorDef(h.floor), r = h.rest;
+      for (let k = 0; k < 6; k++) {
+        const a = (k / 6) * Math.PI * 2 + Math.random() * 0.5, d = r.r + 5 + Math.random() * 3;
+        const spot = randomWalkTileNear(this.zone, Math.round(r.i + Math.cos(a) * d), Math.round(r.j + Math.sin(a) * d), 3, ['walk', 'lot', 'park', 'soi', 'cross']);
+        if (!spot) continue;
+        const m = this.makeMonster(MONSTERS[def.monsters[k % def.monsters.length]], spot[0], spot[1]);
+        m.raider = true;
+        m.home = [r.i, r.j];
+        if (!this.dead && !this.invisible) { m.target = this.player; m.firstBy = m; }
+        this.walkers.push(m);
+      }
+      for (const g of this.walkers) if (g.gdef) { g.target = null; g.path = []; this.bubble(g, L.raidGuard); }
+    } else {
+      // 결계가 다시 서면 마을 안에 남은 습격 괴물은 재가 되어 흩어진다
+      for (const m of this.walkers.slice()) if (m.raider && m.down <= 0 && this.inRest(m.x, m.y)) this.removeWalker(m);
+    }
   }
 
   private spawnCars() {
@@ -1942,7 +2002,7 @@ export class WorldScene {
       q.free = true;
       q.tor.destroy();
       const f = this.zone.hell.floor;
-      const tm = MONSTERS[floorDef(f).monsters.find((k) => MONSTERS[k].body === 'yak') ?? 'gateyak'];
+      const tm = { ...MONSTERS[floorDef(f).torturer], weapon: 'club' };
       const m = this.makeMonster(tm, Math.floor(q.tx), Math.floor(q.ty));
       m.x = q.tx; m.y = q.ty; m.dir = q.tdir;
       m.home = [Math.floor(q.tx), Math.floor(q.ty)];
@@ -2456,8 +2516,11 @@ export class WorldScene {
 
   /** 맞은 몸의 재질 → 타격음이 달라진다 */
   private bodyOf(w: Walker): sfx.Body {
-    if (w.gdef) return w.gdef.body === 'warden1' ? 'bones' : w.gdef.body === 'warden2' ? 'pret' : 'suturer';
-    if (w.mdef) return w.mdef.body === 'yak' ? 'yak' : w.mdef.body === 'pret' || w.mdef.body === 'serane' ? 'pret' : w.mdef.body === 'bones' ? 'bones' : 'ash';
+    if (w.gdef) return w.gdef.body === 'warden1' ? 'ash' : w.gdef.body === 'warden2' ? 'pret' : 'suturer';
+    if (w.mdef) {
+      const b = w.mdef.body;
+      return b === 'yak' || b === 'ashgal' || b === 'glutton' || b === 'broker' ? 'yak' : b === 'pret' || b === 'serane' || b === 'gurma' || b === 'bloat' ? 'pret' : b === 'bones' || b === 'debtor' ? 'bones' : 'ash';
+    }
     if (w.kind === 'suturer') return w.monster ? 'monster' : 'suturer';
     if (w.kind === 'thug') return 'thug';
     if (w.isPlayer || w.kind === 'remote') return 'player';
@@ -2540,8 +2603,9 @@ export class WorldScene {
     const lying = variant === 1;
     const vx = i + 0.5, vy = j + 0.5, tx = i + 1.55, ty = j + 0.45;
     const vic = new Sprite(), tor = new Sprite(), spark = new Graphics();
-    const tm = MONSTERS[floorDef(f).monsters.find((k) => MONSTERS[k].body === 'yak') ?? 'gateyak'];
-    const tlook: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'yak', cols: { 1: tm.skin, 3: tm.cloth, 4: tm.cloth, 5: '#1a1410', 6: tm.glow, 9: tm.cloth, 10: tm.skin, 12: tm.glow, 13: '#4a3422', 14: '#c9a23e', 15: '#140e0c' } };
+    // 고문자: 그 층의 큰 괴물(1층 문지기 야크 · 2층 탐식귀 · 3층 살점 거간꾼)이 몽둥이를 든다
+    const tm = MONSTERS[floorDef(f).torturer];
+    const tlook = this.monsterLook(tm);
     const vlook: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'ash', cols: { 1: '#8a8a90', 3: '#3a3434', 4: '#2e2828', 5: '#1a1410', 6: '#7a2a22', 9: '#3a3434', 10: '#8a8a90', 12: '#7a2a22', 13: '#2a1e18', 14: '#5a5652', 15: '#140e0c' } };
     const ty0 = { tor, vic, tcs: null as CharSet | null, vcs: null as CharSet | null, x: vx, y: vy, tx, ty, t: Math.random() * 2, next: 0.5 + Math.random() * 1.5, t0: -9, hitT: -9, struck: true, lying, tdir: dirFromTile(vx - tx, vy - ty, 'sw'), vdir: dirFromTile(tx - vx, ty - vy, 'se'), spark };
     const g = new Graphics();
@@ -2820,9 +2884,11 @@ export class WorldScene {
     w.atkT -= dt;
     if (w.atkT > 0) return;
     if (w.isPlayer) {
-      w.atkT = ATK_INTERVAL;
+      // 양손 무기: 한 번 내려찍는 데 더 오래 걸리지만 훨씬 묵직하다
+      const two = !ranged && TWO.has(this.gear.weapon ?? '');
+      w.atkT = ATK_INTERVAL * (two ? 1.6 : 1);
       if (ranged && !this.hooks.useAmmo()) { this.gear.ranged = false; return; }
-      let dmg = rand(4, 8) + this.gear.atk * 3 + this.stats.str;
+      let dmg = Math.round((rand(4, 8) + this.gear.atk * 3 + this.stats.str) * (two ? 1.35 : 1));
       const crit = Math.random() * 100 < critChance(this.stats.fai);
       if (crit) dmg *= CRIT_MULTIPLIER;
       this.startAttack(w, tg, dmg, crit);
@@ -2933,7 +2999,7 @@ export class WorldScene {
           w.down -= dt;
           if (w.down <= 0) {
             if (w.kind === 'suturer') { this.removeWalker(w); continue; }
-            if (w.mdef) { if (w.mdef.boss) this.removeWalker(w); else this.spawnMonster(w); continue; }
+            if (w.mdef) { if (w.mdef.boss || w.raider) this.removeWalker(w); else this.spawnMonster(w); continue; }
             if (w.gdef) { const g = this.makeGuard(w.gdef, w.post ?? 0); this.removeWalker(w); this.walkers.push(g); continue; }
             if (w.kind === 'fighter') { this.reviveFighter(w); continue; }
             if (w.kind === 'soul' || w.kind === 'vendor') { w.hp = w.maxHp; continue; }
@@ -3113,6 +3179,20 @@ export class WorldScene {
     this.refreshNight(nf);
     this.streamT -= dt;
     if (this.streamT <= 0) { this.streamT = 0.12; this.stream(false); }
+    this.updateRaid(dt);
+    if (this.gjob) {
+      const { key, job } = this.gjob;
+      if (job.step(this.gjob.vis ? 14 : 5)) {
+        this.gjob = null;
+        if (!this.chunks.has(key)) {
+          const s = new Sprite(tex(job.canvas));
+          s.position.set(job.x, job.y);
+          this.ground.addChild(s);
+          this.chunks.set(key, s);
+        }
+        this.streamT = 0; // 다음 덩어리를 바로
+      }
+    }
   }
 
   /** 행인·불량배의 평소 행동 */
@@ -3122,7 +3202,7 @@ export class WorldScene {
     if (w.kind === 'talus') { this.thinkTalus(w, dt); return; }
     if (w.kind === 'soul' || w.kind === 'vendor') { if (!w.still && !moving && w.target === null && Math.hypot(this.player.x - w.x, this.player.y - w.y) < 3) w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); return; }
     if (w.kind === 'fighter') { this.thinkFighter(w, moving, dt); return; }
-    if (w.kind !== 'pashar' && w.kind !== 'clerk' && w.kind !== 'officer' && w.kind !== 'yellowwing' && !w.mdef?.boss && Math.hypot(w.x - p.x, w.y - p.y) > 34) { if (w.kind === 'suturer') this.removeWalker(w); else if (w.mdef) this.spawnMonster(w); else this.spawnNpc(w.kind as NpcKind, w); return; }
+    if (w.kind !== 'pashar' && w.kind !== 'clerk' && w.kind !== 'officer' && w.kind !== 'yellowwing' && !w.mdef?.boss && Math.hypot(w.x - p.x, w.y - p.y) > 34) { if (w.kind === 'suturer' || w.raider) this.removeWalker(w); else if (w.mdef) this.spawnMonster(w); else this.spawnNpc(w.kind as NpcKind, w); return; }
     if (w.flee > 0) {
       w.flee -= dt;
       if (!w.path.length) {

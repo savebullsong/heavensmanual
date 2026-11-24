@@ -38,6 +38,10 @@ export const MISS_HWANG: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColo
 export const HWANGHON: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'apron', cols: { 1: '#ead2c4', 2: '#3a0e12', 3: '#5a0e18', 4: '#2a0a10', 5: '#0c0808', 6: '#1a1210', 7: '#140a0c', 9: '#5a0e18', 10: '#ead2c4' } };
 
 export const MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle'];
+/** 양손 무기 (16차): 두 손으로 크게 들어 내려찍는다 (heavy 동작) — 느리지만 묵직하다 */
+export const TWO = new Set(['sledge', 'fireaxe', 'greatsword', 'maul']);
+/** 16차 괴물 몸: 차림 → [굽기 키, 자세] (무기를 들면 m) */
+const MON16: Record<string, [string, string, Mode]> = { ashgal: ['h', 'ashgal', 'm'], gurma: ['u', 'gurma', 'u'], cinder: ['n', 'cinder', 'm'], bloat: ['l', 'bloat', 'm'], glutton: ['e', 'glutton', 'm'], hawker: ['v', 'hawker', 'm'], debtor: ['d', 'debtor', 'm'], broker: ['k', 'besk', 'm'] };
 /** 방어구 겉모습: 그리는 순서와 색 (구역 3 = 본색, 구역 5 = 신발) */
 const ARMOR_ORDER = ['workpants', 'shinguard', 'boots', 'jacket', 'vest', 'gloves'];
 const ARMOR_COLOR: Record<string, string> = { helmet: '#b0302a', jacket: '#4a5236', vest: '#3a3f46', gloves: '#d8cfb4', workpants: '#4a4536', shinguard: '#2b2f36', boots: '#3a2a1a' };
@@ -136,7 +140,7 @@ function palette(look: Look): Uint8ClampedArray[] {
 }
 
 // ───────────────────────── 어떤 층을 쓰나 ─────────────────────────
-export function layerKeys(look: Look, weapon: string | null, armor: string[] = []) {
+export function layerKeys(look: Look, weapon: string | null, armor: string[] = []): { base: string; hair: string | null; weapon: string | null; armor: { key: string; piece: string }[]; mode: Mode; two?: boolean } {
   const o = look.outfit ?? 'casual';
   // 대식자: 사람 모습 / 변신한 모습 (머리카락·방어구 없음, 늘 큰 바늘)
   if ((o as string) === 'suturer') return { base: 'b-m1-suturer-m', hair: null, weapon: 'w-m-needle', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
@@ -146,6 +150,11 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
   if (o === 'ash' || o === 'pret' || o === 'bones') {
     const mk = o === 'ash' ? 'a' : o === 'pret' ? 'p' : 's';
     return { base: `b-${mk}-${o}-${weapon ? 'm' : 'u'}`, hair: null, weapon: weapon ? `w-${mk}-${weapon}` : null, armor: [] as { key: string; piece: string }[], mode: (weapon ? 'm' : 'u') as Mode };
+  }
+  const m16 = MON16[o as string];
+  if (m16) {
+    const [mk, body, md] = m16;
+    return { base: `b-${mk}-${body}-${md}`, hair: null, weapon: md === 'm' && weapon ? `w-${mk}-${weapon}` : null, armor: [] as { key: string; piece: string }[], mode: md, two: false };
   }
   if (o === 'serane') return { base: 'b-r-serane-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
   if (o === 'talus') return { base: 'b-t-talus-g', hair: null, weapon: 'w-t-shotgun', armor: [] as { key: string; piece: string }[], mode: 'g' as Mode };
@@ -157,7 +166,7 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
   if (o === 'warden3') return { base: 'b-w-warden3-m', hair: null, weapon: 'w-w-sealstaff', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   if (o === 'yak') return { base: 'b-y-yak-m', hair: null, weapon: weapon === null ? null : 'w-y-club', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   const child = !!look.child;
-  const w = child ? null : weapon && (MELEE.includes(weapon) || weapon === 'pistol') ? weapon : null;
+  const w = child ? null : weapon && (MELEE.includes(weapon) || TWO.has(weapon) || weapon === 'pistol') ? weapon : null;
   let mode: Mode = w === 'pistol' ? 'g' : w ? 'm' : 'u';
   const sex = look.sex;
   const build = Math.max(0, Math.min(2, look.build ?? 1));
@@ -179,7 +188,7 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
       arm.push({ key: `a-${sex}${PER_BUILD.has(piece) ? ab : 1}-${piece}-${mode}`, piece });
     }
   }
-  return { base, hair, weapon: w ? `w-${sex}-${w}` : null, armor: arm, mode };
+  return { base, hair, weapon: w ? `w-${sex}-${w}` : null, armor: arm, mode, two: !!w && TWO.has(w) };
 }
 
 // ───────────────────────── 합치기 ─────────────────────────
@@ -195,7 +204,7 @@ export function charSet(look: Look, weapon: string | null = null, armor: string[
   p = pxReady.then(async () => {
     const cs = await build(look, keys);
     // 괴물 몸을 아직 굽지 않았으면 실밥 터진 대식자 몸에 색만 입혀 쓴다
-    if (!cs.frames.size && ['ash', 'pret', 'yak'].includes(look.outfit ?? '')) return build({ ...look, outfit: 'stitched' }, layerKeys({ ...look, outfit: 'stitched' }, 'needle'));
+    if (!cs.frames.size && ['ash', 'pret', 'yak', 'ashgal', 'gurma', 'cinder', 'bloat', 'glutton', 'hawker', 'debtor', 'broker'].includes(look.outfit ?? '')) return build({ ...look, outfit: 'stitched' }, layerKeys({ ...look, outfit: 'stitched' }, 'needle'));
     return cs;
   });
   sets.set(id, p);
@@ -332,7 +341,8 @@ async function build(look: Look, keys: ReturnType<typeof layerKeys>): Promise<Ch
     const n = Number(idx) + 1;
     if ((counts[an as Anim] ?? 0) < n) counts[an as Anim] = n;
   }
-  const attack: Anim | null = keys.mode === 'u' ? 'punch' : keys.mode === 'm' ? 'swing' : keys.mode === 'g' ? 'shoot' : null;
+  // 양손 무기는 내려찍기 (아직 굽지 않은 그림이면 휘두르기로)
+  const attack: Anim | null = keys.two && counts.heavy ? 'heavy' : keys.mode === 'u' ? 'punch' : keys.mode === 'm' ? 'swing' : keys.mode === 'g' ? 'shoot' : null;
   return { mode: keys.mode, attack, frames, counts, masks, eight: frames.has('hit-s-0') };
 }
 

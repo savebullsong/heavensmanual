@@ -14,7 +14,7 @@ import { streetReady } from './street.ts';
 import { ARRIVALS, rollArrival, arrivalLook, type Arrival, type Look, type Outfit } from './character.ts';
 import { t, lang, setLang, LANGS, type Lang } from './i18n.ts';
 import { load, save, type Slot, type Stash } from './state.ts';
-import { hellZone, OPEN_FLOORS, floorDef, MONSTERS, GUARDS, TOLL, ATONE_GOAL, GURMA_FULL } from './hell.ts';
+import { hellZone, OPEN_FLOORS, floorDef, MONSTERS, GUARDS, TOLL, ATONE_GOAL, GURMA_FULL, setRaidForce } from './hell.ts';
 import { interiorZone } from './interior.ts';
 import { buildingName } from './names.ts';
 import { bangkokClock } from './clock.ts';
@@ -113,6 +113,22 @@ function reclaim(w: 'real' | 'hell') {
 
 async function boot() {
   await app.init({ resizeTo: window, background: '#14110f', antialias: false, autoDensity: true, resolution: Math.min(2, window.devicePixelRatio || 1) });
+  // 느린 기기: 처음 몇 초 평균이 40fps 아래면 화면 밀도를 1로 낮춘다 (한 번만, 고해상도 휴대폰의 버벅임 줄이기)
+  {
+    let acc = 0, n = 0, skip = 360; // 불러오는 동안(처음 몇 초)은 세지 않는다
+    const watch = () => {
+      if (skip > 0) { skip--; return; }
+      acc += app.ticker.FPS; n++;
+      if (n < 240) return;
+      const avg = acc / n; acc = 0; n = 0;
+      if (avg < 40 && app.renderer.resolution > 1) {
+        app.renderer.resolution = 1;
+        app.renderer.resize(window.innerWidth, window.innerHeight);
+        app.ticker.remove(watch);
+      }
+    };
+    app.ticker.add(watch);
+  }
   document.getElementById('game')!.appendChild(app.canvas);
   ui.hidden = true;
   shop = new ShopRoom(app, bodyLook(), false, shopLabels());
@@ -128,7 +144,7 @@ async function boot() {
   setInterval(updateHud, 1000);
   setInterval(() => { snapPos(); save(state); }, 4000);
   addEventListener('pagehide', () => { snapPos(); save(state); });
-  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior }; // 개발용 확인 창구
+  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce }; // 개발용 확인 창구
 }
 
 // ───────────────────────── 장면 전환 ─────────────────────────
@@ -330,6 +346,7 @@ function leaveShop() {
 
 // ───────────────────────── 거리에서 오는 일 ─────────────────────────
 const hooks: WorldHooks = {
+  notice(text) { toast(text, 'evil'); },
   money(n) {
     state.wallet = (state.wallet ?? 0) + n;
     updateHud();

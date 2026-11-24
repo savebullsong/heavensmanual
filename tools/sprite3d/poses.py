@@ -82,6 +82,31 @@ def fall(mode='u'):
         out.append(P)
     return out
 
+# 16차: 양손 무기 내려찍기 (휘두름보다 크게 들어 올려 땅까지 내려친다) · 앉아 쉬는 자세
+HEAVY = [  # 어깨에 멤 · 머리 위로 · 정점 · 내려찍음(맞힘) · 땅에 박힘 · 돌아옴
+    _st(spine=[('X', 4), ('Z', -30)], hips=[('Z', -10)], upper_arm__R=[('X', -120), ('Y', 20)], forearm__R=[('X', -110)], upper_arm__L=[('X', -100), ('Y', 40)], forearm__L=[('X', -100)]),
+    _st(spine=[('X', 12), ('Z', -14)], hips=[('Z', -4)], thigh__L=[('X', -8)], shin__L=[('X', 8)], thigh__R=[('X', 14)], shin__R=[('X', 14)],
+        upper_arm__R=[('X', -172), ('Y', 12)], forearm__R=[('X', -75)], upper_arm__L=[('X', -168), ('Y', 26)], forearm__L=[('X', -75)]),
+    _st(spine=[('X', -2), ('Z', -6)], thigh__L=[('X', -24)], shin__L=[('X', 14)], thigh__R=[('X', 18)], shin__R=[('X', 12)],
+        upper_arm__R=[('X', -158), ('Y', 6)], forearm__R=[('X', -30)], hand__R=[('X', 20)], upper_arm__L=[('X', -152), ('Y', 24)], forearm__L=[('X', -32)]),
+    _st(spine=[('X', -32), ('Z', 4)], hips=[('Z', 2)], thigh__L=[('X', -42)], shin__L=[('X', 28)], thigh__R=[('X', 26)], shin__R=[('X', 18)],
+        upper_arm__R=[('X', -64), ('Y', -6)], forearm__R=[('X', -4)], hand__R=[('X', 66)], upper_arm__L=[('X', -62), ('Y', 30)], forearm__L=[('X', -10)]),
+    _st(spine=[('X', -38), ('Z', 6)], hips=[('Z', 2)], thigh__L=[('X', -42)], shin__L=[('X', 30)], thigh__R=[('X', 26)], shin__R=[('X', 18)],
+        upper_arm__R=[('X', -58), ('Y', -4)], forearm__R=[('X', -2)], hand__R=[('X', 72)], upper_arm__L=[('X', -56), ('Y', 30)], forearm__L=[('X', -6)]),
+    _st(spine=[('X', -14), ('Z', -4)], thigh__L=[('X', -22)], shin__L=[('X', 16)], thigh__R=[('X', 14)], shin__R=[('X', 12)],
+        upper_arm__R=[('X', -46), ('Y', 8)], forearm__R=[('X', -50)], upper_arm__L=[('X', -50), ('Y', 30)], forearm__L=[('X', -60)]),
+]
+
+def sit():
+    """땅바닥에 무릎을 세우고 앉아 고개를 떨군 자세 (지친 영혼)"""
+    return {'thigh.L': [('X', -112), ('Y', -8)], 'shin.L': [('X', 122)], 'foot.L': [('X', -20)],
+            'thigh.R': [('X', -106), ('Y', 8)], 'shin.R': [('X', 116)], 'foot.R': [('X', -18)],
+            'hips': [], 'spine': [('X', -20)], 'head': [('X', 16)],
+            'upper_arm.L': [('X', -58), ('Y', 4)], 'forearm.L': [('X', -42)],
+            'upper_arm.R': [('X', -54), ('Y', -4)], 'forearm.R': [('X', -46)]}
+
+EXTRA = {'heavy': HEAVY, 'sit': [sit()]}
+
 def anims(mode):
     A = {'idle': [idle(mode)], 'walk': [walk(f / 8, mode) for f in range(8)], 'hit': hit(mode), 'fall': fall(mode)}
     if mode == 'u': A['punch'] = PUNCH

@@ -109,6 +109,9 @@ export const more16 = {
     lobbyCounter: "환생 상담 {n}번 창구",
     hellDownEdge: "아래층 계단",
     fordArrive: "늪을 건너 1층으로 올라왔다.",
+    raidStart: "결계가 걷혔다. 괴물들이 마을로 몰려온다! 경비병은 휴전 협약대로 움직이지 않는다.",
+    raidEnd: "결계가 다시 섰다. 마을 안의 괴물이 재가 되어 흩어진다.",
+    raidGuard: "…협약이다. 지금은 지키지 않는다.",
   },
   th: {
     rankUpTitle: 'ระดับวิญญาณเพิ่มขึ้น',
@@ -219,6 +222,9 @@ export const more16 = {
     lobbyCounter: "ช่องปรึกษาการเกิดใหม่ หมายเลข {n}",
     hellDownEdge: "บันไดลงชั้นล่าง",
     fordArrive: "ข้ามบึงขึ้นมาชั้น 1",
+    raidStart: "ม่านคุ้มกันสลายแล้ว ปีศาจกำลังบุกเข้าหมู่บ้าน! ผู้คุมจะไม่ขยับตามสัญญาสงบศึก",
+    raidEnd: "ม่านคุ้มกันกลับมาแล้ว ปีศาจในหมู่บ้านสลายเป็นเถ้า",
+    raidGuard: "…สัญญาคือสัญญา ตอนนี้เราไม่คุ้มกัน",
   },
   en: {
     rankUpTitle: 'SOUL RANK UP',
@@ -329,5 +335,8 @@ export const more16 = {
     lobbyCounter: "Rebirth counsel · window {n}",
     hellDownEdge: "Stairs down",
     fordArrive: "You crossed the swamp up to floor 1.",
+    raidStart: "The ward has fallen. Monsters are swarming the village! The guards will not move, as the truce dictates.",
+    raidEnd: "The ward rises again. The monsters inside crumble into ash.",
+    raidGuard: "…The truce. We do not guard now.",
   },
 };
