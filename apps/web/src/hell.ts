@@ -54,7 +54,7 @@ export const GUARDS: Record<string, GuardDef> = {
 };
 
 /** 괴물: 몸(망자·프렛·야크·해골) + 색. 일반 괴물은 모두 무기를 든다 (망자 곡괭이·낙인 쇠·쇠갈고리 장대·고기 칼, 프렛 국자·꼬챙이, 해골 넓적다리뼈·빚 갈고리, 야크 몽둥이). 거대한 층주 구르마는 맨손 */
-export type MonsterBody = 'ash' | 'pret' | 'yak' | 'bones';
+export type MonsterBody = 'ash' | 'pret' | 'yak' | 'bones' | 'serane';
 export interface MonsterDef {
   key: string; body: MonsterBody; name: Record<Lang, string>;
   skin: string; cloth: string; glow: string; // 살·옷·빛나는 곳 색
@@ -80,7 +80,8 @@ export const MONSTERS: Record<string, MonsterDef> = Object.fromEntries([
   M('debtbones', 'bones', '빚진 해골', 'โครงกระดูกติดหนี้', 'Indebted bones', '#c9b89a', '#5a1a1a', '#f2c84a', 360, [13, 21], 1.2, 7, 0.9, 1, [7, 13], { weapon: 'hook' }),
   M('bloodpret', 'pret', '피 프렛', 'เปรตเลือด', 'Blood pret', '#a06a62', '#5a1a1a', '#ff4a3a', 420, [14, 22], 0.9, 6, 1.0, 1.05, [8, 15], { weapon: 'skewer' }),
   M('merchantyak', 'yak', '장사치 야크', 'ยักษ์พ่อค้า', 'Merchant yak', '#a0302a', '#2a1a12', '#f2c84a', 800, [19, 29], 0.9, 5, 1.1, 1.15, [15, 26], { weapon: 'club' }),
-  M('serane', 'yak', '세라네', 'เซราเน', 'Serane', '#c9a0a8', '#5a0a1a', '#f2d27a', 4200, [30, 42], 1.1, 9, 0.95, 1.5, [380, 460], { boss: true, weapon: 'club' }),
+  // 세라네: 피의 시장 끝 나루터 앞에 도사린 거대한 살덩이 애벌레. 세로로 찢어진 아가리에 이빨이 세 겹 (맨손 = 발톱 팔)
+  M('serane', 'serane', '세라네', 'เซราเน', 'Serane', '#5e1a20', '#360a0e', '#e0281e', 4200, [30, 42], 0.8, 6, 1.0, 1.85, [380, 460], { boss: true, weapon: null }),
 ].map((m) => [m.key, m]));
 
 // ───────────────────────── 지도 ─────────────────────────
@@ -90,6 +91,7 @@ function rng(seed: number) {
   return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
 
+const hash2 = (a: number, b: number) => { let h = (a * 374761393 + b * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 const cache = new Map<number, Zone>();
 export function hellZone(floor: number): Zone {
   const hit = cache.get(floor);
@@ -105,18 +107,21 @@ export function hellZone(floor: number): Zone {
   const set = (i: number, j: number, t: TileType) => { if (i >= 0 && j >= 0 && i < W && j < H) tiles[j * W + i] = TI[t]; };
   const disc = (ci: number, cj: number, rad: number, t: TileType) => { for (let j = cj - rad; j <= cj + rad; j++) for (let i = ci - rad; i <= ci + rad; i++) if ((i - ci) ** 2 + (j - cj) ** 2 <= rad * rad + 1) set(i, j, t); };
   // 바깥: 지나갈 수 없는 경계 (네 칸 바위 + 층마다 다른 해자: 1층 용암 두 칸 · 2층 늪 두 칸 · 3층 핏물 한 칸)
-  const EDGE = 4, MOAT = def.theme === 'market' ? 1 : 2;
+  // 3층(피의 시장)은 바깥이 벽이 아니라 끝없는 피의 용암 바다 (경계 여덟 칸이 모두 피의 용암)
+  const SEA = def.theme === 'market';
+  const EDGE = SEA ? 0 : 4, MOAT = SEA ? 8 : 2;
   const edgeD = (i: number, j: number) => Math.min(i, j, W - 1 - i, H - 1 - j);
-  const border = () => { for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { const d = edgeD(i, j); if (d < EDGE) set(i, j, 'block'); else if (d < EDGE + MOAT) set(i, j, 'water'); } };
+  const border = () => { for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { const d = edgeD(i, j); if (d < EDGE) set(i, j, 'block'); else if (d < EDGE + MOAT + (SEA ? Math.floor(hash2(i, j) * 2) : 0)) set(i, j, 'water'); } };
   border();
   const C = at2(52, 56); // 휴식 공간
-  const U = at2(18, 16); // 올라가는 계단 (1층: 출구)
-  const B = at2(27, 25); // 층주 자리
+  // 올라가는 길: 1·2층은 계단, 3층은 맵 북쪽 끝 기슭의 나루터 (층주 세라네가 그 앞을 지킨다)
+  const U = def.theme === 'market' ? { i: 61, j: 10 } : at2(18, 16);
+  const B = def.theme === 'market' ? { i: 47, j: 19 } : at2(27, 25); // 층주 자리 (3층은 피의 강가, 나루터에서 조금 떨어져)
   const D = at2(86, 88); // 내려가는 계단
   const VR = 11; // 휴식 마을: 울타리로 두른 정사각형 (가운데에서 ±11칸), 네 면 가운데에 문
   // 2층(굶주림의 늪): 마을과 내려가는 구덩이 사이 들판의 노름꾼 탈루스 자리
   const TL = def.theme === 'swamp' ? { i: 76, j: 68 } : null;
-  const keep = [{ ...C, r: VR + 4 }, { ...B, r: 7 }, { ...U, r: 4 }, { ...D, r: 4 }, ...(TL ? [{ ...TL, r: 5 }] : [])];
+  const keep = [{ ...C, r: VR + 4 }, { ...B, r: 7 }, { ...U, r: def.theme === 'market' ? 5 : 4 }, { ...D, r: 4 }, ...(TL ? [{ ...TL, r: 5 }] : [])];
   const free = (i: number, j: number, m = 0) => keep.every((k) => Math.hypot(i - k.i, j - k.j) > k.r + m);
   // 지형
   if (def.theme === 'ash') {
@@ -143,6 +148,18 @@ export function hellZone(floor: number): Zone {
     for (let j = 6; j < H - 4; j += 11) for (let i = 4; i < W - 4; i++) { set(i, j, 'soi'); set(i, j + 1, 'soi'); }
     for (let i = 4; i < W - 4; i++) if (i % 5 !== 0 && free(i, 40, 1)) set(i, 40, 'water');
     for (let j = 4; j < H - 4; j++) if (j % 5 !== 0 && free(62, j, 1)) set(62, j, 'water');
+    // 피의 강: 시장 서쪽 도랑에서 시작해 층주의 자리 뒤(서쪽)를 돌아 북쪽 바다로 흘러 나간다
+    { let ci = 26, cj = 40;
+      const pts: [number, number][] = [[26, 40], [30, 32], [34, 26], [38, 20], [40, 12], [41, 2]];
+      for (let k = 0; k < pts.length - 1; k++) {
+        const [a0, b0] = pts[k], [a1, b1] = pts[k + 1], n = Math.max(Math.abs(a1 - a0), Math.abs(b1 - b0)) * 2;
+        for (let s2 = 0; s2 <= n; s2++) {
+          ci = a0 + ((a1 - a0) * s2) / n + Math.sin(s2 * 0.7 + k) * 0.6; cj = b0 + ((b1 - b0) * s2) / n;
+          const wid = 1.6 + (cj < 16 ? 0.8 : 0);
+          for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) if (Math.hypot(di, dj) <= wid) { const ii = Math.round(ci + di), jj = Math.round(cj + dj); if (Math.hypot(ii - B.i, jj - B.j) > 6 && Math.hypot(ii - U.i, jj - U.j) > 3) set(ii, jj, 'water'); }
+        }
+      }
+    }
   }
   // 들판의 웅덩이: 1층 용암 · 3층 핏물 (늪은 이미 물웅덩이가 많다)
   if (def.theme !== 'swamp') for (let n = 0, t = 0; n < (def.theme === 'ash' ? 16 : 12) * A && t < 800; t++) {
@@ -172,6 +189,7 @@ export function hellZone(floor: number): Zone {
   road(gateFor(B), B); road(B, U); road(gateFor(D), D);
   for (const g of gates) road(C, g);
   disc(B.i, B.j, 6, 'walk'); disc(U.i, U.j, 2, 'walk'); disc(D.i, D.j, 2, 'walk');
+  if (def.theme === 'market') for (let j = 3; j < U.j; j++) set(U.i, j, j < U.j - 1 ? 'cross' : 'walk'); // 나루터 부두 (널빤지)
   // 마을 안 바닥: 1층 재 위의 돌 광장 · 2층 늪 위 널빤지 · 3층 붉은 타일 광장과 자갈길
   for (let j = C.j - VR + 1; j <= C.j + VR - 1; j++) for (let i = C.i - VR + 1; i <= C.i + VR - 1; i++) {
     const sq = (Math.abs(i - C.i) < 5 && Math.abs(j - C.j) < 5) || (i - C.i) * (j - C.j) === 0;
@@ -254,13 +272,7 @@ export function hellZone(floor: number): Zone {
   scatterO('rock', Math.round((def.theme === 'ash' ? 60 : def.theme === 'swamp' ? 36 : 46) * A), () => 0, 3);
   scatterO('crack', Math.round((def.theme === 'ash' ? 60 : def.theme === 'market' ? 56 : 40) * A), () => 0, 4);
   if (def.theme === 'ash') scatter('pillar', 5); // 무너진 돌기둥 몇 개만
-  if (def.theme === 'market') {
-    for (let k = 0, t = 0; k < 8 && t < 3000; t++) { // 노점은 드문드문 (예전 70은 파라솔 숲이었다)
-      const i = 4 + Math.floor(r() * (W - 8)), j = 4 + Math.floor(r() * (H - 8));
-      const nearSoi = at(i + 1, j) === TI.soi || at(i - 1, j) === TI.soi || at(i, j + 1) === TI.soi || at(i, j - 1) === TI.soi;
-      if (nearSoi && empty(i, j)) { props.push({ i, j, kind: 'cart' }); k++; }
-    }
-  }
+  // 3층에도 파라솔 노점은 두지 않는다 (홍등은 나무에 건다)
   // 길가의 화로·등은 두지 않는다 (지옥에 가로등은 인위적이다). 불빛은 마을 안과 용암·버섯·촛불 해골·가마솥뿐
   // 탈루스의 자리: 진흙을 다진 작은 터, 주사위 판(나무 상자)과 작은 모닥불
   if (TL) {
@@ -292,13 +304,8 @@ export function hellZone(floor: number): Zone {
   // 경계 장식: 1층 현무암 기둥(틈에 용암) · 2층 안개 낀 바위산 · 3층 가시 성벽과 망루
   for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
     const d = edgeD(i, j);
-    if (T === 'market') {
-      if (d !== EDGE - 1) continue;
-      const corner = (i === EDGE - 1 || i === W - EDGE) && (j === EDGE - 1 || j === H - EDGE);
-      const alongI = j === EDGE - 1 || j === H - EDGE;
-      const tower = corner || (alongI ? i : j) % 12 === 6;
-      props.push({ i, j, kind: 'crag', o: tower ? 2 : alongI ? 0 : 1 });
-    } else if (d === EDGE - 1 || (d === 1 && (i + j) % 2 === 0)) props.push({ i, j, kind: 'crag' });
+    if (T === 'market') continue; // 3층은 벽 없이 피의 용암 바다
+    else if (d === EDGE - 1 || (d === 1 && (i + j) % 2 === 0)) props.push({ i, j, kind: 'crag' });
   }
   // 괴물이 나오는 자리: 휴식 공간에서 멀리
   const spawns: [number, number][] = [];

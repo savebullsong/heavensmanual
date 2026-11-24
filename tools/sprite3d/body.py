@@ -43,8 +43,8 @@ TORSO = {
           (1.16, .140, .092, -.005), (1.24, .156, .118, -.026), (1.31, .158, .105, -.010), (1.39, .150, .090, .000), (1.45, .080, .060, .010)],
 }
 BODY = {'x': dict(h=1.28, shoulder=.22, hipw=.105, arm=1.4, leg=1.12),   # 변신한 봉합자 (몸집이 크다)
-        'm': dict(h=1.0, shoulder=.19, hipw=.095, arm=1.15, leg=1.0),
-        'f': dict(h=.94, shoulder=.165, hipw=.092, arm=1.0, leg=.94),
+        'm': dict(h=1.0, shoulder=.19, hipw=.095, arm=1.15, leg=1.0, stance=.05, legmass=1.3),
+        'f': dict(h=.94, shoulder=.165, hipw=.092, arm=1.0, leg=.94, stance=.04, legmass=1.2),
         'c': dict(h=.68, shoulder=.17, hipw=.09, arm=1.05, leg=1.0),
         # 지옥 괴물 (2단계): 망자 · 프렛 · 야크
         'a': dict(h=.97, shoulder=.175, hipw=.088, arm=.9, leg=.88),
@@ -60,9 +60,11 @@ BODY = {'x': dict(h=1.28, shoulder=.22, hipw=.105, arm=1.4, leg=1.12),   # 변�
         'o': dict(h=1.14, shoulder=.22, hipw=.1, arm=1.35, leg=1.15),
         'w': dict(h=1.08, shoulder=.19, hipw=.095, arm=1.1, leg=1.05),
         # 지옥 2층 들판의 노름꾼 탈루스 (뼈주사위·산탄총)
-        't': dict(h=1.1, shoulder=.19, hipw=.092, arm=1.05, leg=1.04)}
-MONSTER_BW = {'x': None, 'a': .8, 'p': .68, 'y': 1.32, 's': .42, 'k': 1.7, 'b': 1.0, 'g': .42, 'o': 1.08, 'w': .95, 't': .5}
-MONSTER_HK = {'x': 1.0, 'a': 1.05, 'p': .86, 'y': 1.12, 's': 1.0, 'k': 1.2, 'b': 1.0, 'g': 1.0, 'o': .9, 'w': 1.0, 't': 1.0}
+        't': dict(h=1.1, shoulder=.19, hipw=.092, arm=1.05, leg=1.04),
+        # 3층 층주 세라네: 피의 시장 끝에 도사린 거대한 살덩이 애벌레 (이빨 가득한 아가리)
+        'r': dict(h=1.25, shoulder=.3, hipw=.16, arm=1.25, leg=.7)}
+MONSTER_BW = {'x': None, 'a': .8, 'p': .68, 'y': 1.32, 's': .42, 'k': 1.7, 'b': 1.0, 'g': .42, 'o': 1.08, 'w': .95, 't': .5, 'r': 1.0}
+MONSTER_HK = {'x': 1.0, 'a': 1.05, 'p': .86, 'y': 1.12, 's': 1.0, 'k': 1.2, 'b': 1.0, 'g': 1.0, 'o': .9, 'w': 1.0, 't': 1.0, 'r': 1.0}
 BUILD = [.9, 1.0, 1.14]   # 마름 · 보통 · 건장 (뼈 위치는 같고 굵기만 다르다 → 머리·무기 층을 함께 쓴다)
 
 class Doll:
@@ -143,20 +145,25 @@ class Doll:
             ob = finish(P); bind(ob, self.arm, rigid(f'hand.{k}')); self.add(group, ob)
 
     def legs(self, group, mat, shoe_mat, bare_below=None, boot=False, foot=1.0):
-        lg = self.p['leg'] * self.bw; s = self.s
+        # 사람 몸은 허벅지·종아리에 살집(legmass)이 있고, 신발은 두툼한 밑창의 큰 신 (하체가 단단해 보이게)
+        lm = self.p.get('legmass', 1.0)
+        lg = self.p['leg'] * self.bw * lm; s = self.s
+        fm = 1.12 if lm > 1 else 1.0
         for k in 'LR':
             b = self.bones
             hp, kn = b[f'thigh.{k}'][0], b[f'thigh.{k}'][1]
             an = b[f'shin.{k}'][1]
             P = Part(f'{group}.leg.{k}')
-            limb(P, hp + Vector((0, 0, .03)), kn, [(0, .085 * lg, .088 * lg), (.5, .071 * lg, .074 * lg), (1, .056 * lg, .059 * lg)], mat, None)
+            limb(P, hp + Vector((0, 0, .03)), kn, [(0, .085 * lg, .088 * lg), (.3, .082 * lg, .086 * lg), (.6, .07 * lg, .074 * lg), (1, .056 * lg, .059 * lg)], mat, None)
             shin_mat = bare_below or mat
-            limb(P, kn, an + Vector((0, 0, .02)), [(0, .056 * lg, .059 * lg), (.35, .053 * lg, .062 * lg), (1, .045 * lg, .047 * lg)], shin_mat, None)
-            blob(P, kn, (.057 * lg, .06 * lg, .057 * lg), shin_mat, None, segs=10, rings=7)
+            limb(P, kn, an + Vector((0, 0, .02)), [(0, .056 * lg, .059 * lg), (.3, .056 * lg, .066 * lg), (.6, .05 * lg, .056 * lg), (1, .042 * lg, .045 * lg)], shin_mat, None)
+            blob(P, kn, (.058 * lg, .06 * lg, .058 * lg), shin_mat, None, segs=10, rings=7)
             ob = finish(P); bind(ob, self.arm, autow(self.bones, ['hips', f'thigh.{k}', f'shin.{k}'], power=5)); self.add(group, ob)
             P = Part(f'{group}.shoe.{k}')
             c = Vector((an.x, -.035 * s, .045 * s))
-            blob(P, c, (.05 * s * (1.1 if boot else 1) * foot, .122 * s * foot, .052 * s * (1.25 if boot else 1) * foot), shoe_mat, None, segs=12, rings=8, cut=lambda co: co.z < .0)
+            blob(P, c, (.05 * s * (1.1 if boot else 1) * foot * fm, .122 * s * foot * fm, .052 * s * (1.25 if boot else 1) * foot * fm), shoe_mat, None, segs=12, rings=8, cut=lambda co: co.z < .0)
+            if lm > 1:   # 두툼한 밑창 (어두운 판)
+                limb(P, c + Vector((0, .1 * s * fm, .012 * s)), c + Vector((0, -.13 * s * fm, .012 * s)), [(0, .056 * s * fm, .018 * s), (1, .05 * s * fm, .016 * s)], rmat('dark', .8, .1), None, segs=8)
             if boot:
                 limb(P, an + Vector((0, 0, -.06)), an + Vector((0, 0, .16 * s)), [(0, .058 * s, .06 * s), (1, .055 * s, .057 * s)], shoe_mat, None)
             ob = finish(P); bind(ob, self.arm, autow(self.bones, [f'shin.{k}', f'foot.{k}'], power=8)); self.add(group, ob)
@@ -265,7 +272,7 @@ class Doll:
             for (x, y, z, r) in ((.08, -.12, 1.22, .07), (-.1, -.11, 1.0, .06), (.12, .08, 1.3, .07), (-.06, .1, .95, .06)):
                 blob(P, self.V(x, y, z), (r * s, r * .6 * s, r * s), patch, None, segs=8, rings=5)
             ob = finish(P); bind(ob, self.arm, lambda co: {'head': 1.0} if co.z > 1.5 * s else {'spine': 1.0}); self.add(g, ob)
-        elif name in ('ash', 'pret', 'yak', 'bones', 'besk', 'cockatoo', 'warden1', 'warden2', 'warden3', 'talus'):
+        elif name in ('ash', 'pret', 'yak', 'bones', 'besk', 'cockatoo', 'warden1', 'warden2', 'warden3', 'talus', 'serane'):
             self.hell_body(name)
         elif name == 'parrot':
             pw = rmat('parrot', .95, .05); cr = rmat('crest', .8, .1); dk = rmat('dark', .5, .3); ft = rmat('shoe', .8, .1)
@@ -310,6 +317,8 @@ class Doll:
             self.warden_body(g, name); return
         if name == 'talus':
             self.talus_body(g); return
+        if name == 'serane':
+            self.serane_body(g); return
         if name == 'ash':
             # 잿빛 망자: 마르고 그을린 몸, 갈라진 틈으로 불씨가 비치고, 허리에 해진 천
             def gaunt(rings):
@@ -445,6 +454,93 @@ class Doll:
             x = (k - 2.5) * .011
             blob(P, hc + Vector((x * s, -.098 * s, -.058 * s)), (.005 * s, .004 * s, .007 * s), dark, None, segs=4, rings=3)
         ob = finish(P); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
+
+    # ── 세라네: 3층 피의 시장의 층주. 젖어 번들거리는 마디진 살덩이가 일어선 거대한 애벌레, 세로로 찢어진 아가리에 이빨이 겹겹이 ──
+    def serane_body(self, g):
+        s = self.s; V = self.V
+        flesh = rmat('skin', .28, .5); flesh2 = rmat('top', .3, .45); dark = rmat('dark', .6, .2)
+        tooth = rmat('parrot', .35, .4); blood = rmat('crest', .25, .6); eye = rmat('eye', .2, .7)
+        spine_w = lambda co: {'spine': smooth(co.z, .55 * s, 1.0 * s), 'hips': 1 - smooth(co.z, .55 * s, 1.0 * s)}
+        # 꼬리: 뒤(+y)로 누운 마디 여섯 (마디 사이는 어두운 주름)
+        P = Part(g + '.tail')
+        for k in range(7):
+            y, z = .14 + k * .12, .24 - k * .02
+            rx, ry, rz = .33 - k * .035, .09, .22 - k * .022
+            blob(P, V(0, y, z), (rx * s, ry * s, rz * s), flesh, None, segs=16, rings=10)
+            blob(P, V(0, y + .06, z - .005), (rx * .92 * s, .025 * s, rz * .92 * s), flesh2, None, segs=14, rings=6)
+        ob = finish(P); bind(ob, self.arm, lambda co: {'hips': 1.0}); self.add(g, ob)
+        # 일어선 앞몸: 바닥에서 머리 밑까지 굵은 마디, 위로 갈수록 앞으로 숙인다 (배 쪽에 주름 띠, 온몸에 혹)
+        P = Part(g + '.body')
+        rings = []
+        for z, rx, ry, cy in ((.08, .36, .32, .06), (.3, .38, .33, .03), (.55, .36, .31, -.01), (.8, .33, .29, -.05), (1.0, .3, .27, -.09), (1.16, .28, .25, -.12)):
+            rings.append((V(0, cy, z), Vector((0, -1, 0)), Vector((1, 0, 0)), rx * s, ry * s))
+        loft(P, rings, flesh, None, segs=18, caps=(True, False), matfn=None)
+        for z, cy in ((.2, .045), (.36, .025), (.52, 0), (.68, -.025), (.84, -.055), (.98, -.085)):
+            r = .38 - abs(z - .4) * .12
+            limb(P, V(0, cy, z - .014), V(0, cy, z + .014), [(0, (r + .008) * s, (r * .86 + .008) * s), (1, (r + .008) * s, (r * .86 + .008) * s)], flesh2, None, segs=18)
+        import random
+        rnd = random.Random(7)
+        for k in range(34):   # 혹과 물집 (온몸에 고르지 않게)
+            a = rnd.uniform(0, math.tau); z = rnd.uniform(.15, 1.1); r = .35 - abs(z - .45) * .12
+            c = V(math.cos(a) * r * .98, -.03 * z + math.sin(a) * r * .86, z)
+            rr = rnd.uniform(.018, .05)
+            blob(P, c, (rr * s, rr * .7 * s, rr * s), flesh if k % 3 else flesh2, None, segs=8, rings=6)
+        ob = finish(P); bind(ob, self.arm, spine_w); self.add(g, ob)
+        # 머리: 앞으로 숙인 커다란 머리. 아가리가 얼굴을 다 차지하고 목 아래까지 세로로 찢어졌다 (안은 어둠, 입술은 검붉게)
+        hc = V(0, -.14, 1.36)
+        P = Part(g + '.head')
+        a, b = .19 * s, .3 * s
+        mc = hc + Vector((0, -.25 * s, -.1 * s))
+        blob(P, hc, (.33 * s, .3 * s, .34 * s), flesh, None, segs=22, rings=16, cut=lambda co: co.y < mc.y + .09 * s and ((co.x / (a * 1.05)) ** 2 + ((co.z - mc.z) / (b * 1.05)) ** 2) < 1)
+        blob(P, hc + Vector((0, .04 * s, .2 * s)), (.24 * s, .2 * s, .12 * s), flesh, None, segs=16, rings=10)   # 정수리 혹
+        for k in range(6):   # 목 주름
+            limb(P, V(0, -.1 - k * .006, 1.08 + k * .03), V(0, -.1 - k * .006, 1.095 + k * .03), [(0, (.3 - k * .005) * s, (.27 - k * .005) * s), (1, (.3 - k * .005) * s, (.27 - k * .005) * s)], flesh2, None, segs=18)
+        blob(P, mc + Vector((0, .08 * s, 0)), (a * 1.02, .13 * s, b * 1.02), dark, None, segs=18, rings=14)   # 목구멍
+        for k in range(32):   # 두툼한 입술 테
+            t0, t1 = k / 32 * math.tau, (k + 1) / 32 * math.tau
+            p0 = mc + Vector((math.sin(t0) * a, 0, math.cos(t0) * b)); p1 = mc + Vector((math.sin(t1) * a, 0, math.cos(t1) * b))
+            limb(P, p0, p1, [(0, .04 * s, .04 * s), (1, .04 * s, .04 * s)], flesh2, None, segs=6)
+        # 이빨 세 줄: 바깥은 길고 굽은 송곳니, 안쪽으로 갈수록 짧고 촘촘
+        for row, (ln, inset, n, shrink) in enumerate(((.17, 0, 24, 0), (.1, .05, 20, .14), (.06, .1, 16, .28))):
+            for k in range(n):
+                t = (k + .5 + row * .3) / n * math.tau
+                base = mc + Vector((math.sin(t) * a * (1 - shrink), inset * s, math.cos(t) * b * (1 - shrink)))
+                L = ln * (1.15 if abs(math.cos(t)) > .7 else .9)
+                tip = base + Vector((-math.sin(t) * L * .5 * s, (-.05 + row * .02) * s, -math.cos(t) * L * s))
+                limb(P, base, tip, [(0, .024 * s, .024 * s), (.6, .014 * s, .014 * s), (1, .002 * s, .002 * s)], tooth, None, segs=6)
+        # 깊이 박힌 작은 눈 둘 + 눈두덩 (아가리 위)
+        for sx in (1, -1):
+            blob(P, hc + Vector((sx * .12 * s, -.24 * s, .2 * s)), (.032 * s, .02 * s, .028 * s), eye, None, segs=8, rings=6)
+            blob(P, hc + Vector((sx * .12 * s, -.23 * s, .245 * s)), (.07 * s, .04 * s, .03 * s), flesh2, None, segs=10, rings=6)
+        # 입에서 가슴으로 흘러내리는 피 줄기
+        for k in range(9):
+            x = (k - 4) * .04 * s
+            top = mc + Vector((x, -.03 * s, -b * (.92 - abs(k - 4) * .07)))
+            limb(P, top, top + Vector((0, -.02 * s, -(.2 + (k % 3) * .14) * s)), [(0, .018 * s, .018 * s), (.8, .011 * s, .011 * s), (1, .016 * s, .016 * s)], blood, None, segs=5)
+        ob = finish(P); bind(ob, self.arm, lambda co: {'head': smooth(co.z, 1.0 * s, 1.25 * s), 'spine': 1 - smooth(co.z, 1.0 * s, 1.25 * s)}); self.add(g, ob)
+        # 짧고 굵은 팔 둘 (발톱) — 휘두르는 팔
+        am = self.p['arm']
+        for k in 'LR':
+            sh, el, wr, hd = self.bones[f'upper_arm.{k}'][0], self.bones[f'upper_arm.{k}'][1], self.bones[f'forearm.{k}'][1], self.bones[f'hand.{k}'][1]
+            P = Part(f'{g}.arm.{k}')
+            limb(P, sh + Vector((0, 0, -.06)), el, [(0, .1 * am, .1 * am), (1, .085 * am, .085 * am)], flesh, None, segs=12)
+            limb(P, el, wr, [(0, .085 * am, .085 * am), (1, .07 * am, .07 * am)], flesh, None, segs=12)
+            blob(P, el, (.088 * am, .088 * am, .088 * am), flesh, None, segs=10, rings=7)
+            blob(P, (wr + hd) / 2, (.07 * am, .075 * am, .06 * am), flesh2, None, segs=10, rings=7)
+            for f in range(3):
+                c = hd + Vector(((f - 1) * .03, -.03, -.02))
+                limb(P, c, c + Vector(((f - 1) * .015, -.06, -.07)), [(0, .016, .016), (1, .002, .002)], tooth, None, segs=5)
+            ob = finish(P); bind(ob, self.arm, autow(self.bones, ['spine', f'upper_arm.{k}', f'forearm.{k}', f'hand.{k}'], power=5)); self.add(g, ob)
+        # 배 밑의 뭉툭한 다리 둘 (걸을 때 꿈틀)
+        for k in 'LR':
+            an = self.bones[f'shin.{k}'][1]
+            P = Part(f'{g}.stub.{k}')
+            top = Vector((an.x * 1.3, -.05 * s, .32 * s))
+            limb(P, top, Vector((an.x * 1.4, -.08 * s, .05 * s)), [(0, .1 * s, .1 * s), (1, .085 * s, .08 * s)], flesh, None, segs=10)
+            for f in range(3):
+                c = Vector((an.x * 1.4 + (f - 1) * .04 * s, -.15 * s, .03 * s))
+                limb(P, c + Vector((0, .04 * s, 0)), c, [(0, .02 * s, .02 * s), (1, .004 * s, .004 * s)], tooth, None, segs=5)
+            ob = finish(P); bind(ob, self.arm, autow(self.bones, [f'thigh.{k}', f'shin.{k}', f'foot.{k}'], power=6)); self.add(g, ob)
 
     # ── 탈루스: 지옥 2층 들판의 노름꾼. 해골 위에 기운 긴 가죽 외투, 챙 넓은 모자, 붉은 목수건, 산탄 띠, 허리의 주사위 주머니 ──
     def talus_body(self, g):
@@ -705,22 +801,39 @@ class Doll:
                     out.append((c, u, v, rs * grow + .012, rf * (grow + .06) + .014))
                 return out
             self.torso(g, main, main, hem=0, extra=fit)
+            bw = self.bw
             if piece == 'jacket':
+                # 두툼한 작업 재킷: 어깨 덧댐(둥근 판), 세운 깃, 앞 지퍼, 가슴 주머니 둘, 팔꿈치 패드
                 am = self.p['arm'] * self.bw
                 for k, sx in (('L', 1), ('R', -1)):
                     sh, el = self.bones[f'upper_arm.{k}'][0], self.bones[f'upper_arm.{k}'][1]
                     wr = self.bones[f'forearm.{k}'][1]
                     P = Part(f'{g}.sleeve.{k}')
-                    limb(P, sh + Vector((0, 0, .02)), el, [(0, .07 * am, .07 * am), (1, .058 * am, .058 * am)], main, None)
-                    limb(P, el, wr - (wr - el) * .08, [(0, .056 * am, .056 * am), (1, .046 * am, .046 * am)], main, None)
-                    blob(P, el, (.058 * am, .058 * am, .058 * am), main, None, segs=10, rings=7)
-                    blob(P, sh + Vector((-sx * .015, 0, 0)), (.074 * am, .068 * am, .068 * am), main, None, segs=10, rings=7)
+                    limb(P, sh + Vector((0, 0, .02)), el, [(0, .074 * am, .074 * am), (1, .06 * am, .06 * am)], main, None)
+                    limb(P, el, wr - (wr - el) * .08, [(0, .058 * am, .058 * am), (.85, .05 * am, .05 * am), (1, .054 * am, .054 * am)], main, None)
+                    blob(P, el, (.062 * am, .062 * am, .062 * am), dark, None, segs=10, rings=7)   # 팔꿈치 패드
+                    blob(P, sh + Vector((-sx * .01, 0, .02)), (.092 * am, .085 * am, .07 * am), metal, None, segs=12, rings=8, cut=lambda co, z0=sh.z: co.z < z0 - .03)   # 어깨 덧댐
+                    blob(P, sh + Vector((-sx * .01, 0, .0)), (.086 * am, .08 * am, .03 * am), dark, None, segs=12, rings=6)   # 덧댐 테
                     ob = finish(P); bind(ob, self.arm, autow(self.bones, ['spine', f'upper_arm.{k}', f'forearm.{k}'], power=5)); self.add(g, ob)
+                P = Part(g + '.front')
+                limb(P, V(0, .0, 1.4), V(0, .0, 1.5), [(0, .095 * bw, .085), (1, .085 * bw, .08)], main, None, segs=14)   # 세운 깃
+                limb(P, V(0, -.14 * bw, 1.36), V(0, -.15 * bw, .98), [(0, .008, .006), (1, .008, .006)], dark, None, segs=5)   # 지퍼
+                for sx in (1, -1):
+                    blob(P, V(sx * .075 * bw, -.14 * bw, 1.26), (.04 * bw, .012, .035), dark, None, segs=8, rings=5)   # 가슴 주머니
+                ob = finish(P); bind(ob, self.arm, lambda co: {'spine': 1.0} if co.z < 1.45 * s else {'neck': 1.0}); self.add(g, ob)
             else:
+                # 방탄 조끼: 앞뒤 두꺼운 판, 어깨끈, 허리를 두른 띠와 주머니 셋
                 P = Part(g + '.plates')
-                for z in (1.32, 1.18):
-                    limb(P, V(-.11, -.125, z), V(.11, -.125, z), [(0, .012, .055), (1, .012, .055)], dark, None, segs=6)
-                ob = finish(P); bind(ob, self.arm, lambda co: {'spine': 1.0}); self.add(g, ob)
+                limb(P, V(0, -.118 * bw, 1.36), V(0, -.13 * bw, 1.08), [(0, .14 * bw, .028), (1, .135 * bw, .03)], metal, None, segs=6)   # 앞판
+                limb(P, V(0, .1 * bw, 1.36), V(0, .1 * bw, 1.1), [(0, .14 * bw, .026), (1, .135 * bw, .026)], metal, None, segs=6)   # 뒤판
+                for sx in (1, -1):
+                    limb(P, V(sx * .085, -.1, 1.4), V(sx * .085, .09, 1.4), [(0, .03, .012), (1, .03, .012)], dark, None, segs=5)   # 어깨끈
+                limb(P, V(0, 0, 1.03), V(0, 0, 1.1), [(0, .2 * bw, .155 * bw), (1, .2 * bw, .15 * bw)], dark, None, segs=16)   # 허리 띠
+                for k2 in range(3):
+                    x = (k2 - 1) * .085 * bw
+                    limb(P, V(x, -.16 * bw, 1.0), V(x, -.16 * bw, 1.11), [(0, .036 * bw, .022), (1, .036 * bw, .022)], main, None, segs=6)   # 주머니
+                    limb(P, V(x, -.168 * bw, 1.1), V(x, -.168 * bw, 1.12), [(0, .038 * bw, .024), (1, .038 * bw, .024)], dark, None, segs=6)   # 주머니 덮개
+                ob = finish(P); bind(ob, self.arm, lambda co: {'spine': smooth(co.z, .98 * s, 1.12 * s), 'hips': 1 - smooth(co.z, .98 * s, 1.12 * s)}); self.add(g, ob)
             return
         if piece == 'gloves':
             am = self.p['arm'] * self.bw
@@ -731,26 +844,43 @@ class Doll:
                 limb(P, wr + (wr - hd) * .3, wr - (wr - hd) * .2, [(0, .034 * am, .034 * am), (1, .03 * am, .03 * am)], main, None, segs=8)
                 ob = finish(P); bind(ob, self.arm, autow(self.bones, [f'forearm.{k}', f'hand.{k}'], power=8)); self.add(g, ob)
             return
-        lg = self.p['leg'] * self.bw
+        lm = self.p.get('legmass', 1.0)
+        lg = self.p['leg'] * self.bw * lm
+        fm = 1.12 if lm > 1 else 1.0
         for k in 'LR':
             b = self.bones
             hp, kn = b[f'thigh.{k}'][0], b[f'thigh.{k}'][1]
             an = b[f'shin.{k}'][1]
+            sx = 1 if k == 'L' else -1
             P = Part(f'{g}.{k}')
             if piece == 'workpants':
-                limb(P, hp + Vector((0, 0, .04)), kn, [(0, .094 * lg, .097 * lg), (.5, .08 * lg, .083 * lg), (1, .065 * lg, .068 * lg)], main, None)
-                limb(P, kn, an + Vector((0, 0, .03)), [(0, .065 * lg, .068 * lg), (.4, .061 * lg, .068 * lg), (1, .054 * lg, .056 * lg)], main, None)
-                blob(P, kn, (.066 * lg, .069 * lg, .066 * lg), main, None, segs=10, rings=7)
-                blob(P, (hp + kn) / 2 + Vector((0, -.02, 0)) + Vector(((1 if k == 'L' else -1) * .07, 0, 0)), (.03, .05, .06), dark, None, segs=8, rings=6)
+                # 두꺼운 작업 바지: 허벅지 옆 주머니, 무릎에 덧댄 패드, 발목을 조인 단
+                limb(P, hp + Vector((0, 0, .04)), kn, [(0, .096 * lg, .099 * lg), (.3, .092 * lg, .096 * lg), (.6, .08 * lg, .084 * lg), (1, .066 * lg, .069 * lg)], main, None)
+                limb(P, kn, an + Vector((0, 0, .03)), [(0, .066 * lg, .069 * lg), (.35, .064 * lg, .072 * lg), (1, .056 * lg, .058 * lg)], main, None)
+                blob(P, kn, (.067 * lg, .07 * lg, .067 * lg), main, None, segs=10, rings=7)
+                blob(P, (hp + kn) / 2 + Vector((sx * .085 * lm, -.015, -.02)), (.032 * lm, .055, .065), dark, None, segs=8, rings=6)   # 옆 주머니
+                blob(P, kn + Vector((0, -.06 * lm, .005)), (.055 * lg, .03 * lg, .06 * lg), dark, None, segs=10, rings=7)   # 무릎 패드
+                limb(P, an + Vector((0, 0, .03)), an + Vector((0, 0, .07)), [(0, .06 * lg, .062 * lg), (1, .06 * lg, .062 * lg)], dark, None, segs=10)   # 발목 단
                 ob = finish(P); bind(ob, self.arm, autow(self.bones, ['hips', f'thigh.{k}', f'shin.{k}'], power=5)); self.add(g, ob)
             elif piece == 'shinguard':
-                limb(P, kn + Vector((0, -.05, -.02)), an + Vector((0, -.04, .08)), [(0, .05 * lg, .03 * lg), (1, .045 * lg, .028 * lg)], main, None, segs=8)
-                blob(P, kn + Vector((0, -.055, 0)), (.05 * lg, .035 * lg, .05 * lg), dark, None, segs=8, rings=6)
+                # 정강이 보호대: 무릎을 감싼 둥근 덮개 + 정강이를 덮는 두툼한 판 + 띠 둘
+                limb(P, kn + Vector((0, -.055, -.03)), an + Vector((0, -.045, .07)), [(0, .062 * lg, .036 * lg), (.5, .066 * lg, .04 * lg), (1, .056 * lg, .034 * lg)], main, None, segs=8)
+                blob(P, kn + Vector((0, -.062, .01)), (.064 * lg, .045 * lg, .066 * lg), metal, None, segs=10, rings=7)
+                for t in (.3, .75):
+                    c = kn + (an - kn) * t
+                    limb(P, c + Vector((0, 0, -.01)), c + Vector((0, 0, .01)), [(0, .07 * lg, .073 * lg), (1, .07 * lg, .073 * lg)], dark, None, segs=12)
                 ob = finish(P); bind(ob, self.arm, autow(self.bones, [f'thigh.{k}', f'shin.{k}'], power=8)); self.add(g, ob)
             elif piece == 'boots':
+                # 전투화: 두꺼운 밑창, 앞코 덮개, 종아리 중간까지 오는 목, 끈
                 c = Vector((an.x, -.035 * s, .05 * s))
-                blob(P, c, (.058 * s, .13 * s, .06 * s), bootm, None, segs=12, rings=8, cut=lambda co: co.z < .0)
-                limb(P, an + Vector((0, 0, -.06)), an + Vector((0, 0, .2 * s)), [(0, .062 * s, .064 * s), (1, .058 * s, .06 * s)], bootm, None)
+                blob(P, c, (.064 * s * fm, .138 * s * fm, .066 * s), bootm, None, segs=12, rings=8, cut=lambda co: co.z < .0)
+                limb(P, c + Vector((0, .1 * s, .014 * s)), c + Vector((0, -.145 * s * fm, .014 * s)), [(0, .066 * s * fm, .022 * s), (1, .06 * s * fm, .02 * s)], dark, None, segs=8)   # 밑창
+                blob(P, c + Vector((0, -.1 * s * fm, .035 * s)), (.05 * s, .045 * s, .035 * s), dark, None, segs=10, rings=6)   # 앞코
+                limb(P, an + Vector((0, 0, -.06)), an + Vector((0, 0, .24 * s)), [(0, .068 * s * lm, .07 * s * lm), (1, .064 * s * lm, .066 * s * lm)], bootm, None)
+                limb(P, an + Vector((0, 0, .22 * s)), an + Vector((0, 0, .26 * s)), [(0, .07 * s * lm, .072 * s * lm), (1, .07 * s * lm, .072 * s * lm)], dark, None, segs=12)   # 목 테
+                for t in range(4):
+                    z = .04 + t * .045
+                    blob(P, an + Vector((0, -.058 * s * lm, z * s)), (.03 * s, .008 * s, .008 * s), dark, None, segs=6, rings=4)   # 끈
                 ob = finish(P); bind(ob, self.arm, autow(self.bones, [f'shin.{k}', f'foot.{k}'], power=8)); self.add(g, ob)
 
     # ── 머리카락 ──

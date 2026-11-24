@@ -42,6 +42,8 @@ jobs.append({'sex': 'm', 'build': 1, 'monster': 'p', 'occluder': 'pret', 'sets':
 jobs.append({'sex': 'm', 'build': 1, 'monster': 's', 'occluder': 'bones', 'sets': [{'kind': 'base', 'outfit': 'bones', 'mode': 'm'}] + [{'kind': 'weapon', 'weapon': w} for w in ('femur', 'hook')], 'tag': 'armed'})
 # 지옥 2층 노름꾼 탈루스: 산탄총 든 자세(g)만
 jobs.append({'sex': 'm', 'build': 1, 'monster': 't', 'occluder': 'talus', 'sets': [{'kind': 'base', 'outfit': 'talus', 'mode': 'g'}, {'kind': 'weapon', 'weapon': 'shotgun'}], 'tag': 'talus'})
+# 3층 층주 세라네: 거대한 살덩이 애벌레 (맨손 = 발톱 팔)
+jobs.append({'sex': 'm', 'build': 1, 'monster': 'r', 'occluder': 'serane', 'sets': [{'kind': 'base', 'outfit': 'serane', 'mode': 'u'}], 'tag': 'serane'})
 args = sys.argv[2:]
 # --scale2: 같은 크기의 인물을 픽셀 두 배로 (게임에서는 반으로 줄여 같은 크기, 더 섬세)
 if '--scale2' in args:

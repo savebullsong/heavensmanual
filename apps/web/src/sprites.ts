@@ -147,6 +147,7 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
     const mk = o === 'ash' ? 'a' : o === 'pret' ? 'p' : 's';
     return { base: `b-${mk}-${o}-${weapon ? 'm' : 'u'}`, hair: null, weapon: weapon ? `w-${mk}-${weapon}` : null, armor: [] as { key: string; piece: string }[], mode: (weapon ? 'm' : 'u') as Mode };
   }
+  if (o === 'serane') return { base: 'b-r-serane-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
   if (o === 'talus') return { base: 'b-t-talus-g', hair: null, weapon: 'w-t-shotgun', armor: [] as { key: string; piece: string }[], mode: 'g' as Mode };
   if (o === 'besk') return { base: 'b-k-besk-m', hair: null, weapon: 'w-k-ledger', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   if (o === 'cockatoo') return { base: 'b-b-cockatoo-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };

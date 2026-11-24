@@ -553,6 +553,19 @@ function thornTree(r: (k: number) => number): HPic {
     for (let m = 0; m < 3; m++) p.E(x1 + (r(k * 5 + m) - 0.5) * 12, y1 - 4 + (r(k * 5 + m + 2) - 0.5) * 8, 3.5, 2.4, m % 2 ? '#8a1a14' : '#b8281e');
     if (r(k + 30) < 0.65) hang.push([x0 + (x1 - x0) * 0.7, y0 + (y1 - y0) * 0.7]);
   }
+  // 홍등가의 나무: 가지에 붉은 종이 등롱 (첫 가지에는 반드시 하나, 나머지는 동전 추 · 값표와 섞어서)
+  const lanterns: [number, number][] = [];
+  const lantern = (x: number, y: number, big: number) => {
+    const ly = y + 9 + big * 2;
+    p.L(x, y, x, ly - 7, 1, '#2a1a12');
+    p.E(x, ly, 6 + big, 8 + big, '#a8140e'); p.E(x - 2, ly - 2, 3 + big * 0.5, 5 + big * 0.5, '#e0301e'); p.E(x - 2.5, ly - 3, 1.2, 2.5, '#ff8a6a');
+    for (let yy = ly - 6; yy <= ly + 6; yy += 3) p.R(x - 6 - big, yy, 12 + big * 2, 1, '#7a0e0a');
+    p.R(x - 4, ly - 9 - big, 8, 2, '#2a1a12'); p.R(x - 4, ly + 8 + big, 8, 2, '#2a1a12'); p.R(x - 0.5, ly + 10 + big, 1.5, 6, '#d8a83a');
+    lanterns.push([x, ly]);
+  };
+  const first = spine[3 + (r(70) < 0.5 ? 0 : 1)];
+  lantern(first[0] + (r(71) - 0.5) * 20, first[1] - 6, 1);
+  if (hang.length) { const [x, y] = hang.shift()!; lantern(x, y, 0); }
   // 사슬에 매단 동전 추 · 값표
   hang.forEach(([x, y], k) => {
     const l = 16 + r(k + 40) * 22;
@@ -561,7 +574,8 @@ function thornTree(r: (k: number) => number): HPic {
     else { p.R(x - 4, y + l, 9, 11, '#e8dcc0'); p.R(x - 4, y + l, 9, 2, '#c8b898'); p.R(x - 2, y + l + 4, 5, 1, '#8a1a14'); p.R(x - 2, y + l + 7, 3, 1, '#8a1a14'); }
   });
   p.finish([16, 4, 4]);
-  return { canvas: p.c, ax: 0.5, ay: 202 / 208 };
+  const [lx, ly] = lanterns[0];
+  return { canvas: p.c, ax: 0.5, ay: 202 / 208, glow: [(lx - 58) / 2, (ly - 202) / 2], glowTint: 0xff2a1a };
 }
 /** 바위 무더기: 1층 현무암(틈의 용암 빛) · 2층 이끼 낀 바위 · 3층 붉은 사암과 핏자국 */
 function rock(theme: Theme, r: (k: number) => number): HPic {

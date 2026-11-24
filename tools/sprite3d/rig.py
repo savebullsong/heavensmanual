@@ -41,9 +41,11 @@ def skeleton(p):
         B[f'upper_arm.{k}'] = ((side * sw, 0, 1.40), (side * (sw + .03), .01, 1.12), 'spine')
         B[f'forearm.{k}'] = ((side * (sw + .03), .01, 1.12), (side * (sw + .045), -.02, .88), f'upper_arm.{k}')
         B[f'hand.{k}'] = ((side * (sw + .045), -.02, .88), (side * (sw + .05), -.03, .79), f'forearm.{k}')
-        B[f'thigh.{k}'] = ((side * hw, 0, .93), (side * (hw + .005), 0, .50), 'hips')
-        B[f'shin.{k}'] = ((side * (hw + .005), 0, .50), (side * (hw + .005), .02, .08), f'thigh.{k}')
-        B[f'foot.{k}'] = ((side * (hw + .005), .02, .08), (side * (hw + .005), -.11, .03), f'shin.{k}')
+        # 다리: 무릎과 발을 조금 벌려 단단히 버티고 선 자세 (사람 몸만 — 괴물 몸은 예전 그대로)
+        sp = p.get('stance', 0)
+        B[f'thigh.{k}'] = ((side * hw, 0, .93), (side * (hw + .005 + sp * .55), 0, .50), 'hips')
+        B[f'shin.{k}'] = ((side * (hw + .005 + sp * .55), 0, .50), (side * (hw + .005 + sp), .02, .08), f'thigh.{k}')
+        B[f'foot.{k}'] = ((side * (hw + .005 + sp), .02, .08), (side * (hw + .005 + sp), -.11, .03), f'shin.{k}')
     out = {}
     for n, (a, b, par) in B.items():
         out[n] = (Vector(a) * s, Vector(b) * s, par)

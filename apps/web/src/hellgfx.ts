@@ -56,6 +56,13 @@ export function drawHellGround(z: Zone, theme: Theme, i0: number, j0: number): {
   const set = (h: string) => { r = parseInt(h.slice(1, 3), 16); gg = parseInt(h.slice(3, 5), 16); b = parseInt(h.slice(5, 7), 16); };
   const lerp = (h1: string, h2: string, t: number) => { const a = hex(h1), bb = hex(h2); t = t < 0 ? 0 : t > 1 ? 1 : t; r = a[0] + (bb[0] - a[0]) * t; gg = a[1] + (bb[1] - a[1]) * t; b = a[2] + (bb[2] - a[2]) * t; };
   const shade = (k: number) => { r *= k; gg *= k; b *= k; };
+  const bloodLava = (_X: number, _Yp: number, a1: number, a2: number, a3: number, gr: number) => {
+    const crack = Math.abs(a2 - 0.5);
+    if (crack < 0.012) set('#ff8a70');
+    else if (crack < 0.03) set('#ff3a2a');
+    else if (a3 > 0.6) lerp('#a8100c', '#ff4a2a', (a3 - 0.6) * 4);
+    else { lerp('#2a0404', '#5a0808', a1 * 1.4); if (gr < 0.04) set('#7a0e0a'); }
+  };
   for (let py = 0; py < H; py++) {
     const Y = py + minY;
     for (let px = 0; px < W; px++) {
@@ -93,10 +100,9 @@ export function drawHellGround(z: Zone, theme: Theme, i0: number, j0: number): {
           if (n3 > 0.66 && grain < 0.3) set('#2e3e26'); // 물이끼
           if (edge < 0.05) set('#3a3424');
         } else {
-          lerp('#3a0404', '#6a0a0a', n1 * 1.3);
-          if (n2 > 0.7 && grain < 0.5) set('#8a1410');
-          if (Math.abs(Math.sin(X * 0.11 + Yp * 0.04 + n3 * 8)) < 0.04) set('#b0281a');
-          if (edge < 0.05) set('#2a0606');
+          // 피의 용암: 검붉게 식은 껍질 사이로 핏빛 금이 달아오른다
+          bloodLava(X, Yp, n1, n2, n3, grain);
+          if (edge < 0.05) set(edge < 0.025 ? '#ff7a6a' : '#e0281e');
         }
       } else if (best === 3) {
         // 돌길(1·3층) · 널빤지 길(2층): 칸을 셋으로 나눈 돌·판자에 모서리 빛과 그림자
@@ -176,6 +182,33 @@ export function drawHellGround(z: Zone, theme: Theme, i0: number, j0: number): {
   }
   g.putImageData(im, 0, 0);
   return { canvas: c, x: minX, y: minY };
+}
+
+/** 지도 밖까지 이어지는 피의 용암 바다 (3층): 이음매 없이 반복되는 256×128 한 장 */
+let SEA: HTMLCanvasElement | null = null;
+export function bloodLavaTile() {
+  if (SEA) return SEA;
+  const NZ = noiseTex();
+  const nz = (x: number, y: number) => NZ[((y & 255) << 8) | (x & 255)];
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 128;
+  const g = c.getContext('2d')!;
+  const im = g.createImageData(256, 128);
+  const col = (h: string) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  for (let y = 0; y < 128; y++) for (let x = 0; x < 256; x++) {
+    const Yp = y * 2, n1 = nz(x, Yp), n2 = nz(x + 113, Yp + 71), n3 = nz(x + 57, Yp + 191), gr = hash(x, y, 3); // 모두 256 주기라 이음매가 없다
+    const crack = Math.abs(n2 - 0.5);
+    let c3: number[];
+    if (crack < 0.012) c3 = col('#ff8a70');
+    else if (crack < 0.03) c3 = col('#ff3a2a');
+    else if (n3 > 0.6) { const a = col('#a8100c'), b = col('#ff4a2a'), t = Math.min(1, (n3 - 0.6) * 4); c3 = a.map((v, k) => v + (b[k] - v) * t); }
+    else { const a = col('#2a0404'), b = col('#5a0808'), t = Math.min(1, n1 * 1.4); c3 = a.map((v, k) => v + (b[k] - v) * t); if (gr < 0.04) c3 = col('#7a0e0a'); }
+    const o = (y * 256 + x) * 4;
+    im.data[o] = c3[0]; im.data[o + 1] = c3[1]; im.data[o + 2] = c3[2]; im.data[o + 3] = 255;
+  }
+  g.putImageData(im, 0, 0);
+  SEA = c;
+  return c;
 }
 
 /** 물(용암·늪·핏물) 칸인가: 흐르는 빛을 덧그릴 자리 (가장자리는 빼고 안쪽만) */

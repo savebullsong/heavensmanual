@@ -264,7 +264,7 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
   showStance(true);
   if (how !== 'shop' && how !== 'resume') showPlace(t().hellPlace.replace('{n}', String(f)).replace('{name}', floorDef(f).name[lang()]), floorDef(f).sin[lang()]);
   // 층주를 아직 못 쓰러뜨린 층: 위로 가는 길을 한 번 알려 준다 (세션마다 층당 한 번)
-  if (!h.cleared.includes(f) && how !== 'shop' && !hintedFloors.has(f)) { hintedFloors.add(f); setTimeout(() => toast(t().hellHint.replace('{boss}', MONSTERS[floorDef(f).boss].name[lang()])), 2600); }
+  if (!h.cleared.includes(f) && how !== 'shop' && !hintedFloors.has(f)) { hintedFloors.add(f); setTimeout(() => toast((floorDef(f).theme === 'market' ? t().hellHintFerry : t().hellHint).replace('{boss}', MONSTERS[floorDef(f).boss].name[lang()])), 2600); }
   joinNet(w);
   fx?.done();
 }
@@ -555,6 +555,7 @@ function hellAct(kind: 'up' | 'down' | 'pashar' | 'talus') {
   if (kind === 'pashar' || (kind === 'up' && h.floor === 1)) { talkToPashar(); return; }
   if (kind === 'talus') { talkToTalus(); return; }
   if (kind === 'up') {
+    if (floorDef(h.floor).theme === 'market') { ferry(); return; } // 3층: 나루터
     if (!h.cleared.includes(h.floor)) { toast(L.hellLocked); return; }
     enterHell(h.floor - 1, 'up');
     return;
@@ -599,6 +600,24 @@ async function talkToTalus() {
     save(state); renderHud();
   }
   endTalk();
+}
+
+/** 3층 나루터: 층주 세라네가 쓰러졌으면 바로 타고, 아니면 경비병에게 뱃삯을 내고 건넌다 (혼자서도 올라갈 수 있는 다른 길) */
+const FERRY_FARE = 300;
+async function ferry() {
+  if (busy) return;
+  const L = t();
+  const h = hellState();
+  const go = () => { toast(L.ferryGo); enterHell(h.floor - 1, 'up'); };
+  if (h.cleared.includes(h.floor)) { toast(L.ferryFree); go(); return; }
+  busy = true;
+  dlg.open({ name: L.ferryGuard });
+  await dlg.say(L.ferryNo);
+  const c = await dlg.choose([L.ferryPay.replace('{n}', String(FERRY_FARE)), L.ferryLeave]);
+  if (c === 0 && h.notes < FERRY_FARE) await dlg.say(L.ferryPoor.replace('{n}', String(FERRY_FARE)));
+  dlg.close();
+  busy = false;
+  if (c === 0 && h.notes >= FERRY_FARE) { h.notes -= FERRY_FARE; save(state); renderHud(); go(); }
 }
 
 /** 지옥 1층 환생관: 층주(아쉬갈)를 쓰러뜨렸으면 현실로 다시 태어나게 해 준다 */

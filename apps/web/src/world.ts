@@ -3,7 +3,7 @@
 import { Hound } from './hound.ts';
 import { wingTexture, cloudTexture, heavenVignette } from './heavengfx.ts';
 import { hellDecor } from './hellprops.ts';
-import { Application, ColorMatrixFilter, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture } from 'pixi.js';
+import { Application, ColorMatrixFilter, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture, TilingSprite } from 'pixi.js';
 import { type Look } from './character.ts';
 import { MISS_HWANG, charSet, frameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, ANIM_FPS, IMPACT, type CharSet, type Dir, type Anim, type Frame } from './sprites.ts';
 import { type Zone, type Building, type Lane, type Prop, findPath, walkable, randomWalkTileNear, tileAt } from './zone.ts';
@@ -13,8 +13,8 @@ import { t, lang } from './i18n.ts';
 import { bangkokClock, nightFactor } from './clock.ts';
 import { buildingName, buildingSub, interactive, canWork, hasBank, cuisineOf, storeOf, type StoreKind } from './names.ts';
 import * as sfx from './sfx.ts';
-import { MONSTERS, GUARDS, OPEN_FLOORS, floorDef, type MonsterDef, type GuardDef } from './hell.ts';
-import { drawHellGround, drawHellStructure, hellTint, hellProp, liquidInside } from './hellgfx.ts';
+import { MONSTERS, GUARDS, floorDef, type MonsterDef, type GuardDef } from './hell.ts';
+import { drawHellGround, drawHellStructure, hellTint, hellProp, liquidInside, bloodLavaTile } from './hellgfx.ts';
 import { drawCosmicBird, COSMIC_TOP } from './ujusae.ts';
 import { drawLoanHouse, LOAN_TOP } from './loanhouse.ts';
 import { portraitUrl } from './portraits.ts';
@@ -272,12 +272,8 @@ export class WorldScene {
   /** 흐르는 물: 용암 위로 흘러가는 달아오른 빛줄기와 터지는 거품 · 늪의 물결 · 핏물의 거품 */
   private liquidG = new Graphics();
   private liquidT = 0;
-  /** 화면 가장자리의 길잡이: 올라가는 계단 · 층주 · 내려가는 구덩이 쪽 화살표와 글자 (화면 밖에 있을 때만) */
-  private guide = new Container();
-  private guideG = new Graphics();
-  private guideTx: Text[] = [];
-  private guideHits: { x: number; y: number; i: number; j: number }[] = [];
-  private guideT = 0;
+  /** 3층: 지도 밖까지 끝없이 흐르는 피의 용암 바다 (바닥 밑에 깐 반복 그림) */
+  private sea: TilingSprite | null = null;
   private gfxTop = new Graphics();
   private gfx: { kind: 'slam' | 'mud'; x: number; y: number; t: number }[] = [];
   /** 내가 마을 둘레에서 마지막으로 싸움을 건 때 (경비병 적대는 3초 뒤 풀린다) */
@@ -417,7 +413,7 @@ export class WorldScene {
         if (hp.glow) {
           const glow = new Sprite(this.glowTex());
           glow.anchor.set(0.5);
-          glow.scale.set(p.kind === 'bonfire' ? 1.3 : p.kind === 'crag' ? 0.6 : 0.7);
+          glow.scale.set(p.kind === 'bonfire' ? 1.3 : p.kind === 'crag' ? 0.6 : p.kind === 'htree' ? 0.45 : 0.7);
           glow.tint = hp.glowTint ?? 0xff7a32;
           glow.position.set(x + hp.glow[0], y + hp.glow[1]);
           glow.blendMode = 'add';
@@ -1052,8 +1048,13 @@ export class WorldScene {
     this.featureG.zIndex = 0;
     this.objects.addChild(this.featureG);
     this.drawFeatures();
-    this.guide.addChild(this.guideG);
-    this.root.addChild(this.guide);
+    if (floorDef(h.floor).theme === 'market') {
+      const st = Texture.from(bloodLavaTile()); st.source.scaleMode = 'nearest';
+      const M = 2400, x0 = -this.zone.H * (TW / 2) - M, x1 = this.zone.W * (TW / 2) + M, y1 = (this.zone.W + this.zone.H) * (TH / 2) + M;
+      this.sea = new TilingSprite({ texture: st, width: x1 - x0, height: y1 + M });
+      this.sea.position.set(x0, -M);
+      this.ground.addChildAt(this.sea, 0);
+    }
     this.liquidG.zIndex = -1;
     this.objects.addChild(this.liquidG);
     this.gfxLow.zIndex = 0.6;
@@ -1068,11 +1069,14 @@ export class WorldScene {
     }
     const gk = floorDef(h.floor).guard;
     if (gk && GUARDS[gk]) for (let k = 0; k < 2; k++) this.walkers.push(this.makeGuard(GUARDS[gk], k));
+    // 3층 나루터를 지키는 경비병 둘 (부두 들머리 양쪽에 선다)
+    if (gk && GUARDS[gk] && floorDef(h.floor).theme === 'market') for (const post of [2, 3]) this.walkers.push(this.makeGuard(GUARDS[gk], post));
   }
 
   /** 경비병 순찰로: 마을 가운데(모닥불·공동 식탁·등불 가게 앞) ↔ 문 안쪽. 둘이 네 문을 나눠 돈다 */
   private patrolOf(post: number): [number, number][] {
     const r = this.zone.hell!.rest;
+    if (post >= 2) { const u = this.zone.hell!.up; return [[u.i + (post === 2 ? -1 : 2), u.j]]; } // 나루터 경비병: 제자리
     const C: [number, number] = [r.i, r.j], In = r.r - 1;
     const pts: [number, number][] = post === 0
       ? [[C[0] + 2, C[1] + 2], [C[0], C[1] - In], [C[0] - 1, C[1] - 1], [C[0] - In, C[1]]]
@@ -1263,8 +1267,10 @@ export class WorldScene {
     if (!h) return;
     const g = this.featureG;
     g.clear();
+    // 3층: 계단 대신 나루터 — 기슭에서 피의 바다로 뻗은 널빤지 부두와 붉은 등롱을 단 나룻배 (층주가 살아 있으면 사슬에 묶여 있다)
+    if (floorDef(h.floor).theme === 'market') this.drawFerry(g, h);
     // 올라가는 계단 (층주가 쓰러지기 전에는 사슬로 막혀 있다)
-    {
+    else {
       const [x, y] = iso(h.up.i + 0.5, h.up.j + 0.5);
       for (let k = 0; k < 5; k++) {
         const yy = y - k * 7, w = 30 - k * 3;
@@ -1281,6 +1287,54 @@ export class WorldScene {
       g.ellipse(x, y + 4, 14, 6).fill({ color: 0xc23a18, alpha: 0.55 });
     }
     g.zIndex = 0.5;
+  }
+
+  private ferryG = new Graphics();
+  private ferryGlow: Sprite | null = null;
+  private drawFerry(g: Graphics, h: NonNullable<Zone['hell']>) {
+    const ui = h.up.i, uj = h.up.j;
+    // 부두: 널빤지와 기둥 (기슭 → 바다)
+    for (let jj = 3; jj < uj; jj += 0.34) {
+      const p = [iso(ui - 0.05, jj), iso(ui + 1.05, jj), iso(ui + 1.05, jj + 0.28), iso(ui - 0.05, jj + 0.28)].flat();
+      g.poly(p).fill(((jj * 3) | 0) % 2 ? 0x4a3020 : 0x3e281a).stroke({ color: 0x1a0e08, width: 1 });
+    }
+    for (const [pi, pj] of [[ui - 0.05, 3], [ui + 1.05, 3], [ui - 0.05, uj - 1], [ui + 1.05, uj - 1]] as [number, number][]) {
+      const [x, y] = iso(pi, pj);
+      g.rect(x - 2, y - 14, 4, 18).fill(0x2a1810).rect(x - 2, y - 14, 1.5, 18).fill(0x4a3020);
+    }
+    // 나룻배: 부두 끝에 옆으로 댄 검은 배 (선체 옆면 → 갑판 → 뱃전 → 가로 널 → 노 → 고물의 붉은 등롱)
+    const f = this.ferryG;
+    f.clear();
+    const bj0 = 1.2, bj1 = 2.5, ba = ui - 1.6, bb = ui + 2.4, bm = (bj0 + bj1) / 2;
+    const rim = [iso(ba, bj0), iso(bb, bj0), iso(bb + 0.5, bm), iso(bb, bj1), iso(ba, bj1), iso(ba - 0.5, bm)];
+    const lift = (p: number[], d: number) => [p[0], p[1] - d];
+    f.poly([...lift(rim[3], 6), ...lift(rim[4], 6), ...lift(rim[5], 6), ...lift(rim[5], -4), ...lift(rim[4], -6), ...lift(rim[3], -6), ...lift(rim[2], -4), ...lift(rim[2], 6)]).fill(0x24140c).stroke({ color: 0x0e0604, width: 1 });
+    f.poly(rim.flatMap((p) => lift(p, 6))).fill(0x3a2418).stroke({ color: 0x5a3a24, width: 1.5 });
+    const inner = [iso(ba + 0.2, bj0 + 0.2), iso(bb - 0.1, bj0 + 0.2), iso(bb + 0.25, bm), iso(bb - 0.1, bj1 - 0.2), iso(ba + 0.2, bj1 - 0.2), iso(ba - 0.2, bm)];
+    f.poly(inner.flatMap((p) => lift(p, 4))).fill(0x1a0e08);
+    for (const ti of [ui - 0.6, ui + 0.6, ui + 1.6]) { const a = iso(ti, bj0 + 0.15), b = iso(ti, bj1 - 0.15); f.moveTo(a[0], a[1] - 6).lineTo(b[0], b[1] - 6).stroke({ color: 0x5a3a24, width: 3 }); }
+    { const a = iso(ui + 0.2, bj1 - 0.2), b = iso(ui + 1.4, bj1 + 0.9); f.moveTo(a[0], a[1] - 7).lineTo(b[0], b[1] + 2).stroke({ color: 0x6a4a2a, width: 2 }); f.ellipse(b[0], b[1] + 3, 5, 2.5).fill(0x6a4a2a); }
+    const [sx, sy] = iso(ba - 0.2, bm);
+    f.moveTo(sx, sy - 6).lineTo(sx, sy - 40).stroke({ color: 0x2a1810, width: 2.5 });
+    f.moveTo(sx, sy - 40).lineTo(sx + 9, sy - 40).stroke({ color: 0x2a1810, width: 2 });
+    f.ellipse(sx + 9, sy - 32, 6, 8).fill(0xa8140e).stroke({ color: 0x3a0a06, width: 1 });
+    f.rect(sx + 5, sy - 41, 8, 2).fill(0x2a1810).rect(sx + 5, sy - 25, 8, 2).fill(0x2a1810);
+    for (let k = -5; k <= 5; k += 2.5) f.moveTo(sx + 3, sy - 32 + k).lineTo(sx + 15, sy - 32 + k).stroke({ color: 0x7a0e0a, width: 1 });
+    if (!this.bossDown) {
+      // 층주가 살아 있는 동안: 배는 쇠사슬로 부두 기둥에 묶여 있다
+      const a = iso(ui - 0.05, 3), b = iso(ui - 0.4, bj1 - 0.1);
+      for (let k = 0; k <= 8; k++) { const tq = k / 8; f.ellipse(a[0] + (b[0] - a[0]) * tq, a[1] - 10 + (b[1] - a[1] - 2) * tq + Math.sin(tq * Math.PI) * 6, 2.2, 1.4).stroke({ color: 0x8a8680, width: 1 }); }
+    }
+    f.zIndex = ui + bm + 0.4;
+    if (!f.parent) this.objects.addChild(f);
+    if (!this.ferryGlow) {
+      const gl = new Sprite(this.glowTex());
+      gl.anchor.set(0.5); gl.scale.set(0.8); gl.tint = 0xff3a2a; gl.blendMode = 'add';
+      gl.position.set(sx + 9, sy - 32);
+      this.lights.addChild(gl);
+      this.glows.push({ s: gl, i: Math.floor(ba), j: Math.floor(bm) });
+      this.ferryGlow = gl;
+    }
   }
 
   /** 층마다 일반 괴물 3종 중 하나를 내 둘레(휴식 공간 밖)에 세운다 */
@@ -1637,14 +1691,6 @@ export class WorldScene {
       }
       this.cancelActs();
       this.moveToScreen(gx, gy);
-      return;
-    }
-    // 0) 길잡이 화살표: 그 방향(계단·층주·구덩이)으로 걷는다
-    const gq = this.zone.hell ? this.guideAt(gx, gy) : null;
-    if (gq) {
-      this.cancelActs();
-      const spot = walkable(this.zone, gq.i, gq.j) ? [gq.i, gq.j] : randomWalkTileNear(this.zone, gq.i, gq.j, 3, ['walk', 'lot', 'park', 'soi']);
-      if (spot) this.walkTo(spot[0], spot[1]);
       return;
     }
     // 1) 사람: 메뉴 (컨트롤·시프트를 누르고 누르면 바로 공격 = 강제 공격). 고문하던 야크도 누르면 고문을 멈추고 덤빈다
@@ -2044,7 +2090,7 @@ export class WorldScene {
   /** 맞은 몸의 재질 → 타격음이 달라진다 */
   private bodyOf(w: Walker): sfx.Body {
     if (w.gdef) return w.gdef.body === 'warden1' ? 'bones' : w.gdef.body === 'warden2' ? 'pret' : 'suturer';
-    if (w.mdef) return w.mdef.body === 'yak' ? 'yak' : w.mdef.body === 'pret' ? 'pret' : w.mdef.body === 'bones' ? 'bones' : 'ash';
+    if (w.mdef) return w.mdef.body === 'yak' ? 'yak' : w.mdef.body === 'pret' || w.mdef.body === 'serane' ? 'pret' : w.mdef.body === 'bones' ? 'bones' : 'ash';
     if (w.kind === 'suturer') return w.monster ? 'monster' : 'suturer';
     if (w.kind === 'thug') return 'thug';
     if (w.isPlayer || w.kind === 'remote') return 'player';
@@ -2477,7 +2523,7 @@ export class WorldScene {
   private update(dt: number, realDt = dt) {
     const p = this.player;
     this.drawSparks(realDt);
-    if (this.zone.hell) { this.drawEmbers(realDt); this.updateHound(dt); this.updateTorture(dt); this.drawGuardFx(dt); this.drawLiquid(realDt); this.drawGuide(realDt); }
+    if (this.zone.hell) { this.drawEmbers(realDt); this.updateHound(dt); this.updateTorture(dt); this.drawGuardFx(dt); this.drawLiquid(realDt); }
     if (this.realm === 'heaven') this.updateHeaven(realDt);
     this.time += dt;
     if (this.stun > 0) { this.stun -= dt; p.path = []; }
@@ -2872,54 +2918,8 @@ export class WorldScene {
   }
 
   /** 지옥의 불티: 화면 아래에서 위로 날아오른다 */
-  private drawGuide(dt: number) {
-    this.guideT += dt;
-    if (this.guideT < 0.1) return;
-    this.guideT = 0;
-    const h = this.zone.hell!, L = t();
-    const g = this.guideG;
-    g.clear();
-    this.guideHits = [];
-    const Wd = this.app.screen.width, Hd = this.app.screen.height, M = 30;
-    const boss = this.walkers.find((w) => w.mdef?.boss && w.down <= 0);
-    const items: { i: number; j: number; label: string; col: number }[] = [
-      { i: h.up.i + 0.5, j: h.up.j + 0.5, label: h.floor === 1 ? L.guideExit : L.guideUp.replace('{n}', String(h.floor - 1)) + (this.bossDown ? '' : L.guideLocked), col: 0xfff1c4 },
-    ];
-    if (boss) items.push({ i: boss.x, j: boss.y, label: L.guideBoss.replace('{name}', boss.mdef!.name[lang()]), col: 0xff7a5a });
-    if (h.floor < OPEN_FLOORS) items.push({ i: h.down.i + 0.5, j: h.down.j + 0.5, label: L.guideDown.replace('{n}', String(h.floor + 1)), col: 0xff9a4a });
-    let k = 0;
-    for (const it of items) {
-      const [wx, wy] = iso(it.i, it.j);
-      const sx = wx + this.camera.x, sy = wy + this.camera.y - 20;
-      if (sx > M && sx < Wd - M && sy > M + 40 && sy < Hd - M - 60) continue; // 화면 안에 보이면 화살표는 필요 없다
-      const cx = Wd / 2, cy = Hd / 2, dx = sx - cx, dy = sy - cy;
-      const s2 = Math.min((Wd / 2 - M) / Math.abs(dx || 1e-6), (Hd / 2 - M - 40) / Math.abs(dy || 1e-6));
-      let ax = cx + dx * s2, ay = cy + dy * s2;
-      // 같은 쪽을 가리키는 화살표가 이미 있으면 가장자리를 따라 비켜 놓는다 (글자가 겹치지 않게)
-      const onSide = Math.abs(ax - M) < 2 || Math.abs(ax - (Wd - M)) < 2;
-      for (let tries = 0; tries < 4 && this.guideHits.some((q) => Math.hypot(q.x - ax, q.y - ay) < 40); tries++) { if (onSide) ay += 40; else ax += ax > cx ? -120 : 120; }
-      const an = Math.atan2(sy - ay, sx - ax);
-      const ca = Math.cos(an), sa = Math.sin(an);
-      g.poly([ax + ca * 12, ay + sa * 12, ax - ca * 6 - sa * 9, ay - sa * 6 + ca * 9, ax - ca * 2, ay - sa * 2, ax - ca * 6 + sa * 9, ay - sa * 6 - ca * 9]).fill({ color: it.col, alpha: 0.92 }).stroke({ color: 0x140e0a, width: 2 });
-      let tx = this.guideTx[k];
-      if (!tx) { tx = new Text({ text: '', style: { fontFamily: 'system-ui, sans-serif', fontSize: 12, fontWeight: '700', fill: '#fff6d8', stroke: { color: '#140e0a', width: 3, join: 'round' } } }); this.guideTx.push(tx); this.guide.addChild(tx); }
-      tx.text = it.label;
-      tx.style.fill = '#' + it.col.toString(16).padStart(6, '0');
-      tx.anchor.set(ca > 0.3 ? 1 : ca < -0.3 ? 0 : 0.5, sa > 0.3 ? 1 : sa < -0.3 ? 0 : 0.5);
-      tx.position.set(Math.round(ax - ca * 18), Math.round(ay - sa * 18));
-      tx.visible = true;
-      this.guideHits.push({ x: ax, y: ay, i: Math.floor(it.i), j: Math.floor(it.j) });
-      k++;
-    }
-    for (; k < this.guideTx.length; k++) this.guideTx[k].visible = false;
-  }
-  /** 길잡이 화살표를 누르면 그쪽으로 걸어간다 */
-  private guideAt(gx: number, gy: number) {
-    for (const q of this.guideHits) if (Math.hypot(gx - q.x, gy - q.y) < 22) return q;
-    return null;
-  }
-
   private drawLiquid(dt: number) {
+    if (this.sea) this.sea.tilePosition.x += dt * 9;
     this.liquidT += dt;
     if (this.liquidT < 1 / 30) return; // 초당 30번이면 충분
     const tt = this.time;
@@ -2931,11 +2931,13 @@ export class WorldScene {
     // 화면 네 모서리 → 칸 범위
     const toTile = (sx: number, sy: number) => { const X = sx - this.camera.x, Y = sy - this.camera.y; return [(X / (TW / 2) + Y / (TH / 2)) / 2, (Y / (TH / 2) - X / (TW / 2)) / 2]; };
     const cs = [toTile(0, 0), toTile(Wd, 0), toTile(0, Hd), toTile(Wd, Hd)];
-    const ia = Math.max(1, Math.floor(Math.min(...cs.map((q) => q[0]))) - 1), ib = Math.min(z.W - 2, Math.ceil(Math.max(...cs.map((q) => q[0]))) + 1);
-    const ja = Math.max(1, Math.floor(Math.min(...cs.map((q) => q[1]))) - 1), jb = Math.min(z.H - 2, Math.ceil(Math.max(...cs.map((q) => q[1]))) + 1);
+    const sea = !!this.sea, lo = sea ? -60 : 1;
+    const ia = Math.max(lo, Math.floor(Math.min(...cs.map((q) => q[0]))) - 1), ib = Math.min(sea ? z.W + 60 : z.W - 2, Math.ceil(Math.max(...cs.map((q) => q[0]))) + 1);
+    const ja = Math.max(lo, Math.floor(Math.min(...cs.map((q) => q[1]))) - 1), jb = Math.min(sea ? z.H + 60 : z.H - 2, Math.ceil(Math.max(...cs.map((q) => q[1]))) + 1);
     let n = 0;
-    for (let j = ja; j <= jb && n < 500; j++) for (let i = ia; i <= ib && n < 500; i++) {
-      if (!liquidInside(z, i, j)) continue;
+    for (let j = ja; j <= jb && n < 600; j++) for (let i = ia; i <= ib && n < 600; i++) {
+      const out = i < 1 || j < 1 || i >= z.W - 1 || j >= z.H - 1;
+      if (out ? !sea : !liquidInside(z, i, j)) continue;
       n++;
       const h1 = ((i * 73856093) ^ (j * 19349663)) >>> 0, a = (h1 % 1000) / 1000, bq = ((h1 >> 10) % 1000) / 1000, c = ((h1 >> 20) % 1000) / 1000;
       if (theme === 'ash') {
@@ -2955,12 +2957,13 @@ export class WorldScene {
         const [x, y] = iso(i + 0.5, j + 0.5); const r = 3 + t * 16;
         g.ellipse(x + (c - 0.5) * 20, y, r, r * 0.5).stroke({ color: 0x5a6a5a, width: 1, alpha: 0.45 * (1 - t) });
       } else {
-        // 핏물: 천천히 흐르는 검붉은 결 + 드문 거품
-        const t = (tt * 0.08 + a) % 1;
-        const [x0, y0] = iso(i + t, j + 0.3 + bq * 0.4);
-        g.moveTo(x0, y0).lineTo(x0 + 9, y0 + 4.5).stroke({ color: 0xb0281a, width: 1.2, alpha: 0.5 * Math.sin(t * Math.PI) });
-        const bt = (tt * 0.22 + c) % 1;
-        if (bt < 0.12) { const [bx, by] = iso(i + 0.5, j + 0.5); g.circle(bx + (a - 0.5) * 16, by - bt * 10, 1.5 + bt * 8).stroke({ color: 0x8a1410, width: 1, alpha: 1 - bt / 0.12 }); }
+        // 피의 용암: 칸을 가로질러 흐르는 핏빛 빛줄기 + 부풀어 터지는 거품
+        if (a > 0.6) continue;
+        const t = (tt * (0.12 + c * 0.06) + a) % 1;
+        const [x0, y0] = iso(i + t, j + 0.25 + bq * 0.5);
+        g.moveTo(x0, y0).lineTo(x0 + 7 + c * 5, y0 + 3.5 + c * 2.5).stroke({ color: c > 0.5 ? 0xffa08a : 0xff3a2a, width: 1.3, alpha: 0.7 * Math.sin(t * Math.PI) });
+        const bt = (tt * 0.3 + bq) % 1;
+        if (bt < 0.16) { const [bx, by] = iso(i + 0.3 + a * 0.4, j + 0.3 + c * 0.4); const r = 1 + bt * 12; g.ellipse(bx, by, r, r * 0.5).stroke({ color: 0xff7a6a, width: 1, alpha: 1 - bt / 0.16 }); }
       }
     }
   }
@@ -3059,7 +3062,7 @@ export class WorldScene {
           const f = found === -2 ? this.zone.hell!.up : this.zone.hell!.down;
           fx = f.i + 0.5; fy = f.j + 0.5;
           const L = t();
-          this.hooks.place(found === -2 ? (this.zone.hell!.floor === 1 ? L.hellExit : L.hellUp) : L.hellDown, '');
+          this.hooks.place(found === -2 ? (this.zone.hell!.floor === 1 ? L.hellExit : floorDef(this.zone.hell!.floor).theme === 'market' ? L.ferryLabel : L.hellUp) : L.hellDown, found === -2 && floorDef(this.zone.hell!.floor).theme === 'market' ? (this.bossDown ? L.ferryOpen : L.ferryLocked) : '');
         } else {
           const b = this.zone.buildings[found];
           const f = this.frontCached(found)!;
