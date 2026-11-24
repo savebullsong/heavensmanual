@@ -18,8 +18,8 @@ import { hellZone, OPEN_FLOORS, floorDef, MONSTERS } from './hell.ts';
 import { interiorZone } from './interior.ts';
 import { buildingName } from './names.ts';
 import { bangkokClock } from './clock.ts';
-import { unlockAudio, isMuted, setMuted } from './sfx.ts';
-import { bgmMode, cycleBgm, setIndoor, MUSIC, type BgmMode } from './bgm.ts';
+import { unlockAudio, isMuted, setMuted, plunge } from './sfx.ts';
+import { bgmMode, setBgmMode, setIndoor, type BgmMode } from './bgm.ts';
 import { applyDeed, addSoulExp, judge, prayerAnswerChance, restRegenPerMinute, isDanger, DEED_TABLE, newStats, soulExpToNext, maxHp as maxHpFor, POINTS_PER_RANK, STAT_KEYS, STAT_MAX, type DeedKey, type StatKey } from '../../../packages/shared/src/rules.ts';
 
 const state = load();
@@ -70,8 +70,10 @@ const zoneReady: Promise<Zone> = fetch(ZONE_URL)
   .then((j) => decodeZone(j))
   .catch(() => sukhumvitTestZone());
 
-const shopLabels = () => ({ hwang: state.realm === 'hell' ? t().hwanghon : t().clerk, parrot: t().parrot, door: t().doorLabel });
+const shopLabels = () => ({ hwang: state.realm === 'hell' ? t().hwanghon : t().clerk, parrot: t().parrot, door: t().doorLabel, besk: t().besk });
 const realm = () => state.realm ?? 'real';
+/** 노자돈 환율: ฿10 = 노전 1닢 */
+const OBOL_RATE = 10;
 const inHell = () => realm() === 'hell';
 const hellState = () => (state.hell ??= { floor: 1, cleared: [], notes: 0 });
 
@@ -118,7 +120,7 @@ async function boot() {
   else enterShop(false);
   setInterval(updateHud, 1000);
   setInterval(() => save(state), 4000);
-  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state }; // 개발용 확인 창구
+  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell }; // 개발용 확인 창구
 }
 
 // ───────────────────────── 장면 전환 ─────────────────────────
@@ -188,7 +190,32 @@ async function enterWorld(at: 'door' | [number, number] = 'door') {
 }
 
 /** 지옥 n층으로: 떨어짐(죽음·악업) · 계단 · 구덩이 · 황혼의 가게에서 나옴 · 다시 열기 */
+/** 지옥으로 떨어지는 장면: 화면이 꺼지고 붉은 빛줄기가 위로 스쳐 간다 (떨어지는 느낌). 덮인 뒤 세계를 바꾸고 걷힌다 */
+function hellFall(long: boolean) {
+  const el = document.createElement('div');
+  el.className = 'hell-fall' + (long ? ' long' : '');
+  const streaks = Array.from({ length: long ? 26 : 14 }, () => {
+    const l = (Math.random() * 100).toFixed(1), d = (Math.random() * (long ? 1.6 : 0.7)).toFixed(2), s = (0.35 + Math.random() * 0.5).toFixed(2), w = Math.random() < 0.25 ? 3 : 1;
+    return `<i style="left:${l}%;animation-delay:${d}s;animation-duration:${s}s;width:${w}px"></i>`;
+  }).join('');
+  el.innerHTML = `<div class="hf-dark"></div><div class="hf-streaks">${streaks}</div><p class="hf-text"></p>`;
+  if (long) el.querySelector('.hf-text')!.textContent = t().fallingHell;
+  document.body.appendChild(el);
+  plunge(long);
+  requestAnimationFrame(() => el.classList.add('show'));
+  const covered = new Promise<void>((r) => setTimeout(r, long ? 900 : 380));
+  const minEnd = Date.now() + (long ? 2300 : 1000);
+  return {
+    covered,
+    done() {
+      setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 900); }, Math.max(0, minEnd - Date.now()));
+    },
+  };
+}
+
 async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | 'shop' | 'resume') {
+  const fx = how === 'fall' || how === 'drop' || how === 'down' ? hellFall(how !== 'down') : null;
+  if (fx) await fx.covered;
   if (how === 'shop') restInShop();
   const f = Math.max(1, Math.min(OPEN_FLOORS, floor));
   const h = hellState();
@@ -226,6 +253,7 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
   showStance(true);
   if (how !== 'shop' && how !== 'resume') showPlace(t().hellPlace.replace('{n}', String(f)).replace('{name}', floorDef(f).name[lang()]), floorDef(f).sin[lang()]);
   joinNet(w);
+  fx?.done();
 }
 
 function joinNet(w: WorldScene) {
@@ -269,6 +297,8 @@ const hooks: WorldHooks = {
     const el = hud.querySelector('.work');
     if (el) { el.textContent = workLine; el.setAttribute('title', st ? t().workOut : ''); }
     hud.querySelector('.hud-left')?.classList.toggle('working', !!st);
+    // 가게 안에서 일할 때만 '그만두기' 단추 (붙이거나 뗄 때만 다시 그린다)
+    if (!!hud.querySelector('.work-stop') !== (!!st && !!world?.isWorkingInside)) renderHud();
   },
   store(kind, name, cuisine) {
     openStore(kind, name, cuisine);
@@ -302,8 +332,8 @@ const hooks: WorldHooks = {
   hellAct(kind) {
     hellAct(kind);
   },
-  enterBuilding(k, out, chaser) {
-    enterInterior(k, out, chaser);
+  enterBuilding(k, out, chaser, work) {
+    enterInterior(k, out, chaser, !!work);
   },
   leaveBuilding() {
     leaveInterior();
@@ -321,13 +351,22 @@ const hooks: WorldHooks = {
     hellState().notes += n;
     updateHud();
   },
+  debt: () => state.debt ?? 0,
+  debtEat(n) {
+    const L = t();
+    state.debt = Math.max(0, (state.debt ?? 0) - n);
+    save(state);
+    updateHud();
+    if (state.debt > 0) toast(L.debtTaken.replace('{n}', String(n)).replace('{m}', String(state.debt)));
+    else toast(L.debtPaid, 'good');
+  },
 };
 
 // ───────────────────────── 건물 안 ─────────────────────────
 /** 방에 들어가 있는 동안 멈춰 둔 거리 (나오면 그대로 이어진다) */
 let street: WorldScene | null = null;
 
-function enterInterior(k: number, out: { i: number; j: number }, chaser: { monster: boolean; hp: number } | null) {
+function enterInterior(k: number, out: { i: number; j: number }, chaser: { monster: boolean; hp: number } | null, work = false) {
   if (!world || world.zone.interior || busy) return;
   const outer = world;
   const b = outer.zone.buildings[k];
@@ -338,7 +377,7 @@ function enterInterior(k: number, out: { i: number; j: number }, chaser: { monst
   outer.root.visible = false;
   street = outer;
   net.leaveZone(); // 방 안은 혼자
-  const w = new WorldScene(app, z, bodyLook(), () => enterShop(true), hooks, state.hp ?? maxHp(), { realm: 'real', chaser });
+  const w = new WorldScene(app, z, bodyLook(), () => enterShop(true), hooks, state.hp ?? maxHp(), { realm: 'real', chaser, work: work ? z.interior!.name : undefined });
   w.crimeT = outer.crimeT;
   world = w;
   app.stage.addChild(w.root);
@@ -351,10 +390,11 @@ function enterInterior(k: number, out: { i: number; j: number }, chaser: { monst
   setIndoor(true);
   renderHud();
   showPlace(z.interior!.name, '');
-  if (z.interior!.rest) toast(t().restRoom, 'good');
+  if (work) toast(t().workInside);
+  else if (z.interior!.rest) toast(t().restRoom, 'good');
 }
 
-/** 방의 나가는 매트: 거리의 그 건물 앞으로 (쫓던 봉합자는 따라 나온다) */
+/** 방의 나가는 매트: 거리의 그 건물 앞으로 (쫓던 대식자는 따라 나온다) */
 function leaveInterior() {
   if (!world?.zone.interior || !street) return;
   const inner = world;
@@ -551,6 +591,7 @@ function onShopArrive(target: ShopTarget) {
   if (busy) return;
   if (realm() === 'ghost' && target !== 'door') { ghostParrot(); return; }
   if (target === 'hwang') talkToHwang();
+  else if (target === 'besk') talkToBesk();
   else if (target === 'door') goOut();
 }
 
@@ -569,7 +610,11 @@ async function talkToHwang() {
   const money = () => (hell ? hellState().notes : state.wallet ?? 0);
   dlg.open({ name: hell ? L.hwanghon : L.clerk, portrait: hell ? 'hwanghon' : 'miss-hwang' });
   if (!talkedThisVisit) {
-    if (hell) await dlg.say(L.hwGreet);
+    if (hell) {
+      // 황혼은 미스 황도 황색날개도 모른다 (스스로 다른 사람이라 여긴다)
+      if (!hellState().met) { hellState().met = true; save(state); await dlg.say(L.hwFirst); }
+      await dlg.say(L.hwGreet);
+    }
     else if (!state.look) {
       await dlg.say(L.greetFirst);
       await dlg.say(L.react[state.arrival!.kind]);
@@ -613,6 +658,44 @@ async function talkToHwang() {
       endTalk();
       shop.goTo('door');
       return;
+    }
+  }
+  endTalk();
+}
+
+/** 유황새의 대부업자 베스크: 최대 100닢, 갚을 땐 두 배. 빚이 남으면 미납귀가 따라다닌다 */
+const DEBT_MAX = 100;
+async function talkToBesk() {
+  busy = true;
+  shop.lock(true);
+  const L = t();
+  const h = hellState();
+  const debt = () => state.debt ?? 0;
+  dlg.open({ name: L.besk, portrait: 'besk' });
+  if (debt() > 0) await dlg.say(L.beskOwe.replace('{n}', String(debt())));
+  else { await dlg.say(L.beskGreet); await dlg.say(L.beskTerms); }
+  const room = Math.floor((DEBT_MAX * 2 - debt()) / 2); // 더 빌릴 수 있는 원금
+  const amounts = [...new Set([30, 60, DEBT_MAX].map((n) => Math.min(n, room)))].filter((n) => n > 0);
+  const opts = amounts.map((n) => L.beskBorrow.replace('{n}', String(n)));
+  if (debt() > 0) opts.push(L.beskRepay.replace('{n}', String(debt())));
+  opts.push(L.beskNo);
+  const c = await dlg.choose(opts);
+  if (c < amounts.length) {
+    const n = amounts[c];
+    h.notes += n;
+    state.debt = debt() + n * 2;
+    save(state);
+    renderHud();
+    await dlg.say(L.beskLent.replace('{n}', String(n)).replace('{m}', String(state.debt)));
+  } else if (debt() > 0 && c === amounts.length) {
+    if (h.notes <= 0) await dlg.say(L.beskEmpty);
+    else {
+      const pay = Math.min(h.notes, debt());
+      h.notes -= pay;
+      state.debt = debt() - pay;
+      save(state);
+      renderHud();
+      await dlg.say(state.debt > 0 ? L.beskPart.replace('{n}', String(pay)).replace('{m}', String(state.debt)) : L.beskPaid);
     }
   }
   endTalk();
@@ -778,7 +861,7 @@ function gear() {
 function myInfo(): RemoteInfo {
   const g = gear();
   const acc = net.account();
-  return { name: acc?.username ?? '', look: bodyLook(), weapon: g.weapon, armor: g.armor, member: !!acc };
+  return { name: acc?.username ?? '', nick: acc?.name, look: bodyLook(), weapon: g.weapon, armor: g.armor, member: !!acc };
 }
 
 function toggleBag() {
@@ -952,7 +1035,7 @@ function showDeath(cause: 'car' | 'beaten' | 'hell') {
   requestAnimationFrame(() => el.classList.add('show'));
 }
 
-/** 지옥에서 쓰러지면: 들고 있던 저승돈 절반을 잃고, 그 층의 휴식처에서 다시 일어난다 */
+/** 지옥에서 쓰러지면: 들고 있던 노전 절반을 잃고, 그 층의 휴식처에서 다시 일어난다 */
 function showHellDeath() {
   const L = t();
   closeMenus();
@@ -990,43 +1073,176 @@ function renderHud() {
   const live = !net.account() ? `<button class="live">${L.live}</button>` : '';
   const narrow = matchMedia('(max-width: 640px)').matches;
   hudNarrow = narrow;
-  const langName = (l: Lang) => narrow ? l.toUpperCase() : l === 'ko' ? '한국어' : l === 'th' ? 'ไทย' : 'English';
   hud.innerHTML = `
-    <div class="hud-left${workLine ? ' working' : ''}"><div class="where" data-zone="${escHtml(place)}"><b>${escHtml(place)}</b></div>${scene === 'shop' ? `<span class="hint">${realm() === 'hell' ? L.hintHell : realm() === 'ghost' ? L.hintGhost : L.hintShop}</span>` : ''}<span class="work">${workLine}</span></div>
+    <div class="hud-left${workLine ? ' working' : ''}"><div class="where" data-zone="${escHtml(place)}"><b>${escHtml(place)}</b></div>${scene === 'shop' ? `<span class="hint">${realm() === 'hell' ? L.hintHell : realm() === 'ghost' ? L.hintGhost : L.hintShop}</span>` : ''}<span class="work">${workLine}</span>${workLine && world?.isWorkingInside ? `<button class="work-stop">${L.workStop}</button>` : ''}</div>
     <div class="hud-tools">${live}<div class="hud-right">
       <span class="hpbox" title="${L.hpLabel}"><span class="clock"></span><i class="hpbar"><i></i></i></span>
       <span class="wallet"></span>
       <button class="to-soul">${narrow ? L.rankShort : L.rank} ${state.soul?.rank ?? 1}</button>
       <button class="to-bag">${L.bag}</button>
-      <button class="bgm" data-mode="${bgmMode()}" aria-label="${L.bgmLabel}" title="${L.bgmLabel}">${BGM_SVG}</button>
-      <button class="snd${isMuted() ? ' off' : ''}" aria-label="${L.sound}" title="${L.sound}">${SND_SVG}</button>
-      <select class="lang" aria-label="language">${LANGS.map((l) => `<option value="${l}" ${l === lang() ? 'selected' : ''}>${langName(l)}</option>`).join('')}</select>
+      <button class="to-set" aria-label="${L.settings}" title="${L.settings}">${SET_SVG}${narrow ? '' : `<span>${L.settings}</span>`}</button>
     </div></div>
     ${scene === 'world' && world?.zone.attribution ? '<a class="attrib" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>' : ''}`;
   (hud.querySelector('.to-bag') as HTMLButtonElement).onclick = toggleBag;
-  const snd = hud.querySelector('.snd') as HTMLButtonElement;
-  snd.onclick = () => { unlockAudio(); setMuted(!isMuted()); snd.classList.toggle('off', isMuted()); toast(isMuted() ? L.sfxOff : L.sfxOn); };
-  const bg = hud.querySelector('.bgm') as HTMLButtonElement;
-  bg.onclick = () => {
-    unlockAudio();
-    const m: BgmMode = cycleBgm();
-    bg.dataset.mode = m;
-    toast(m === 'music' ? L.bgmMusic.replace('{t}', MUSIC.title) : m === 'nature' ? L.bgmNature : L.bgmOff);
-  };
+  (hud.querySelector('.to-set') as HTMLButtonElement).onclick = toggleSettings;
   (hud.querySelector('.to-soul') as HTMLButtonElement).onclick = toggleSoul;
+  hud.querySelector('.work-stop')?.addEventListener('click', () => { world?.stopWorkInside(); leaveInterior(); });
   const lb = hud.querySelector('.live') as HTMLButtonElement | null;
   if (lb) lb.onclick = () => openSignup('signup');
-  (hud.querySelector('.lang') as HTMLSelectElement).onchange = (e) => {
-    const l = (e.target as HTMLSelectElement).value as Lang;
-    setLang(l);
-    state.lang = l;
-    save(state);
-    document.documentElement.lang = l;
-    world?.relabel();
-    shop.setLabels(shopLabels());
-    renderHud();
-  };
   updateHud();
+}
+
+/** 언어 바꾸기 (영혼 설정) */
+function changeLang(l: Lang) {
+  setLang(l);
+  state.lang = l;
+  save(state);
+  document.documentElement.lang = l;
+  world?.relabel();
+  shop.setLabels(shopLabels());
+  renderHud();
+}
+
+// ───────────────────────── 영혼 설정 ─────────────────────────
+// 소리(배경·효과음) · 언어 · 내 영혼(아이디·이름·이메일 인증·비밀번호·프로필·떠나기)를 한 창에
+function toggleSettings() {
+  const old = document.querySelector('.set-panel');
+  if (old) { old.remove(); return; }
+  closeMenus();
+  document.querySelector('.bag-panel')?.remove();
+  document.querySelector('.soul-panel')?.remove();
+  renderSettings();
+}
+function renderSettings() {
+  document.querySelector('.set-panel')?.remove();
+  const L = t();
+  const el = document.createElement('div');
+  el.className = 'set-panel soul-panel shop-menu';
+  el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close" aria-label="${L.close}">✕</button></div>
+    <section class="set-sec"><h4></h4>
+      <div class="set-row"><span class="lbl l-bgm"></span><div class="seg s-bgm"></div></div>
+      <div class="set-row"><span class="lbl l-sfx"></span><div class="seg s-sfx"></div></div>
+    </section>
+    <section class="set-sec"><h4 class="h-lang"></h4><div class="seg s-lang wide"></div></section>
+    <section class="set-sec set-acc"><h4 class="h-acc"></h4><div class="acc"></div></section>`;
+  el.querySelector('.menu-head b')!.textContent = L.settings;
+  (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
+  el.querySelector('.set-sec h4')!.textContent = L.setSound;
+  el.querySelector('.l-bgm')!.textContent = L.setBgm;
+  el.querySelector('.l-sfx')!.textContent = L.setSfx;
+  el.querySelector('.h-lang')!.textContent = L.setLang;
+  el.querySelector('.h-acc')!.textContent = L.setAccount;
+  const seg = <T extends string>(box: Element, vals: T[], labels: string[], cur: () => T, pick: (v: T) => void) => {
+    const draw = () => {
+      box.innerHTML = '';
+      vals.forEach((v, k) => {
+        const b = document.createElement('button');
+        b.textContent = labels[k];
+        b.className = v === cur() ? 'on' : '';
+        b.setAttribute('aria-pressed', String(v === cur()));
+        b.onclick = () => { unlockAudio(); pick(v); draw(); };
+        box.appendChild(b);
+      });
+    };
+    draw();
+  };
+  seg(el.querySelector('.s-bgm')!, ['music', 'nature', 'off'] as BgmMode[], L.bgmOpts, bgmMode, (v) => setBgmMode(v));
+  seg(el.querySelector('.s-sfx')!, ['on', 'off'], L.onOff, () => (isMuted() ? 'off' : 'on'), (v) => setMuted(v === 'off'));
+  seg(el.querySelector('.s-lang')!, LANGS, LANGS.map((l) => (l === 'ko' ? '한국어' : l === 'th' ? 'ไทย' : 'English')), lang, (v) => { changeLang(v); renderSettings(); });
+  renderAccountSettings(el.querySelector('.acc')!);
+  document.body.appendChild(el);
+  const hudBottom = document.getElementById('hud')?.getBoundingClientRect().bottom ?? 56;
+  el.style.top = `${Math.round(hudBottom + 6)}px`;
+  el.style.maxHeight = `calc(100vh - ${Math.round(hudBottom + 20)}px)`;
+}
+/** 내 영혼: 비회원은 안내 한 줄, 회원은 아이디·이름·이메일·비밀번호·프로필·떠나기 */
+function renderAccountSettings(box: Element) {
+  const L = t();
+  const acc = net.account();
+  box.innerHTML = '';
+  if (!acc) {
+    const p = document.createElement('p');
+    p.className = 'note';
+    p.textContent = L.setGuest;
+    box.append(p);
+    return;
+  }
+  box.innerHTML = `
+    <div class="set-row"><span class="lbl"></span><span class="val id"></span></div>
+    <div class="set-field f-name"><label><span class="lbl"></span><div class="inline"><input class="name" maxlength="12" autocomplete="nickname" spellcheck="false"><button class="name-go"></button></div></label><small class="hint"></small><small class="f-err"></small></div>
+    <div class="set-field f-mail"><label><span class="lbl"></span><span class="chip"></span><div class="inline"><input class="mail" type="email" inputmode="email" maxlength="120" autocomplete="email" autocapitalize="none" spellcheck="false"><button class="mail-go"></button></div></label><small class="hint"></small><small class="f-err"></small></div>
+    <details class="set-field f-pw"><summary></summary><div class="pw-box"><input class="pw-old" type="password" autocomplete="current-password" maxlength="72"><input class="pw-new" type="password" autocomplete="new-password" maxlength="72"><small class="f-err"></small><div class="row"><button class="pw-go"></button></div></div></details>
+    <div class="set-field f-prof"><span class="lbl"></span><input class="intro" maxlength="140"><input class="contact" maxlength="80"><div class="row"><button class="logout"></button><button class="save primary"></button></div></div>`;
+  const q = <T extends Element>(s: string) => box.querySelector(s) as T;
+  const lbls = box.querySelectorAll('.lbl');
+  lbls[0].textContent = L.setId; lbls[1].textContent = L.setName; lbls[2].textContent = L.setEmail; lbls[3].textContent = L.profileTitle;
+  q<HTMLElement>('.val.id').textContent = acc.username;
+  const nameIn = q<HTMLInputElement>('.name'), nameGo = q<HTMLButtonElement>('.name-go'), nameErr = q<HTMLElement>('.f-name .f-err');
+  const mailIn = q<HTMLInputElement>('.mail'), mailGo = q<HTMLButtonElement>('.mail-go'), mailErr = q<HTMLElement>('.f-mail .f-err'), chip = q<HTMLElement>('.chip');
+  const intro = q<HTMLInputElement>('.intro'), contact = q<HTMLInputElement>('.contact');
+  nameIn.placeholder = L.setNamePh;
+  nameIn.value = acc.name ?? '';
+  q<HTMLElement>('.f-name .hint').textContent = acc.name ? L.setNameRule : `${L.noName} ${L.setNameRule}`;
+  nameGo.textContent = acc.name ? L.setNameChange : L.setNameMake;
+  mailIn.placeholder = L.emailPh;
+  q<HTMLElement>('.f-mail .hint').textContent = L.emailRule;
+  q<HTMLElement>('.f-pw summary').textContent = L.setPw;
+  q<HTMLInputElement>('.pw-old').placeholder = L.pwOld;
+  q<HTMLInputElement>('.pw-new').placeholder = L.pwNew;
+  q<HTMLButtonElement>('.pw-go').textContent = L.pwBtn;
+  intro.placeholder = L.introPh; contact.placeholder = L.contactPh;
+  q<HTMLButtonElement>('.save').textContent = L.save;
+  q<HTMLButtonElement>('.logout').textContent = L.logout;
+  let verified = false, savedMail = '';
+  const drawMail = () => {
+    const same = mailIn.value.trim().toLowerCase() === savedMail && !!savedMail;
+    chip.textContent = same && verified ? L.emailVerified : L.emailNot;
+    chip.className = 'chip' + (same && verified ? ' ok' : '');
+    chip.hidden = !savedMail;
+    mailGo.textContent = same && !verified ? L.emailResend : L.emailSend;
+    mailGo.disabled = same && verified;
+  };
+  net.loadServer().then((r) => {
+    if (!r) return;
+    intro.value = r.profile?.intro ?? ''; contact.value = r.profile?.contact ?? '';
+    savedMail = (r.email ?? '').toLowerCase(); verified = !!r.email_verified;
+    mailIn.value = r.email ?? '';
+    if (r.name && !nameIn.value) nameIn.value = r.name;
+    drawMail();
+  });
+  drawMail();
+  mailIn.oninput = () => { mailErr.textContent = ''; drawMail(); };
+  nameIn.oninput = () => { nameErr.textContent = ''; nameIn.classList.remove('bad'); };
+  const busyBtn = async <T,>(b: HTMLButtonElement, f: () => Promise<T>) => { b.disabled = true; try { return await f(); } finally { b.disabled = false; } };
+  nameGo.onclick = async () => {
+    const v = nameIn.value.trim();
+    if (!/^[0-9A-Za-z_\uAC00-\uD7A3\u0E01-\u0E5B]{2,12}$/.test(v)) { nameErr.textContent = L.nameErr.bad; nameIn.classList.add('bad'); return; }
+    const r = await busyBtn(nameGo, () => net.setName(v));
+    if (r.name) {
+      toast(L.nameDone.replace('{name}', r.name), 'good');
+      net.nudge();
+      renderAccountSettings(box);
+    } else { nameErr.textContent = (L.nameErr[r.error ?? 'net'] ?? L.nameErr.net).replace('{n}', String(r.days ?? 7)); nameIn.classList.add('bad'); }
+  };
+  mailGo.onclick = async () => {
+    const v = mailIn.value.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) { mailErr.textContent = L.emailErr.bad; return; }
+    const r = await busyBtn(mailGo, () => net.sendVerify(v, lang()));
+    if (r.ok) { savedMail = (r.email ?? v).toLowerCase(); verified = false; drawMail(); mailErr.textContent = ''; toast(L.emailSent.replace('{email}', r.email ?? v), 'good'); }
+    else mailErr.textContent = L.emailErr[r.error ?? 'net'] ?? L.emailErr.net;
+    drawMail();
+  };
+  const pwGo = q<HTMLButtonElement>('.pw-go'), pwErr = q<HTMLElement>('.f-pw .f-err');
+  pwGo.onclick = async () => {
+    const o = q<HTMLInputElement>('.pw-old').value, n = q<HTMLInputElement>('.pw-new').value;
+    if (n.length < 6 || n.length > 72) { pwErr.textContent = L.pwErr.bad_pw; return; }
+    const r = await busyBtn(pwGo, () => net.setPassword(o, n));
+    if (r.ok) { pwErr.textContent = ''; q<HTMLInputElement>('.pw-old').value = ''; q<HTMLInputElement>('.pw-new').value = ''; (q<HTMLDetailsElement>('.f-pw')).open = false; toast(L.pwDone, 'good'); }
+    else pwErr.textContent = L.pwErr[r.error ?? 'net'] ?? L.pwErr.net;
+  };
+  const sv = q<HTMLButtonElement>('.save');
+  sv.onclick = async () => { const ok = await busyBtn(sv, () => net.setProfile(intro.value, contact.value, savedMail)); toast(ok ? L.saved : L.errNet); };
+  q<HTMLButtonElement>('.logout').onclick = async () => { await net.pushSave(state, true); await net.logout(); renderHud(); renderSettings(); };
 }
 
 const escHtml = (v: string) => v.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -1042,9 +1258,8 @@ function placeName() {
 }
 
 let hudNarrow = false;
-// 배경 소리 단추: 음표(음악) · 잎(자연음) · 빗금(끔)
-const BGM_SVG = '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><g class="note"><path d="M8 4.5l7-1.6v9.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><ellipse cx="6" cy="14.6" rx="2.6" ry="2" fill="currentColor"/><ellipse cx="13" cy="12.6" rx="2.6" ry="2" fill="currentColor"/><path d="M8 4.5v10" stroke="currentColor" stroke-width="1.6"/></g><g class="leaf"><path d="M4 16C4 8 9 4 16.5 3.5 16 11 12 16 4 16z" fill="currentColor" opacity=".9"/><path d="M4.5 15.5L12 8" stroke="#140e0a" stroke-width="1.2" stroke-linecap="round"/></g><path class="x" d="M3.5 3.5l13 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
-const SND_SVG = '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M3 7.5h3.2L10.5 4v12L6.2 12.5H3z" fill="currentColor"/><path class="w" d="M13 6.5c1.6 1.9 1.6 5.1 0 7M15.4 4.4c2.8 3.1 2.8 8.1 0 11.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path class="x" d="M13.2 7.6l4.6 4.8M17.8 7.6l-4.6 4.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+// 영혼 설정 단추: 빛살 두른 고리
+const SET_SVG = '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="10" cy="10" r="3.1" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 1.8v2.6M10 15.6v2.6M1.8 10h2.6M15.6 10h2.6M4.2 4.2l1.9 1.9M13.9 13.9l1.9 1.9M4.2 15.8l1.9-1.9M13.9 6.1l1.9-1.9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 document.addEventListener('pointerdown', unlockAudio, true);
 // 길게 누르기 = 이동이라, 게임 화면에서는 길게 눌러도 메뉴가 뜨지 않게
 document.getElementById('game')?.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -1083,7 +1298,7 @@ function updateHud() {
   if (el) el.innerHTML = `${inHell() ? '' : `<span class="lbl">${t().bkk}</span> `}${bangkokClock().label}`;
   const w = hud.querySelector('.wallet');
   if (w) w.innerHTML = inHell()
-    ? `<span class="lbl">${t().notesLabel}</span> 冥${Math.floor(hellState().notes).toLocaleString('en-US')}`
+    ? `<span class="lbl">${t().notesLabel}</span> <i class="obol-ic"></i>${Math.floor(hellState().notes).toLocaleString('en-US')}${(state.debt ?? 0) > 0 ? ` <span class="debt">${t().debtHud.replace('{n}', String(Math.ceil(state.debt ?? 0)))}</span>` : ''}`
     : `<span class="lbl">${t().wallet}</span> ฿${Math.floor(state.wallet ?? 0).toLocaleString('en-US')}`;
   updateHpBar(state.hp ?? maxHp(), maxHp());
 }
@@ -1113,7 +1328,7 @@ function renderSoul() {
   const need = soulExpToNext(soul.rank);
   el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close">✕</button></div>
     <div class="soul-exp"><span></span><i class="xpbar"><i style="width:${Math.min(100, (soul.exp / need) * 100)}%"></i></i></div>
-    <div class="soul-points"></div><div class="soul-stats"></div><div class="soul-account"></div>`;
+    <div class="soul-points"></div><div class="soul-stats"></div>`;
   el.querySelector('.menu-head b')!.textContent = `${L.soulTitle} · ${L.rank} ${soul.rank}`;
   el.querySelector('.soul-exp span')!.textContent = L.soulExp;
   el.querySelector('.soul-points')!.textContent = left ? L.points.replace('{n}', String(left)) : '';
@@ -1134,7 +1349,6 @@ function renderSoul() {
     }
     list.appendChild(row);
   }
-  renderAccountBox(el.querySelector('.soul-account')!);
   document.body.appendChild(el);
   const hudBottom = document.getElementById('hud')?.getBoundingClientRect().bottom ?? 56;
   el.style.top = `${Math.round(hudBottom + 6)}px`;
@@ -1149,30 +1363,6 @@ function addStat(k: StatKey) {
   renderSoul();
   updateHud();
 }
-/** 영혼 창 아래: 비회원이면 '살기로 결정', 회원이면 프로필 */
-function renderAccountBox(box: Element) {
-  const L = t();
-  const acc = net.account();
-  box.innerHTML = '';
-  if (!acc) {
-    const p = document.createElement('p');
-    p.className = 'note';
-    p.textContent = L.guestNote; // 가입 단추는 화면 위쪽에 이미 있으니 여기서는 다시 그리지 않는다
-    box.append(p);
-    return;
-  }
-  box.innerHTML = `<p class="note"></p><b class="prof-title"></b><input class="intro" maxlength="140"><input class="contact" maxlength="80"><input class="email" type="email" maxlength="120"><div class="row"><button class="save primary"></button><button class="logout"></button></div>`;
-  box.querySelector('.note')!.textContent = `${acc.username} · ${L.memberNote}`;
-  box.querySelector('.prof-title')!.textContent = L.profileTitle;
-  const intro = box.querySelector('.intro') as HTMLInputElement, contact = box.querySelector('.contact') as HTMLInputElement, email = box.querySelector('.email') as HTMLInputElement;
-  intro.placeholder = L.introPh; contact.placeholder = L.contactPh; email.placeholder = L.emailPh;
-  net.loadServer().then((r) => { if (r) { intro.value = r.profile?.intro ?? ''; contact.value = r.profile?.contact ?? ''; email.value = r.email ?? ''; } });
-  const sv = box.querySelector('.save') as HTMLButtonElement, lo = box.querySelector('.logout') as HTMLButtonElement;
-  sv.textContent = L.save; lo.textContent = L.logout;
-  sv.onclick = async () => { sv.disabled = true; const ok = await net.setProfile(intro.value, contact.value, email.value); sv.disabled = false; toast(ok ? L.saved : L.errNet); };
-  lo.onclick = async () => { await net.pushSave(state, true); await net.logout(); renderHud(); renderSoul(); };
-}
-
 // ───────────────────────── 거리 가게 (편의점·약국·식당·카페) ─────────────────────────
 function openStore(kind: 'mart' | 'pharmacy' | 'food' | 'cafe', name: string, cuisine?: string) {
   closeMenus();
@@ -1234,6 +1424,7 @@ function openBank(name: string) {
       <div class="bank-quick"></div>
       <div class="bank-act"><button class="primary b-in">${L.bankIn}</button><button class="primary b-out">${L.bankOut}</button></div>
       <p class="bank-note">${L.bankNote}</p>
+      <div class="obol-ex"><div class="bank-row"><span>${L.obolEx}</span><b class="b-obol"></b></div><p class="bank-note">${L.obolExSub.replace('{r}', String(OBOL_RATE))}</p><div class="bank-quick obol-quick"></div></div>
     </div>`;
   el.querySelector('.menu-head b')!.textContent = name;
   el.querySelector('.store-line')!.textContent = L.bankLine;
@@ -1242,7 +1433,23 @@ function openBank(name: string) {
   const draw = () => {
     el.querySelector('.b-wallet')!.textContent = `฿${Math.floor(state.wallet ?? 0).toLocaleString('en-US')}`;
     el.querySelector('.b-bank')!.textContent = `฿${Math.floor(state.bank ?? 0).toLocaleString('en-US')}`;
+    el.querySelector('.b-obol')!.textContent = L.obolFmt.replace('{n}', String(Math.floor(hellState().notes)));
   };
+  // 노자돈: 지갑의 바트를 노전으로 바꿔 둔다 (죽어서 지옥에 가면 그대로 들고 간다 · 되돌릴 수 없음)
+  for (const b of [100, 500, 1000]) {
+    const btn = document.createElement('button');
+    btn.textContent = L.obolExBtn.replace('{b}', b.toLocaleString('en-US')).replace('{n}', String(b / OBOL_RATE));
+    btn.onclick = () => {
+      if ((state.wallet ?? 0) < b) { toast(L.noMoney); return; }
+      state.wallet = (state.wallet ?? 0) - b;
+      hellState().notes += b / OBOL_RATE;
+      save(state);
+      updateHud();
+      draw();
+      toast(L.obolDone.replace('{n}', String(b / OBOL_RATE)), 'good');
+    };
+    el.querySelector('.obol-quick')!.appendChild(btn);
+  }
   const quick = el.querySelector('.bank-quick')!;
   for (const n of [100, 500, 1000]) {
     const b = document.createElement('button');
@@ -1309,7 +1516,7 @@ function showStance(on: boolean) {
 // ───────────────────────── 다른 사람 (실시간) ─────────────────────────
 function personMenu(id: string, info: RemoteInfo, x: number, y: number, attack: () => void) {
   const L = t();
-  const name = info.member ? info.name : L.guestName;
+  const name = info.member ? info.nick || info.name : L.guestName;
   const opts: { label: string; danger?: boolean; act: () => void }[] = [];
   if (info.member) opts.push({ label: L.viewProfile, act: () => showProfile(info.name) });
   opts.push({ label: L.act.force, danger: true, act: attack });
@@ -1323,7 +1530,7 @@ async function showProfile(username: string) {
   const p = await net.getProfile(username);
   if (!p) { toast(L.errNet); return; }
   const lines = [`${L.rank} ${p.rank}`, p.intro || L.noIntro, p.contact || ''].filter(Boolean).join('\n');
-  npcSay(p.username, lines);
+  npcSay(p.name || p.username, lines);
 }
 function reportMenu(username: string, x: number, y: number) {
   const L = t();
@@ -1335,7 +1542,7 @@ let installEvt: (Event & { prompt(): Promise<void> }) | null = null;
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e as Event & { prompt(): Promise<void> }; });
 const standalone = () => window.matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
 
-function openSignup(tab: 'signup' | 'login') {
+function openSignup(tab: 'signup' | 'login' | 'forgot') {
   document.querySelector('.signup')?.remove();
   closeMenus();
   const L = t();
@@ -1345,9 +1552,9 @@ function openSignup(tab: 'signup' | 'login') {
     <div class="tabs"><button data-t="signup"></button><button data-t="login"></button></div>
     <h2></h2><p class="sub"></p>
     <label><span class="l-id"></span><input class="id" inputmode="email" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="16"><small class="r-id"></small><small class="f-err e-id"></small></label>
-    <label><span class="l-pw"></span><input class="pw" type="password" autocomplete="new-password" maxlength="72"><small class="r-pw"></small><small class="f-err e-pw"></small></label>
+    <label class="pw-row"><span class="l-pw"></span><input class="pw" type="password" autocomplete="new-password" maxlength="72"><small class="r-pw"></small><small class="f-err e-pw"></small></label>
     <label class="pw2-row"><span class="l-pw2"></span><input class="pw2" type="password" autocomplete="new-password" maxlength="72"><small class="f-err e-pw2"></small></label>
-    <p class="err"></p>
+    <p class="err"></p><button class="forgot linkish"></button>
     <div class="row"><button class="go primary"></button><button class="cancel"></button></div></div>`;
   const q = <T extends Element>(s: string) => el.querySelector(s) as T;
   const [tSign, tLogin] = el.querySelectorAll('.tabs button') as NodeListOf<HTMLButtonElement>;
@@ -1355,15 +1562,18 @@ function openSignup(tab: 'signup' | 'login') {
   q<HTMLElement>('.l-id').textContent = L.idLabel; q<HTMLElement>('.l-pw').textContent = L.pwLabel; q<HTMLElement>('.l-pw2').textContent = L.pw2Label;
   q<HTMLElement>('.r-id').textContent = L.idRule; q<HTMLElement>('.r-pw').textContent = L.pwRule;
   q<HTMLButtonElement>('.cancel').textContent = L.later;
-  const setTab = (tb: 'signup' | 'login') => {
+  const setTab = (tb: 'signup' | 'login' | 'forgot') => {
     tab = tb;
     el.dataset.tab = tb;
-    q<HTMLElement>('h2').textContent = tb === 'signup' ? L.signupTitle : L.loginTab;
-    q<HTMLElement>('.sub').textContent = tb === 'signup' ? L.signupSub : '';
-    q<HTMLButtonElement>('.go').textContent = tb === 'signup' ? L.signup : L.login;
+    q<HTMLElement>('h2').textContent = tb === 'signup' ? L.signupTitle : tb === 'forgot' ? L.forgot : L.loginTab;
+    q<HTMLElement>('.sub').textContent = tb === 'signup' ? L.signupSub : tb === 'forgot' ? L.forgotSub : '';
+    q<HTMLButtonElement>('.go').textContent = tb === 'signup' ? L.signup : tb === 'forgot' ? L.forgotBtn : L.login;
     q<HTMLElement>('.err').textContent = '';
-    tSign.classList.toggle('on', tb === 'signup'); tLogin.classList.toggle('on', tb === 'login');
+    q<HTMLElement>('.err').classList.remove('info');
+    tSign.classList.toggle('on', tb === 'signup'); tLogin.classList.toggle('on', tb !== 'signup');
   };
+  q<HTMLButtonElement>('.forgot').textContent = L.forgot;
+  q<HTMLButtonElement>('.forgot').onclick = () => setTab('forgot');
   tSign.onclick = () => setTab('signup');
   tLogin.onclick = () => setTab('login');
   q<HTMLButtonElement>('.cancel').onclick = () => el.remove();
@@ -1388,6 +1598,14 @@ function openSignup(tab: 'signup' | 'login') {
     // 아이디: 영어·숫자 (대문자는 소문자로 바꿔 받는다 · 밑줄 _ 은 받아 주지만 안내하지 않는다)
     if (!/^[a-z0-9_]*$/.test(id)) { fieldErr('id', L.idBadChar); idIn.focus(); return; }
     if (id.length < 4 || id.length > 16) { fieldErr('id', L.idBadLen); idIn.focus(); return; }
+    if (tab === 'forgot') {
+      go.disabled = true;
+      const r = await net.requestReset(id, lang());
+      go.disabled = false;
+      err.classList.add('info');
+      err.textContent = r.ok ? L.forgotSent : r.error === 'wait' ? L.forgotWait : L.errNet;
+      return;
+    }
     if (pw.length < 6) { fieldErr('pw', L.pwRule); return; }
     if (tab === 'signup' && pw !== pw2) { fieldErr('pw2', L.pwMismatch); return; }
     go.disabled = true;
@@ -1470,7 +1688,35 @@ function phoneCall() {
 // ───────────────────────── 서버 저장 (회원) ─────────────────────────
 setInterval(() => { if (net.account()) net.pushSave(state); }, 20000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && net.account()) net.pushSave(state); });
-if (net.account()) net.loadServer().then((r) => { if (!r) renderHud(); });
+if (net.account()) net.loadServer().then((r) => { if (!r) renderHud(); else net.nudge(); });
+
+/** 메일의 '새 비밀번호 정하기' 링크로 들어왔을 때 (?reset=코드) */
+(() => {
+  const code = new URLSearchParams(location.search).get('reset');
+  if (!code || !/^[0-9a-f]{48}$/.test(code)) return;
+  history.replaceState(null, '', location.pathname);
+  const L = t();
+  const el = document.createElement('div');
+  el.className = 'signup';
+  el.innerHTML = `<div class="signup-box"><h2></h2><label><span class="l-pw"></span><input class="pw" type="password" autocomplete="new-password" maxlength="72"><small class="r-pw"></small></label><label><span class="l-pw2"></span><input class="pw2" type="password" autocomplete="new-password" maxlength="72"></label><p class="err"></p><div class="row"><button class="go primary"></button><button class="cancel"></button></div></div>`;
+  const q = <T extends Element>(s: string) => el.querySelector(s) as T;
+  q<HTMLElement>('h2').textContent = L.resetTitle;
+  q<HTMLElement>('.l-pw').textContent = L.pwNew; q<HTMLElement>('.l-pw2').textContent = L.pw2Label; q<HTMLElement>('.r-pw').textContent = L.pwRule;
+  const go = q<HTMLButtonElement>('.go'), err = q<HTMLElement>('.err');
+  go.textContent = L.resetBtn; q<HTMLButtonElement>('.cancel').textContent = L.close;
+  q<HTMLButtonElement>('.cancel').onclick = () => el.remove();
+  go.onclick = async () => {
+    const pw = q<HTMLInputElement>('.pw').value, pw2 = q<HTMLInputElement>('.pw2').value;
+    if (pw.length < 6 || pw.length > 72) { err.textContent = L.pwErr.bad_pw; return; }
+    if (pw !== pw2) { err.textContent = L.pwMismatch; return; }
+    go.disabled = true;
+    const r = await net.finishReset(code, pw);
+    go.disabled = false;
+    if (r.ok) { el.remove(); toast(L.resetDone, 'good'); openSignup('login'); const idIn = document.querySelector('.signup .id') as HTMLInputElement | null; if (idIn && r.username) idIn.value = r.username; }
+    else err.textContent = r.error === 'bad_pw' ? L.pwErr.bad_pw : r.error === 'net' ? L.errNet : L.resetBad;
+  };
+  document.body.appendChild(el);
+})();
 
 // 홈 화면 설치용 서비스 워커
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('./sw.js').catch(() => undefined);

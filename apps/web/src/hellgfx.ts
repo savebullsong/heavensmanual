@@ -91,7 +91,7 @@ export function drawHellGround(z: Zone, theme: Theme, i0: number, j0: number): {
   return { canvas: c, x: minX, y: minY };
 }
 
-/** 지옥 구조물: 재의 문턱 = 부서진 돌 폐허, 굶주림의 늪 = 판잣집, 피의 시장 = 붉은 천막 가게. 황혼의 우주새는 검붉은 돌집 */
+/** 지옥 구조물: 재의 문턱 = 부서진 돌 폐허, 굶주림의 늪 = 판잣집, 피의 시장 = 붉은 천막 가게. 유황새는 검붉은 돌집 */
 export function drawHellStructure(b: Building, theme: Theme, night: boolean): { canvas: HTMLCanvasElement; x: number; y: number } {
   if (b.hut) return drawHut(b, theme);
   const { i0, j0, w, d } = b;

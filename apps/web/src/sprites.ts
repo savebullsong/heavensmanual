@@ -34,6 +34,8 @@ export interface CharSet {
 
 /** 미스 황의 겉모습 (우주새 카운터 뒤, 관리자 페이지 도트 칸에서도 쓴다) */
 export const MISS_HWANG: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 3, top: 0, bottom: 0, outfit: 'apron' };
+/** 유황새(지옥)의 황혼: 미스 황과는 다른 사람이라고 스스로 믿는다. 검붉은 긴 머리, 핏빛 옷, 창백한 피부 */
+export const HWANGHON: Look = { sex: 'f', build: 1, skin: 0, hair: 5, hairColor: 0, top: 0, bottom: 0, outfit: 'apron', cols: { 1: '#ead2c4', 2: '#3a0e12', 3: '#5a0e18', 4: '#2a0a10', 5: '#0c0808', 6: '#1a1210', 7: '#140a0c', 9: '#5a0e18', 10: '#ead2c4' } };
 
 export const MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle'];
 /** 방어구 겉모습: 그리는 순서와 색 (구역 3 = 본색, 구역 5 = 신발) */
@@ -139,12 +141,14 @@ function palette(look: Look): Uint8ClampedArray[] {
 // ───────────────────────── 어떤 층을 쓰나 ─────────────────────────
 export function layerKeys(look: Look, weapon: string | null, armor: string[] = []) {
   const o = look.outfit ?? 'casual';
-  // 봉합자: 사람 모습 / 변신한 모습 (머리카락·방어구 없음, 늘 큰 바늘)
+  // 대식자: 사람 모습 / 변신한 모습 (머리카락·방어구 없음, 늘 큰 바늘)
   if ((o as string) === 'suturer') return { base: 'b-m1-suturer-m', hair: null, weapon: 'w-m-needle', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   if ((o as string) === 'stitched') return { base: 'b-x-stitched-m', hair: null, weapon: 'w-x-needle', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   // 지옥 괴물: 망자(맨손) · 프렛(맨손) · 야크(몽둥이)
   if (o === 'ash') return { base: 'b-a-ash-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
   if (o === 'pret') return { base: 'b-p-pret-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
+  if (o === 'bones') return { base: 'b-s-bones-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
+  if (o === 'besk') return { base: 'b-k-besk-m', hair: null, weapon: 'w-k-ledger', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   if (o === 'yak') return { base: 'b-y-yak-m', hair: null, weapon: weapon === null ? null : 'w-y-club', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   const child = !!look.child;
   const w = child ? null : weapon && (MELEE.includes(weapon) || weapon === 'pistol') ? weapon : null;
@@ -183,7 +187,7 @@ export function charSet(look: Look, weapon: string | null = null, armor: string[
   if (p) { sets.delete(id); sets.set(id, p); return p; }
   p = pxReady.then(async () => {
     const cs = await build(look, keys);
-    // 괴물 몸을 아직 굽지 않았으면 실밥 터진 봉합자 몸에 색만 입혀 쓴다
+    // 괴물 몸을 아직 굽지 않았으면 실밥 터진 대식자 몸에 색만 입혀 쓴다
     if (!cs.frames.size && ['ash', 'pret', 'yak'].includes(look.outfit ?? '')) return build({ ...look, outfit: 'stitched' }, layerKeys({ ...look, outfit: 'stitched' }, 'needle'));
     return cs;
   });

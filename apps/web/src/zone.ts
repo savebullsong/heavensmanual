@@ -17,7 +17,9 @@ export interface Building {
   hut?: boolean; // 지옥 마을의 오두막 (지붕이 있다)
 }
 /** fence o: 0 = i 방향, 1 = j 방향, 2 = 모서리 기둥 */
-export interface Prop { i: number; j: number; kind: 'tree' | 'lamp' | 'pillar' | 'cart' | 'fence' | 'pole' | 'spirit' | 'moto' | 'plant' | 'bin'; o?: number }
+export interface Prop { i: number; j: number; kind: 'tree' | 'lamp' | 'pillar' | 'cart' | 'fence' | 'pole' | 'spirit' | 'moto' | 'plant' | 'bin' | HellDecorKind; o?: number }
+/** 지옥 소품: 경계 바위·성벽, 뼈, 해골 더미, 꼬챙이, 가마솥, 철창, 마을 불빛, 고문 장면(움직임) */
+export type HellDecorKind = 'crag' | 'bones' | 'skulls' | 'stake' | 'cauldron' | 'cage' | 'lantern' | 'bonfire' | 'torture';
 /** 차가 달리는 구간: j 행의 i0~i1, dir = +1 이면 +i 방향 */
 export interface Lane { j: number; i0: number; i1: number; dir: 1 | -1 }
 export interface Zone {
@@ -53,7 +55,7 @@ export interface InteriorInfo {
 }
 export interface HellInfo {
   floor: number;
-  rest: { i: number; j: number; r: number }; // 휴식 마을 (울타리 안 ±r칸 정사각형: 황혼의 우주새, 싸움 불가·괴물 못 들어옴)
+  rest: { i: number; j: number; r: number }; // 휴식 마을 (울타리 안 ±r칸 정사각형: 유황새, 싸움 불가·괴물 못 들어옴)
   up: { i: number; j: number }; // 올라가는 계단 (층주를 쓰러뜨려야 열림) · 1층은 출구 = 파샤르
   down: { i: number; j: number }; // 내려가는 계단 (언제나 열림)
   boss: { i: number; j: number };

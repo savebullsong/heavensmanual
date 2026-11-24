@@ -1,5 +1,5 @@
 // 우주새 상품: 소비품 · 무기 · 방어구 (브랜드 실명 없음, 가격은 바트)
-import type { Lang } from './i18n.ts';
+import { t, type Lang } from './i18n.ts';
 
 export type ItemCat = 'goods' | 'weapon' | 'armor';
 export interface ItemDef {
@@ -13,7 +13,7 @@ export interface ItemDef {
   name: Record<Lang, string>;
   store?: 'mart' | 'pharmacy' | 'food' | 'cafe'; // 우주새가 아니라 거리 가게에서 파는 것
   now?: boolean; // 가게에서 바로 먹는다 (가방에 넣지 않음)
-  hell?: boolean; // 지옥의 우주새(황혼)에서만, 저승돈으로 판다
+  hell?: boolean; // 지옥의 우주새(황혼)에서만, 노전으로 판다
   sprite?: string; // 몸에 그릴 때 쓰는 그림 (지옥 무기·방어구는 현실 그림을 빌려 쓴다)
   icon?: string; // 아이콘 그림 (없으면 key)
 }
@@ -58,7 +58,7 @@ export const ITEMS: ItemDef[] = [
   { key: 'coffee', cat: 'goods', price: 65, heal: 35, store: 'cafe', now: true, name: { ko: '커피', th: 'กาแฟ', en: 'Coffee' } },
   { key: 'thaitea', cat: 'goods', price: 45, heal: 30, store: 'cafe', now: true, name: { ko: '타이 밀크티', th: 'ชาไทย', en: 'Thai milk tea' } },
   { key: 'cake', cat: 'goods', price: 80, heal: 60, store: 'cafe', now: true, name: { ko: '케이크', th: 'เค้ก', en: 'Cake' } },
-  // 지옥 (황혼의 우주새 · 저승돈) — 단검·둔기·장병기·검 네 갈래
+  // 지옥 (유황새 · 노전) — 단검·둔기·장병기·검 네 갈래
   { key: 'hdagger', cat: 'weapon', price: 30, atk: 6, hell: true, sprite: 'dagger', name: { ko: '녹슨 망자의 단검', th: 'มีดสั้นสนิมของผู้ตาย', en: 'Rusted dead man’s dagger' } },
   { key: 'hhammer', cat: 'weapon', price: 70, atk: 8, hell: true, sprite: 'hammer', name: { ko: '뼈 망치', th: 'ค้อนกระดูก', en: 'Bone hammer' } },
   { key: 'hspear', cat: 'weapon', price: 110, atk: 9, hell: true, sprite: 'pipe', name: { ko: '쇠사슬 창', th: 'หอกโซ่', en: 'Chain spear' } },
@@ -151,7 +151,7 @@ export function effectText(it: ItemDef, l: Lang): string {
 }
 
 export function priceText(n: number, hell = false): string {
-  return hell ? `冥${n.toLocaleString('en-US')}` : `฿${n.toLocaleString('en-US')}`;
+  return hell ? t().obolFmt.replace('{n}', n.toLocaleString('en-US')) : `฿${n.toLocaleString('en-US')}`;
 }
 
 /** 물건 아이콘 — 지옥 물건은 현실 그림을 빌려 그을리고 붉게 물들인다 */

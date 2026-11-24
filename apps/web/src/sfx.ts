@@ -4,7 +4,7 @@
 
 export type HitKind = 'fist' | 'blunt' | 'blade' | 'gun';
 /** 맞는 쪽의 몸: 같은 무기라도 대상마다 소리가 다르다 */
-export type Body = 'flesh' | 'thug' | 'suturer' | 'monster' | 'player' | 'ash' | 'pret' | 'yak';
+export type Body = 'flesh' | 'thug' | 'suturer' | 'monster' | 'player' | 'ash' | 'pret' | 'yak' | 'bones';
 
 const BLADES = new Set(['knife', 'dagger', 'sword', 'hatchet', 'needle']);
 export function hitKind(weapon: string | null | undefined, ranged = false): HitKind {
@@ -177,6 +177,10 @@ export function impact(kind: HitKind, s: Spot, crit = false, body: Body = 'flesh
     // 프렛: 텅 빈 몸이 울리는 소리 + 가늘고 높은 신음
     tone(o, t, 0.18, 'triangle', 240 * pitch, 140, 0.45);
     grunt(o, t + 0.03, 330 * pitch, [900, 2400], 0.16, 0.32);
+  } else if (body === 'bones') {
+    // 해골: 마른 뼈가 부딪히는 딱딱한 소리 두세 번
+    for (let k = 0; k < 3; k++) noise(o, t + k * 0.035, 0.03, 'bandpass', 2600 - k * 400, 1800, 6, 0.55 - k * 0.12, 0.001);
+    tone(o, t, 0.05, 'square', 900 * pitch, 500, 0.12);
   } else if (body === 'yak') {
     // 야크: 거대한 몸통을 치는 깊은 울림 + 낮은 노성
     tone(o, t, 0.3, 'sine', 70 * pitch, 34, 1.0);
@@ -206,4 +210,16 @@ export function thud(s: Spot) {
   noise(o, t, 0.32, 'lowpass', 420, 120, 0.8, 0.7, 0.01);
   tone(o, t, 0.26, 'sine', 75, 38, 0.8);
   noise(o, t + 0.12, 0.18, 'lowpass', 300, 100, 0.8, 0.35, 0.01);
+}
+
+/** 지옥으로 떨어질 때: 낮게 울리는 땅울림과 아래로 꺼지는 바람 소리 */
+export function plunge(long = true) {
+  if (!ready()) return;
+  const t = ctx!.currentTime, o = out({ pan: 0, vol: 1 }, 1);
+  const dur = long ? 2.2 : 1.1;
+  noise(o, t, dur, 'lowpass', 260, 60, 0.9, 0.9, 0.25);
+  noise(o, t + 0.05, dur * 0.9, 'bandpass', 1400, 180, 1.4, 0.45, 0.3);
+  tone(o, t, dur, 'sawtooth', 62, 28, 0.32);
+  tone(o, t + 0.1, dur * 0.8, 'sine', 120, 40, 0.4);
+  if (long) noise(o, t + dur - 0.2, 0.5, 'lowpass', 500, 90, 0.8, 0.8, 0.01); // 바닥에 닿는 소리
 }

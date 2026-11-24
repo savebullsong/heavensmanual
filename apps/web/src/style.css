@@ -256,3 +256,63 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 .stance.low .st-low { border-color: #8fd07a; background: rgba(30, 60, 30, 0.55); color: #d8f4cc; }
 .stance.low .st-low .tall { display: none; }
 .stance.low .st-low .short { display: inline; }
+
+#hud .work-stop { margin-left: 6px; padding: 3px 9px; font-size: 12px; border-radius: 12px; border: 1px solid #e0b437; background: rgba(40, 28, 12, 0.85); color: #f2d27a; pointer-events: auto; }
+
+.obol-ic { display: inline-block; width: 10px; height: 10px; margin-right: 3px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #f0c878, #9a6a2a 70%); box-shadow: inset 0 0 0 1px #5a3a14; vertical-align: -1px; }
+#hud .debt { color: #ff8a6a; font-size: 11px; margin-left: 4px; }
+.bank-panel .obol-ex { margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(224, 180, 55, 0.35); }
+
+/* 지옥으로 떨어지는 장면 */
+.hell-fall { position: fixed; inset: 0; z-index: 45; pointer-events: none; overflow: hidden; }
+.hell-fall .hf-dark { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 120%, #5a0c06 0%, #1a0403 45%, #050101 80%); opacity: 0; transition: opacity 0.35s ease-in; }
+.hell-fall.long .hf-dark { transition-duration: 0.8s; }
+.hell-fall.show .hf-dark { opacity: 1; }
+.hell-fall.out .hf-dark, .hell-fall.out .hf-streaks, .hell-fall.out .hf-text { opacity: 0; transition: opacity 0.85s ease-out; }
+.hell-fall .hf-streaks { position: absolute; inset: 0; }
+.hell-fall .hf-streaks i { position: absolute; bottom: -30%; height: 30%; background: linear-gradient(to top, rgba(255, 90, 30, 0), rgba(255, 120, 50, 0.85) 60%, rgba(255, 220, 150, 0.95)); animation: hf-rise linear infinite; opacity: 0; }
+.hell-fall.show .hf-streaks i { opacity: 1; }
+@keyframes hf-rise { from { transform: translateY(0); } to { transform: translateY(-460%); } }
+.hell-fall .hf-text { position: absolute; left: 0; right: 0; top: 46%; margin: 0; text-align: center; color: #f2b89a; font-size: 20px; letter-spacing: 0.3em; text-shadow: 0 0 12px #c22a10; opacity: 0; transition: opacity 0.8s 0.5s; }
+.hell-fall.show .hf-text { opacity: 1; }
+.hell-fall.show { animation: hf-shake 0.12s 6 0.2s; }
+@keyframes hf-shake { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(2px, -1px); } 75% { transform: translate(-2px, 1px); } }
+@media (prefers-reduced-motion: reduce) { .hell-fall .hf-streaks, .hell-fall.show { animation: none; } .hell-fall .hf-streaks i { animation: none; display: none; } }
+
+/* 영혼 설정 */
+#hud .to-set { display: inline-flex; align-items: center; gap: 5px; background: none; border: 1px solid #6b4f36; color: #e0b437; }
+#hud .to-set span { color: #eadfc8; }
+@media (max-width: 640px) { #hud .to-set { padding: 4px 6px; } }
+.set-panel .set-sec { padding: 10px 12px; border-top: 1px solid #3a2a1c; }
+.set-panel .set-sec:first-of-type { border-top: 0; }
+.set-panel h4 { margin: 0 0 8px; font-size: 13px; color: #e0b437; font-weight: 700; }
+.set-panel .set-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 0; }
+.set-panel .lbl { font-size: 13px; color: #d8ccb4; }
+.set-panel .val { font-size: 13px; color: #f2e8d2; font-family: ui-monospace, Menlo, monospace; }
+.set-panel .seg { display: inline-flex; border: 1px solid #5a4424; border-radius: 6px; overflow: hidden; }
+.set-panel .seg.wide { display: flex; }
+.set-panel .seg.wide button { flex: 1; }
+.set-panel .seg button { background: none; border: 0; border-left: 1px solid #3e2e1e; border-radius: 0; color: #cbbfa8; padding: 6px 11px; font-size: 13px; }
+.set-panel .seg button:first-child { border-left: 0; }
+.set-panel .seg button.on { background: #c9a23e; color: #1a120a; font-weight: 700; }
+.set-panel .set-field { display: flex; flex-direction: column; gap: 4px; margin: 10px 0 4px; }
+.set-panel .set-field label { display: flex; flex-direction: column; gap: 5px; }
+.set-panel .inline { display: flex; gap: 6px; }
+.set-panel .inline input { flex: 1; min-width: 0; }
+.set-panel input { padding: 7px 8px; background: #1c140e; border: 1px solid #5a4424; border-radius: 4px; color: #eadfc8; font: inherit; font-size: 13px; }
+.set-panel input.bad { border-color: #c0503a; }
+.set-panel .inline button { white-space: nowrap; }
+.set-panel .chip { align-self: flex-start; font-size: 11px; padding: 1px 7px; border-radius: 9px; background: #4a3424; color: #d8c8a8; }
+.set-panel .chip.ok { background: #2c5226; color: #c8f0b8; }
+.set-panel .hint { font-size: 11.5px; line-height: 1.45; color: #9a8e7a; }
+.set-panel .f-err { font-size: 12px; color: #ff8a7a; min-height: 0; }
+.set-panel .f-err:empty { display: none; }
+.set-panel details summary { cursor: pointer; font-size: 13px; color: #d8ccb4; }
+.set-panel .pw-box { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.set-panel .row { display: flex; gap: 8px; justify-content: flex-end; }
+.set-panel .f-prof .row { justify-content: space-between; margin-top: 4px; }
+.set-panel .note { margin: 0; font-size: 12.5px; line-height: 1.5; color: #b8a888; }
+.signup .linkish { align-self: flex-start; background: none; border: 0; padding: 0; color: #c9a23e; text-decoration: underline; font-size: 12.5px; display: none; }
+.signup[data-tab="login"] .linkish { display: inline; }
+.signup[data-tab="forgot"] .pw-row, .signup[data-tab="forgot"] .pw2-row, .signup[data-tab="forgot"] .r-id { display: none; }
+.signup .err.info { color: #d8c8a8; }

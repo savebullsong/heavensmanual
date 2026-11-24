@@ -24,8 +24,10 @@ export interface Save {
   called?: boolean;
   // 2단계: 지금 있는 세계와 지옥에서의 걸음
   realm?: 'real' | 'ghost' | 'hell';
-  /** 지옥: 지금 층, 이번 지옥행에서 쓰러뜨린 층주, 저승돈(영혼에 붙어 다음 지옥행에도 남는다) */
-  hell?: { floor: number; cleared: number[]; notes: number };
+  /** 지옥: 지금 층, 이번 지옥행에서 쓰러뜨린 층주, 노전(영혼에 붙어 다음 지옥행에도 남는다) */
+  hell?: { floor: number; cleared: number[]; notes: number; met?: boolean };
+  /** 베스크에게 진 빚 (노전). 0이 되면 미납귀가 돌아간다 */
+  debt?: number;
   /** 세계마다 우주새에 봉인된 물건 — 그 세계의 우주새에서 되찾는다 */
   vault?: Partial<Record<'real' | 'hell', Stash>>;
   /** 하루에 한도가 있는 선행 (기도 3 · 읽기 1 · 기부 20) */

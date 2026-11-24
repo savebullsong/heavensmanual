@@ -1,17 +1,19 @@
 // 관리자 페이지: 주요 인물 그림(대화창) · 게임 속 도트 그림 교체 — 두 메뉴로 나눔
 import './admin.css';
 import { PORTRAIT_SLOTS, SPRITE_SLOTS, DEFAULT_PORTRAITS, type PortraitSlot } from './portraits.ts';
-import { charSet, frameOf, MISS_HWANG, PX } from './sprites.ts';
+import { charSet, frameOf, MISS_HWANG, HWANGHON, PX } from './sprites.ts';
 
 const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   'miss-hwang': { name: '미스 황', where: '현실 · 우주새 점원' },
   'yellow-wing': { name: '황색날개', where: '천국 · 우주새 점원' },
-  hwanghon: { name: '황혼', where: '지옥 · 우주새 점원' },
+  hwanghon: { name: '황혼', where: '지옥 · 유황새 점원 (미스 황과는 다른 사람이라고 믿는다)' },
   parrot: { name: '앵무새', where: '우주새 · 환생시키는 순간에만 말함' },
   luen: { name: '루엔', where: '천국 · 환생관' },
   pashar: { name: '파샤르', where: '지옥 1층 · 환생관' },
   'goat-king': { name: '염소대왕', where: '지옥 13층 · 최종 보스' },
+  besk: { name: '베스크', where: '지옥 · 유황새 안의 대부업자' },
   'sprite-miss-hwang': { name: '미스 황', where: '우주새 카운터 뒤에 서 있는 모습 (왼쪽 아래를 봄)' },
+  'sprite-hwanghon': { name: '황혼', where: '유황새(지옥) 카운터 뒤에 서 있는 모습 (왼쪽 아래를 봄)' },
   'sprite-parrot': { name: '앵무새 · 볏 내림', where: '카운터 끝 횃대 · 평소 모습' },
   'sprite-parrot-up': { name: '앵무새 · 볏 세움', where: '가끔 머리깃을 세울 때 (비워 두면 볏 내림 그림을 그대로 씀)' },
 };
@@ -27,8 +29,8 @@ function dotSpec(slot: PortraitSlot): Promise<DotSpec | null> {
   if (p) return p;
   p = (async () => {
     try {
-      if (slot === 'sprite-miss-hwang') {
-        const cs = await charSet(MISS_HWANG);
+      if (slot === 'sprite-miss-hwang' || slot === 'sprite-hwanghon') {
+        const cs = await charSet(slot === 'sprite-hwanghon' ? HWANGHON : MISS_HWANG);
         const f = frameOf(cs, 'idle', 'sw', 0);
         if (!f) return null;
         const src = f.tex.source.resource as HTMLCanvasElement;

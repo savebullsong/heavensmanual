@@ -27,6 +27,9 @@ jobs.append({'sex': 'm', 'build': 1, 'child': True, 'sets': [{'kind': 'base', 'o
 for mk, outfit, mode, weapon in (('a', 'ash', 'u', None), ('p', 'pret', 'u', None), ('y', 'yak', 'm', 'club')):
     sets = [{'kind': 'base', 'outfit': outfit, 'mode': mode}] + ([{'kind': 'weapon', 'weapon': weapon}] if weapon else [])
     jobs.append({'sex': 'm', 'build': 1, 'monster': mk, 'occluder': outfit, 'sets': sets, 'tag': 'hell'})
+# 해골(맨손, 모든 동작) · 대부업자 베스크(장부, 서 있기만)
+jobs.append({'sex': 'm', 'build': 1, 'monster': 's', 'occluder': 'bones', 'sets': [{'kind': 'base', 'outfit': 'bones', 'mode': 'u'}], 'tag': 'hell2'})
+jobs.append({'sex': 'm', 'build': 1, 'monster': 'k', 'occluder': 'besk', 'sets': [{'kind': 'base', 'outfit': 'besk', 'mode': 'm'}, {'kind': 'weapon', 'weapon': 'ledger'}], 'only': ['idle'], 'tag': 'hell2'})
 args = sys.argv[2:]
 # --scale2: 같은 크기의 인물을 픽셀 두 배로 (게임에서는 반으로 줄여 같은 크기, 더 섬세)
 if '--scale2' in args:

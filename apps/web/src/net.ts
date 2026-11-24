@@ -9,7 +9,7 @@ const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi
 const sb = createClient(URL, KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 
 const ACC = 'heavensmanual.account';
-export interface Account { token: string; username: string }
+export interface Account { token: string; username: string; name?: string }
 export function account(): Account | null {
   try { return JSON.parse(localStorage.getItem(ACC) ?? 'null'); } catch { return null; }
 }
@@ -61,9 +61,13 @@ export async function logout() {
 export async function loadServer() {
   const a = account();
   if (!a) return null;
-  const r = await rpc<{ username: string; save: unknown; profile: { intro?: string; contact?: string }; email: string | null; error?: Err }>('hm_load', { p_token: a.token });
+  const r = await rpc<{ username: string; name: string | null; save: unknown; profile: { intro?: string; contact?: string }; email: string | null; email_verified: boolean; error?: Err }>('hm_load', { p_token: a.token });
   if ('error' in r && r.error === 'session') setAccount(null);
-  return 'error' in r && r.error ? null : r;
+  if ('error' in r && r.error) return null;
+  const ok = r as { username: string; name: string | null; save: unknown; profile: { intro?: string; contact?: string }; email: string | null; email_verified: boolean };
+  // 게임 속 이름은 기기에도 적어 둔다 (다른 사람에게 보이는 이름)
+  if ((ok.name ?? undefined) !== a.name) setAccount({ ...a, name: ok.name ?? undefined });
+  return ok;
 }
 let lastSaved = '';
 /** 서버 저장 (바뀐 것이 있을 때만) */
@@ -81,8 +85,39 @@ export async function setProfile(intro: string, contact: string, email: string) 
   if (!a) return false;
   return (await rpc<boolean>('hm_profile_set', { p_token: a.token, p_intro: intro, p_contact: contact, p_email: email })) === true;
 }
+/** 게임 속 이름 짓기·바꾸기 */
+export async function setName(name: string): Promise<{ name?: string; error?: string; days?: number }> {
+  const a = account();
+  if (!a) return { error: 'session' };
+  const r = await rpc<{ name?: string; error?: string; days?: number }>('hm_name_set', { p_token: a.token, p_name: name });
+  if ('name' in r && r.name) setAccount({ ...a, name: r.name });
+  return r as { name?: string; error?: string; days?: number };
+}
+/** 비밀번호 바꾸기 (지금 비밀번호 확인) */
+export async function setPassword(oldPw: string, newPw: string): Promise<{ ok?: boolean; error?: string }> {
+  const a = account();
+  if (!a) return { error: 'session' };
+  return (await rpc<{ ok?: boolean; error?: string }>('hm_password_set', { p_token: a.token, p_old: oldPw, p_new: newPw })) as { ok?: boolean; error?: string };
+}
+/** 메일 함수 (인증 메일 · 비밀번호 다시 정하기) */
+async function mail(body: Record<string, unknown>): Promise<{ ok?: boolean; error?: string; email?: string; username?: string }> {
+  try {
+    const r = await fetch('/api/email', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    return await r.json();
+  } catch {
+    return { error: 'net' };
+  }
+}
+export function sendVerify(email: string, lang: string) {
+  const a = account();
+  if (!a) return Promise.resolve({ error: 'session' } as { ok?: boolean; error?: string; email?: string });
+  return mail({ action: 'verify', token: a.token, email, lang });
+}
+export const requestReset = (username: string, lang: string) => mail({ action: 'reset', username, lang });
+export const finishReset = (code: string, password: string) => mail({ action: 'resetDone', code, password });
+
 export async function getProfile(username: string) {
-  const r = await rpc<{ username: string; rank: number; intro: string | null; contact: string | null } | null>('hm_profile_get', { p_username: username });
+  const r = await rpc<{ username: string; name: string | null; rank: number; intro: string | null; contact: string | null } | null>('hm_profile_get', { p_username: username });
   return r && !('error' in r) ? r : null;
 }
 export async function report(target: string, reason: string) {

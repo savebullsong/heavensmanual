@@ -4,14 +4,13 @@ import { portraitUrl } from './portraits.ts';
 import { parrotPixels, type Look } from './character.ts';
 import { toCanvas } from './raster.ts';
 import { iso } from './gfx.ts';
-import { MISS_HWANG, charSet, frameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, type CharSet, type Dir, type Frame } from './sprites.ts';
+import { MISS_HWANG, HWANGHON, charSet, frameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, type CharSet, type Dir, type Frame } from './sprites.ts';
 import { RW, RD, COUNTER, DOOR, ROOM_BOUNDS, PARROT_PERCH, drawRoomBackground, drawCounterPieces, drawLamp, nightFactor } from './shopgfx.ts';
 import { bangkokClock } from './clock.ts';
 import { shopKitReady, counterStrips, type ShopKit } from './shopkit.ts';
 
 export { MISS_HWANG };
 /** 지옥의 우주새: 같은 얼굴, 검은 레이스 옷의 황혼 */
-const HWANGHON: Look = { ...MISS_HWANG, cols: { 1: '#e6c2a6', 2: '#c9a46e', 3: '#18121a', 4: '#120e12', 5: '#0c0a0a', 6: '#1a1210', 7: '#2a161c' } };
 
 /** 관리자가 올린 도트 그림 (뭉개지지 않게 nearest) */
 async function loadPixel(u: string): Promise<Texture | null> {
@@ -28,6 +27,11 @@ const DOOR_TILE: [number, number] = [0, 6];
 const START_FIRST: [number, number] = [4, 5];
 const START_BACK: [number, number] = [1, 6];
 const SPEED = 2.3;
+/** 유황새: 바닥에 선 큰 앵무새 (사람 키쯤), 베스크 자리와 말 거는 칸 */
+const BIG_BIRD = { x: 7.6, y: 3.55, k: 2.9 };
+const BESK = { x: 1.55, y: 3.5 };
+const BESK_TILE: [number, number] = [2, 4];
+const BESK_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'besk', cols: { 1: '#b8382a', 3: '#3a1410', 4: '#2a100c', 5: '#140a08', 6: '#e8c050', 9: '#3a1410', 10: '#e8dcc0', 12: '#f2d27a', 13: '#4a2a1a', 14: '#e0b437', 15: '#140e0c' } };
 
 function tex(c: HTMLCanvasElement): Texture {
   const t = Texture.from(c);
@@ -36,9 +40,11 @@ function tex(c: HTMLCanvasElement): Texture {
 }
 
 /** 걸을 수 없는 칸: 카운터와 그 뒤, 창 아래 의자, 화분, 우산꽂이 */
+let hellRoom = false; // 유황새: 바닥에 선 큰 앵무새와 대부업자 베스크 자리도 막는다
 function blocked(i: number, j: number) {
   if (i < 0 || j < 0 || i >= RW || j >= RD) return true;
   if (j <= 2) return true;
+  if (hellRoom && ((i === 7 && j === 3) || (i === 1 && j === 3))) return true;
   if (i === 0 && (j === 4 || j === 5 || j === 7)) return true;
   if (i === 8 && j === 4) return true;
   return false;
@@ -69,12 +75,13 @@ function roomPath(si: number, sj: number, ti: number, tj: number): [number, numb
   return path;
 }
 
-export type ShopTarget = 'hwang' | 'parrot' | 'door';
+export type ShopTarget = 'hwang' | 'parrot' | 'door' | 'besk';
 
 export interface ShopLabels {
   hwang: string;
   parrot: string;
   door: string;
+  besk: string;
 }
 
 export class ShopRoom {
@@ -92,6 +99,12 @@ export class ShopRoom {
   private hwang: Sprite;
   private parrot: Sprite;
   private parrotTex: Texture[];
+  /** 유황새의 앵무새: 사람만큼 커져 바닥에 서 있다 */
+  private bigParrot: Sprite;
+  private besk = new Sprite();
+  private beskShadow = new Graphics();
+  private hellOn = false;
+  private beskReady = false;
   private px = START_FIRST[0] + 0.5;
   private py = START_FIRST[1] + 0.5;
   private path: [number, number][] = [];
@@ -153,6 +166,24 @@ export class ShopRoom {
     this.parrot.position.set(ax + 1, ay - PARROT_PERCH.z);
     this.parrot.zIndex = PARROT_PERCH.x + PARROT_PERCH.y + 1;
     this.objects.addChild(this.parrot);
+    // 유황새: 같은 앵무새가 사람 키만큼 자라 카운터 오른쪽 바닥에 서 있다
+    this.bigParrot = new Sprite(this.parrotTex[0]);
+    this.bigParrot.anchor.set(0.5, 16 / 18);
+    this.bigParrot.scale.set(BIG_BIRD.k);
+    const [bx, by] = iso(BIG_BIRD.x, BIG_BIRD.y);
+    this.bigParrot.position.set(bx, by);
+    this.bigParrot.zIndex = BIG_BIRD.x + BIG_BIRD.y;
+    this.bigParrot.visible = false;
+    this.objects.addChild(this.bigParrot);
+    // 유황새 왼쪽 구석: 장부를 든 대부업자 베스크
+    const [kx, ky] = iso(BESK.x, BESK.y);
+    this.beskShadow.ellipse(0, 0, 15, 6).fill({ color: 0x000000, alpha: 0.35 });
+    this.beskShadow.position.set(kx, ky);
+    this.beskShadow.zIndex = BESK.x + BESK.y - 0.2;
+    this.besk.position.set(kx, ky);
+    this.besk.zIndex = BESK.x + BESK.y;
+    this.besk.visible = this.beskShadow.visible = false;
+    this.objects.addChild(this.beskShadow, this.besk);
     // 매달린 등 두 개와 불빛
     this.glow = new Sprite(tex(glowCanvas()));
     for (const [gx2, gy2] of [[2.4, 2.0], [6.6, 2.0]] as const) {
@@ -264,11 +295,7 @@ export class ShopRoom {
     if (this.keeperHell === hell) return;
     this.keeperHell = hell;
     const id = ++this.keeperId;
-    if (hell) {
-      charSet(HWANGHON).then((cs) => { if (id === this.keeperId) applyFrame(this.hwang, frameOf(cs, 'idle', 'sw', 0)); });
-      return;
-    }
-    Promise.all([charSet(MISS_HWANG), portraitUrl('sprite-miss-hwang')]).then(async ([cs, u]) => {
+    Promise.all([charSet(hell ? HWANGHON : MISS_HWANG), portraitUrl(hell ? 'sprite-hwanghon' : 'sprite-miss-hwang')]).then(async ([cs, u]) => {
       if (id !== this.keeperId) return;
       const f = frameOf(cs, 'idle', 'sw', 0);
       applyFrame(this.hwang, f);
@@ -287,6 +314,13 @@ export class ShopRoom {
   /** 세계마다 같은 가게, 다른 빛: 귀신에게는 잿빛, 지옥에서는 황혼의 붉은 가게 */
   setRealm(r: 'real' | 'ghost' | 'hell') {
     this.dressKeeper(r === 'hell');
+    this.hellOn = hellRoom = r === 'hell';
+    this.parrot.visible = !this.hellOn;
+    this.bigParrot.visible = this.besk.visible = this.beskShadow.visible = this.hellOn;
+    if (this.hellOn && !this.beskReady) {
+      this.beskReady = true;
+      charSet(BESK_LOOK).then((cs) => applyFrame(this.besk, frameOf(cs, 'idle', 'se', 0)));
+    }
     if (r === 'real') { this.camera.filters = []; this.setGhost(false); return; }
     const cm = new ColorMatrixFilter();
     if (r === 'ghost') cm.desaturate();
@@ -360,7 +394,7 @@ export class ShopRoom {
 
   /** 지정한 대상 앞으로 걸어간다 */
   goTo(t: ShopTarget) {
-    const [ti, tj] = t === 'door' ? DOOR_TILE : TALK_TILE;
+    const [ti, tj] = t === 'door' ? DOOR_TILE : t === 'besk' ? BESK_TILE : TALK_TILE;
     const si = Math.floor(this.px), sj = Math.floor(this.py);
     this.pending = t;
     if (si === ti && sj === tj) { this.path = []; return; }
@@ -379,7 +413,10 @@ export class ShopRoom {
       const b = s.getBounds();
       return gx >= b.x - pad && gx <= b.x + b.width + pad && gy >= b.y - pad && gy <= b.y + b.height + pad;
     };
-    if (inSprite(this.parrot, 6)) return 'parrot';
+    if (this.hellOn) {
+      if (inSprite(this.besk, 4)) return 'besk';
+      if (inSprite(this.bigParrot, 4)) return 'parrot';
+    } else if (inSprite(this.parrot, 6)) return 'parrot';
     if (inSprite(this.hwang)) return 'hwang';
     // 왼쪽 벽(x = 0)의 문: 화면 좌표를 벽 위의 (y, z)로 바꿔 본다
     const wy = -x / 32, wz = wy * 16 - y;
@@ -426,6 +463,8 @@ export class ShopRoom {
   }
   private labelAnchor(t: ShopTarget): [number, number] {
     if (t === 'hwang') { const [x, y] = iso(HWANG.x, HWANG.y); return [x, y - 48]; }
+    if (t === 'parrot' && this.hellOn) { const [x, y] = iso(BIG_BIRD.x, BIG_BIRD.y); return [x, y - 18 * BIG_BIRD.k - 6]; }
+    if (t === 'besk') { const [x, y] = iso(BESK.x, BESK.y); return [x, y - 62]; }
     if (t === 'parrot') { const [x, y] = iso(PARROT_PERCH.x, PARROT_PERCH.y); return [x + 1, y - PARROT_PERCH.z - 20]; }
     const [x, y] = iso(0, (DOOR.y0 + DOOR.y1) / 2);
     return [x, y - DOOR.h - 12];
@@ -450,6 +489,7 @@ export class ShopRoom {
       const t = this.pending;
       this.pending = null;
       if (t === 'hwang') this.dir = 'ne';
+      if (t === 'besk') this.dir = 'nw';
       this.onArrive(t);
     }
     this.anim = moving ? this.anim + dt * SPEED * 8.5 : 0;
@@ -477,6 +517,23 @@ export class ShopRoom {
       this.parrot.scale.set(ct && ct.width >= pp.w * 2 ? 0.5 : 1);
       this.parrot.position.set(pp.x, pp.y);
     } else this.parrot.texture = this.customParrot?.[ci] ?? this.parrotTex[ci];
+    if (this.hellOn) {
+      // 큰 앵무새: 미리 구운 2배 그림 (없으면 작은 그림을 키운다). 숨 쉬듯 조금씩 들썩인다
+      const bp = this.kit?.bigParrot?.[ci];
+      const breath = 1 + Math.sin(this.time * 1.7) * 0.012;
+      if (bp) {
+        this.bigParrot.texture = bp.tex;
+        this.bigParrot.anchor.set(0, 1);
+        this.bigParrot.position.set(bp.x, bp.y + bp.h);
+        this.bigParrot.scale.set(0.5, 0.5 * breath);
+      } else {
+        this.bigParrot.texture = this.customParrot?.[ci] ?? this.parrotTex[ci];
+        const cw = this.bigParrot.texture.width;
+        const k = BIG_BIRD.k * (cw > 20 ? 16 / cw : 1);
+        this.bigParrot.scale.set(k, k * breath);
+      }
+      this.besk.y = iso(BESK.x, BESK.y)[1] + Math.round(Math.sin(this.time * 1.2) * 0.6);
+    }
     // 이름표
     if (this.labelT > 0) { this.labelT -= dt; if (this.labelT <= 0) this.hideLabel(); }
     if (this.labelFor) { const [lx, ly] = this.labelAnchor(this.labelFor); this.label.position.set(Math.round(lx), Math.round(ly)); }
