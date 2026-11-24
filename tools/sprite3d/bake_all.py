@@ -71,6 +71,17 @@ for sex in 'mf':
 for sex in 'mf':
     jobs.append({'sex': sex, 'build': 1, 'sets': [{'kind': 'base', 'outfit': 'robber', 'mode': 'm'}, {'kind': 'base', 'outfit': 'mafia', 'mode': 'm'}, {'kind': 'base', 'outfit': 'mafia', 'mode': 'g'}]
                  + [{'kind': 'weapon', 'weapon': w} for w in ('bow', 'cleaver', 'femur', 'pickaxe', 'hook')], 'tag': 'g17'})
+# ── 19차: 양손 무기를 싸우지 않을 때도 두 손으로 (idle2 · walk2) — 무기 든 몸·머리카락·방어구·양손 무기에 덧붙인다 ──
+for sex in 'mf':
+    for b in (0, 1, 2):
+        sets = [{'kind': 'base', 'outfit': 'casual', 'mode': 'm', 'extra': ['idle2', 'walk2']}]
+        if b == 1: sets += [{'kind': 'base', 'outfit': o, 'mode': 'm', 'extra': ['idle2', 'walk2']} for o in ('raincoat', 'patient', 'parrot', 'robber', 'mafia')] + [{'kind': 'hair', 'style': h, 'extra': ['idle2', 'walk2']} for h in HAIRS]
+        sets += [{'kind': 'armor', 'piece': pc, 'mode': 'm', 'extra': ['idle2', 'walk2']} for pc in (['jacket', 'vest', 'workpants'] + (['helmet', 'gloves', 'shinguard', 'boots'] if b == 1 else []))]
+        if b == 1: sets += [{'kind': 'weapon', 'weapon': w, 'extra': ['idle2', 'walk2']} for w in TWO]
+        jobs.append({'sex': sex, 'build': b, 'sets': sets, 'only': ['idle2', 'walk2'], 'merge': True, 'tag': 'hold19'})
+# ── 20차: 한손검 · 왼팔 방패 (맨손 u · 무기 m 자세, 보통 체형 하나로 모든 체형에) ──
+for sex in 'mf':
+    jobs.append({'sex': sex, 'build': 1, 'sets': [{'kind': 'weapon', 'weapon': 'arming'}] + [{'kind': 'armor', 'piece': 'shield', 'mode': m} for m in ('u', 'm')], 'tag': 'shield20'})
 args = sys.argv[2:]
 # --scale2: 같은 크기의 인물을 픽셀 두 배로 (게임에서는 반으로 줄여 같은 크기, 더 섬세)
 if '--scale2' in args:

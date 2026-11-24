@@ -140,3 +140,57 @@ export function terraceSkyTexture(): Texture {
   skyTex = Texture.from(c);
   return skyTex;
 }
+
+/**
+ * 20차: 천국 가장자리의 거대한 지옥문 — 검게 그을린 바위 고리에 뿔처럼 솟은 가시, 안쪽은 붉은 소용돌이.
+ * 장면 셋(소용돌이가 돈다)과 아래로 번지는 핏빛 기운
+ */
+const portalTex: Texture[] = [];
+export function hellPortalTexture(k: number): Texture {
+  if (portalTex.length) return portalTex[k % 3];
+  for (let f = 0; f < 3; f++) {
+    const W = 240, H = 330, cx = W / 2, cy = 168, rx = 82, ry = 128;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d')!;
+    // 바닥의 붉은 기운
+    const fl = g.createRadialGradient(cx, H - 24, 4, cx, H - 24, 120);
+    fl.addColorStop(0, 'rgba(255,70,30,0.55)'); fl.addColorStop(1, 'rgba(255,40,20,0)');
+    g.fillStyle = fl; g.beginPath(); g.ellipse(cx, H - 24, 120, 34, 0, 0, Math.PI * 2); g.fill();
+    // 소용돌이 (안쪽)
+    const vg = g.createRadialGradient(cx, cy, 6, cx, cy, ry);
+    vg.addColorStop(0, '#ffd08a'); vg.addColorStop(0.18, '#ff6a2a'); vg.addColorStop(0.5, '#b8160e'); vg.addColorStop(0.85, '#3a0606'); vg.addColorStop(1, '#120202');
+    g.fillStyle = vg; g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); g.fill();
+    g.save(); g.beginPath(); g.ellipse(cx, cy, rx - 4, ry - 4, 0, 0, Math.PI * 2); g.clip();
+    for (let arm = 0; arm < 5; arm++) {
+      g.strokeStyle = arm % 2 ? 'rgba(255,190,110,0.55)' : 'rgba(255,90,40,0.5)'; g.lineWidth = 3;
+      g.beginPath();
+      for (let s = 0; s < 60; s++) {
+        const a = arm * (Math.PI * 2 / 5) + s * 0.16 + f * 0.42, r = s * 2.1;
+        const x = cx + Math.cos(a) * r * (rx / ry), y = cy + Math.sin(a) * r;
+        if (s) g.lineTo(x, y); else g.moveTo(x, y);
+      }
+      g.stroke();
+    }
+    g.restore();
+    // 바위 고리: 바깥 테두리를 두껍게, 군데군데 금
+    g.lineWidth = 20; g.strokeStyle = '#1e1416'; g.beginPath(); g.ellipse(cx, cy, rx + 8, ry + 8, 0, 0, Math.PI * 2); g.stroke();
+    g.lineWidth = 6; g.strokeStyle = '#3a2a2a'; g.beginPath(); g.ellipse(cx, cy, rx + 4, ry + 4, 0, Math.PI * 1.05, Math.PI * 1.95); g.stroke();
+    g.lineWidth = 2; g.strokeStyle = '#ff5a2a';
+    for (let n = 0; n < 9; n++) { const a = n * 0.71 + 0.3, x = cx + Math.cos(a) * (rx + 8), y = cy + Math.sin(a) * (ry + 8); g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * 6, y + Math.sin(a) * 9); g.stroke(); }
+    // 가시·뿔 (위쪽으로 휘어 솟는다)
+    for (let n = 0; n < 11; n++) {
+      const a = Math.PI + 0.15 + n * ((Math.PI - 0.3) / 10), x = cx + Math.cos(a) * (rx + 14), y = cy + Math.sin(a) * (ry + 14);
+      const len = 22 + ((n * 37) % 5) * 7 + (n === 5 ? 26 : 0);
+      g.fillStyle = '#16100f';
+      g.beginPath(); g.moveTo(x - 6, y + 4); g.lineTo(x + Math.cos(a) * len * 0.7 + (n < 5 ? -6 : n > 5 ? 6 : 0), y + Math.sin(a) * len); g.lineTo(x + 6, y + 4); g.closePath(); g.fill();
+    }
+    // 받침: 갈라진 검은 바위
+    g.fillStyle = '#1a1214'; g.beginPath(); g.moveTo(cx - 110, H - 22); g.lineTo(cx - 70, cy + ry - 10); g.lineTo(cx + 70, cy + ry - 10); g.lineTo(cx + 110, H - 22); g.lineTo(cx + 60, H - 8); g.lineTo(cx - 60, H - 8); g.closePath(); g.fill();
+    g.strokeStyle = '#ff5a2a'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(cx - 40, H - 14); g.lineTo(cx - 20, H - 30); g.lineTo(cx - 28, H - 44); g.moveTo(cx + 30, H - 12); g.lineTo(cx + 44, H - 32); g.stroke();
+    // 불씨
+    for (let n = 0; n < 16; n++) { const x = cx - 70 + ((n * 53 + f * 17) % 140), y = 20 + ((n * 97 + f * 41) % 260); g.fillStyle = n % 3 ? '#ff8a3a' : '#ffd27a'; g.fillRect(Math.round(x), Math.round(y), 2, 2); }
+    portalTex.push(Texture.from(c));
+  }
+  return portalTex[k % 3];
+}

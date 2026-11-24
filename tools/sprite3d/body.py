@@ -7,9 +7,9 @@ REG = {'void': 0, 'skin': 1, 'hair': 2, 'top': 3, 'bottom': 4, 'shoe': 5, 'eye':
        'gown': 9, 'bandage': 10, 'parrot': 11, 'crest': 12, 'wood': 13, 'metal': 14, 'dark': 15}
 HAIRS = ['short', 'swept', 'bob', 'long', 'ponytail', 'buzz']
 OUTFITS = ['casual', 'apron', 'raincoat', 'patient', 'parrot']
-MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle']
+MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle', 'arming']   # 20차: arming = 한손검
 TWO = ['sledge', 'fireaxe', 'greatsword', 'maul']   # 16차 양손 무기 (heavy 동작)
-ARMOR = ['helmet', 'jacket', 'vest', 'gloves', 'workpants', 'shinguard', 'boots']
+ARMOR = ['helmet', 'jacket', 'vest', 'gloves', 'workpants', 'shinguard', 'boots', 'shield']   # 20차: 왼팔의 둥근 방패
 WEAPONS = MELEE + ['pistol']
 RANGED_G = ['pistol', 'shotgun', 'bow']   # 쏘는 자세(g)로 드는 것
 
@@ -923,6 +923,19 @@ class Doll:
                     limb(P, V(x, -.168 * bw, 1.1), V(x, -.168 * bw, 1.12), [(0, .038 * bw, .024), (1, .038 * bw, .024)], dark, None, segs=6)   # 주머니 덮개
                 ob = finish(P); bind(ob, self.arm, lambda co: {'spine': smooth(co.z, .98 * s, 1.12 * s), 'hips': 1 - smooth(co.z, .98 * s, 1.12 * s)}); self.add(g, ob)
             return
+        if piece == 'shield':
+            # 20차: 왼팔 바깥쪽에 끼운 둥근 방패 — 칠한 나무 판(구역 top = 방패 색), 쇠 테두리, 가운데 쇠 돌기, 판자 이음새
+            wood = rmat('top', .6, .25, tag='armor')
+            el, wr = self.bones['forearm.L'][0], self.bones['forearm.L'][1]
+            c = el + (wr - el) * .55 + Vector((.075, -.02, 0))
+            P = Part(g)
+            blob(P, c, (.02, .245, .245), metal, None, segs=24, rings=10)                       # 쇠 테두리 (뒤판)
+            blob(P, c + Vector((.012, 0, 0)), (.02, .222, .222), wood, None, segs=24, rings=10)   # 칠한 나무 판
+            for dz in (-.11, 0, .11):
+                blob(P, c + Vector((.03, 0, dz)), (.004, .2 * (1 - abs(dz) * 2.4), .006), dark, None, segs=8, rings=4)   # 판자 이음새
+            blob(P, c + Vector((.034, 0, 0)), (.03, .055, .055), metal, None, segs=14, rings=8)   # 가운데 돌기
+            ob = finish(P); bind(ob, self.arm, rigid('forearm.L')); self.add(g, ob)
+            return
         if piece == 'gloves':
             am = self.p['arm'] * self.bw
             for k in 'LR':
@@ -1031,6 +1044,12 @@ class Doll:
             limb(P, grip - d * .12, grip + d * .07, [(0, .016, .016), (1, .016, .016)], dark, None, segs=8)
             limb(P, grip + d * .07 - side * .09, grip + d * .07 + side * .09, [(0, .013, .013), (1, .013, .013)], metal, None, segs=6)
             limb(P, grip + d * .08, grip + d * .95, [(0, .005, .026), (.85, .004, .02), (1, .001, .003)], metal, None, segs=6)
+        elif name == 'arming':
+            # 20차 한손검: 장검보다 짧고 넓은 날, 곧은 십자 날밑, 둥근 자루 끝
+            limb(P, grip - d * .09, grip + d * .06, [(0, .017, .017), (1, .017, .017)], dark, None, segs=8)
+            blob(P, grip - d * .1, (.026, .026, .026), metal, None, segs=8, rings=6)
+            limb(P, grip + d * .06 - side * .11, grip + d * .06 + side * .11, [(0, .015, .015), (1, .015, .015)], metal, None, segs=6)
+            limb(P, grip + d * .07, grip + d * .72, [(0, .006, .036), (.8, .005, .03), (1, .001, .004)], metal, None, segs=6)
         elif name == 'hatchet':
             limb(P, grip - d * .06, grip + d * .36, [(0, .017, .017), (1, .015, .015)], wood, None, segs=8)
             h = grip + d * .33
@@ -1190,7 +1209,7 @@ class Doll:
                 blob(P, grip + d * t + side * (.055 if k % 2 else -.055), (.02, .015, .028), metal, None, segs=6, rings=4)
         ob = finish(P)
         # 16차: 작은 현실 무기는 화면에서 잘 보이게 키운다 (손 쥔 자리를 기준으로)
-        k = {'knife': 1.45, 'dagger': 1.45, 'hammer': 1.45, 'hatchet': 1.45, 'pipe': 1.15, 'bat': 1.15, 'sword': 1.15}.get(name, 1.0)
+        k = {'knife': 1.45, 'dagger': 1.45, 'hammer': 1.45, 'hatchet': 1.45, 'pipe': 1.15, 'bat': 1.15, 'sword': 1.15, 'arming': 1.2}.get(name, 1.0)
         if k != 1.0:
             for v in ob.data.vertices: v.co = grip + (v.co - grip) * k
         bind(ob, self.arm, rigid('hand.R'), subsurf=0)

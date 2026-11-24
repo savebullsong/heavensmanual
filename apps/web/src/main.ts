@@ -16,6 +16,7 @@ import { t, lang, setLang, LANGS, type Lang } from './i18n.ts';
 import { load, save, type Slot, type Stash } from './state.ts';
 import { hellZone, OPEN_FLOORS, floorDef, MONSTERS, GUARDS, TOLL, ATONE_GOAL, GURMA_FULL, setRaidForce } from './hell.ts';
 import { interiorZone } from './interior.ts';
+import { TWO } from './sprites.ts';
 import { buildingName } from './names.ts';
 import { bangkokClock } from './clock.ts';
 import { unlockAudio, isMuted, setMuted, plunge, chime } from './sfx.ts';
@@ -151,6 +152,7 @@ async function boot() {
   ui.hidden = true;
   shop = new ShopRoom(app, bodyLook(), false, shopLabels());
   shop.onArrive = onShopArrive;
+  shop.onParrot = talkToParrot;
   app.stage.addChild(shop.root);
   preloadPortrait('miss-hwang');
   // 다시 열면 마지막 자리에서 (현실·천국·귀신은 거리의 그 자리, 가게 안에서 일하던 중이면 그 가게 안에서 계속)
@@ -250,6 +252,7 @@ async function enterWorld(at: 'door' | [number, number] = 'door', zoneId?: strin
   renderHud();
   showStance(want !== 'ghost');
   for (const nb of [zone.edges?.w, zone.edges?.e]) if (nb) loadZone(nb); // 이웃 구역은 미리
+  if (pendingEater && want === 'real') { pendingEater = false; setTimeout(() => world?.sendEater(), 1500); }
   if (want === 'ghost') { net.leaveZone(); return; } // 귀신은 산 사람들 사이에 보이지 않는다
   joinNet(world);
 }
@@ -364,6 +367,7 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
   w.setInvisible(invisible()); // 관리자 투명은 층을 옮겨도 그대로
   if (zh.exit === 'ford' && (h.fed ?? 0) >= GURMA_FULL && !h.cleared.includes(f)) w.gurmaSleep(); // 배불러 잠든 구르마
   w.start();
+  if (pendingEater) { pendingEater = false; setTimeout(() => world?.sendEater(), 1500); } // 황혼의 가게에서 훔치다 걸렸다
   renderHud();
   showStance(true);
   if (how !== 'shop' && how !== 'resume') showPlace(t().hellPlace.replace('{n}', String(f)).replace('{name}', floorDef(f).name[lang()]), floorDef(f).sin[lang()]);
@@ -1041,7 +1045,12 @@ async function talkToHwang() {
   const hell = inHell();
   const money = () => (hell ? hellState().notes : state.wallet ?? 0);
   dlg.open({ name: hell ? L.hwanghon : L.clerk, portrait: hell ? 'hwanghon' : 'miss-hwang' });
-  if (!talkedThisVisit) {
+  if (!talkedThisVisit && state.grudge) {
+    // 20차: 지난번에 훔쳐 간 손님
+    state.grudge = false;
+    save(state);
+    await dlg.say(hell ? L.hwGrudge : L.hwangGrudge);
+  } else if (!talkedThisVisit) {
     if (hell) {
       // 황혼은 미스 황도 황색날개도 모른다 (스스로 다른 사람이라 여긴다)
       if (!hellState().met) { hellState().met = true; save(state); await dlg.say(L.hwFirst); }
@@ -1070,6 +1079,20 @@ async function talkToHwang() {
     if (!picked) break;
     tab = picked.tab;
     const it = picked.it, name = it.name[lang()];
+    if (picked.steal) {
+      // 20차: 우주새에서 훔치기 — 미스 황(황혼)은 몹시 화를 내고 내쫓는다. 걸리면 밖에서 대식자가 기다린다
+      const shelf = ITEMS.filter((x) => x.cat === it.cat && !x.store && !!x.hell === hell).map((x) => ({ it: x, price: x.price }));
+      const ok = trySteal(it, it.price, shelf);
+      if (ok) await dlg.say(L.stealSlip.replace('{item}', name));
+      for (const line of (hell ? L.hwFury : L.hwangFury)) await dlg.say(line);
+      state.grudge = true;
+      if (!ok) pendingEater = true;
+      save(state);
+      renderHud();
+      endTalk();
+      leaveShop();
+      return;
+    }
     if (picked.sell) {
       const unit = sellPrice(it);
       const have = state.bag?.[it.key] ?? 0;
@@ -1172,7 +1195,72 @@ function sellable(hell: boolean) {
 }
 
 /** 상품 창: 고른 물건(사기·팔기)을 돌려준다. '나가기'나 창 밖 빈 곳을 누르면 null */
-function pickItem(hell: boolean, start: ShopTab): Promise<{ it: ItemDef; sell: boolean; tab: ShopTab } | null> {
+// ───────────────────────── 20차: 훔치기 ─────────────────────────
+/** 걸려서 쫓겨난 뒤 거리에 나가면 대식자가 온다 */
+let pendingEater = false;
+/** 처음 한 번은 그 가게의 가장 싼 무기를 반드시 훔친다 */
+function freeSteal(it: ItemDef, shelf: { it: ItemDef; price: number }[]) {
+  if (state.stoleOnce || it.cat !== 'weapon' || !it.atk) return false;
+  const ws = shelf.filter((x) => x.it.cat === 'weapon' && !!x.it.atk); // 탄약·화살은 무기가 아니다
+  return !!ws.length && Math.min(...ws.map((x) => x.price)) === shelf.find((x) => x.it.key === it.key)?.price;
+}
+/** 쌀수록 쉽고 비쌀수록 어렵다 (민첩이 조금 돕는다): ฿10 ≈ 70% · ฿100 ≈ 50% · ฿1,000 ≈ 27% · ฿10,000 ≈ 5% */
+function stealChance(it: ItemDef, price: number, shelf: { it: ItemDef; price: number }[]) {
+  if (freeSteal(it, shelf)) return 1;
+  return Math.max(0.04, Math.min(0.9, 0.93 - Math.log10(Math.max(1, price)) * 0.22 + stats().agi * 0.004));
+}
+/** 훔치기 한 번: 악행은 늘 기록된다. 성공하면 가방에 (그 자리에서 먹는 음식은 먹는다) */
+function trySteal(it: ItemDef, price: number, shelf: { it: ItemDef; price: number }[]) {
+  const ok = Math.random() < stealChance(it, price, shelf);
+  recordDeed('steal');
+  state.stoleOnce = true;
+  if (ok) {
+    if (it.now) world?.heal(it.heal ?? 0);
+    else addToBag(it);
+  }
+  save(state);
+  updateHud();
+  renderQuick();
+  return ok;
+}
+/** 물건 줄 옆에 '훔치기' 단추 (확률을 보여 준다) */
+function withSteal(row: HTMLButtonElement, it: ItemDef, price: number, shelf: { it: ItemDef; price: number }[], act: () => void) {
+  if (realm() === 'heaven' || realm() === 'ghost') return row;
+  const wrap = document.createElement('div');
+  wrap.className = 'bag-row steal-row';
+  const side = document.createElement('div');
+  side.className = 'bag-side';
+  const b = document.createElement('button');
+  b.className = 'b-steal';
+  const pc = Math.round(stealChance(it, price, shelf) * 100);
+  b.innerHTML = `<span>🤏</span><small>${pc}%</small>`;
+  b.title = t().stealBtn.replace('{p}', String(pc));
+  b.onclick = (e) => { e.stopPropagation(); act(); };
+  side.appendChild(b);
+  wrap.append(row, side);
+  return wrap;
+}
+/** 거리·지옥 가게에서 훔치기: 성공하면 슬쩍, 걸리면 주인이 소리치고 대식자가 잡으러 온다 */
+function streetSteal(it: ItemDef, price: number, shelf: { it: ItemDef; price: number }[], panel: HTMLElement, redraw: () => void) {
+  const L = t();
+  if (trySteal(it, price, shelf)) { toast(L.stealOk.replace('{item}', it.name[lang()]), 'evil'); redraw(); return; }
+  panel.remove();
+  toast(L.stealCaught, 'evil');
+  world?.sendEater();
+}
+
+/** 20차: 앵무새는 말이 없다. 아주 가끔 한 마디 */
+async function talkToParrot() {
+  if (busy || dlg.isOpen) return;
+  const L = t();
+  busy = true;
+  shop.lock(true);
+  dlg.open({ name: L.parrot, portrait: 'parrot' });
+  await dlg.say(Math.random() < 0.01 ? L.parrotRare : '......');
+  endTalk();
+}
+
+function pickItem(hell: boolean, start: ShopTab): Promise<{ it: ItemDef; sell: boolean; tab: ShopTab; steal?: boolean } | null> {
   const L = t();
   const cats: ShopTab[] = ['goods', 'weapon', 'armor', 'sell']; // 무기와 방어구도 처음부터 · 팔기
   let cat: ShopTab = start;
@@ -1191,7 +1279,7 @@ function pickItem(hell: boolean, start: ShopTab): Promise<{ it: ItemDef; sell: b
     list.className = 'menu-list';
     el.append(head, list);
     let off: ((e: PointerEvent) => void) | null = null;
-    const done = (v: { it: ItemDef; sell: boolean; tab: ShopTab } | null) => {
+    const done = (v: { it: ItemDef; sell: boolean; tab: ShopTab; steal?: boolean } | null) => {
       if (off) document.removeEventListener('pointerdown', off, true);
       dlg.setPanel(null);
       resolve(v);
@@ -1218,7 +1306,8 @@ function pickItem(hell: boolean, start: ShopTab): Promise<{ it: ItemDef; sell: b
         }
         return;
       }
-      for (const it of ITEMS.filter((x) => x.cat === cat && !x.store && !!x.hell === hell)) list.appendChild(itemRow(it, priceText(it.price, hell), () => done({ it, sell: false, tab: cat }), money < it.price));
+      const shelf = ITEMS.filter((x) => x.cat === cat && !x.store && !!x.hell === hell);
+      for (const it of shelf) list.appendChild(withSteal(itemRow(it, priceText(it.price, hell), () => done({ it, sell: false, tab: cat }), money < it.price), it, it.price, shelf.map((x) => ({ it: x, price: x.price })), () => done({ it, sell: false, tab: cat, steal: true })));
     };
     render();
     dlg.setPanel(el);
@@ -1345,7 +1434,7 @@ function chooseBody(title: string, confirm: string, initial: Look, extra: { outf
 
 // ───────────────────────── 가방 · 장착 ─────────────────────────
 // 장착 칸은 물건 종류에서 정한다 (목록을 따로 두면 새 무기가 빠진다 — 흑철 대검이 끼워지지 않던 까닭)
-const ARMOR_SLOT: Record<string, Slot> = { helmet: 'head', jacket: 'body', vest: 'body', gloves: 'hands', workpants: 'legs', shinguard: 'shins', boots: 'feet' };
+const ARMOR_SLOT: Record<string, Slot> = { helmet: 'head', jacket: 'body', vest: 'body', gloves: 'hands', workpants: 'legs', shinguard: 'shins', boots: 'feet', shield: 'offhand' };
 function slotOf(k: string): Slot | undefined {
   const it = ITEMS.find((x) => x.key === k);
   if (!it || it.note === 'ammo' || it.note === 'arrows') return undefined;
@@ -1362,15 +1451,18 @@ function addToBag(it: ItemDef) {
   state.bag[it.key] = (state.bag[it.key] ?? 0) + 1;
 }
 
+/** 20차: 방패는 권총·활·양손 무기와 함께 들 수 없다 */
+const noShieldWith = (k?: string) => { const it = k ? itemByKey(k) : null; return !!it && (!!it.ranged || !!it.two || TWO.has(it.sprite ?? it.key)); };
 function gear() {
-  const eq = state.equip ?? {};
+  const eq0 = state.equip ?? {};
+  const eq = eq0.offhand && noShieldWith(eq0.weapon) ? { ...eq0, offhand: undefined } : eq0;
   const w = eq.weapon ? itemByKey(eq.weapon) : null;
   // 쏘는 무기: 권총은 탄약, 활은 화살이 있어야 멀리서 쏜다 (없으면 휘둘러 치는 셈)
   const shots = w?.key === 'pistol' ? state.ammo ?? 0 : w?.key === 'bow' ? state.arrows ?? 0 : 0;
   const ranged = !!w?.ranged && shots > 0;
-  const def = Object.entries(eq).reduce((s, [slot, k]) => (slot === 'weapon' || !k ? s : s + (itemByKey(k).def ?? 0)), 0);
-  const dr = Object.entries(eq).reduce((s, [, k]) => (!k ? s : s + (itemByKey(k).dr ?? 0)), 0);
-  const armor = Object.entries(eq).filter(([slot, k]) => slot !== 'weapon' && k).map(([, k]) => itemByKey(k as string).sprite ?? (k as string));
+  const def = Object.entries(eq).reduce((s, [slot, k]) => (slot === 'weapon' || !k ? s : s + (itemByKey(k)?.def ?? 0)), 0);
+  const dr = Object.entries(eq).reduce((s, [, k]) => (!k ? s : s + (itemByKey(k)?.dr ?? 0)), 0);
+  const armor = Object.entries(eq).filter(([slot, k]) => slot !== 'weapon' && k && itemByKey(k)).map(([, k]) => itemByKey(k as string).sprite ?? (k as string));
   return { atk: w?.ranged ? (ranged ? w.atk ?? 0 : 1) : w?.atk ?? 0, def, dr, ranged, weapon: w ? w.sprite ?? w.key : null, armor };
 }
 /** 실시간으로 남에게 보이는 나 */
@@ -1447,20 +1539,24 @@ function renderBag() {
   const list = document.createElement('div');
   list.className = 'menu-list';
   const bag = state.bag ?? {};
-  const keys = Object.keys(bag).filter((k) => bag[k] > 0 && itemByKey(k) && isGearItem(itemByKey(k)) === (bagTab === 'gear'));
+  // 20차: 장비 탭에서는 끼고 있는 것은 위 몸 그림에만 (같은 것을 두 번 보이지 않게) — 남는 것만 목록에
+  const worn = (k: string) => Object.values(state.equip ?? {}).filter((x) => x === k).length;
+  const keys = Object.keys(bag).filter((k) => bag[k] > 0 && itemByKey(k) && isGearItem(itemByKey(k)) === (bagTab === 'gear') && (bagTab !== 'gear' || bag[k] - worn(k) > 0));
   if (!keys.length) { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = bagTab === 'gear' ? L.bagEmptyGear : L.bagEmpty; list.appendChild(p); }
   const redraw = () => { renderBag(); renderHud(); renderQuick(); };
   for (const k of keys) {
     const it = itemByKey(k);
     const slot = slotOf(k);
-    const on = !!slot && state.equip?.[slot] === k;
+    const on = bagTab !== 'gear' && !!slot && state.equip?.[slot] === k; // 장비 탭의 목록은 끼지 않은 여분뿐
     const quick = state.quick === k;
     const label = it.heal ? (it.key === 'bandage' || it.key === 'hbandage' ? L.use : L.eat) : slot ? (on ? L.unequip : L.equip) : '';
-    const row = itemRow(it, `×${bag[k]}${on ? ' · ' + L.equipped : ''}`, () => {
+    const row = itemRow(it, `${slot ? L.slotNames[slot] + ' · ' : ''}×${bag[k] - (bagTab === 'gear' ? worn(k) : 0)}${on ? ' · ' + L.equipped : ''}`, () => {
       if (bagDrop) { bagDrop = null; renderBag(); return; }
       if (it.heal) useItem(k);
       else if (slot) {
         state.equip = state.equip ?? {};
+        if (!on && slot === 'offhand' && noShieldWith(state.equip.weapon)) { toast(L.shieldNo); return; }
+        if (!on && slot === 'weapon' && state.equip.offhand && noShieldWith(k)) { delete state.equip.offhand; toast(L.shieldOff); }
         if (on) delete state.equip[slot]; else state.equip[slot] = k;
         world?.setGear(gear());
         if (scene === 'shop') shop.setLook(bodyLook(), gear());
@@ -1515,7 +1611,35 @@ function renderBag() {
       list.appendChild(ask);
     }
   }
-  el.append(head, info, list);
+  // 20차: 장비 탭 — 위에 몸 그림(부위마다 끼고 있는 것), 아래로 넘겨 보는 목록
+  if (bagTab === 'gear') {
+    const doll = document.createElement('div');
+    doll.className = 'bag-doll';
+    doll.innerHTML = `<svg class="doll-fig" viewBox="0 0 60 130" aria-hidden="true"><circle cx="30" cy="13" r="9"/><path d="M18 26h24l5 30-6 2-3-20v32H22V38l-3 20-6-2z"/><path d="M22 70h7l-1 54h-7zM31 70h7l1 54h-7z"/></svg>`;
+    const equip = state.equip ?? {};
+    for (const sl of ['weapon', 'offhand', 'head', 'body', 'hands', 'legs', 'shins', 'feet'] as Slot[]) {
+      const cell = document.createElement('button');
+      cell.className = `doll-slot ds-${sl}` + (equip[sl] ? ' on' : '');
+      const k = equip[sl];
+      const it = k ? itemByKey(k) : null;
+      const lb = document.createElement('small');
+      lb.textContent = L.slotNames[sl];
+      cell.appendChild(lb);
+      if (it) { const ic = iconFor(it); ic.className = 'icon'; const nm = document.createElement('span'); nm.textContent = it.name[lang()]; const x = document.createElement('i'); x.className = 'off'; x.textContent = '✕'; cell.append(ic, nm, x); cell.title = L.unequip; }
+      else { const nm = document.createElement('span'); nm.className = 'empty'; nm.textContent = '—'; cell.appendChild(nm); cell.disabled = true; }
+      cell.onclick = () => {
+        if (!state.equip?.[sl]) return;
+        delete state.equip[sl];
+        world?.setGear(gear());
+        if (scene === 'shop') shop.setLook(bodyLook(), gear());
+        net.nudge();
+        save(state);
+        renderBag(); renderHud();
+      };
+      doll.appendChild(cell);
+    }
+    el.append(head, info, doll, list);
+  } else el.append(head, info, list);
   document.body.appendChild(el);
   // HUD가 두 줄로 접히는 좁은 화면에서도 가방이 HUD를 덮지 않도록
   const hudBottom = document.getElementById('hud')?.getBoundingClientRect().bottom ?? 56;
@@ -1948,6 +2072,7 @@ function openHellStore(kind: 'butcher' | 'junk') {
   const draw = () => {
     list.innerHTML = '';
     const stock: [ItemDef, number][] = kind === 'butcher' ? ITEMS.filter((x) => x.store === 'hmeat').map((x) => [x, x.price]) : [...ITEMS.filter((x) => x.store === 'hjunk').map((x): [ItemDef, number] => [x, x.price]), ...used.map((x): [ItemDef, number] => [x, Math.max(1, Math.round(x.price * 0.7))])];
+    const shelf = stock.map(([x, p]) => ({ it: x, price: p }));
     for (const [it, price] of stock) {
       const row = itemRow(it, priceText(price, true), () => {
         if (h.notes < price) { toast(L.hwNoMoney); return; }
@@ -1958,7 +2083,7 @@ function openHellStore(kind: 'butcher' | 'junk') {
         draw();
       }, h.notes < price);
       const tag = document.createElement('span'); tag.className = 'act'; tag.textContent = L.buy; row.appendChild(tag); row.classList.add('has-act');
-      list.appendChild(row);
+      list.appendChild(withSteal(row, it, price, shelf, () => streetSteal(it, price, shelf, el, draw)));
     }
     if (kind === 'junk') for (const it of sellable(true)) {
       const p = sellPrice(it);
@@ -2346,7 +2471,9 @@ function openStore(kind: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept
   const list = el.querySelector('.menu-list')!;
   const draw = () => {
     list.innerHTML = '';
-    for (const { key, price } of menuFor(kind, cuisine)) {
+    const menu = menuFor(kind, cuisine);
+    const shelf = menu.map((m) => ({ it: itemByKey(m.key), price: m.price }));
+    for (const { key, price } of menu) {
       const it = itemByKey(key);
       const poor = (state.wallet ?? 0) < price;
       const row = itemRow(it, priceText(price), () => {
@@ -2368,7 +2495,7 @@ function openStore(kind: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept
       tag.textContent = it.now ? L.eatHere : L.buy;
       row.appendChild(tag);
       row.classList.add('has-act');
-      list.appendChild(row);
+      list.appendChild(withSteal(row, it, price, shelf, () => streetSteal(it, price, shelf, el, draw)));
     }
   };
   draw();

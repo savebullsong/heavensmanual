@@ -139,6 +139,8 @@ export class ShopRoom {
   /** 대상(미스 황·앵무새·문)을 눌러 도착했을 때 */
   onArrive: (t: ShopTarget) => void = () => {};
 
+  /** 20차: 앵무새를 눌렀다 (대화) */
+  onParrot?: () => void;
   constructor(private app: Application, look: Look, ghost: boolean, private labels: ShopLabels) {
     this.objects.sortableChildren = true;
     this.bg.zIndex = -1;
@@ -430,6 +432,7 @@ export class ShopRoom {
       this.showLabel(t, 2.2);
       if (t === 'parrot') {
         this.crestT = 0.8;
+        this.onParrot?.();
         // 걷던 앵무새는 멈춰 서서 나를 돌아본다
         if (this.hellOn) { this.bpath = []; this.bwait = 3; this.bdir = dirFromTile(this.px - this.bx, this.py - this.by, this.bdir); }
         return;

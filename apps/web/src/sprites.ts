@@ -5,7 +5,7 @@ import { SKIN_COLORS, HAIR_COLORS, TOP_COLORS, BOTTOM_COLORS, HAIR_STYLES, AURA_
 
 /** 화면 기준 8방향. 대각선 넷은 모든 동작, 상하좌우 넷(s·e·n·w)은 서기·걷기만 구워져 있다 */
 export type Dir = 'se' | 'sw' | 'ne' | 'nw' | 's' | 'e' | 'n' | 'w';
-export type Anim = 'idle' | 'walk' | 'hit' | 'fall' | 'punch' | 'swing' | 'shoot' | 'heavy' | 'sit';
+export type Anim = 'idle' | 'walk' | 'hit' | 'fall' | 'punch' | 'swing' | 'shoot' | 'heavy' | 'sit' | 'idle2' | 'walk2';
 export type Mode = 'u' | 'm' | 'g' | 'w';
 export const DIRS: Dir[] = ['se', 'sw', 'ne', 'nw', 's', 'e', 'n', 'w'];
 /** 상하좌우로 굽지 않은 동작(공격·맞음·쓰러짐)을 보여 줄 때 쓸 가까운 대각선 */
@@ -30,6 +30,8 @@ export interface CharSet {
   eight: boolean;
   /** 광채용: 서 있는 장면의 실루엣 (방향별) */
   masks: Map<Dir, { w: number; h: number; ox: number; oy: number; solid: Uint8Array }>;
+  /** 19차: 양손 무기 — 서 있을 때·걸을 때도 두 손으로 쥔다 (idle2 · walk2 장면이 모든 층에 있을 때) */
+  hold2?: boolean;
 }
 
 /** 미스 황의 겉모습 (우주새 카운터 뒤, 관리자 페이지 도트 칸에서도 쓴다) */
@@ -37,19 +39,19 @@ export const MISS_HWANG: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColo
 /** 유황새(지옥)의 황혼: 미스 황과는 다른 사람이라고 스스로 믿는다. 검붉은 긴 머리, 핏빛 옷, 창백한 피부 */
 export const HWANGHON: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'apron', cols: { 1: '#ead2c4', 2: '#3a0e12', 3: '#5a0e18', 4: '#2a0a10', 5: '#0c0808', 6: '#1a1210', 7: '#140a0c', 9: '#5a0e18', 10: '#ead2c4' } };
 
-export const MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle'];
+export const MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle', 'arming'];
 /** 양손 무기 (16차): 두 손으로 크게 들어 내려찍는다 (heavy 동작) — 느리지만 묵직하다 */
 export const TWO = new Set(['sledge', 'fireaxe', 'greatsword', 'maul']);
 /** 16차 괴물 몸: 차림 → [굽기 키, 자세] (무기를 들면 m) */
 const MON16: Record<string, [string, string, Mode]> = { ashgal: ['h', 'ashgal', 'm'], gurma: ['u', 'gurma', 'u'], cinder: ['n', 'cinder', 'm'], bloat: ['l', 'bloat', 'm'], glutton: ['e', 'glutton', 'm'], hawker: ['v', 'hawker', 'm'], debtor: ['d', 'debtor', 'm'], broker: ['k', 'besk', 'm'] };
 /** 방어구 겉모습: 그리는 순서와 색 (구역 3 = 본색, 구역 5 = 신발) */
-const ARMOR_ORDER = ['workpants', 'shinguard', 'boots', 'jacket', 'vest', 'gloves'];
-const ARMOR_COLOR: Record<string, string> = { helmet: '#b0302a', jacket: '#4a5236', vest: '#3a3f46', gloves: '#d8cfb4', workpants: '#4a4536', shinguard: '#2b2f36', boots: '#3a2a1a' };
+const ARMOR_ORDER = ['workpants', 'shinguard', 'boots', 'jacket', 'vest', 'gloves', 'shield'];
+const ARMOR_COLOR: Record<string, string> = { helmet: '#b0302a', jacket: '#4a5236', vest: '#3a3f46', gloves: '#d8cfb4', workpants: '#4a4536', shinguard: '#2b2f36', boots: '#3a2a1a', shield: '#7a4a2a' };
 const PER_BUILD = new Set(['jacket', 'vest', 'workpants']);
 const COSTUMES = new Set(['raincoat', 'patient', 'parrot', 'robber']); // 강도: 복면이 머리를 덮는다
 
 /** 동작 속도 (초당 장면 수)와 맞히는 장면 */
-export const ANIM_FPS: Record<Anim, number> = { idle: 1, walk: 9, hit: 16, fall: 11, punch: 22, swing: 21, shoot: 16, heavy: 15, sit: 1 };
+export const ANIM_FPS: Record<Anim, number> = { idle: 1, walk: 9, hit: 16, fall: 11, punch: 22, swing: 21, shoot: 16, heavy: 15, sit: 1, idle2: 1, walk2: 9 };
 export const IMPACT: Partial<Record<Anim, number>> = { punch: 2, swing: 3, shoot: 1, heavy: 3 };
 
 /** 칸 좌표로 움직이는 방향(di, dj) → 바라보는 쪽.
@@ -186,6 +188,7 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
     for (const piece of [...ARMOR_ORDER, 'helmet']) {
       if (!armor.includes(piece)) continue;
       if (piece === 'helmet' && costume && o !== 'patient') continue; // 우비 모자·앵무새 머리 위에는 헬멧을 씌우지 않는다
+      if (piece === 'shield' && (mode === 'g' || (!!w && TWO.has(w)))) continue; // 20차: 권총·활·양손 무기와는 방패를 들지 않는다
       arm.push({ key: `a-${sex}${PER_BUILD.has(piece) ? ab : 1}-${piece}-${mode}`, piece });
     }
   }
@@ -344,11 +347,12 @@ async function build(look: Look, keys: ReturnType<typeof layerKeys>): Promise<Ch
   }
   // 양손 무기는 내려찍기 (아직 굽지 않은 그림이면 휘두르기로)
   const attack: Anim | null = keys.two && counts.heavy ? 'heavy' : keys.mode === 'u' ? 'punch' : keys.mode === 'm' ? 'swing' : keys.mode === 'g' ? 'shoot' : null;
-  return { mode: keys.mode, attack, frames, counts, masks, eight: frames.has('hit-s-0') };
+  return { mode: keys.mode, attack, frames, counts, masks, eight: frames.has('hit-s-0'), hold2: !!keys.two && !!counts.idle2 && !!counts.walk2 };
 }
 
 /** 장면 하나 (없으면 서 있는 장면) */
 export function frameOf(cs: CharSet, anim: Anim, dir: Dir, i: number): Frame | undefined {
+  if (cs.hold2 && (anim === 'idle' || anim === 'walk')) anim = anim === 'idle' ? 'idle2' : 'walk2';
   const n = cs.counts[anim];
   if (!n) return cs.frames.get(`idle-${dir}-0`) ?? cs.frames.get(`idle-${DIAG[dir] ?? dir}-0`);
   const k = Math.max(0, Math.min(n - 1, i));

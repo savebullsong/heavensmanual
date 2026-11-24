@@ -378,7 +378,7 @@ function putTo(D: Uint8ClampedArray, W: number, H: number, key: string, sx: numb
 // ───────────────────────── 바닥 ─────────────────────────
 export const CHUNK = 24;
 const GROUND_KEY: Record<string, string> = { road: 'road', median: 'median', walk: 'walk', soi: 'soi', cross: 'cross', lot: 'lot', block: 'block', park: 'park', water: 'water' };
-export function drawGroundKit(z: Zone, i0: number, j0: number): { canvas: HTMLCanvasElement; x: number; y: number } | null {
+export function drawGroundKit(z: Zone, i0: number, j0: number, clip?: { i0: number; i1: number; j0: number; j1: number } | null): { canvas: HTMLCanvasElement; x: number; y: number } | null {
   const i1 = Math.min(z.W, i0 + CHUNK), j1 = Math.min(z.H, j0 + CHUNK);
   let any = false;
   for (let j = j0; j < j1 && !any; j++) for (let i = i0; i < i1; i++) if (tileAt(z, i, j) !== 'void') { any = true; break; }
@@ -397,6 +397,7 @@ export function drawGroundKit(z: Zone, i0: number, j0: number): { canvas: HTMLCa
     for (let i = i0; i < i1; i++) {
       const t = tileAt(z, i, j);
       if (t === 'void') continue;
+      if (clip && (i < clip.i0 - 1 || i > clip.i1 || j < clip.j0 - 1 || j > clip.j1)) continue; // 20차 천국: 구름 아래는 하늘
       const m = ground.meta[`${GROUND_KEY[t] ?? 'lot'}-${hash(i, j) % 4}`];
       if (!m) continue;
       const [x, y] = S(i, j);

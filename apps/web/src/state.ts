@@ -38,6 +38,10 @@ export interface Save {
   heaven?: { met?: boolean; admin?: boolean };
   /** 19차 지옥면죄부: 앞으로 짓는 악행에서 지워 줄 남은 점수 (한 장 = 30, 최대 10장 = 300) */
   absolve?: number;
+  /** 20차 훔치기: 처음 한 번은 가장 싼 무기를 반드시 훔친다 (그 뒤로는 값에 따라) */
+  stoleOnce?: boolean;
+  /** 20차: 우주새에서 훔친 일 — 다음에 들르면 미스 황(황혼)이 차갑게 맞는다 */
+  grudge?: boolean;
   /** 19차 켈베로스 호출: 지옥 로비에서 사 온 횟수 (현실에서 부르면 10분 동안 함께 싸운다) */
   kerberos?: number;
   /** 지옥: 지금 층, 이번 지옥행에서 쓰러뜨린 층주, 노전(영혼에 붙어 다음 지옥행에도 남는다) */
@@ -60,7 +64,7 @@ export interface Save {
   daily?: { d: string; pray: number; read: number; donate: number };
 }
 export interface Stash { bag: Record<string, number>; ammo: number }
-export type Slot = 'weapon' | 'head' | 'body' | 'hands' | 'legs' | 'shins' | 'feet';
+export type Slot = 'weapon' | 'offhand' | 'head' | 'body' | 'hands' | 'legs' | 'shins' | 'feet';
 // v2: 작은 캐릭터와 '처음 모습' 시나리오로 바뀌어 예전 저장은 새로 시작한다
 const KEY = 'heavensmanual.save.v2';
 

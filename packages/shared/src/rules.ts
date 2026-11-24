@@ -98,6 +98,7 @@ export const DEED_TABLE = {
   firstStrike: { kind: 'evil', points: 2, exp: 10, note: '먼저 공격하기' },
   extort: { kind: 'evil', points: 3, exp: 30, note: '갈취 성공' },
   rob: { kind: 'evil', points: 4, exp: 40, note: '쓰러뜨리고 돈을 빼앗기' },
+  steal: { kind: 'evil', points: 3, exp: 15, note: '가게에서 훔치기 (20차)' },
   suturerHit: { kind: 'evil', points: 4, exp: 40, note: '대식자 공격' },
   murder: { kind: 'evil', points: 10, exp: 100, note: '유저 살해 (밀쳐서 일으킨 사고사 포함)' },
   angelAssault: { kind: 'evil', points: 5, exp: 0, note: '천사 공격·유혹 — 현실로 강제 환생' },

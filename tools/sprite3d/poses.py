@@ -105,7 +105,20 @@ def sit():
             'upper_arm.L': [('X', -58), ('Y', 4)], 'forearm.L': [('X', -42)],
             'upper_arm.R': [('X', -54), ('Y', -4)], 'forearm.R': [('X', -46)]}
 
-EXTRA = {'heavy': HEAVY, 'sit': [sit()]}
+# 19차: 양손 무기를 싸우지 않을 때도 두 손으로 든다 — 오른손이 아래, 왼손이 위를 잡고 칼끝은 앞 위로 비스듬히 (중단 겨눔)
+HOLD2 = {'upper_arm.R': [('X', -28), ('Y', -14)], 'forearm.R': [('X', -62)], 'hand.R': [('X', -26)],
+         'upper_arm.L': [('X', -36), ('Y', 24)], 'forearm.L': [('X', -70)]}
+
+def idle2():
+    P = idle('m'); P.update({k: list(v) for k, v in HOLD2.items()}); return P
+
+def walk2(t):
+    P = walk(t, 'm'); s = math.sin(2 * math.pi * t)
+    P.update({k: list(v) for k, v in HOLD2.items()})
+    P['upper_arm.R'] = [('X', -28 - 3 * s), ('Y', -14)]; P['upper_arm.L'] = [('X', -36 - 3 * s), ('Y', 24)]
+    return P
+
+EXTRA = {'heavy': HEAVY, 'sit': [sit()], 'idle2': [idle2()], 'walk2': [walk2(f / 8) for f in range(8)]}
 
 def anims(mode):
     A = {'idle': [idle(mode)], 'walk': [walk(f / 8, mode) for f in range(8)], 'hit': hit(mode), 'fall': fall(mode)}
