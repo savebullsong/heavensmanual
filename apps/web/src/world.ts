@@ -792,9 +792,10 @@ export class WorldScene {
     for (let n = 0; n < ANGEL_COUNT; n++) this.spawnNpc('angel');
     for (let n = 0; n < SHADE_COUNT; n++) this.spawnNpc('thug', undefined, 'shade');
     const d = this.zone.door;
-    // 환생관: 우주새 문 옆 (흰 옷의 아주 늙은 할아버지)
+    // 환생관 루엔: 우주새 문 옆 (컨셉 아트 — 길고 흰 머리, 흰 법의에 옅은 푸른 띠, 흰 날개)
     const spot = randomWalkTileNear(this.zone, d.i, d.j, 3, ['walk', 'soi', 'lot', 'cross']) ?? [d.i, d.j];
-    const ofc = this.makeWalker({ sex: 'm', build: 0, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, cols: { 1: '#d8b496', 2: '#ecebe6', 3: '#f6f2ea', 4: '#c9b27a', 5: '#7a6a4a' } }, spot[0], spot[1], 'officer');
+    const ofc = this.makeWalker({ sex: 'f', build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, cols: { 1: '#f2dccc', 10: '#f2dccc', 2: '#e8e6f2', 3: '#f8f6f2', 4: '#b8c4e2', 9: '#f8f6f2', 5: '#d8ccb0' } }, spot[0], spot[1], 'officer');
+    this.giveWings(ofc, 0xf4efe4);
     ofc.dir = 'sw';
     ofc.wait = 1e9;
     ofc.speed = 0;

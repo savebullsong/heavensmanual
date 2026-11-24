@@ -294,11 +294,12 @@ export class ShopRoom {
       const tx = await loadPixel(u);
       if (!tx) return;
       this.hwang.texture = tx;
-      // 같은 크기 또는 2배(더 섬세한 그림): 2배면 반으로 줄여 같은 크기로 보인다 (고해상도 화면에서 두 배 선명)
+      // 같은 크기 또는 2배(더 섬세한 그림)면 그 배율 그대로, 크기가 조금이라도 다르면(구운 그림이 바뀌어 한두 점 달라졌을 때)
+      // 게임 속 키에 맞춰 줄인다 — 거인이 되지 않게 (발 기준점은 아래 가운데)
       const lw = Math.round(f.w * f.k), lh = Math.round(f.h * f.k); // 게임 속 크기
-      const k = tx.width === lw * 2 && tx.height === lh * 2 ? 2 : 1;
-      this.hwang.scale.set(1 / k);
-      if (tx.width === lw * k && tx.height === lh * k) this.hwang.anchor.set(f.ax, f.ay); else this.hwang.anchor.set(0.5, 1);
+      const k = tx.width === lw * 2 && tx.height === lh * 2 ? 2 : tx.width === lw && tx.height === lh ? 1 : 0;
+      if (k) { this.hwang.scale.set(1 / k); this.hwang.anchor.set(f.ax, f.ay); }
+      else { this.hwang.scale.set(lh / tx.height); this.hwang.anchor.set(0.5, 1); }
     });
   }
 

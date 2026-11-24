@@ -10,6 +10,8 @@ export const DEFAULT_PORTRAITS: Partial<Record<PortraitSlot, string>> = {
   'miss-hwang': 'portraits/miss-hwang.webp',
   'yellow-wing': 'portraits/yellow-wing.webp',
   hwanghon: 'portraits/hwanghon.webp',
+  luen: 'portraits/luen.webp', // 천국 환생관 루엔 (사용자 컨셉 아트: 흰 머리·별 가시 후광·날개·등불)
+  pashar: 'portraits/pashar.webp', // 지옥 환생관 파샤르 (사용자 컨셉 아트: 잿빛 머리·검은 망토 코트·장부와 깃펜)
 };
 
 let overrides: Promise<Partial<Record<PortraitSlot, string>>> | null = null;
