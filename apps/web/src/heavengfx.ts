@@ -194,3 +194,48 @@ export function hellPortalTexture(k: number): Texture {
   }
   return portalTex[k % 3];
 }
+
+/** 21차: 천국 길가의 침대 — 나무 틀, 흰 매트리스, 베개, 옅은 빛깔 이불 (i 방향 두 칸 길이). 그림의 (BED_ANCHOR) 점이 칸 (i, j) 모서리에 놓인다 */
+const bedTex = new Map<number, Texture>();
+const BW = 112, BH = 86, BOX = 39, BOY = 28;
+export const BED_ANCHOR: [number, number] = [BOX / BW, BOY / BH];
+export function bedTexture(v: number): Texture {
+  const k = v % 4;
+  const hit = bedTex.get(k);
+  if (hit) return hit;
+  const c = document.createElement('canvas');
+  c.width = BW; c.height = BH;
+  const g = c.getContext('2d')!;
+  const quilt = ['#b8d0ec', '#f2c8d4', '#d8e8c0', '#f2e2b0'][k];
+  const quiltD = ['#94b0d2', '#d8a6b4', '#b4c89c', '#d8c48c'][k];
+  const P = (i: number, j: number, z: number): [number, number] => [BOX + (i - j) * 32, BOY + (i + j) * 16 - z];
+  const poly = (pts: [number, number][], col: string) => { g.fillStyle = col; g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill(); };
+  const a0 = 0.08, a1 = 1.92, b0 = 0.14, b1 = 0.86;
+  // 그림자
+  g.fillStyle = 'rgba(120,130,160,0.18)';
+  poly([P(a0, b0 + 0.06, -2), P(a1 + 0.08, b0 + 0.06, -2), P(a1 + 0.08, b1 + 0.1, -2), P(a0, b1 + 0.1, -2)], 'rgba(120,130,160,0.18)');
+  // 다리와 틀 (앞면 · 옆면)
+  poly([P(a0, b1, 0), P(a1, b1, 0), P(a1, b1, 9), P(a0, b1, 9)], '#8a6a48');
+  poly([P(a1, b0, 0), P(a1, b1, 0), P(a1, b1, 9), P(a1, b0, 9)], '#6e5236');
+  // 매트리스
+  poly([P(a0, b1, 9), P(a1, b1, 9), P(a1, b1, 14), P(a0, b1, 14)], '#e4dfd4');
+  poly([P(a1, b0, 9), P(a1, b1, 9), P(a1, b1, 14), P(a1, b0, 14)], '#d4cec2');
+  poly([P(a0, b0, 14), P(a1, b0, 14), P(a1, b1, 14), P(a0, b1, 14)], '#fbfaf6');
+  // 이불 (발치 쪽 · 가장자리로 흘러내린다)
+  const q0 = 0.72;
+  poly([P(q0, b0 - 0.03, 15), P(a1 + 0.03, b0 - 0.03, 15), P(a1 + 0.03, b1 + 0.03, 15), P(q0, b1 + 0.03, 15)], quilt);
+  poly([P(q0, b1 + 0.03, 15), P(a1 + 0.03, b1 + 0.03, 15), P(a1 + 0.03, b1 + 0.03, 8), P(q0, b1 + 0.03, 8)], quiltD);
+  poly([P(a1 + 0.03, b0 - 0.03, 15), P(a1 + 0.03, b1 + 0.03, 15), P(a1 + 0.03, b1 + 0.03, 8), P(a1 + 0.03, b0 - 0.03, 8)], quiltD);
+  g.strokeStyle = 'rgba(255,255,255,0.6)'; g.lineWidth = 1;
+  for (const f of [1.1, 1.5]) { const a = P(f, b0, 15.2), b = P(f, b1, 15.2); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
+  // 베개
+  poly([P(0.16, 0.24, 15), P(0.6, 0.24, 15), P(0.6, 0.76, 15), P(0.16, 0.76, 15)], '#ffffff');
+  poly([P(0.16, 0.76, 15), P(0.6, 0.76, 15), P(0.6, 0.76, 12), P(0.16, 0.76, 12)], '#e8e6e0');
+  // 머리판 (구름 무늬로 깎은 나무)
+  poly([P(a0, b0, 0), P(a0, b1, 0), P(a0, b1, 26), P(a0, b0, 26)], '#9a7a56');
+  poly([P(a0, b0, 26), P(a0, b1, 26), P(a0, b1, 28), P(a0, b0, 28)], '#b8946a');
+  g.fillStyle = 'rgba(255,255,255,0.28)';
+  for (const f of [0.3, 0.5, 0.7]) { const [x, y] = P(a0, f, 20); g.beginPath(); g.arc(x, y, 3, 0, Math.PI * 2); g.fill(); }
+  bedTex.set(k, Texture.from(c));
+  return bedTex.get(k)!;
+}

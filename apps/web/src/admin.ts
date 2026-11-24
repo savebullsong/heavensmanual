@@ -2,7 +2,7 @@
 import './admin.css';
 import { PORTRAIT_SLOTS, SPRITE_SLOTS, DEFAULT_PORTRAITS, type PortraitSlot } from './portraits.ts';
 import { charSet, frameOf, MISS_HWANG, HWANGHON, PX } from './sprites.ts';
-import { drawCosmicBird } from './ujusae.ts';
+import { drawCosmicBird, drawCosmicBirdHeaven } from './ujusae.ts';
 import { drawYuhwang } from './yuhwang.ts';
 import { drawLoanHouse } from './loanhouse.ts';
 import type { Building } from './zone.ts';
@@ -23,6 +23,7 @@ const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   'sprite-parrot-up': { name: '앵무새 · 볏 세움', where: '가끔 머리깃을 세울 때 (비워 두면 볏 내림 그림을 그대로 씀)' },
   'bld-ujusae': { name: '우주새 건물 · 낮', where: '현실·천국의 우주새 · 바닥 2×2칸' },
   'bld-ujusae-night': { name: '우주새 건물 · 밤', where: '창에 불이 켜진 밤 모습 (비워 두면 낮 그림을 밤에도 씀)' },
+  'bld-ujusae-heaven': { name: '우주새 건물 · 천국', where: '천국의 우주새 (늘 낮) · 바닥 2×2칸 · 비워 두면 볕에 바랜 흰·금빛 기본 그림' },
   'bld-loan': { name: '베스크 대부소', where: '지옥 3층 피의 시장 마을 · 바닥 3×2칸' },
   'bld-hell-1': { name: '유황새 · 지옥 1층', where: '재의 문턱 마을 (그을음·재 더미) · 바닥 2×2칸' },
   'bld-hell-2': { name: '유황새 · 지옥 2층', where: '굶주림의 늪 마을 (진흙·이끼·판자 창) · 바닥 2×2칸' },
@@ -41,9 +42,9 @@ function dotSpec(slot: PortraitSlot): Promise<DotSpec | null> {
   p = (async () => {
     try {
       // 건물: 게임이 그리는 그림을 그대로 (그림의 왼쪽 위가 같은 자리에 놓인다)
-      if (slot === 'bld-ujusae' || slot === 'bld-ujusae-night' || slot === 'bld-loan' || slot.startsWith('bld-hell-')) {
+      if (slot === 'bld-ujusae' || slot === 'bld-ujusae-night' || slot === 'bld-ujusae-heaven' || slot === 'bld-loan' || slot.startsWith('bld-hell-')) {
         const b = { i0: 0, j0: 0, w: slot === 'bld-loan' ? 3 : 2, d: 2, h: 60, cat: slot === 'bld-loan' ? 'loan' : 'ujusae', color: '#000000' } as Building;
-        const d = slot === 'bld-loan' ? drawLoanHouse(b) : slot.startsWith('bld-hell-') ? drawYuhwang(b, Number(slot.slice(9))) : drawCosmicBird(b, slot === 'bld-ujusae-night');
+        const d = slot === 'bld-loan' ? drawLoanHouse(b) : slot.startsWith('bld-hell-') ? drawYuhwang(b, Number(slot.slice(9))) : slot === 'bld-ujusae-heaven' ? drawCosmicBirdHeaven(b) : drawCosmicBird(b, slot === 'bld-ujusae-night');
         return { canvas: d.canvas, w: d.canvas.width, h: d.canvas.height };
       }
       if (slot === 'sprite-miss-hwang' || slot === 'sprite-hwanghon') {

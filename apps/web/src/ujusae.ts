@@ -321,3 +321,43 @@ export function drawCosmicBird(b: Building, night: boolean): { canvas: HTMLCanva
   g.putImageData(im, 0, 0);
   return { canvas: c, x: minX, y: minY };
 }
+
+/**
+ * 21차: 천국의 우주새 — 같은 가게지만 볕에 바랜 듯 희고, 금빛이 돈다. 풍향계 위에 옅은 고리 하나.
+ * (관리자 '우주새 건물 · 천국' 칸에 그림을 올리면 이 그림 대신 쓴다)
+ */
+export function drawCosmicBirdHeaven(b: Building): { canvas: HTMLCanvasElement; x: number; y: number } {
+  const d = drawCosmicBird(b, false);
+  const c = d.canvas, W = c.width, H = c.height;
+  const g = c.getContext('2d')!;
+  g.globalCompositeOperation = 'source-atop';
+  g.fillStyle = 'rgba(255,250,238,0.46)';
+  g.fillRect(0, 0, W, H);
+  const gr = g.createLinearGradient(0, 0, 0, H);
+  gr.addColorStop(0, 'rgba(255,230,150,0.32)');
+  gr.addColorStop(0.55, 'rgba(255,244,210,0.08)');
+  gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr;
+  g.fillRect(0, 0, W, H);
+  g.globalCompositeOperation = 'source-over';
+  // 풍향계 위의 고리
+  const cx = W / 2, vy = ((b.w + b.d) / 2) * (TH / 2) + 20 - 7;
+  g.strokeStyle = 'rgba(255,214,90,0.95)';
+  g.lineWidth = 2;
+  g.beginPath(); g.ellipse(cx, vy, 11, 3.5, 0, 0, Math.PI * 2); g.stroke();
+  g.strokeStyle = 'rgba(255,250,220,0.7)';
+  g.lineWidth = 1;
+  g.beginPath(); g.ellipse(cx, vy - 0.5, 9, 2.5, 0, 0, Math.PI * 2); g.stroke();
+  // 벽에 내려앉은 금빛 티끌 (가게마다 같은 자리)
+  let s = b.i0 * 73 + b.j0 * 37 + 11;
+  const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  const id = g.getImageData(0, 0, W, H);
+  for (let n = 0; n < 70; n++) {
+    const x = Math.floor(rnd() * W), y = Math.floor(rnd() * H * 0.8);
+    const k = (y * W + x) * 4;
+    if (id.data[k + 3] === 0) continue;
+    id.data[k] = 255; id.data[k + 1] = 226 + Math.floor(rnd() * 28); id.data[k + 2] = 120 + Math.floor(rnd() * 80);
+  }
+  g.putImageData(id, 0, 0);
+  return d;
+}

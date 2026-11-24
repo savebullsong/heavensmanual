@@ -378,7 +378,111 @@ function putTo(D: Uint8ClampedArray, W: number, H: number, key: string, sx: numb
 // ───────────────────────── 바닥 ─────────────────────────
 export const CHUNK = 24;
 const GROUND_KEY: Record<string, string> = { road: 'road', median: 'median', walk: 'walk', soi: 'soi', cross: 'cross', lot: 'lot', block: 'block', park: 'park', water: 'water' };
-export function drawGroundKit(z: Zone, i0: number, j0: number, clip?: { i0: number; i1: number; j0: number; j1: number } | null): { canvas: HTMLCanvasElement; x: number; y: number } | null {
+// ───────────────────────── 21차: 땅의 프랙탈 결 ─────────────────────────
+// 같은 타일 네 장이 되풀이되어도 넓게 보면 한 번도 같은 데가 없도록: 큰 결(동네의 볕·그늘) → 중간 결(닳은 자리·젖은 자리)
+// → 작은 결(얼룩) 세 겹을 전체 지도 좌표로 겹치고(구역 경계에서 이어진다), 그 위에 흔적(기름 자국·금·껌·낙엽·꽃·맨홀)을 뿌린다.
+// 흔적은 중간 결이 짙은 곳에 몰린다 — 닳은 데가 더 닳고, 낙엽은 낙엽 곁에 쌓인다 (자기 닮음)
+const nh = (x: number, y: number, s: number) => { let n = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(s, 1442695041); n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967295; };
+function vnoise(x: number, y: number, s: number) {
+  const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi;
+  const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+  const a = nh(xi, yi, s), b = nh(xi + 1, yi, s), c = nh(xi, yi + 1, s), d = nh(xi + 1, yi + 1, s);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+/** 세 겹의 결 (0~1) · 결을 살짝 비틀어 격자 냄새를 지운다 */
+export function groundGrain(x: number, y: number): { big: number; mid: number; fine: number } {
+  const wx = x + (vnoise(x / 29, y / 29, 7) - 0.5) * 9, wy = y + (vnoise(x / 29 + 40, y / 29, 8) - 0.5) * 9;
+  return { big: vnoise(wx / 43, wy / 43, 1), mid: vnoise(wx / 11, wy / 11, 2), fine: vnoise(wx / 3.4, wy / 3.4, 3) };
+}
+type Rgb = [number, number, number];
+/** 땅마다 결이 밝을 때 · 어두울 때 물드는 빛깔과 세기 */
+const GRAIN: Record<string, { hi: Rgb; lo: Rgb; k: number }> = {
+  road: { hi: [226, 214, 190], lo: [12, 14, 20], k: 0.34 },
+  cross: { hi: [226, 214, 190], lo: [12, 14, 20], k: 0.16 },
+  median: { hi: [230, 220, 190], lo: [30, 40, 30], k: 0.18 },
+  walk: { hi: [244, 232, 206], lo: [44, 52, 46], k: 0.27 },
+  soi: { hi: [236, 222, 194], lo: [36, 40, 40], k: 0.3 },
+  park: { hi: [222, 204, 118], lo: [18, 58, 26], k: 0.34 },
+  lot: { hi: [236, 224, 200], lo: [86, 70, 52], k: 0.3 },
+  block: { hi: [236, 224, 200], lo: [86, 70, 52], k: 0.24 },
+  water: { hi: [210, 236, 240], lo: [20, 40, 60], k: 0.14 },
+};
+function paintGrain(g: CanvasRenderingContext2D, z: Zone, minX: number, minY: number, W: number, H: number, heaven: boolean) {
+  const R = 8, lw = Math.ceil(W / R), lh = Math.ceil(H / R);
+  const low = document.createElement('canvas');
+  low.width = lw; low.height = lh;
+  const lg = low.getContext('2d')!;
+  const im = lg.createImageData(lw, lh);
+  const o = z.origin ?? { i: 0, j: 0 };
+  for (let py = 0; py < lh; py++)
+    for (let px = 0; px < lw; px++) {
+      const X = (px + 0.5) * R + minX, Y = (py + 0.5) * R + minY;
+      const ti = (X / (TW / 2) + Y / (TH / 2)) / 2, tj = (Y / (TH / 2) - X / (TW / 2)) / 2;
+      const t = tileAt(z, Math.floor(ti), Math.floor(tj));
+      const spec = GRAIN[t];
+      if (!spec) continue;
+      const n = groundGrain(ti + o.i, tj + o.j);
+      const v = n.big * 0.5 + n.mid * 0.32 + n.fine * 0.18 - 0.5; // -0.5 ~ 0.5
+      const col = heaven ? (v > 0 ? [255, 246, 214] as Rgb : [196, 206, 230] as Rgb) : v > 0 ? spec.hi : spec.lo;
+      const a = Math.min(1, Math.abs(v) * 2.3) * spec.k * (heaven ? 0.7 : 1);
+      const q = (py * lw + px) * 4;
+      im.data[q] = col[0]; im.data[q + 1] = col[1]; im.data[q + 2] = col[2]; im.data[q + 3] = Math.round(a * 255);
+    }
+  lg.putImageData(im, 0, 0);
+  g.save();
+  g.globalCompositeOperation = 'source-atop';
+  g.imageSmoothingEnabled = true;
+  g.drawImage(low, 0, 0, lw * R, lh * R);
+  g.restore();
+  g.imageSmoothingEnabled = false;
+}
+/** 칸 하나의 흔적. 중간 결이 짙을수록 잘 생긴다 */
+function paintDecal(g: CanvasRenderingContext2D, t: string, gi: number, gj: number, S: (x: number, y: number) => [number, number], i: number, j: number, heaven: boolean) {
+  const mid = groundGrain(gi + 0.5, gj + 0.5).mid;
+  const dens = 0.35 + mid * 1.3;
+  let seed = nh(gi, gj, 99) * 4294967295 >>> 0;
+  const r = () => ((seed = Math.imul(seed ^ (seed >>> 15), 2246822519) + 0x9e3779b9 >>> 0) / 4294967295);
+  const roll = r();
+  const at = (a: number, b: number) => S(i + a, j + b);
+  const dot = (a: number, b: number, w: number, h: number, col: string) => { const [x, y] = at(a, b); g.fillStyle = col; g.fillRect(Math.round(x), Math.round(y), w, h); };
+  const blob = (a: number, b: number, rr: number, col: string) => { const [x, y] = at(a, b); g.fillStyle = col; g.beginPath(); g.ellipse(x, y, rr * TW / 2, rr * TH / 2, 0, 0, Math.PI * 2); g.fill(); };
+  const crack = (col: string) => {
+    let a = 0.15 + r() * 0.7, b = 0.15 + r() * 0.7;
+    g.strokeStyle = col; g.lineWidth = 1; g.beginPath();
+    let [x, y] = at(a, b); g.moveTo(Math.round(x) + 0.5, Math.round(y) + 0.5);
+    for (let k = 0; k < 4 + Math.floor(r() * 3); k++) { a = Math.max(0.05, Math.min(0.95, a + (r() - 0.5) * 0.3)); b = Math.max(0.05, Math.min(0.95, b + (r() - 0.5) * 0.3)); [x, y] = at(a, b); g.lineTo(Math.round(x) + 0.5, Math.round(y) + 0.5); }
+    g.stroke();
+  };
+  const flowers = (n: number, cols: string[]) => { for (let k = 0; k < n; k++) dot(0.15 + r() * 0.7, 0.15 + r() * 0.7, 2, 2, cols[Math.floor(r() * cols.length)]); };
+  if (heaven) {
+    // 천국: 때도 금도 없다. 꽃잎과 금빛 티끌만
+    if (t === 'park' && roll < 0.22 * dens) flowers(4 + Math.floor(r() * 6), ['#ffffff', '#ffe27a', '#f6b8c8', '#c8b8f0']);
+    else if (t !== 'water' && t !== 'park' && roll < 0.07 * dens) flowers(2 + Math.floor(r() * 4), ['#f8d8e0', '#ffffff', '#ffe9a8']);
+    else if (t !== 'water' && roll > 1 - 0.05 * dens) dot(0.2 + r() * 0.6, 0.2 + r() * 0.6, 1, 1, '#ffd65a');
+    return;
+  }
+  if (t === 'road') {
+    if (roll < 0.07 * dens) { const a = 0.25 + r() * 0.5, b = 0.25 + r() * 0.5, rr = 0.1 + r() * 0.18; blob(a, b, rr, 'rgba(8,8,12,0.2)'); blob(a + 0.03, b, rr * 0.55, 'rgba(8,8,14,0.22)'); }
+    else if (roll < 0.11 * dens) { const a = r() * 0.4, b = r() * 0.4, w = 0.35 + r() * 0.4, h = 0.3 + r() * 0.4; const p = [at(a, b), at(a + w, b), at(a + w, b + h), at(a, b + h)]; g.fillStyle = 'rgba(52,54,58,0.3)'; g.beginPath(); p.forEach(([x, y], k) => (k ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill(); g.strokeStyle = 'rgba(16,16,18,0.32)'; g.lineWidth = 1; g.stroke(); }
+    else if (roll < 0.17 * dens) crack('rgba(14,14,18,0.42)');
+    else if (roll > 0.993) { const [x, y] = at(0.5, 0.5); g.fillStyle = '#3c3b39'; g.beginPath(); g.ellipse(x, y, 10, 5, 0, 0, Math.PI * 2); g.fill(); g.strokeStyle = '#26252a'; g.lineWidth = 1; g.stroke(); g.strokeStyle = 'rgba(120,118,112,0.5)'; for (let k = -2; k <= 2; k++) { g.beginPath(); g.moveTo(x - 7, y + k * 1.6); g.lineTo(x + 7, y + k * 1.6); g.stroke(); } }
+  } else if (t === 'walk' || t === 'soi') {
+    if (roll < 0.06 * dens) crack(t === 'walk' ? 'rgba(70,64,56,0.4)' : 'rgba(30,30,32,0.4)');
+    else if (roll < 0.16 * dens) for (let k = 0, n = 1 + Math.floor(r() * 3); k < n; k++) dot(0.15 + r() * 0.7, 0.15 + r() * 0.7, 2, 1, 'rgba(40,36,34,0.5)'); // 껌 자국
+    else if (roll < 0.25 * dens) flowers(3 + Math.floor(r() * 5), ['#6f8a3a', '#a89a3a', '#8a5a2a', '#c8a048']); // 낙엽
+    else if (t === 'soi' && roll < 0.27 * dens) { const a = 0.3 + r() * 0.4, b = 0.3 + r() * 0.4, rr = 0.14 + r() * 0.16; blob(a, b, rr, 'rgba(110,140,160,0.34)'); const [x, y] = at(a - rr * 0.3, b - rr * 0.3); g.fillStyle = 'rgba(230,240,248,0.5)'; g.fillRect(Math.round(x), Math.round(y), 5, 1); } // 물웅덩이
+    else if (t === 'walk' && roll > 0.99) { const p = [at(0.35, 0.4), at(0.65, 0.4), at(0.65, 0.6), at(0.35, 0.6)]; g.fillStyle = '#2a2a2c'; g.beginPath(); p.forEach(([x, y], k) => (k ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill(); g.strokeStyle = '#6a6862'; g.lineWidth = 1; for (let k = 1; k < 4; k++) { const a = at(0.35 + k * 0.075, 0.4), b = at(0.35 + k * 0.075, 0.6); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); } } // 빗물받이
+  } else if (t === 'park') {
+    if (roll < 0.14 * dens) flowers(4 + Math.floor(r() * 6), ['#ffffff', '#f2d23a', '#e87aa0', '#a88ad8', '#f29a4a']);
+    else if (roll < 0.36 * dens) { g.strokeStyle = 'rgba(20,60,24,0.55)'; g.lineWidth = 1; for (let k = 0; k < 3; k++) { const [x, y] = at(0.2 + r() * 0.6, 0.2 + r() * 0.6); g.beginPath(); g.moveTo(Math.round(x) + 0.5, Math.round(y)); g.lineTo(Math.round(x) + 0.5 + (r() - 0.5) * 2, Math.round(y) - 3); g.stroke(); } }
+    else if (roll < 0.4 * dens) blob(0.3 + r() * 0.4, 0.3 + r() * 0.4, 0.12 + r() * 0.15, 'rgba(130,100,64,0.3)');
+  } else if (t === 'lot' || t === 'block') {
+    if (roll < 0.3 * dens) for (let k = 0; k < 5; k++) dot(0.1 + r() * 0.8, 0.1 + r() * 0.8, 1, 1, r() < 0.5 ? 'rgba(250,244,230,0.55)' : 'rgba(60,50,40,0.45)');
+    else if (roll < 0.36 * dens) { g.strokeStyle = 'rgba(70,110,50,0.7)'; g.lineWidth = 1; const [x, y] = at(0.3 + r() * 0.4, 0.3 + r() * 0.4); for (let k = -1; k <= 1; k++) { g.beginPath(); g.moveTo(Math.round(x) + 0.5, Math.round(y)); g.lineTo(Math.round(x) + 0.5 + k * 2, Math.round(y) - 3); g.stroke(); } }
+  }
+}
+
+export function drawGroundKit(z: Zone, i0: number, j0: number, clip?: { i0: number; i1: number; j0: number; j1: number } | null, heaven = false): { canvas: HTMLCanvasElement; x: number; y: number } | null {
   const i1 = Math.min(z.W, i0 + CHUNK), j1 = Math.min(z.H, j0 + CHUNK);
   let any = false;
   for (let j = j0; j < j1 && !any; j++) for (let i = i0; i < i1; i++) if (tileAt(z, i, j) !== 'void') { any = true; break; }
@@ -441,6 +545,16 @@ export function drawGroundKit(z: Zone, i0: number, j0: number, clip?: { i0: numb
           g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
         }
       }
+    }
+  // 21차: 프랙탈 결 + 흔적
+  paintGrain(g, z, minX, minY, c.width, c.height, heaven);
+  const og = z.origin ?? { i: 0, j: 0 };
+  for (let j = j0; j < j1; j++)
+    for (let i = i0; i < i1; i++) {
+      const t = tileAt(z, i, j);
+      if (t === 'void' || t === 'cross' || t === 'median' || (t === 'walk' && bridge(i, j))) continue;
+      if (clip && (i < clip.i0 || i >= clip.i1 || j < clip.j0 || j >= clip.j1)) continue;
+      paintDecal(g, t, i + og.i, j + og.j, S, i, j, heaven);
     }
   // 연석과 차선
   const line = (j: number, a0: number, a1: number, color: string, dashed: boolean, width = 2) => {

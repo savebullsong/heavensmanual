@@ -15,9 +15,9 @@ import { ARRIVALS, rollArrival, arrivalLook, type Arrival, type Look, type Outfi
 import { t, lang, setLang, LANGS, type Lang } from './i18n.ts';
 import { load, save, type Slot, type Stash } from './state.ts';
 import { hellZone, OPEN_FLOORS, floorDef, MONSTERS, GUARDS, TOLL, ATONE_GOAL, GURMA_FULL, setRaidForce } from './hell.ts';
-import { interiorZone } from './interior.ts';
+import { interiorZone, roomKind as roomKindOf, canEnter } from './interior.ts';
 import { TWO } from './sprites.ts';
-import { buildingName } from './names.ts';
+import { buildingName, hasBank } from './names.ts';
 import { bangkokClock } from './clock.ts';
 import { unlockAudio, isMuted, setMuted, plunge, chime } from './sfx.ts';
 import * as sfx from './sfx.ts';
@@ -253,6 +253,8 @@ async function enterWorld(at: 'door' | [number, number] = 'door', zoneId?: strin
   showStance(want !== 'ghost');
   for (const nb of [zone.edges?.w, zone.edges?.e]) if (nb) loadZone(nb); // 이웃 구역은 미리
   if (pendingEater && want === 'real') { pendingEater = false; setTimeout(() => world?.sendEater(), 1500); }
+  if (pendingGuide !== null && want === 'real' && zone.id === HOME_ZONE) { world.setGuide(pendingGuide); pendingGuide = null; }
+  if (want === 'heaven') world.setYwFollow(ywShouldFollow());
   if (want === 'ghost') { net.leaveZone(); return; } // 귀신은 산 사람들 사이에 보이지 않는다
   joinNet(world);
 }
@@ -288,6 +290,7 @@ async function crossEdge(dir: 'w' | 'e', x: number, y: number) {
     world.setAutoCounter(autoCounter());
     world.start();
     renderHud();
+    if (want === 'heaven') world.setYwFollow(ywShouldFollow());
     showPlace(t().zones[id] ?? id, '');
     snapPos();
     save(state);
@@ -458,9 +461,22 @@ const hooks: WorldHooks = {
     state.hp = Math.max(0, hp);
     updateHpBar(hp, max);
   },
+  over(n) {
+    // 21차: 넘치는 체력 — 체력 막대 오른쪽에 금빛 +숫자
+    const el = hud.querySelector('.hp-over') as HTMLElement | null;
+    if (el) { el.textContent = n >= 1 ? `+${Math.ceil(n)}` : ''; el.hidden = n < 1; }
+  },
   died(cause) {
     if (realm() === 'heaven') { heavenFaint(); return; }
     showDeath(cause);
+  },
+  heavenFood(from) {
+    heavenFood(from);
+  },
+  ywLost() {
+    state.heaven = { ...state.heaven, ywLost: true };
+    save(state);
+    toast(t().ywLostToast);
   },
   heavenAct(what) {
     heavenAct(what);
@@ -725,7 +741,8 @@ function clerkTalk() {
       recordDeed('donate100');
     } });
   } else if (info.kind === 'massage') {
-    opts.push({ label: L.massageBtn, act: () => { if (pay(250)) { healFull(); toast(L.massaged, 'good'); } } });
+    // 21차: 마사지 — 체력을 가득 채우고 넘치게 (최대 체력의 40%만큼 더, 맞으면 먼저 깎이고 10분에 걸쳐 빠진다)
+    opts.push({ label: L.massageBtn, act: () => { if (pay(250)) { healFull(); world?.addOverHp(Math.round(maxHp() * 0.4)); toast(L.massaged, 'good'); } } });
   } else if (info.kind === 'salon') {
     opts.push({ label: L.haircutBtn, act: () => {
       if (!state.look || !pay(300)) return;
@@ -1078,6 +1095,19 @@ async function talkToHwang() {
     const picked = await pickItem(hell, tab);
     if (!picked) break;
     tab = picked.tab;
+    if (picked.ask === 'work') { for (const line of L.hwangWork) await dlg.say(line); continue; }
+    if (picked.ask === 'dir') {
+      // 주요 가게 자리: 아속 구역 지도에서 우주새 문에서 가장 가까운 곳을 찾아 방향·거리로 말해 주고, 나가면 그곳 위에 표시
+      const places = await nearbyPlaces();
+      const c = await dlg.choose([...places.map((p) => `${p.label} · ${p.name}`), L.askNever]);
+      if (c < places.length) {
+        const p = places[c];
+        await dlg.say(L.hwangDir.replace('{name}', p.name).replace('{dir}', p.dir).replace('{m}', String(p.m)));
+        pendingGuide = p.k;
+        await dlg.say(L.hwangDirMark);
+      }
+      continue;
+    }
     const it = picked.it, name = it.name[lang()];
     if (picked.steal) {
       // 20차: 우주새에서 훔치기 — 미스 황(황혼)은 몹시 화를 내고 내쫓는다. 걸리면 밖에서 대식자가 기다린다
@@ -1186,7 +1216,7 @@ function endTalk() {
 
 /** 되팔 때 값: 산 값의 4할 (적어도 1) */
 const sellPrice = (it: ItemDef) => Math.max(1, Math.floor(it.price * 0.4));
-type ShopTab = ItemCat | 'sell';
+type ShopTab = ItemCat | 'sell' | 'ask';
 /** 이 세계 돈으로 값이 매겨지는 내 물건 (지옥 = 노전 물건, 현실 = 바트 물건). 끼고 있는 건 팔지 않는다 */
 function sellable(hell: boolean) {
   const bag = state.bag ?? {};
@@ -1195,6 +1225,42 @@ function sellable(hell: boolean) {
 }
 
 /** 상품 창: 고른 물건(사기·팔기)을 돌려준다. '나가기'나 창 밖 빈 곳을 누르면 null */
+// ───────────────────────── 21차: 미스 황에게 길 묻기 ─────────────────────────
+/** 거리에 나가면 그 건물 위에 표시 (미스 황이 알려 준 곳) */
+let pendingGuide: number | null = null;
+/** 우주새 문에서 가까운 은행 · 종교시설 · 병원·약국 · 마사지 · 편의점 · 헬스장 */
+async function nearbyPlaces() {
+  const L = t();
+  const z = await loadZone(HOME_ZONE);
+  const d = z.door;
+  const want: [string, (b: Building) => boolean][] = [
+    [L.placeKinds.bank, (b) => hasBank(b)],
+    [L.placeKinds.worship, (b) => ['temple', 'church', 'mosque', 'gurdwara'].includes(roomKindOf(b))],
+    [L.placeKinds.clinic, (b) => ['clinic', 'pharmacy'].includes(roomKindOf(b))],
+    [L.placeKinds.massage, (b) => roomKindOf(b) === 'massage'],
+    [L.placeKinds.mart, (b) => roomKindOf(b) === 'mart'],
+    [L.placeKinds.gym, (b) => roomKindOf(b) === 'gym'],
+  ];
+  const out: { label: string; name: string; k: number; dir: string; m: number }[] = [];
+  for (const [label, test] of want) {
+    let best = -1, bd = 1e9;
+    z.buildings.forEach((b, k) => {
+      if (!canEnter(b) || !test(b)) return;
+      const dd = Math.hypot(b.i0 + b.w / 2 - d.i, b.j0 + b.d / 2 - d.j);
+      if (dd < bd) { bd = dd; best = k; }
+    });
+    if (best < 0) continue;
+    const b = z.buildings[best];
+    const di = b.i0 + b.w / 2 - d.i, dj = b.j0 + b.d / 2 - d.j;
+    // 수쿰빗이 가로(i)로 놓였다: +i = 프롬퐁 쪽, -i = 나나 쪽, -j = 홀수 소이 쪽(대로 북쪽), +j = 짝수 소이 쪽(남쪽)
+    const ew = Math.abs(di) > 6 ? (di > 0 ? L.dirs.e : L.dirs.w) : '';
+    const ns = Math.abs(dj) > 6 ? (dj > 0 ? L.dirs.s : L.dirs.n) : '';
+    const dir = [ew, ns].filter(Boolean).join(L.dirs.and) || L.dirs.here;
+    out.push({ label, name: buildingName(b, lang()), k: best, dir, m: Math.max(10, Math.round(bd * 3 / 10) * 10) });
+  }
+  return out;
+}
+
 // ───────────────────────── 20차: 훔치기 ─────────────────────────
 /** 걸려서 쫓겨난 뒤 거리에 나가면 대식자가 온다 */
 let pendingEater = false;
@@ -1260,9 +1326,9 @@ async function talkToParrot() {
   endTalk();
 }
 
-function pickItem(hell: boolean, start: ShopTab): Promise<{ it: ItemDef; sell: boolean; tab: ShopTab; steal?: boolean } | null> {
+function pickItem(hell: boolean, start: ShopTab): Promise<{ it: ItemDef; sell: boolean; tab: ShopTab; steal?: boolean; ask?: 'dir' | 'work' } | null> {
   const L = t();
-  const cats: ShopTab[] = ['goods', 'weapon', 'armor', 'sell']; // 무기와 방어구도 처음부터 · 팔기
+  const cats: ShopTab[] = hell ? ['goods', 'weapon', 'armor', 'sell'] : ['goods', 'weapon', 'armor', 'sell', 'ask']; // 무기와 방어구도 처음부터 · 팔기 · 21차 묻기(현실)
   let cat: ShopTab = start;
   return new Promise((resolve) => {
     const el = document.createElement('div');
@@ -1279,7 +1345,7 @@ function pickItem(hell: boolean, start: ShopTab): Promise<{ it: ItemDef; sell: b
     list.className = 'menu-list';
     el.append(head, list);
     let off: ((e: PointerEvent) => void) | null = null;
-    const done = (v: { it: ItemDef; sell: boolean; tab: ShopTab; steal?: boolean } | null) => {
+    const done = (v: { it: ItemDef; sell: boolean; tab: ShopTab; steal?: boolean; ask?: 'dir' | 'work' } | null) => {
       if (off) document.removeEventListener('pointerdown', off, true);
       dlg.setPanel(null);
       resolve(v);
@@ -1289,13 +1355,26 @@ function pickItem(hell: boolean, start: ShopTab): Promise<{ it: ItemDef; sell: b
       tabs.innerHTML = '';
       for (const c of cats) {
         const b = document.createElement('button');
-        b.textContent = c === 'sell' ? L.tabSell : L.tabs[c];
+        b.textContent = c === 'sell' ? L.tabSell : c === 'ask' ? L.tabAsk : L.tabs[c];
         b.className = (c === cat ? 'on' : '') + (c === 'sell' ? ' sell' : '');
         b.onclick = () => { cat = c; render(); };
         tabs.appendChild(b);
       }
       list.innerHTML = '';
       const money = hell ? hellState().notes : state.wallet ?? 0;
+      if (cat === 'ask') {
+        // 21차: 미스 황에게 묻기 — 주요 가게 자리 · 일하는 법
+        for (const [k, title, sub] of [['dir', L.askDir, L.askDirSub], ['work', L.askWork, L.askWorkSub]] as const) {
+          const row = document.createElement('button');
+          row.className = 'menu-item';
+          row.innerHTML = `<span class="nm"></span><small></small>`;
+          row.querySelector('.nm')!.textContent = title;
+          row.querySelector('small')!.textContent = sub;
+          row.onclick = () => done({ it: ITEMS[0], sell: false, tab: 'ask', ask: k });
+          list.appendChild(row);
+        }
+        return;
+      }
       if (cat === 'sell') {
         const mine = sellable(hell);
         if (!mine.length) { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = L.sellNothing; list.appendChild(p); }
@@ -1814,9 +1893,11 @@ function showDeath(cause: 'car' | 'beaten' | 'hell') {
 }
 
 // ───────────────────────── 천국 (3단계) ─────────────────────────
-function heavenAct(what: 'officer' | 'yellowwing' | 'shop' | 'assault' | 'terrace') {
+function heavenAct(what: 'officer' | 'yellowwing' | 'shop' | 'assault' | 'terrace' | 'taxi' | 'ceremony') {
   if (busy || dlg.isOpen) return;
   if (what === 'terrace') enterTerrace();
+  else if (what === 'taxi') talkToTaxi();
+  else if (what === 'ceremony') talkToPreacher();
   else if (what === 'officer') talkToOfficer();
   else if (what === 'yellowwing') talkToYellowWing();
   else if (what === 'shop') npcSay(t().shopLabel, t().heavenShopEmpty);
@@ -1852,27 +1933,148 @@ async function talkToOfficer() {
   const fx = worldFade('heaven', false);
   fx.covered.then(() => { rebirthFrom('heaven'); fx.done(); });
 }
-/** 황색날개: 미스 황과 같은 얼굴이지만 스스로는 다른 사람이라 여긴다. 천국의 물건은 공짜 */
+/** 21차: 안내천사가 따라다니는가 — 처음 온 영혼이 천국에 익숙해질 때까지 (종교행사에 한 번 다녀오면 끝, 따돌리면 멈춘다) */
+function ywShouldFollow() {
+  return realm() === 'heaven' && !state.heaven?.adapted && !state.heaven?.ywLost;
+}
+const pick = <T,>(a: readonly T[]) => a[Math.floor(Math.random() * a.length)];
+/** 셋을 겹치지 않게 고른다 */
+function pickN<T>(a: readonly T[], n: number): T[] {
+  const b = [...a];
+  for (let k = b.length - 1; k > 0; k--) { const r = Math.floor(Math.random() * (k + 1)); [b[k], b[r]] = [b[r], b[k]]; }
+  return b.slice(0, n);
+}
+/**
+ * 황색날개: 미스 황과 같은 얼굴이지만 스스로는 다른 사람이라 여긴다. 21차 — 천국의 안내천사.
+ * 처음 온 영혼 곁을 따라다니며 규칙을 일러 준다 (종교행사는 필수 · 사람이 천사를 사랑하면 벌은 천사가). 환생을 물으면 의아해하며 말린다. 루엔이 어디 있는지 알려 준다
+ */
 const HEAVEN_GIFTS = ['water', 'cola', 'choco', 'chips', 'bandage'];
 async function talkToYellowWing() {
   const L = t();
   busy = true;
   dlg.open({ name: L.yellowWing, portrait: 'yellow-wing' });
-  if (!state.heaven?.met) { state.heaven = { ...state.heaven, met: true }; save(state); await dlg.say(L.ywFirst); }
-  else await dlg.say(L.ywLines[Math.floor(Math.random() * L.ywLines.length)]);
-  await dlg.say(L.ywGreet);
-  const gifts = HEAVEN_GIFTS.map((k) => ITEMS.find((i) => i.key === k)!).filter(Boolean);
-  const c = await dlg.choose([...gifts.map((i) => i.name[lang()]), L.ywNo]);
-  if (c < gifts.length) {
-    const it = gifts[c];
-    state.bag ??= {};
-    state.bag[it.key] = (state.bag[it.key] ?? 0) + 1;
+  if (!state.heaven?.met) {
+    state.heaven = { ...state.heaven, met: true };
     save(state);
-    await dlg.say(L.ywGot.replace('{item}', it.name[lang()]));
+    await dlg.say(L.ywFirst);
+    for (const line of L.ywAssigned) await dlg.say(line);
+  } else await dlg.say(pick(L.ywLines));
+  for (;;) {
+    const M = L.ywMenu;
+    const opts: [string, string][] = [['rebirth', M.rebirth], ['luen', M.luen], ['rules', M.rules], ['gift', M.gift]];
+    if (!state.heaven?.adapted) opts.push(state.heaven?.ywLost ? ['follow', M.follow] : ['alone', M.alone]);
+    opts.push(['bye', M.bye]);
+    const c = opts[await dlg.choose(opts.map((o) => o[1]))]?.[0] ?? 'bye';
+    if (c === 'bye') break;
+    if (c === 'rebirth') {
+      await dlg.say(pick(L.ywRebirthPuzzled));
+      for (const line of pickN(L.ywRebirthPleas, 3)) await dlg.say(line);
+      await dlg.say(L.ywRebirthEnd);
+    } else if (c === 'luen') {
+      if (world?.guideStair()) await dlg.say(L.ywLuenHere);
+      else {
+        const here = ZONE_IDS.indexOf(world?.zone.id ?? HOME_ZONE), home = ZONE_IDS.indexOf(HOME_ZONE);
+        await dlg.say(L.ywLuenFar.replace('{dir}', here < home ? L.dirs.e : L.dirs.w));
+      }
+    } else if (c === 'rules') {
+      for (const line of L.ywRules) await dlg.say(line);
+    } else if (c === 'gift') {
+      await dlg.say(L.ywGreet);
+      const gifts = HEAVEN_GIFTS.map((k) => ITEMS.find((i) => i.key === k)!).filter(Boolean);
+      const g = await dlg.choose([...gifts.map((i) => i.name[lang()]), L.ywNo]);
+      if (g < gifts.length) {
+        const it = gifts[g];
+        state.bag ??= {};
+        state.bag[it.key] = (state.bag[it.key] ?? 0) + 1;
+        save(state);
+        await dlg.say(L.ywGot.replace('{item}', it.name[lang()]));
+      }
+    } else if (c === 'alone') {
+      await dlg.say(L.ywAlone);
+    } else if (c === 'follow') {
+      state.heaven = { ...state.heaven, ywLost: false };
+      save(state);
+      world?.setYwFollow(true);
+      await dlg.say(L.ywFollowAgain);
+    }
   }
   dlg.close();
   busy = false;
   renderHud();
+}
+/** 21차: 천국의 음식 — 가게 앞 천사와 따라다니는 요리사가 권한다. 공짜, 맛있다, 아무 효과도 없다 */
+async function heavenFood(from: string) {
+  if (busy || dlg.isOpen) return;
+  const L = t();
+  busy = true;
+  dlg.open({ name: from });
+  await dlg.say(pick(L.heavenFoodOffer));
+  const dishes = pickN(L.heavenDishes, 3);
+  const c = await dlg.choose([...dishes, L.heavenFoodNo]);
+  if (c < dishes.length) {
+    chime();
+    await dlg.say(L.heavenAte.replace('{food}', dishes[c]));
+  }
+  await dlg.say(L.heavenFoodBye);
+  dlg.close();
+  busy = false;
+}
+/** 21차: 종교시설 앞 천사 — 행사는 필수. 한 번 다녀오면 천국에 익숙해진 것으로 치고, 안내천사는 제자리로 돌아간다 */
+async function talkToPreacher() {
+  const L = t();
+  busy = true;
+  dlg.open({ name: L.preachAngel });
+  await dlg.say(L.ceremonyCall);
+  const c = await dlg.choose([L.ceremonyJoin, L.ceremonyLater]);
+  if (c !== 0) { await dlg.say(L.ceremonyNag); dlg.close(); busy = false; return; }
+  dlg.close();
+  const fx = worldFade('heaven', false);
+  await fx.covered;
+  dlg.open({ name: L.ceremonyTitle });
+  for (const line of L.ceremonyLines) await dlg.say(line);
+  dlg.close();
+  fx.done();
+  dlg.open({ name: L.preachAngel });
+  await dlg.say(L.ceremonyDone);
+  dlg.close();
+  const first = !state.heaven?.adapted;
+  state.heaven = { ...state.heaven, adapted: true, rites: (state.heaven?.rites ?? 0) + 1 };
+  save(state);
+  if (first) {
+    world?.setYwFollow(false);
+    dlg.open({ name: L.yellowWing, portrait: 'yellow-wing' });
+    await dlg.say(L.ywAdapted);
+    dlg.close();
+  }
+  busy = false;
+}
+/** 21차: 도시 끝의 택시 천사 — 아주 큰 날개로 다른 도시까지 태워 준다 (지금은 수쿰빗 안에서만. 서울·파타야는 아직 하늘길이 없다) */
+async function talkToTaxi() {
+  const L = t();
+  busy = true;
+  dlg.open({ name: L.taxiAngel });
+  await dlg.say(L.taxiGreet);
+  const here = world?.zone.id ?? HOME_ZONE;
+  const far = here === ZONE_IDS[0] ? ZONE_IDS[ZONE_IDS.length - 1] : ZONE_IDS[0];
+  const T = L.taxiTo;
+  const c = await dlg.choose([T.asok, T.far.replace('{zone}', L.zones[far] ?? far), T.seoul, T.pattaya, T.no]);
+  if (c === 2 || c === 3) { await dlg.say(L.taxiNotYet.replace('{city}', c === 2 ? T.seoul : T.pattaya)); dlg.close(); busy = false; return; }
+  if (c !== 0 && c !== 1) { dlg.close(); busy = false; return; }
+  await dlg.say(L.taxiFly);
+  dlg.close();
+  const fx = worldFade('heaven', true);
+  await fx.covered;
+  if (c === 0) await enterWorld('door');
+  else {
+    const z = await loadZone(far);
+    const e = z.edges;
+    const at: [number, number] = e ? [far === ZONE_IDS[0] ? e.i0 + 6 : e.i1 - 7, e.c] : [z.door.i, z.door.j + 2];
+    await enterWorld(at, far);
+  }
+  fx.done();
+  snapPos();
+  save(state);
+  busy = false;
 }
 /** 천국에서 손을 들면: 악행이 기록되고 현실로 떨어진다 (선행 보너스는 받지 못한다) */
 async function heavenAssault() {
@@ -2113,7 +2315,7 @@ function renderHud() {
   hud.innerHTML = `
     <div class="hud-left${workLine ? ' working' : ''}"><div class="where" data-zone="${escHtml(place)}"><b>${escHtml(place)}</b></div>${scene === 'shop' && realm() === 'ghost' ? `<span class="hint">${L.hintGhost}</span>` : ''}<span class="work">${workLine}</span>${workLine && world?.isWorkingInside ? `<button class="work-stop">${L.workStop}</button>` : ''}</div>
     <div class="hud-tools">${live}<div class="hud-right">
-      <span class="hpbox" title="${L.hpLabel}"><span class="clock"></span><i class="hpbar"><i></i></i></span>
+      <span class="hpbox" title="${L.hpLabel}"><span class="clock"></span><i class="hpbar"><i></i></i><b class="hp-over" hidden></b></span>
       <span class="wallet"></span>
       <button class="to-soul">${narrow ? L.rankShort : L.rank} <b class="rk">${state.soul?.rank ?? 1}</b></button>
       <button class="to-bag">${L.bag}</button>
