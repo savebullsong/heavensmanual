@@ -9,7 +9,7 @@ export const FOOT_Y = 46;
 
 export type Sex = 'f' | 'm';
 export type Facing = 'front' | 'back';
-export type Outfit = 'casual' | 'apron' | 'raincoat' | 'patient' | 'parrot' | 'suturer' | 'stitched' | 'ash' | 'pret' | 'yak' | 'bones' | 'besk' | 'cockatoo' | 'warden1' | 'warden2' | 'warden3' | 'talus' | 'serane' | 'ashgal' | 'gurma' | 'cinder' | 'bloat' | 'glutton' | 'hawker' | 'debtor' | 'broker';
+export type Outfit = 'casual' | 'apron' | 'raincoat' | 'patient' | 'parrot' | 'suturer' | 'stitched' | 'ash' | 'pret' | 'yak' | 'bones' | 'besk' | 'cockatoo' | 'warden1' | 'warden2' | 'warden3' | 'talus' | 'serane' | 'robber' | 'mafia' | 'ashgal' | 'gurma' | 'cinder' | 'bloat' | 'glutton' | 'hawker' | 'debtor' | 'broker';
 export interface Look {
   sex: Sex;
   build: number; // 0 마름 · 1 보통 · 2 건장

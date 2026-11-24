@@ -19,8 +19,13 @@ export interface Save {
   /** 빠른 칸에 끼운 소비품 (누르면 바로 먹기) */
   quick?: string;
   ammo?: number;
+  /** 화살 (활) */
+  arrows?: number;
   hp?: number;
+  /** 이번 생의 선행·악행 (천국·지옥 심판은 이번 생으로) */
   deeds?: { good: number; evil: number };
+  /** 모든 생에 걸쳐 쌓인 선행·악행 (영혼의 기록) */
+  deedsAll?: { good: number; evil: number };
   // 영혼 (환생해도 남는다)
   soul?: { rank: number; exp: number; stats?: { str: number; agi: number; vit: number; fai: number } };
   // 비회원: 처음 거리로 나선 뒤 지난 시간(초)과 미스 황의 전화
@@ -28,9 +33,9 @@ export interface Save {
   called?: boolean;
   // 2단계: 지금 있는 세계와 지옥에서의 걸음
   realm?: 'real' | 'ghost' | 'hell' | 'heaven';
-  adminTrip?: 'real' | 'ghost' | 'heaven'; // 관리자가 지옥 층 이동으로 들어오기 전의 세계 (시찰에서 돌아갈 곳)
+  adminTrip?: 'real' | 'ghost' | 'heaven' | 'hell'; // 관리자가 시찰(지옥 층 이동·천국)을 떠나기 전의 세계 (돌아갈 곳)
   /** 천국: 환생할 때 받을 선행 보너스 (영혼 경험치) */
-  heaven?: { bonus: number; met?: boolean };
+  heaven?: { bonus: number; met?: boolean; admin?: boolean };
   /** 지옥: 지금 층, 이번 지옥행에서 쓰러뜨린 층주, 노전(영혼에 붙어 다음 지옥행에도 남는다) */
   hell?: {
     floor: number; cleared: number[]; notes: number; met?: boolean;

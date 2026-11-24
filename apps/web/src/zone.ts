@@ -19,7 +19,7 @@ export interface Building {
   hk?: HellBuildKind; // 지옥의 집·덩어리 종류
 }
 /** 지옥: 초가집 · 감옥 · 뼈집 · 대형 짐승 시체 · 뼈 무더기 · 내장 더미 */
-export type HellBuildKind = 'thatch' | 'prison' | 'bonehouse' | 'carcass' | 'bonepile' | 'guts' | 'butcher' | 'stall' | 'burnt';
+export type HellBuildKind = 'thatch' | 'prison' | 'bonehouse' | 'carcass' | 'bonepile' | 'guts' | 'butcher' | 'stall' | 'burnt' | 'idol';
 /** fence o: 0 = i 방향, 1 = j 방향, 2 = 모서리 기둥 */
 export interface Prop { i: number; j: number; kind: 'tree' | 'lamp' | 'pillar' | 'cart' | 'fence' | 'pole' | 'spirit' | 'moto' | 'plant' | 'bin' | 'stools' | 'pushcart' | HellDecorKind; o?: number }
 /** 지옥 소품: 경계 바위·성벽, 뼈, 해골 더미, 꼬챙이, 가마솥, 철창, 마을 불빛, 고문 장면(움직임) */
@@ -71,7 +71,7 @@ export interface HellInfo {
   /** 마을 모양: 1층 둥근 성벽(가장 크다) · 2층 늪 위 널빤지 섬 · 3층 비좁은 네모 */
   shape: 'round' | 'blob' | 'square';
   /** 마을에 앉거나 누운 영혼들 (환생을 기다리며 지친 사람들) */
-  souls: { i: number; j: number; pose: 'sit' | 'lie' | 'stand'; d: number }[];
+  souls: { i: number; j: number; pose: 'sit' | 'lie' | 'stand'; d: number; pray?: boolean }[];
   /** 장사꾼 자리: 고깃간 · 잡동사니 좌판 */
   vendors: { i: number; j: number; kind: 'butcher' | 'junk' }[];
   /** 문지기(경비병) 둘이 서는 곳 — 위층 길 들머리 */

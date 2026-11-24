@@ -88,7 +88,8 @@ export const DEED_TABLE = {
   thugDown: { kind: 'good', points: 3, exp: 30, note: '불량배·건달 처치' },
   drunkDown: { kind: 'good', points: 1, exp: 10, note: '시비 거는 취객 제압 (약한 적)' },
   shadeDown: { kind: 'good', points: 1, exp: 8, note: '천국의 그림자(미련)를 흩음 (약한 적)' },
-  gangDown: { kind: 'good', points: 5, exp: 50, note: '범죄조직원 처치' },
+  robberDown: { kind: 'good', points: 4, exp: 45, note: '강도 처치 (17차)' },
+  gangDown: { kind: 'good', points: 5, exp: 60, note: '범죄조직원(마피아) 처치' },
   criminalUserDown: { kind: 'good', points: 8, exp: 80, note: '범죄 표시가 된 유저 처치' },
   donate100: { kind: 'good', points: 1, exp: 5, note: '병원·학교 기부 ฿100마다 (하루 20점까지)' },
   pray: { kind: 'good', points: 1, exp: 5, note: '종교시설 기도 (하루 3번)' },
@@ -113,6 +114,15 @@ export const SAME_TARGET_COOLDOWN_MIN = 60;
 /** 하루에 기부로 얻을 수 있는 선행 점수 상한 — 돈으로 카르마를 사는 것 방지 */
 export const DONATION_DAILY_CAP = 20;
 
+/**
+ * 선행·악행은 아주 조금씩 쌓인다 (17차): 표의 점수 × 0.2 (소수 첫째 자리까지)
+ * 예: 불량배 처치 +0.6 · 살해 +2 · 속죄 헌금 1,000닢 +0.2. 심판은 이번 생의 비율로
+ */
+export const KARMA_SCALE = 0.2;
+export const karmaPoints = (key: DeedKey) => Math.round(DEED_TABLE[key].points * KARMA_SCALE * 10) / 10;
+/** 0.6 · 2 · 12.4 처럼 보이게 */
+export const fmtKarma = (n: number) => String(Math.round(n * 10) / 10);
+
 /** 행위 하나를 기록에 더한다. 지옥 괴물은 층수를 곱한다 */
 export function applyDeed(d: Deeds, key: DeedKey, opt: { floor?: number; share?: number } = {}): { deeds: Deeds; exp: number } {
   const rule: DeedRule = DEED_TABLE[key];
@@ -120,8 +130,9 @@ export function applyDeed(d: Deeds, key: DeedKey, opt: { floor?: number; share?:
   // share: 함께 싸우다 경비병이 마무리한 괴물은 내가 준 피해만큼만 (0~1)
   const exp = opt.share !== undefined ? Math.round(full * Math.max(0, Math.min(1, opt.share))) : full;
   const deeds = { ...d };
-  if (rule.kind === 'good') deeds.good += rule.points;
-  else if (rule.kind === 'evil') deeds.evil += rule.points;
+  const pts = karmaPoints(key);
+  if (rule.kind === 'good') deeds.good = Math.round((deeds.good + pts) * 10) / 10;
+  else if (rule.kind === 'evil') deeds.evil = Math.round((deeds.evil + pts) * 10) / 10;
   return { deeds, exp };
 }
 
@@ -168,6 +179,20 @@ export function critChance(fai: number): number {
 export const CRIT_MULTIPLIER = 2;
 
 /** 민첩 → 회피율(%) = 민첩 × 0.4, 최대 40 */
+/**
+ * 17차 D&D식 회피: 공격하는 쪽이 d20 + 명중 보너스를 굴려 방어 등급(AC) 이상이면 맞는다.
+ * AC = 10 + 방어구 방어력 합 ÷ 2 + 민첩 ÷ 5. 1은 늘 빗나가고 20은 늘 맞는다 (20은 치명타)
+ * 맞으면 피해는 무작위 그대로 (방어력은 피해를 줄이지 않는다 · 피해 감소 물건만 줄인다)
+ */
+export function armorClass(def: number, agi: number): number {
+  return 10 + Math.floor(def / 2) + Math.floor(agi / 5);
+}
+export function rollToHit(bonus: number, ac: number, roll = 1 + Math.floor(Math.random() * 20)): { hit: boolean; roll: number; nat20: boolean } {
+  if (roll === 1) return { hit: false, roll, nat20: false };
+  if (roll === 20) return { hit: true, roll, nat20: true };
+  return { hit: roll + bonus >= ac, roll, nat20: false };
+}
+/** 예전 회피 확률 (17차부터 쓰지 않음 — armorClass 로) */
 export function dodgeChance(agi: number): number {
   return Math.min(40, agi * 0.4);
 }

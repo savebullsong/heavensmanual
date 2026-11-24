@@ -9,14 +9,16 @@ export interface ItemDef {
   heal?: number; // 체력 회복
   atk?: number; // 공격력
   def?: number; // 방어력
-  note?: 'rope' | 'needsAmmo' | 'ammo';
+  note?: 'rope' | 'needsAmmo' | 'ammo' | 'needsArrows' | 'arrows';
   name: Record<Lang, string>;
-  store?: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'talus' | 'hmeat'; // 우주새가 아니라 거리 가게(또는 지옥 2층 탈루스)에서 파는 것
+  store?: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'talus' | 'hmeat' | 'tools' | 'dept' | 'hjunk'; // 우주새가 아니라 거리 가게(철물점·백화점) · 지옥 탈루스·고깃간·넝마장수에서 파는 것
   now?: boolean; // 가게에서 바로 먹는다 (가방에 넣지 않음)
   hell?: boolean; // 지옥의 우주새(황혼)에서만, 노전으로 판다
   sprite?: string; // 몸에 그릴 때 쓰는 그림 (지옥 무기·방어구는 현실 그림을 빌려 쓴다)
   icon?: string; // 아이콘 그림 (없으면 key)
   two?: boolean; // 양손 무기: 두 손으로 내려찍는다 (느리지만 묵직하다)
+  ranged?: boolean; // 멀리서 쏜다 (권총·활) — 민첩이 공격력에 더해진다
+  dr?: number; // 피해 감소 (17차: 방어력은 회피만 올린다. 피해를 줄이는 건 이 값이 있는 물건뿐)
 }
 
 export const ITEMS: ItemDef[] = [
@@ -29,19 +31,22 @@ export const ITEMS: ItemDef[] = [
   { key: 'rope', cat: 'goods', price: 120, note: 'rope', name: { ko: '밧줄', th: 'เชือก', en: 'Rope' } },
   { key: 'bandage', cat: 'goods', price: 45, heal: 120, name: { ko: '붕대', th: 'ผ้าพันแผล', en: 'Bandage' } },
   // 무기 — 공격력 차이가 가격에 반영된다
-  { key: 'pipe', cat: 'weapon', price: 180, atk: 4, name: { ko: '쇠파이프', th: 'ท่อเหล็ก', en: 'Steel pipe' } },
-  { key: 'hammer', cat: 'weapon', price: 290, atk: 4, name: { ko: '장도리', th: 'ค้อนหงอน', en: 'Claw hammer' } },
-  { key: 'knife', cat: 'weapon', price: 390, atk: 5, name: { ko: '식칼', th: 'มีดทำครัว', en: 'Kitchen knife' } },
-  { key: 'shovel', cat: 'weapon', price: 420, atk: 5, name: { ko: '삽', th: 'พลั่ว', en: 'Shovel' } },
-  { key: 'bat', cat: 'weapon', price: 850, atk: 6, name: { ko: '야구 배트', th: 'ไม้เบสบอล', en: 'Baseball bat' } },
+  { key: 'pipe', cat: 'weapon', price: 180, atk: 4, store: 'tools', name: { ko: '쇠파이프', th: 'ท่อเหล็ก', en: 'Steel pipe' } },
+  { key: 'hammer', cat: 'weapon', price: 290, atk: 4, store: 'tools', name: { ko: '장도리', th: 'ค้อนหงอน', en: 'Claw hammer' } },
+  { key: 'knife', cat: 'weapon', price: 390, atk: 5, store: 'dept', name: { ko: '식칼', th: 'มีดทำครัว', en: 'Kitchen knife' } },
+  { key: 'shovel', cat: 'weapon', price: 420, atk: 5, store: 'tools', name: { ko: '삽', th: 'พลั่ว', en: 'Shovel' } },
+  { key: 'bat', cat: 'weapon', price: 850, atk: 6, store: 'dept', name: { ko: '야구 배트', th: 'ไม้เบสบอล', en: 'Baseball bat' } },
   { key: 'hatchet', cat: 'weapon', price: 950, atk: 7, name: { ko: '손도끼', th: 'ขวานมือ', en: 'Hatchet' } },
   { key: 'dagger', cat: 'weapon', price: 1800, atk: 8, name: { ko: '단검', th: 'มีดสั้น', en: 'Dagger' } },
   { key: 'sword', cat: 'weapon', price: 7500, atk: 12, name: { ko: '장검', th: 'ดาบยาว', en: 'Longsword' } },
   // 양손 무기 (16차)
-  { key: 'sledge', cat: 'weapon', price: 2600, atk: 10, two: true, name: { ko: '오함마', th: 'ค้อนปอนด์', en: 'Sledgehammer' } },
+  { key: 'sledge', cat: 'weapon', price: 2600, atk: 10, store: 'tools', two: true, name: { ko: '오함마', th: 'ค้อนปอนด์', en: 'Sledgehammer' } },
   { key: 'fireaxe', cat: 'weapon', price: 5200, atk: 13, two: true, name: { ko: '소방 도끼', th: 'ขวานดับเพลิง', en: 'Fire axe' } },
-  { key: 'pistol', cat: 'weapon', price: 45000, atk: 20, note: 'needsAmmo', name: { ko: '권총', th: 'ปืนพก', en: 'Pistol' } },
+  { key: 'pistol', cat: 'weapon', price: 45000, atk: 20, ranged: true, note: 'needsAmmo', name: { ko: '권총', th: 'ปืนพก', en: 'Pistol' } },
   { key: 'ammo', cat: 'weapon', price: 600, note: 'ammo', name: { ko: '권총탄 12발', th: 'กระสุนปืนพก 12 นัด', en: 'Pistol rounds ×12' } },
+  // 17차 활: 소리 없이 멀리서. 민첩이 높을수록 세다
+  { key: 'bow', cat: 'weapon', price: 3200, atk: 9, ranged: true, note: 'needsArrows', name: { ko: '사냥 활', th: 'ธนูล่าสัตว์', en: 'Hunting bow' } },
+  { key: 'arrows', cat: 'weapon', price: 150, note: 'arrows', name: { ko: '화살 20대', th: 'ลูกธนู 20 ดอก', en: 'Arrows ×20' } },
   // 방어구
   { key: 'helmet', cat: 'armor', price: 690, def: 3, name: { ko: '헬멧', th: 'หมวกกันน็อก', en: 'Helmet' } },
   { key: 'jacket', cat: 'armor', price: 1290, def: 4, name: { ko: '보호 재킷', th: 'แจ็กเก็ตกันกระแทก', en: 'Protective jacket' } },
@@ -83,6 +88,11 @@ export const ITEMS: ItemDef[] = [
   { key: 'hjerky', cat: 'goods', price: 3, heal: 50, hell: true, store: 'hmeat', icon: 'chips', name: { ko: '말린 고기', th: 'เนื้อแห้ง', en: 'Dried meat' } },
   { key: 'hskewer', cat: 'goods', price: 5, heal: 100, hell: true, store: 'hmeat', icon: 'ricebox', name: { ko: '고기 꼬치', th: 'เนื้อเสียบไม้', en: 'Meat skewer' } },
   { key: 'hstew', cat: 'goods', price: 10, heal: 220, hell: true, store: 'hmeat', icon: 'noodle', name: { ko: '뼈국', th: 'ซุปกระดูก', en: 'Bone broth' } },
+  // 17차: 마을 장사꾼만 파는 무기 (유황새와 겹치지 않는다) — 고깃간 고기 칼 · 넝마장수의 주워 온 것들
+  { key: 'hcleaver', cat: 'weapon', price: 90, atk: 10, hell: true, store: 'hmeat', sprite: 'cleaver', icon: 'hatchet', name: { ko: '푸줏간 고기 칼', th: 'มีดสับเนื้อ', en: 'Butcher’s cleaver' } },
+  { key: 'hfemur', cat: 'weapon', price: 40, atk: 7, hell: true, store: 'hjunk', sprite: 'femur', icon: 'bat', name: { ko: '넓적다리뼈 몽둥이', th: 'กระบองกระดูกต้นขา', en: 'Thighbone club' } },
+  { key: 'hpick', cat: 'weapon', price: 140, atk: 11, hell: true, store: 'hjunk', sprite: 'pickaxe', icon: 'pickaxe', name: { ko: '망자의 곡괭이', th: 'จอบของผู้ตาย', en: 'Dead man’s pickaxe' } },
+  { key: 'hhook', cat: 'weapon', price: 230, atk: 13, hell: true, store: 'hjunk', sprite: 'hook', icon: 'hook', name: { ko: '빚 갈고리', th: 'ขอเกี่ยวทวงหนี้', en: 'Debt hook' } },
   // 음식점마다 실제 업종(지도의 cuisine)에 맞는 메뉴
   ...([
     ['pizza', 120, 140, '피자 한 조각', 'พิซซ่าหนึ่งชิ้น', 'Pizza slice'], ['pasta', 220, 190, '파스타', 'พาสต้า', 'Pasta'],
@@ -105,7 +115,7 @@ export const ITEMS: ItemDef[] = [
   ] as [string, number, number, string, string, string][]).map(([key, price, heal, ko, th, en]): ItemDef => ({ key, cat: 'goods', price, heal, store: 'cafe', now: true, name: { ko, th, en } })),
 ];
 
-// 숫자는 보여 주지 않는다 (체력 막대로만 짐작). 효과는 말로
+// 회복은 말로, 무기·방어구는 숫자로 (17차: 공격력·방어력 표시)
 /** 거리 가게 진열 (우주새 물건도 가게 가격으로 판다) */
 /** 음식점·카페 메뉴: 지도의 cuisine(없으면 이름)으로 고른다. 모르면 태국 음식 / 커피 */
 const M = (...xs: [string, number][]) => xs.map(([key, price]) => ({ key, price }));
@@ -132,32 +142,36 @@ export const MENUS: Record<string, { key: string; price: number }[]> = {
   icecream: M(['icecream', 80], ['water', 10]),
   tea: M(['bubbletea', 60], ['thaitea', 45], ['matcha', 90]),
 };
-export function menuFor(kind: 'mart' | 'pharmacy' | 'food' | 'cafe', cuisine?: string) {
+export function menuFor(kind: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept', cuisine?: string) {
   if (kind === 'food') return MENUS[cuisine ?? ''] ?? MENUS.thai;
   if (kind === 'cafe') return MENUS[cuisine ?? ''] ?? MENUS.coffee;
   return STORES[kind];
 }
 
-export const STORES: Record<'mart' | 'pharmacy' | 'food' | 'cafe', { key: string; price: number }[]> = {
+export const STORES: Record<'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept', { key: string; price: number }[]> = {
   mart: [{ key: 'water', price: 10 }, { key: 'cola', price: 17 }, { key: 'noodle', price: 15 }, { key: 'ricebox', price: 39 }, { key: 'chips', price: 30 }, { key: 'choco', price: 35 }, { key: 'plaster', price: 25 }],
   pharmacy: [{ key: 'painkiller', price: 30 }, { key: 'bandage', price: 45 }, { key: 'saline', price: 20 }, { key: 'firstaid', price: 250 }, { key: 'water', price: 10 }],
   food: [{ key: 'padthai', price: 60 }, { key: 'khaoman', price: 50 }, { key: 'noodlesoup', price: 50 }, { key: 'water', price: 10 }],
   cafe: [{ key: 'coffee', price: 65 }, { key: 'thaitea', price: 45 }, { key: 'cake', price: 80 }, { key: 'water', price: 10 }],
+  // 17차: 우주새와 다른 무기를 파는 거리 상인
+  tools: [{ key: 'pipe', price: 180 }, { key: 'hammer', price: 290 }, { key: 'shovel', price: 420 }, { key: 'sledge', price: 2600 }, { key: 'water', price: 10 }], // 철물점·수리점: 공구
+  dept: [{ key: 'knife', price: 390 }, { key: 'bat', price: 850 }, { key: 'cola', price: 20 }, { key: 'chips', price: 35 }], // 백화점·쇼핑몰: 주방칼·운동용품
 };
 
-const EFFECT: Record<Lang, { heal: string[]; atk: string[]; def: string[]; rope: string; needsAmmo: string; ammo: string; two: string }> = {
-  ko: { heal: ['조금 회복', '회복', '많이 회복', '크게 회복'], atk: ['가벼움', '묵직함', '날카로움', '위험함', '치명적'], def: ['얇음', '튼튼함', '단단함'], rope: '추락을 한 번 막아 줌', needsAmmo: '탄약 필요', ammo: '권총에 넣는 탄약', two: '양손 · 느리지만 묵직하게 내려찍음' },
-  th: { heal: ['ฟื้นฟูเล็กน้อย', 'ฟื้นฟู', 'ฟื้นฟูมาก', 'ฟื้นฟูมหาศาล'], atk: ['เบา', 'หนักมือ', 'คม', 'อันตราย', 'ถึงตาย'], def: ['บาง', 'ทนทาน', 'แข็งแรง'], rope: 'กันตกจากที่สูงได้หนึ่งครั้ง', needsAmmo: 'ต้องใช้กระสุน', ammo: 'กระสุนสำหรับปืนพก', two: 'สองมือ · ช้าแต่ฟาดลงหนักหน่วง' },
-  en: { heal: ['Heals a little', 'Heals', 'Heals a lot', 'Heals greatly'], atk: ['Light', 'Heavy', 'Sharp', 'Dangerous', 'Deadly'], def: ['Thin', 'Sturdy', 'Solid'], rope: 'Saves you from one fall', needsAmmo: 'Needs ammo', ammo: 'Rounds for the pistol', two: 'Two-handed · slow, crushing overhead blows' },
+const EFFECT: Record<Lang, { heal: string[]; atkN: string; defN: string; rope: string; needsAmmo: string; ammo: string; two: string; ranged: string; needsArrows: string; arrows: string }> = {
+  ko: { heal: ['조금 회복', '회복', '많이 회복', '크게 회복'], atkN: '공격력 {n}', defN: '방어력 {n}', rope: '추락을 한 번 막아 줌', needsAmmo: '탄약 필요', ammo: '권총에 넣는 탄약', two: '양손 · 느리지만 묵직하게 내려찍음', ranged: '원거리 · 민첩이 더해짐', needsArrows: '화살 필요', arrows: '활에 메기는 화살' },
+  th: { heal: ['ฟื้นฟูเล็กน้อย', 'ฟื้นฟู', 'ฟื้นฟูมาก', 'ฟื้นฟูมหาศาล'], atkN: 'พลังโจมตี {n}', defN: 'พลังป้องกัน {n}', rope: 'กันตกจากที่สูงได้หนึ่งครั้ง', needsAmmo: 'ต้องใช้กระสุน', ammo: 'กระสุนสำหรับปืนพก', two: 'สองมือ · ช้าแต่ฟาดลงหนักหน่วง', ranged: 'ระยะไกล · ความว่องไวช่วยเพิ่มพลัง', needsArrows: 'ต้องใช้ลูกธนู', arrows: 'ลูกธนูสำหรับธนู' },
+  en: { heal: ['Heals a little', 'Heals', 'Heals a lot', 'Heals greatly'], atkN: 'Attack {n}', defN: 'Defense {n}', rope: 'Saves you from one fall', needsAmmo: 'Needs ammo', ammo: 'Rounds for the pistol', two: 'Two-handed · slow, crushing overhead blows', ranged: 'Ranged · agility adds power', needsArrows: 'Needs arrows', arrows: 'Arrows for the bow' },
 };
 
 export function effectText(it: ItemDef, l: Lang): string {
   const E = EFFECT[l];
   const parts: string[] = [];
   if (it.heal) parts.push(E.heal[it.heal <= 30 ? 0 : it.heal <= 80 ? 1 : it.heal <= 160 ? 2 : 3]);
-  if (it.atk) parts.push(E.atk[it.atk <= 4 ? 0 : it.atk <= 6 ? 1 : it.atk <= 8 ? 2 : it.atk <= 12 ? 3 : 4]);
-  if (it.def) parts.push(E.def[it.def <= 2 ? 0 : it.def <= 4 ? 1 : 2]);
+  if (it.atk) parts.push(E.atkN.replace('{n}', String(it.atk)));
+  if (it.def) parts.push(E.defN.replace('{n}', String(it.def)));
   if (it.two) parts.push(E.two);
+  if (it.ranged && it.key !== 'pistol') parts.push(E.ranged);
   if (it.note) parts.push(E[it.note]);
   return parts.join(' · ');
 }
@@ -299,6 +313,24 @@ export function itemIcon(key: string): HTMLCanvasElement {
       P([[4, 9], [28, 9], [28, 15], [13, 15], [12, 26], [5, 26], [7, 15], [4, 15]], '#25272b');
       R(4, 9, 24, 2, '#4a4e55'); R(6, 18, 5, 7, '#3a2f28'); P([[13, 15], [17, 15], [17, 20], [13, 19]], '#1a1b1e');
       R(14, 16, 2, 2, '#4a4e55'); R(26, 8, 2, 1, '#4a4e55'); R(9, 12, 12, 1, '#3a3d42');
+      break;
+    case 'bow':
+      for (let k = 0; k < 26; k++) { const a = (k / 25 - 0.5) * 2.2, x = Math.round(9 + Math.cos(a) * 14 - 6), y = Math.round(16 + Math.sin(a) * 14); R(x, y, 2, 2, '#8a6238'); R(x, y, 1, 1, '#b08a52'); }
+      Ln(5, 2, 5, 29, 1, '#e8e2d0'); R(6, 14, 3, 4, '#3a2a1e');
+      Ln(4, 16, 28, 16, 1, '#9a7a4a'); P([[28, 14], [31, 16], [28, 18]], '#c9ced6'); P([[3, 13], [6, 16], [3, 19]], '#c8382a');
+      break;
+    case 'arrows':
+      for (let k = 0; k < 4; k++) { const y = 8 + k * 5; Ln(4, y + 6, 26, y, 1, '#9a7a4a'); P([[26, y - 2], [30, y - 1], [27, y + 2]], '#c9ced6'); P([[3, y + 4], [6, y + 5], [4, y + 8]], '#c8382a'); }
+      R(9, 22, 13, 8, '#6a4a2a'); R(9, 22, 13, 2, '#8a6238');
+      break;
+    case 'pickaxe':
+      Ln(6, 29, 20, 9, 3, '#6a4a2e'); Ln(7, 28, 19, 11, 1, '#8a6238');
+      P([[8, 6], [16, 4], [24, 6], [31, 12], [24, 9], [16, 8], [9, 9]], '#6a6e74'); P([[24, 6], [31, 12], [29, 12]], '#a8aeb6');
+      break;
+    case 'hook':
+      Ln(4, 30, 18, 12, 2, '#3a3430');
+      for (let k = 0; k < 14; k++) { const a = Math.PI * (0.9 + k / 13 * 1.3), x = Math.round(22 + Math.cos(a) * 6), y = Math.round(10 + Math.sin(a) * 6); R(x, y, 2, 2, '#7c8492'); }
+      P([[27, 13], [30, 9], [28, 15]], '#c9ced6');
       break;
     case 'ammo':
       R(5, 16, 22, 12, '#4a5a3a'); R(5, 16, 22, 2, '#6a7a52'); R(7, 20, 18, 3, '#d8d2c4');

@@ -16,6 +16,14 @@ export function canEnter(b: Building) {
   return !!b.sign || ['place_of_worship', 'hospital', 'clinic', 'bank'].includes(p.t);
 }
 
+/** 17차: 우주새와 다른 무기를 파는 거리 상인 — 철물점·수리점(공구) · 백화점·쇼핑몰(주방칼·운동용품) */
+function streetSeller(b: Building): 'tools' | 'dept' | undefined {
+  const k = kindOf(b);
+  if (['hardware', 'car_repair', 'motorcycle_repair', 'bicycle', 'second_hand', 'doityourself'].includes(k)) return 'tools';
+  if (['department_store', 'mall'].includes(k)) return 'dept';
+  return undefined;
+}
+
 export function roomKind(b: Building): string {
   if (b.cat === 'loan') return 'loan'; // 지옥 3층 베스크 대부소
   if (b.cat === 'hbank' || b.cat === 'atone' || b.cat === 'rebirth') return b.cat; // 지옥 은행 · 속죄의 회당 · 지옥 로비
@@ -190,7 +198,7 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
   const look = LOOKS[kind];
   const info: InteriorInfo = {
     kind, rest: REST_ROOMS.has(kind), name, ...look, exit, clerk, counter, furn,
-    from: { b: k, out }, store: kind === 'bank' ? 'bank' : ['mart', 'pharmacy', 'food', 'cafe'].includes(kind) ? kind : undefined, cuisine: cuisineOf(b), seats: seats.filter(([i, j]) => tiles[j * W + i] === TI.walk),
+    from: { b: k, out }, store: kind === 'bank' ? 'bank' : ['mart', 'pharmacy', 'food', 'cafe'].includes(kind) ? kind : streetSeller(b), cuisine: cuisineOf(b), seats: seats.filter(([i, j]) => tiles[j * W + i] === TI.walk),
   };
   return finalize({ id: `in-${k}`, W, H, tiles, buildings: [], props: [], lanes: [], door: exit, spawn: { i: exit.i, j: exit.j - 1 }, interior: info });
 }

@@ -11,6 +11,7 @@ MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword
 TWO = ['sledge', 'fireaxe', 'greatsword', 'maul']   # 16차 양손 무기 (heavy 동작)
 ARMOR = ['helmet', 'jacket', 'vest', 'gloves', 'workpants', 'shinguard', 'boots']
 WEAPONS = MELEE + ['pistol']
+RANGED_G = ['pistol', 'shotgun', 'bow']   # 쏘는 자세(g)로 드는 것
 
 def id_color(rid):
     v = (rid * 16 + 8) / 255
@@ -238,6 +239,75 @@ class Doll:
             blob(P, hc + Vector((0, .006, .012)), (.1 * s, .112 * s, .128 * s), bd, None, segs=16, rings=12, cut=lambda co: co.z < 1.62 * s or (co.y < -.04 * s and co.z < 1.655 * s))
             limb(P, hc + Vector((-.075 * s, .06 * s, .02 * s)), hc + Vector((-.11 * s, .13 * s, -.06 * s)), [(0, .02 * s, .008 * s), (1, .016 * s, .006 * s)], bd, None, segs=6)
             ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
+        elif name == 'robber':
+            # 17차 강도: 후드를 뒤집어쓴 후드티, 눈만 뚫린 검은 복면, 장갑, 카고 바지, 등에 멘 불룩한 더플백
+            hood = rmat('top', .9, .08); mask = rmat('raincoat', .95, .05); bot = rmat('bottom', .85, .1); shoe = rmat('shoe', .6, .3)
+            glove = rmat('dark', .8, .1); bag = rmat('apron', .85, .1); skin = rmat('skin', .6, .3); eye = rmat('eye', .3, .6)
+            s = self.s
+            def hoodie(rings):
+                out = []
+                for c, u, v, rs, rf in rings:
+                    z = c.z / s
+                    out.append((c, u, v, rs * (1.12 if z > 1.0 else 1.18) + .012, rf * 1.16 + .014))
+                return out
+            self.torso(g, hood, bot, hem=.9, extra=hoodie)
+            self.arms(g, hood, 1.9, cuff=True, wide=1.12); self.hands(g, glove); self.legs(g, bot, shoe)
+            P = Part(g + '.mask')
+            hc = self.V(0, -.005, 1.615)
+            blob(P, hc, (.093 * s, .103 * s, .118 * s), mask, None, segs=16, rings=12)                     # 복면 (머리 전체)
+            limb(P, hc + Vector((-.05 * s, -.093 * s, .016 * s)), hc + Vector((.05 * s, -.093 * s, .016 * s)), [(0, .012 * s, .009 * s), (1, .012 * s, .009 * s)], skin, None, segs=6)   # 눈 구멍 (살갗)
+            for sx in (1, -1):
+                blob(P, hc + Vector((sx * .03 * s, -.1 * s, .016 * s)), (.009 * s, .004 * s, .007 * s), eye, None, segs=6, rings=4)
+            # 뒤집어쓴 후드 (복면 위로, 얼굴 쪽은 트였다)
+            blob(P, hc + Vector((0, .02 * s, .012 * s)), (.11 * s, .118 * s, .132 * s), hood, None, segs=16, rings=12, cut=lambda co: co.y < -.05 * s and abs(co.x) < .075 * s and 1.52 * s < co.z < 1.72 * s)
+            limb(P, self.V(0, .0, 1.40), self.V(0, .0, 1.53), [(0, .09 * s, .085 * s), (1, .075 * s, .07 * s)], hood, None)
+            ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': smooth(co.z, 1.46 * s, 1.52 * s), 'neck': 1 - smooth(co.z, 1.46 * s, 1.52 * s)}); self.add(g, ob)
+            P = Part(g + '.bag')   # 등에 멘 불룩한 더플백 + 끈
+            blob(P, self.V(0, .17, 1.18), (.13 * s, .08 * s, .14 * s), bag, None, segs=12, rings=8)
+            for sx in (1, -1):
+                limb(P, self.V(sx * .1, -.12, 1.38), self.V(sx * .11, .12, 1.3), [(0, .012, .006), (1, .012, .006)], glove, None, segs=4)
+            limb(P, self.V(-.12, .2, 1.27), self.V(.12, .2, 1.27), [(0, .01, .01), (1, .01, .01)], glove, None, segs=4)   # 지퍼
+            ob = finish(P); bind(ob, self.arm, lambda co: {'spine': 1.0}); self.add(g, ob)
+        elif name == 'mafia':
+            # 17차 마피아: 엉덩이까지 오는 짙은 정장 재킷, 흰 셔츠 깃과 붉은 넥타이, 금 목걸이, 검은 선글라스, 반짝이는 구두
+            suit = rmat('top', .55, .3); bot = rmat('bottom', .6, .25); shoe = rmat('shoe', .25, .7)
+            shirt = rmat('bandage', .6, .2); tie = rmat('crest', .5, .3); gold = rmat('metal', .25, .7, .9); dark = rmat('dark', .2, .8)
+            s = self.s
+            def jacket(rings):
+                out = []
+                for c, u, v, rs, rf in rings:
+                    z = c.z / s
+                    out.append((c, u, v, rs * (1.1 if z > 1.0 else 1.16) + .01, rf * 1.12 + .012))
+                c0, u, v, rs, rf = out[0]
+                out.insert(0, (self.V(0, .005, .8), u, v, rs * 1.1, rf * 1.12))
+                return out
+            self.torso(g, suit, bot, hem=.86, extra=jacket)
+            self.head(g); self.arms(g, suit, 1.9, cuff=True, wide=1.05); self.hands(g); self.legs(g, bot, shoe)
+            P = Part(g + '.dress')
+            # 셔츠 앞섶(V자) · 넥타이 · 깃 · 금 목걸이
+            for sx in (1, -1):
+                limb(P, self.V(sx * .055, -.13, 1.44), self.V(sx * .012, -.17, 1.18), [(0, .03, .006), (1, .012, .006)], shirt, None, segs=4)
+                limb(P, self.V(sx * .06, -.12, 1.45), self.V(sx * .1, -.15, 1.3), [(0, .028, .006), (1, .014, .006)], suit, None, segs=4)   # 재킷 깃
+            limb(P, self.V(0, -.165, 1.42), self.V(0, -.18, 1.12), [(0, .016, .006), (.85, .022, .006), (1, .006, .004)], tie, None, segs=4)
+            for n in range(9):
+                t = n / 8 * 2 - 1
+                blob(P, self.V(t * .07, -.13 - (1 - t * t) * .02, 1.45 - (1 - t * t) * .05), (.009, .006, .009), gold, None, segs=6, rings=4)
+            for z in (1.06, .98):   # 단추
+                blob(P, self.V(0, -.2, z), (.01, .006, .01), dark, None, segs=6, rings=4)
+            ob = finish(P); bind(ob, self.arm, lambda co: {'spine': smooth(co.z, .98 * s, 1.12 * s), 'hips': 1 - smooth(co.z, .98 * s, 1.12 * s)}); self.add(g, ob)
+            P = Part(g + '.shades')   # 선글라스
+            hc = self.V(0, -.005, 1.615)
+            for sx in (1, -1):
+                blob(P, hc + Vector((sx * .034 * s, -.098 * s, .014 * s)), (.026 * s, .008 * s, .017 * s), dark, None, segs=10, rings=6)
+            limb(P, hc + Vector((-.01 * s, -.1 * s, .02 * s)), hc + Vector((.01 * s, -.1 * s, .02 * s)), [(0, .004, .004), (1, .004, .004)], gold, None, segs=4)
+            for sx in (1, -1):
+                limb(P, hc + Vector((sx * .058 * s, -.09 * s, .016 * s)), hc + Vector((sx * .086 * s, -.02 * s, .02 * s)), [(0, .004, .004), (1, .004, .004)], dark, None, segs=4)
+            ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
+            for k in 'LR':   # 반지
+                hd = self.bones[f'hand.{k}'][0]
+                P = Part(f'{g}.ring.{k}')
+                blob(P, hd + Vector((0, -.012, -.03)), (.012, .012, .008), gold, None, segs=6, rings=4)
+                ob = finish(P); bind(ob, self.arm, rigid(f'hand.{k}')); self.add(g, ob)
         elif name == 'suturer':
             # 봉합자: 짙은 긴 코트, 꿰맨 자국이 있는 흰 가면, 챙 넓은 모자, 흰 장갑
             coat = rmat('top', .7, .2); mask = rmat('bandage', .4, .4); dark = rmat('dark', .8, .1); bot = rmat('bottom', .8, .15); boot = rmat('shoe', .4, .5)
@@ -1060,6 +1130,23 @@ class Doll:
             for sx in (-.012, .012):
                 limb(P, grip + Vector((sx, -.1, .07)), grip + Vector((sx, -.1, .07)) + fwd * .44, [(0, .011, .011), (1, .011, .011)], dark, None, segs=6)
             limb(P, grip + Vector((0, -.13, .05)), grip + Vector((0, -.29, .055)), [(0, .016, .022), (1, .016, .022)], wood, None, segs=6)   # 앞 손잡이
+        elif name == 'bow':   # 17차 활: 위아래로 휜 나무 활대, 팽팽한 시위, 메긴 화살 (쏘는 자세에서 세로로 선다)
+            # 쏘는 자세에서 손의 아래쪽(-Z)이 앞을, 앞쪽(-Y)이 위를 향한다 → 활대는 Y 축, 화살은 -Z 축
+            fwd = Vector((0, 0, -1)); zz = Vector((0, -1, 0))
+            string = rmat('bandage', .6, .2, tag='wpn')
+            limb(P, grip - zz * .08, grip + zz * .08, [(0, .02, .02), (1, .02, .02)], dark, None, segs=6)   # 손잡이
+            for sg in (1, -1):
+                pts = [grip + zz * sg * .07, grip + zz * sg * .22 + fwd * .045, grip + zz * sg * .37 + fwd * .035, grip + zz * sg * .46 - fwd * .015]
+                for a, b in zip(pts, pts[1:]):
+                    limb(P, a, b, [(0, .016, .016), (1, .012, .012)], wood, None, segs=6)
+            tipU, tipD = grip + zz * .46 - fwd * .015, grip - zz * .46 - fwd * .015
+            nock = grip - fwd * .16
+            limb(P, tipU, nock, [(0, .004, .004), (1, .004, .004)], string, None, segs=4)
+            limb(P, nock, tipD, [(0, .004, .004), (1, .004, .004)], string, None, segs=4)
+            limb(P, nock, grip + fwd * .3, [(0, .006, .006), (1, .006, .006)], wood, None, segs=4)   # 화살대
+            limb(P, grip + fwd * .3, grip + fwd * .37, [(0, .012, .012), (1, .001, .001)], metal, None, segs=4)   # 화살촉
+            for sg in (1, -1):
+                limb(P, nock - fwd * .0 + zz * sg * .004, nock + fwd * .08 + zz * sg * .03, [(0, .004, .004), (1, .002, .002)], rmat('crest', .7, .1), None, segs=3)   # 깃
         elif name == 'pistol':
             fwd = Vector((0, -1, 0))
             limb(P, grip + Vector((0, .01, .04)), grip + Vector((0, -.01, -.06)), [(0, .016, .026), (1, .016, .026)], dark, None, segs=6)

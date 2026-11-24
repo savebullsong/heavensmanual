@@ -8,6 +8,7 @@ export type Body = 'flesh' | 'thug' | 'suturer' | 'monster' | 'player' | 'ash' |
 
 const BLADES = new Set(['knife', 'dagger', 'sword', 'hatchet', 'needle', 'pickaxe', 'cleaver', 'hook', 'skewer', 'boathook', 'fireaxe', 'greatsword']);
 export function hitKind(weapon: string | null | undefined, ranged = false): HitKind {
+  if (weapon === 'bow') return 'blade'; // 화살은 꽂히는 소리
   if (ranged || weapon === 'pistol') return 'gun';
   if (!weapon) return 'fist';
   return BLADES.has(weapon) ? 'blade' : 'blunt';

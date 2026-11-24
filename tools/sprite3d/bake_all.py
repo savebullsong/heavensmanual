@@ -67,6 +67,10 @@ for sex in 'mf':
         sets = [{'kind': 'base', 'outfit': 'casual', 'mode': 'u', 'extra': ['sit']}]
         if b == 1: sets += [{'kind': 'base', 'outfit': o, 'mode': 'u', 'extra': ['sit']} for o in ('raincoat', 'patient')] + [{'kind': 'hair', 'style': h, 'extra': ['sit']} for h in HAIRS]
         jobs.append({'sex': sex, 'build': b, 'sets': sets, 'only': ['sit'], 'merge': True, 'tag': 'sit16'})
+# ── 17차: 강도·마피아(남녀) · 활 · 지옥 장사꾼의 무기(고기 칼·넓적다리뼈·곡괭이·빚 갈고리)를 사람 손에 ──
+for sex in 'mf':
+    jobs.append({'sex': sex, 'build': 1, 'sets': [{'kind': 'base', 'outfit': 'robber', 'mode': 'm'}, {'kind': 'base', 'outfit': 'mafia', 'mode': 'm'}, {'kind': 'base', 'outfit': 'mafia', 'mode': 'g'}]
+                 + [{'kind': 'weapon', 'weapon': w} for w in ('bow', 'cleaver', 'femur', 'pickaxe', 'hook')], 'tag': 'g17'})
 args = sys.argv[2:]
 # --scale2: 같은 크기의 인물을 픽셀 두 배로 (게임에서는 반으로 줄여 같은 크기, 더 섬세)
 if '--scale2' in args:

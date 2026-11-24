@@ -46,7 +46,7 @@ const MON16: Record<string, [string, string, Mode]> = { ashgal: ['h', 'ashgal', 
 const ARMOR_ORDER = ['workpants', 'shinguard', 'boots', 'jacket', 'vest', 'gloves'];
 const ARMOR_COLOR: Record<string, string> = { helmet: '#b0302a', jacket: '#4a5236', vest: '#3a3f46', gloves: '#d8cfb4', workpants: '#4a4536', shinguard: '#2b2f36', boots: '#3a2a1a' };
 const PER_BUILD = new Set(['jacket', 'vest', 'workpants']);
-const COSTUMES = new Set(['raincoat', 'patient', 'parrot']);
+const COSTUMES = new Set(['raincoat', 'patient', 'parrot', 'robber']); // 강도: 복면이 머리를 덮는다
 
 /** 동작 속도 (초당 장면 수)와 맞히는 장면 */
 export const ANIM_FPS: Record<Anim, number> = { idle: 1, walk: 9, hit: 16, fall: 11, punch: 22, swing: 21, shoot: 16, heavy: 15, sit: 1 };
@@ -166,8 +166,8 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
   if (o === 'warden3') return { base: 'b-w-warden3-m', hair: null, weapon: 'w-w-sealstaff', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   if (o === 'yak') return { base: 'b-y-yak-m', hair: null, weapon: weapon === null ? null : 'w-y-club', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   const child = !!look.child;
-  const w = child ? null : weapon && (MELEE.includes(weapon) || TWO.has(weapon) || weapon === 'pistol') ? weapon : null;
-  let mode: Mode = w === 'pistol' ? 'g' : w ? 'm' : 'u';
+  const w = child ? null : weapon && (MELEE.includes(weapon) || TWO.has(weapon) || weapon === 'pistol' || weapon === 'bow') ? weapon : null;
+  let mode: Mode = w === 'pistol' || w === 'bow' ? 'g' : w ? 'm' : 'u'; // 권총·활은 쏘는 자세
   const sex = look.sex;
   const build = Math.max(0, Math.min(2, look.build ?? 1));
   // 우비·환자복·앵무새 옷 차림이라도 몸 방어구(재킷·조끼·작업 바지)를 입으면 그 옷 대신 방어구가 보인다
@@ -175,7 +175,8 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
   let base: string;
   if (child) { base = 'b-c-casual-w'; mode = 'w'; }
   else if (o === 'apron' && sex === 'f' && !w) { base = 'b-f1-apron-w'; mode = 'w'; }
-  else if (costume) base = `b-${sex}1-${o}-${mode}`;
+  else if (o === 'mafia') { if (mode === 'u') mode = 'm'; base = `b-${sex}1-mafia-${mode}`; } // 마피아 정장 (머리카락은 보인다)
+  else if (costume) base = `b-${sex}1-${o}-${mode === 'u' ? 'm' : mode}`;
   else base = `b-${sex}${build}-casual-${mode}`;
   const style = HAIR_STYLES[look.hair] ?? 'short';
   const hair = costume ? null : child ? `h-c-${style}` : `h-${sex}-${style}`;

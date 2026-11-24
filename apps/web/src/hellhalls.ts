@@ -1,5 +1,5 @@
 // 지옥 마을의 공공 건물 (1배 점 그림)
-// · 지옥 은행: 두꺼운 돌 금고 건물, 둥근 쇠 금고문, 문 위의 큰 노전 문장, 창살 창
+// · 지옥 은행: 두꺼운 돌 금고 건물, 돌 아치 문틀 속 쇠띠 두 짝 나무문(17차), 문 위의 큰 노전 문장, 창살 창, 문 옆 돌화로
 // · 속죄의 회당: 좁고 높은 돌 회당, 종탑 박공의 종, 금 간 후광 표시, 문 앞 촛불과 무릎 돌
 // · 환생 로비 입구(1층 불탄 도시 골목 끝): 폐허 사이에 홀로 멀쩡한 현대식 건물, 흰 빛이 새는 유리문
 // 층마다 돌 색이 다르다 (1층 그을린 회색 · 2층 이끼 낀 녹회색 · 3층 붉은 갈색) — 깊을수록 금 가고 지저분하다
@@ -70,17 +70,41 @@ export function drawHellBank(b: Building, floor: number) {
   qL(i0, i1, 0, 6, shade(STONE[floor], 0.55)); qR(j0, j1, 0, 6, shade(STONE[floor], 0.42));
   // 모서리 기둥 둘 (앞면 양 끝)
   for (const x of [i0 + 0.08, i1 - 0.22]) { qL(x, x + 0.14, 0, Hw, shade(STONE[floor], 1.15)); qL(x + 0.1, x + 0.14, 0, Hw, shade(STONE[floor], 0.7)); }
-  // 둥근 쇠 금고문 (앞면 가운데): 두꺼운 테 → 문판 → 바퀴 손잡이
+  // 17차 새 문: 두꺼운 돌 아치 문틀(쐐기돌) 안에 쇠띠를 두른 두 짝 나무문. 가운데 틈으로 등불 빛이 새고,
+  // 문짝마다 큰 쇠고리, 아치 안쪽 위에는 반쯤 올린 쇠살문의 이빨이 걸려 있다
   const m = i0 + w / 2;
-  const [cx, cy] = P(m, j1 + 0.02, 22);
-  g.fillStyle = '#1a1816'; g.beginPath(); g.ellipse(cx, cy, 14, 19, 0.46, 0, Math.PI * 2); g.fill();
-  g.fillStyle = '#6a6660'; g.beginPath(); g.ellipse(cx, cy, 12, 16.5, 0.46, 0, Math.PI * 2); g.fill();
-  g.fillStyle = '#4a4642'; g.beginPath(); g.ellipse(cx + 1, cy + 1, 9, 12.5, 0.46, 0, Math.PI * 2); g.fill();
-  for (let a = 0; a < 12; a++) { const t = (a / 12) * Math.PI * 2; R(cx + Math.cos(t) * 10.5 * 0.9, cy + Math.sin(t) * 14, 1, 1, '#9a968e'); } // 리벳
-  for (let a = 0; a < 3; a++) { const t = (a / 3) * Math.PI; line([cx - Math.cos(t) * 6, cy - Math.sin(t) * 8], [cx + Math.cos(t) * 6, cy + Math.sin(t) * 8], 1.5, '#c9a23e'); }
-  g.fillStyle = '#c9a23e'; g.beginPath(); g.arc(cx, cy, 2.5, 0, Math.PI * 2); g.fill();
-  // 문 앞 돌계단
-  poly([P(m - 0.6, j1, 2), P(m + 0.6, j1, 2), P(m + 0.6, j1 + 0.25, 0), P(m - 0.6, j1 + 0.25, 0)], shade(STONE[floor], 0.75));
+  const stoneL = shade(STONE[floor], 1.5), stoneD = shade(STONE[floor], 0.55);
+  const arch = (half: number, z0: number, rise: number, dd: number): Pt[] => {
+    const pts: Pt[] = [];
+    for (let a = 0; a <= 14; a++) { const t = a / 14; pts.push(P(m - half + t * half * 2, j1 + dd, z0 + Math.sin(t * Math.PI) * rise)); }
+    return pts;
+  };
+  // 문틀: 바깥 돌 테 (벽에서 살짝 튀어나온다) → 그늘 → 어두운 문 구멍
+  poly([P(m + 0.72, j1 + 0.07, 0), P(m - 0.72, j1 + 0.07, 0), ...arch(0.72, 34, 13, 0.07)], '#100c0a'); // 문틀 그림자 테
+  poly([P(m + 0.66, j1 + 0.06, 0), P(m - 0.66, j1 + 0.06, 0), ...arch(0.66, 33, 12, 0.06)], stoneL);
+  for (let t = 0; t < 8; t++) { const z = 4 + t * 4; qL(m - 0.66, m - 0.5, z, z + 1, stoneD, 1, 0.06); qL(m + 0.5, m + 0.66, z, z + 1, stoneD, 1, 0.06); } // 돌 이음매
+  for (let a = 1; a < 7; a++) { const t = a / 7; line(P(m - 0.66 + t * 1.32, j1 + 0.065, 33 + Math.sin(t * Math.PI) * 12), P(m - 0.5 + t * 1.0, j1 + 0.065, 31 + Math.sin(t * Math.PI) * 10), 1, stoneD); } // 아치 돌 이음
+  poly([P(m + 0.5, j1 + 0.04, 0), P(m - 0.5, j1 + 0.04, 0), ...arch(0.5, 31, 10, 0.04)], '#0c0806');
+  // 쐐기돌 (아치 꼭대기)
+  { const [kx, ky] = P(m, j1 + 0.07, 42); poly([[kx - 4, ky - 1], [kx + 4, ky - 1], [kx + 3, ky + 6], [kx - 3, ky + 6]], shade(STONE[floor], 1.35)); R(kx - 1, ky + 1, 2, 3, '#c9a23e'); }
+  // 두 짝 나무문 (판자 결 · 쇠띠 · 징)
+  const wood = floor === 2 ? '#3a3424' : floor === 3 ? '#4a1e16' : '#3a2a1e';
+  for (const [a0, a1] of [[m - 0.46, m - 0.02], [m + 0.02, m + 0.46]] as [number, number][]) {
+    poly([P(a1, j1 + 0.03, 0), P(a0, j1 + 0.03, 0), ...arch(0.46, 29, 9, 0.03).filter(([x]) => { const [xa] = P(a0, j1 + 0.03, 0), [xb] = P(a1, j1 + 0.03, 0); return x >= Math.min(xa, xb) - 0.5 && x <= Math.max(xa, xb) + 0.5; })], wood);
+    for (let t = 1; t < 4; t++) { const x = a0 + ((a1 - a0) * t) / 4; qL(x, x + 0.012, 0, 28, shade(wood, 0.6), 1, 0.03); }
+    for (const z of [6, 17, 26]) { qL(a0, a1, z, z + 2, '#2a2826', 1, 0.035); for (let t = 0; t < 4; t++) { const [sx, sy] = P(a0 + 0.05 + t * ((a1 - a0 - 0.1) / 3), j1 + 0.04, z + 1); R(sx, sy - 1, 1, 1, '#9a968e'); } }
+  }
+  qL(m - 0.02, m + 0.02, 0, 30, '#ffb04a', 0.9, 0.03); // 가운데 틈의 빛
+  for (const x of [m - 0.16, m + 0.16]) { const [rx, ry] = P(x, j1 + 0.05, 15); g.strokeStyle = '#b08a3a'; g.lineWidth = 1.2; g.beginPath(); g.ellipse(rx, ry + 2, 2.2, 2.8, 0, 0, Math.PI * 2); g.stroke(); R(rx - 1, ry - 2, 2, 2, '#5a4a2a'); } // 쇠고리
+  // 반쯤 올린 쇠살문의 이빨
+  for (let t = 0; t < 9; t++) { const x = m - 0.42 + t * 0.105; qL(x, x + 0.025, 29 + Math.sin((t / 8) * Math.PI) * 6, 34 + Math.sin((t / 8) * Math.PI) * 8, '#3a3836', 1, 0.045); }
+  // 문 양옆 돌화로 (층마다 불빛이 다르다)
+  for (const x of [m - 0.78, m + 0.68]) {
+    poly([P(x, j1 + 0.25, 10), P(x + 0.12, j1 + 0.25, 10), P(x + 0.12, j1 + 0.25, 0), P(x, j1 + 0.25, 0)], stoneD);
+    const [fx, fy] = P(x + 0.06, j1 + 0.25, 10);
+    R(fx - 3, fy - 2, 7, 2, shade(STONE[floor], 0.9));
+    R(fx - 2, fy - 5, 5, 3, floor === 2 ? '#8ad06a' : floor === 3 ? '#ff4a2a' : '#ff9a3a'); R(fx - 1, fy - 7, 3, 2, floor === 2 ? '#c8f08a' : '#ffd27a');
+  }
   // 문 위 큰 노전 문장 (가운데 네모 구멍)
   { const [ex, ey] = P(m, j1 + 0.01, Hw - 10);
     g.fillStyle = '#8a6a2a'; g.beginPath(); g.ellipse(ex, ey, 9, 7, 0, 0, Math.PI * 2); g.fill();

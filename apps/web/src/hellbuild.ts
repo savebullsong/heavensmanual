@@ -569,6 +569,7 @@ function burnt(b: Building, theme: Theme) {
 
 /** 지옥의 집·덩어리 한 채 */
 export function drawHellBuild(b: Building, kind: HellBuildKind, theme: Theme): { canvas: HTMLCanvasElement; x: number; y: number } {
+  if (kind === 'idol') return theme === 'ash' ? demonIdol(b) : theme === 'swamp' ? hungryMaw(b) : bloodScale(b);
   if (kind === 'thatch') return thatch(b, theme);
   if (kind === 'prison') return prison(b, theme);
   if (kind === 'bonehouse') return bonehouse(b, theme);
@@ -578,4 +579,143 @@ export function drawHellBuild(b: Building, kind: HellBuildKind, theme: Theme): {
   if (kind === 'burnt') return burnt(b, theme);
   if (kind === 'bonepile') return bonepile(b, theme);
   return guts(b, theme);
+}
+
+
+// ───────── 17차: 마을의 조형물 (들어갈 수 없는 건물 대신) — 층마다 다르다 ─────────
+/** 계단식 돌 받침 (위에서 본 네모 두 단) */
+function plinth(cv: Cv, b: Building, z0: number, z1: number, inset: number, top: string, left: string, right: string) {
+  const { P, poly } = cv;
+  const { i0, j0, w, d } = b, a0 = i0 + inset, a1 = i0 + w - inset, c0 = j0 + inset, c1 = j0 + d - inset;
+  poly([P(a0, c1, z0), P(a1, c1, z0), P(a1, c1, z1), P(a0, c1, z1)], left);
+  poly([P(a1, c1, z0), P(a1, c0, z0), P(a1, c0, z1), P(a1, c1, z1)], right);
+  poly([P(a0, c0, z1), P(a1, c0, z1), P(a1, c1, z1), P(a0, c1, z1)], top);
+}
+
+/** 1층: 재의 악마상 — 두 단 현무암 받침 위에 무릎 꿇은 거대한 뿔 달린 악마. 접은 박쥐 날개, 불씨 눈, 앞으로 내민 손에 공물 그릇.
+ *  받침 앞에는 화로 둘과 공물(해골·촛불), 둘레에는 재 더미. 영혼들이 그 앞에 엎드려 빈다 */
+function demonIdol(b: Building) {
+  const top = b.h + 24;
+  const cv = canvasFor(b, top, 22);
+  const { g, P, R, line, finish } = cv;
+  const { i0, j0, w, d } = b, i1 = i0 + w, j1 = j0 + d;
+  plinth(cv, b, 0, 7, 0.05, '#4a4642', '#3a3634', '#2a2624');
+  plinth(cv, b, 7, 13, 0.5, '#56524c', '#403c38', '#2e2a28');
+  const [cx, cy] = P(i0 + w / 2, j0 + d / 2, 13);
+  const K = 1.85; // 상의 크기
+  const stone = '#2c2826', stoneL = '#4a4440', stoneD = '#1a1614', ember = '#ff7a2a', ember2 = '#ffd27a';
+  const X = (a: number) => cx + a * K, Y = (a: number) => cy + a * K;
+  const E = (x: number, y: number, rx: number, ry: number, col: string) => { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); g.fill(); };
+  const EK = (a: number, b2: number, rx: number, ry: number, col: string) => E(X(a), Y(b2), rx * K, ry * K, col);
+  const LK = (a: [number, number], b2: [number, number], wd: number, col: string) => line([X(a[0]), Y(a[1])], [X(b2[0]), Y(b2[1])], wd * K, col);
+  // 접은 날개 (몸 뒤로 솟은 뼈대와 막)
+  for (const sx of [-1, 1]) {
+    g.fillStyle = stoneD; g.beginPath();
+    for (const [n, [a, b2]] of ([[6, -44], [26, -78], [30, -60], [22, -40], [24, -24], [10, -18]] as [number, number][]).entries()) { if (n === 0) g.moveTo(X(sx * a), Y(b2)); else g.lineTo(X(sx * a), Y(b2)); }
+    g.closePath(); g.fill();
+    LK([sx * 6, -44], [sx * 26, -78], 1.1, stoneL); LK([sx * 26, -78], [sx * 22, -40], 0.6, stone); LK([sx * 26, -78], [sx * 12, -22], 0.6, stone);
+    for (let k = 0; k < 3; k++) LK([sx * (24 - k * 3), -70 + k * 10], [sx * (14 - k * 2), -26 + k * 2], 0.4, '#24201e'); // 날개막 결
+  }
+  // 무릎 꿇은 다리와 몸통
+  EK(-8, -4, 9, 5, stone); EK(8, -4, 9, 5, stone); EK(-10, -6, 4, 3, stoneL);
+  EK(0, -22, 13, 16, stone); EK(-3, -26, 8, 10, stoneL);
+  for (let k = 0; k < 4; k++) R(X(-7), Y(-30 + k * 4), 14 * K, K, stoneD); // 갈비 같은 근육 결
+  // 어깨와 앞으로 내민 팔, 손바닥 위 공물 그릇 (안에 불씨)
+  EK(-12, -34, 6, 5, stoneL); EK(12, -34, 6, 5, stone);
+  LK([-14, -32], [-10, -14], 5, stone); LK([14, -32], [10, -14], 5, stone);
+  EK(0, -12, 10, 4, stoneD); EK(0, -13, 8, 2.5, '#4a1a0a'); R(X(-3), Y(-15), 6 * K, 2 * K, ember); R(X(-1), Y(-17), 2 * K, 2 * K, ember2);
+  // 머리: 짐승 같은 주둥이, 불씨 눈, 크게 말린 숫양 뿔
+  EK(0, -46, 7, 8, stone); EK(0, -41, 5, 4, stoneL);
+  for (const sx of [-1, 1]) { R(X(sx * 3 - 1), Y(-48), 2 * K, 2 * K, ember); R(X(sx * 3 - 1), Y(-48), K, K, ember2); }
+  R(X(-3), Y(-39), 6 * K, K, '#140c0a'); R(X(-3), Y(-40), K, 2 * K, '#c8bca8'); R(X(2), Y(-40), K, 2 * K, '#c8bca8'); // 송곳니
+  for (const sx of [-1, 1]) {
+    let px = 5 * sx, py = -52;
+    for (let k = 0; k < 9; k++) { const a = (k / 8) * Math.PI * 1.4; const nx = sx * (6 + Math.sin(a) * 11), ny = -54 - Math.cos(a) * 9 + k * 0.6; LK([px, py], [nx, ny], Math.max(0.8, 2.2 - k * 0.16), k % 2 ? '#3a2e26' : '#4a3c30'); px = nx; py = ny; }
+  }
+  // 재가 쌓인 머리와 어깨
+  R(X(-6), Y(-54), 12 * K, 2, '#8a8580'); R(X(-16), Y(-39), 8 * K, 2, '#8a8580'); R(X(9), Y(-39), 8 * K, 2, '#7a7570');
+  // 받침 앞: 화로 둘 · 해골 공물 · 촛불
+  for (const x of [i0 + 0.3, i1 - 0.4]) {
+    const [fx, fy] = P(x, j1 + 0.1, 0);
+    R(fx - 1, fy - 14, 3, 14, '#1a1412'); E(fx + 0.5, fy - 15, 6, 2, '#2a2420');
+    R(fx - 3, fy - 21, 7, 5, ember); R(fx - 1, fy - 25, 3, 4, ember2); R(fx, fy - 27, 1, 2, '#fff0c0');
+  }
+  for (let k = 0; k < 3; k++) { const [x, y] = P(i0 + 0.9 + k * 0.5, j1 + 0.15, 7); skull(cv, x, y - 2); }
+  for (let k = 0; k < 6; k++) { const [x, y] = P(i0 + 0.6 + k * 0.32, j1 + 0.2, 0); R(x, y - 4, 1, 4, '#efe6d0'); R(x, y - 6, 1, 2, '#ffc04a'); }
+  for (let k = 0; k < 7; k++) { const [x, y] = P(i0 + hash(k, 1, i0) * w, j0 + hash(k, 2, j0) * d, 0); E(x, y, 4 + hash(k, 3) * 4, 2, '#6a6560'); }
+  finish();
+  return { canvas: cv.c, x: cv.minX, y: cv.minY };
+}
+
+/** 2층: 굶주린 아가리 — 진흙 늪에 반쯤 잠긴 거대한 돌 얼굴. 턱이 빠질 듯 벌린 입 속은 끝없는 어둠, 깨진 이빨,
+ *  눈구멍에서 흘러내린 이끼 물, 입 앞에 놓인 빈 그릇과 뼈다귀 (먹을 것을 바쳐도 채워지지 않는다) */
+function hungryMaw(b: Building) {
+  const top = b.h + 10;
+  const cv = canvasFor(b, top, 16);
+  const { g, P, R, line, finish } = cv;
+  const { i0, j0, w, d } = b, j1 = j0 + d;
+  const E = (x: number, y: number, rx: number, ry: number, col: string) => { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); g.fill(); };
+  const [cx, cy] = P(i0 + w / 2, j0 + d / 2, 0);
+  // 둘레의 진흙 웅덩이
+  E(cx, cy + 4, 40, 13, '#2e2618'); E(cx, cy + 3, 34, 10, '#3a3020');
+  // 머리통 (이끼 낀 녹회색 돌)
+  const st = '#4a5040', stL = '#5e6650', stD = '#2e3428';
+  E(cx, cy - 30, 30, 30, st); E(cx - 8, cy - 40, 16, 14, stL);
+  // 이마 주름과 눈두덩, 텅 빈 눈구멍에서 흘러내린 물때
+  for (let k = 0; k < 3; k++) line([cx - 18, cy - 50 + k * 4], [cx + 18, cy - 51 + k * 4], 1, stD);
+  for (const sx of [-1, 1]) {
+    E(cx + sx * 11, cy - 36, 6, 4, '#0e100c');
+    R(cx + sx * 11 - 1, cy - 33, 2, 10, '#2e3e22'); R(cx + sx * 11, cy - 24, 1, 5, '#3e5a2a');
+  }
+  // 벌린 입: 위턱 이빨 → 끝없는 어둠 → 아래턱이 진흙에 잠긴다
+  g.fillStyle = '#050605'; g.beginPath(); g.moveTo(cx - 20, cy - 24); g.quadraticCurveTo(cx, cy - 30, cx + 20, cy - 24); g.quadraticCurveTo(cx + 22, cy - 2, cx, cy + 2); g.quadraticCurveTo(cx - 22, cy - 2, cx - 20, cy - 24); g.fill();
+  for (let k = 0; k < 7; k++) { const x = cx - 16 + k * 5.3, h = k === 2 ? 2 : 4 + (k % 2) * 2; g.fillStyle = '#b8b098'; g.beginPath(); g.moveTo(x - 2, cy - 26 + Math.abs(k - 3) * 0.6); g.lineTo(x + 2, cy - 26 + Math.abs(k - 3) * 0.6); g.lineTo(x, cy - 26 + h + Math.abs(k - 3) * 0.6); g.fill(); }
+  for (let k = 0; k < 6; k++) { const x = cx - 13 + k * 5.2; g.fillStyle = k === 4 ? '#6a6250' : '#a8a088'; g.beginPath(); g.moveTo(x - 2, cy - 1); g.lineTo(x + 2, cy - 1); g.lineTo(x, cy - 5 - (k % 2)); g.fill(); }
+  // 입에서 늘어진 침 (녹빛)
+  for (const x of [cx - 9, cx + 6]) { R(x, cy - 22, 1, 12, '#8ab05a'); R(x, cy - 10, 2, 2, '#a8d06a'); }
+  // 이끼 덩어리와 진흙 튄 자국
+  for (let k = 0; k < 14; k++) { const a = hash(k, 1, i0) * Math.PI * 2, rr = 22 + hash(k, 2, j0) * 8; E(cx + Math.cos(a) * rr * 0.9, cy - 30 + Math.sin(a) * rr * 0.9, 3 + hash(k, 3) * 3, 2, hash(k, 4) < 0.5 ? '#3e5a2a' : '#56702e'); }
+  // 입 앞: 빈 그릇 넷과 뼈다귀 (먹을 것은 없다)
+  for (let k = 0; k < 4; k++) { const [x, y] = P(i0 + 0.5 + k * 0.6, j1 + 0.25, 0); E(x, y - 1, 4, 1.6, '#5a4a36'); E(x, y - 1.6, 3, 1, '#1a140e'); }
+  for (let k = 0; k < 3; k++) { const [x, y] = P(i0 + 0.8 + k * 0.7, j1 + 0.45, 0); line([x - 3, y], [x + 3, y - 1], 2, BONE2); R(x - 4, y - 1, 2, 2, BONE); R(x + 3, y - 2, 2, 2, BONE); }
+  finish();
+  return { canvas: cv.c, x: cv.minX, y: cv.minY };
+}
+
+/** 3층: 피의 저울 — 핏빛 돌 받침 위 쇠기둥, 가로대 양 끝에 사슬로 매단 두 접시: 한쪽엔 뛰는 심장, 한쪽엔 노전 더미.
+ *  늘 노전 쪽으로 기운다. 가로대 끝의 붉은 등롱, 받침을 타고 흐르는 피, 바닥에 흩어진 동전 */
+function bloodScale(b: Building) {
+  const top = b.h + 24;
+  const cv = canvasFor(b, top, 18);
+  const { g, P, R, line, finish } = cv;
+  const { i0, j0, w, d } = b, j1 = j0 + d;
+  const E = (x: number, y: number, rx: number, ry: number, col: string) => { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); g.fill(); };
+  plinth(cv, b, 0, 10, 0.1, '#5a2a24', '#4a1e1a', '#36140f');
+  plinth(cv, b, 10, 18, 0.7, '#6a3028', '#521f1a', '#3a1410');
+  const [cx, cy] = P(i0 + w / 2, j0 + d / 2, 18);
+  const iron = '#3a3634', gold = '#c9a23e', goldD = '#8a6a2a';
+  // 기둥과 꼭대기 장식 (눈 하나)
+  R(cx - 2, cy - 74, 5, 74, iron); R(cx - 1, cy - 74, 1, 74, '#5a5652');
+  E(cx + 0.5, cy - 78, 5, 5, gold); E(cx + 0.5, cy - 78, 2.5, 2.5, '#2a0a06'); R(cx, cy - 79, 1, 1, '#ff4a2a');
+  // 기운 가로대 (노전 쪽 = 왼쪽이 낮다)
+  const L: Pt = [cx - 30, cy - 66], Rr: Pt = [cx + 31, cy - 74];
+  line(L, Rr, 3, goldD); line([L[0], L[1] - 1], [Rr[0], Rr[1] - 1], 1, gold);
+  // 사슬과 접시
+  const pan = (p: Pt, drop: number, fill: (x: number, y: number) => void) => {
+    for (const dx of [-7, 0, 7]) for (let k = 0; k < drop; k += 3) R(p[0] + (dx * k) / drop, p[1] + k, 1, 2, '#6a6660');
+    E(p[0], p[1] + drop, 10, 3, goldD); E(p[0], p[1] + drop - 1, 9, 2, gold);
+    fill(p[0], p[1] + drop - 2);
+  };
+  pan(L, 30, (x, y) => { for (let k = 0; k < 9; k++) E(x - 6 + (k % 5) * 3, y - 1 - Math.floor(k / 5) * 2, 2, 1, k % 2 ? '#d9b44a' : '#f2d27a'); });
+  pan(Rr, 22, (x, y) => { E(x, y - 3, 4, 4, '#8a0e0c'); E(x - 1, y - 4, 2, 2, '#d8281e'); R(x + 1, y - 8, 1, 3, '#5a0606'); R(x - 2, y - 7, 1, 2, '#5a0606'); });
+  // 가로대 끝의 붉은 등롱
+  for (const p of [L, Rr]) {
+    const x = p[0] + (p === L ? -4 : 4), y = p[1] + 2;
+    R(x, y, 1, 4, '#1a0c08'); R(x - 3, y + 4, 7, 7, '#6a0a08'); R(x - 2, y + 4, 5, 7, '#d8281e'); R(x - 1, y + 6, 2, 3, '#ff8a4a'); R(x, y + 11, 1, 3, gold);
+  }
+  // 받침을 타고 흐르는 피와 바닥에 흩어진 동전
+  for (let k = 0; k < 5; k++) { const [x, y] = P(i0 + 0.3 + k * (w - 0.6) / 4, j1 - 0.1, 18); R(x, y, 1, 8 + (k * 5) % 9, '#7a0a08'); }
+  for (let k = 0; k < 10; k++) { const [x, y] = P(i0 + hash(k, 1, i0) * w, j1 + 0.1 + hash(k, 2, j0) * 0.4, 0); R(x, y - 1, 2, 1, hash(k, 3) < 0.5 ? '#d9b44a' : '#a8823a'); }
+  finish();
+  return { canvas: cv.c, x: cv.minX, y: cv.minY };
 }
