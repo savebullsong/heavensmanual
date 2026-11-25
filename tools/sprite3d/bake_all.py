@@ -81,6 +81,12 @@ for sex in 'mf':
         jobs.append({'sex': sex, 'build': b, 'sets': sets, 'only': ['idle2', 'walk2'], 'merge': True, 'tag': 'hold19'})
 # ── 24차: 4층 층주 도르칸 (가시 갑옷 기사 + 사슬 철퇴 지팡이)
 jobs.append({'sex': 'm', 'build': 1, 'monster': 'z', 'occluder': 'forgeknight', 'sets': [{'kind': 'base', 'outfit': 'forgeknight', 'mode': 'm'}, {'kind': 'weapon', 'weapon': 'chainmace'}], 'tag': 'forge24'})
+# ── 25차: 검은 마스크(헬멧 자리) · 화염방사기(쏘는 자세) · 4층 쇠망치병(야크 + 오함마) · 철갑마(가시 갑옷 + 대검)
+for sex in 'mf':
+    jobs.append({'sex': sex, 'build': 1, 'sets': [{'kind': 'weapon', 'weapon': 'flamer'}] + [{'kind': 'armor', 'piece': 'mask', 'mode': m, 'extra': ['heavy'] if m == 'm' else []} for m in MODES], 'tag': 'r25'})
+    jobs.append({'sex': sex, 'build': 1, 'sets': [{'kind': 'armor', 'piece': 'mask', 'mode': 'm', 'extra': ['idle2', 'walk2']}], 'only': ['idle2', 'walk2'], 'merge': True, 'tag': 'r25'})
+jobs.append({'sex': 'm', 'build': 1, 'monster': 'y', 'occluder': 'yak', 'sets': [{'kind': 'weapon', 'weapon': 'sledge'}], 'tag': 'r25'})
+jobs.append({'sex': 'm', 'build': 1, 'monster': 'z', 'occluder': 'forgeknight', 'sets': [{'kind': 'weapon', 'weapon': 'greatsword'}], 'tag': 'r25'})
 # ── 20차: 한손검 · 왼팔 방패 (맨손 u · 무기 m 자세, 보통 체형 하나로 모든 체형에) ──
 for sex in 'mf':
     jobs.append({'sex': sex, 'build': 1, 'sets': [{'kind': 'weapon', 'weapon': 'arming'}] + [{'kind': 'armor', 'piece': 'shield', 'mode': m} for m in ('u', 'm')], 'tag': 'shield20'})

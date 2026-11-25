@@ -211,6 +211,15 @@ export function gunshot(s: Spot) {
   tone(o, t, 0.2, 'sine', 95, 38, 0.9);
 }
 
+/** 25차 불길: 낮게 으르렁대는 바람 + 타닥거림 (화염방사기 · 불씨귀) */
+export function flame(s: Spot) {
+  if (!ready()) return;
+  const t = ctx!.currentTime, o = out(s, 1);
+  noise(o, t, 0.5, 'lowpass', jit(700), 260, 0.8, 0.7, 0.04);
+  noise(o, t, 0.42, 'bandpass', jit(1800), 900, 1.4, 0.3, 0.03);
+  for (let k = 0; k < 4; k++) noise(o, t + 0.05 + k * 0.08 + Math.random() * 0.04, 0.02, 'highpass', jit(3200), 2400, 0.7, 0.25, 0.001);
+}
+
 /** 뼈주사위가 나무 상자 위를 구르는 소리: 짧은 딸깍 여럿이 잦아든다 */
 export function dice() {
   if (!ready()) return;

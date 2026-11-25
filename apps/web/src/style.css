@@ -381,7 +381,7 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 
 /* 20차: 장비 탭의 몸 그림 (위) + 넘겨 보는 목록 (아래) */
 .bag-panel .menu-list { flex: 1 1 auto; min-height: 0; }
-.bag-doll { position: relative; display: grid; grid-template-columns: 1fr 1.1fr 1fr; grid-template-areas: "weapon head offhand" "weapon body offhand" "hands legs ammo" "hands shins ammo" ". feet ."; gap: 4px; padding: 8px 10px 6px; border-bottom: 1px solid #4f3a28; flex: 0 0 auto; }
+.bag-doll { position: relative; display: grid; grid-template-columns: 1fr 1.1fr 1fr; grid-template-areas: "weapon head offhand" "weapon body offhand" "hands legs ammo" "hands shins ammo" ". feet ." "info info info"; gap: 4px; padding: 8px 10px 6px; border-bottom: 1px solid #4f3a28; flex: 0 0 auto; }
 .bag-doll .doll-fig { position: absolute; left: 50%; top: 8px; height: calc(100% - 14px); transform: translateX(-50%); fill: rgba(224, 180, 55, 0.1); stroke: rgba(224, 180, 55, 0.34); stroke-width: 0.8; stroke-linejoin: round; pointer-events: none; }
 .bag-doll .doll-fig .hair { fill: rgba(224, 180, 55, 0.18); }
 .doll-slot { position: relative; display: flex; align-items: center; gap: 4px; min-height: 34px; padding: 3px 5px; font-size: 11px; text-align: left; background: rgba(32, 23, 17, 0.72); border: 1px dashed #4f3a28; border-radius: 4px; color: #c8b898; overflow: hidden; }
@@ -392,13 +392,24 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 .doll-slot .empty { color: #6a5a48; }
 .ds-weapon { grid-area: weapon; } .ds-offhand { grid-area: offhand; } .ds-head { grid-area: head; } .ds-body { grid-area: body; }
 .ds-ammo { grid-area: ammo; } .ds-hands { grid-area: hands; } .ds-legs { grid-area: legs; } .ds-shins { grid-area: shins; } .ds-feet { grid-area: feet; }
-.doll-slot .off { position: absolute; bottom: 2px; right: 4px; font-style: normal; font-size: 10px; color: #b88a6a; }
+/* 25차: ✕를 정확히 눌러야 벗는다 (칸을 누르면 자세한 효과) · 공격력·방어력은 칸에 늘 */
+.doll-slot.on { cursor: pointer; padding-right: 26px; }
+.doll-slot.sel { border-color: #e0b437; box-shadow: 0 0 0 1px rgba(224, 180, 55, 0.45) inset; }
+.doll-slot .ds-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.doll-slot .ds-text span { padding-top: 6px; }
+.doll-slot .stat { font-size: 10px; font-weight: 700; color: #f2cf5a; white-space: nowrap; }
+.doll-slot .off { position: absolute; bottom: 2px; right: 2px; width: 22px; height: 22px; padding: 0; border: 1px solid #6a4a30; border-radius: 4px; background: rgba(20, 14, 10, 0.8); font-size: 11px; line-height: 20px; color: #e0a888; cursor: pointer; }
+.doll-slot .off:hover, .doll-slot .off:focus-visible { border-color: #c8603a; color: #ffd0b8; }
+.doll-slot .reload { position: absolute; bottom: 2px; right: 2px; height: 20px; padding: 0 6px; border: 1px solid #8a6a3a; border-radius: 4px; background: rgba(60, 42, 24, 0.9); font-size: 10px; color: #f2e6c8; cursor: pointer; }
+.doll-slot.ds-ammo.unloaded > span, .doll-slot.ds-ammo.unloaded > .icon { opacity: 0.45; }
+.doll-info { grid-area: info; min-height: 18px; padding: 2px 4px; font-size: 11px; color: #d8c8a8; line-height: 1.35; }
+.ammo-chip.off { opacity: 0.5; }
 /* 21차: 넘치는 체력 (마사지) */
 .hp-over { margin-left: 4px; font-size: 11px; font-weight: 800; color: #f2cf5a; text-shadow: 0 0 6px rgba(242, 207, 90, 0.6); }
 
 /* 23차: 화살·탄약 — 장비 몸 그림의 칸, 공격 버튼 위의 남은 수 */
 .doll-slot.ds-ammo { flex-wrap: wrap; align-content: center; }
-.doll-slot.ds-ammo:disabled { opacity: 1; cursor: default; }
+.doll-slot.ds-ammo { padding-right: 26px; }
 .doll-slot.ds-ammo.dry { border-color: #a8402a; }
 .doll-slot.ds-ammo.dry span { color: #ff9a80; }
 .ammo-chip { position: fixed; z-index: 15; right: 14px; bottom: 88px; width: 54px; height: 30px; padding: 0 6px 0 2px; border-radius: 15px; background: rgba(20, 15, 11, 0.6); border: 2px solid rgba(201, 162, 62, 0.6); display: flex; align-items: center; justify-content: space-between; gap: 2px; backdrop-filter: blur(2px); }

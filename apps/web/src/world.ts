@@ -9,7 +9,7 @@ import { wingTexture, cloudTexture, heavenVignette, cloudStairTexture, terraceSk
 import { hellDecor } from './hellprops.ts';
 import { Application, ColorMatrixFilter, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture, TilingSprite } from 'pixi.js';
 import { type Look } from './character.ts';
-import { MISS_HWANG, TALUS_LOOK, charSet, frameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, ANIM_FPS, IMPACT, TWO, type CharSet, type Dir, type Anim, type Frame } from './sprites.ts';
+import { MISS_HWANG, TALUS_LOOK, MASKGIRL_LOOK, charSet, frameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, ANIM_FPS, IMPACT, TWO, type CharSet, type Dir, type Anim, type Frame } from './sprites.ts';
 import { type Zone, type Building, type Lane, type Prop, type HellVendor, type Furn, findPath, walkable, randomWalkTileNear, tileAt } from './zone.ts';
 import { iso, TW, TH, drawBuilding, drawGroundChunk, buildingHeight } from './gfx.ts';
 import { drawBuildingKit, drawGroundKit, buildingTop, upperFloors, carSprite, propSprite, CAR_MODELS, CHUNK, kitOk } from './street.ts';
@@ -85,7 +85,7 @@ function tex(c: HTMLCanvasElement): Texture {
   return tx;
 }
 
-export type NpcKind = 'passer' | 'thug' | 'suturer' | 'monster' | 'pashar' | 'clerk' | 'angel' | 'yellowwing' | 'officer' | 'guard' | 'talus' | 'soul' | 'vendor' | 'fighter' | 'elder' | 'sleeper' | 'goat';
+export type NpcKind = 'passer' | 'thug' | 'suturer' | 'monster' | 'pashar' | 'clerk' | 'angel' | 'yellowwing' | 'officer' | 'guard' | 'talus' | 'soul' | 'vendor' | 'fighter' | 'elder' | 'sleeper' | 'goat' | 'maskgirl';
 export type Realm = 'real' | 'ghost' | 'hell' | 'heaven' | 'border'; // 24차: border = 경계의 해변 (귀신 대신)
 export type Stance = 'talk' | 'hostile' | 'all';
 /** name = 아이디(프로필·신고에 쓰는 열쇠), nick = 게임 속 이름(보이는 이름) */
@@ -221,6 +221,8 @@ export interface WorldHooks {
   cash(): number;
   /** 지옥: 계단·파샤르 */
   hellAct(kind: 'up' | 'down' | 'pashar' | 'talus'): void;
+  /** 25차: 지옥 1층 마스크 팔이 소녀의 바구니 */
+  maskGirl(): void;
   /** 지옥: 층주를 쓰러뜨렸다 */
   bossDown(floor: number): void;
   /** 지옥: 노전을 주웠다 */
@@ -252,7 +254,7 @@ export interface WorldHooks {
   /** 가방에 먹을 것이 있는가 (구르마가 덤비지 않고 조른다) */
   hasFood(): boolean;
 }
-export interface Gear { atk: number; def: number; dr?: number; ranged: boolean; weapon: string | null; armor: string[] }
+export interface Gear { atk: number; def: number; dr?: number; ranged: boolean; flame?: boolean; weapon: string | null; armor: string[] }
 
 const PED_COUNT = 14;
 const THUG_COUNT = 4;
@@ -269,6 +271,7 @@ const WAGE_PER_SEC = WAGE_PER_HOUR / 3600;
 const ATK_INTERVAL = 0.62; // 6차: 더 빠르게
 const MELEE = 1.25;
 const RANGED = 5;
+const FLAME = 3.2; // 25차: 불길이 닿는 거리 (화염방사기 · 불씨귀)
 
 const rand = (a: number, b: number) => a + Math.floor(Math.random() * (b - a + 1));
 /** 행인(중립)이 떨어뜨리는 돈 (1~300): 대개 불량배처럼 몇 바트, 아주 드물게 큰돈 */
@@ -1624,6 +1627,28 @@ export class WorldScene {
     w.home = [spot[0], spot[1]];
     this.walkers.push(w);
   }
+  /** 25차 마스크 팔이 소녀: 휴식 마을 울타리 바깥, 몇 칸 떨어진 고리 위를 천천히 돈다 */
+  private maskGirlSpot(): [number, number] | null {
+    const h = this.zone.hell;
+    if (!h) return null;
+    for (let n = 0; n < 40; n++) {
+      const to = randomWalkTileNear(this.zone, h.rest.i, h.rest.j, h.rest.r + 9, ['lot', 'walk', 'soi']);
+      if (to && Math.hypot(to[0] - h.rest.i, to[1] - h.rest.j) > h.rest.r + 2.5) return to;
+    }
+    return null;
+  }
+  private thinkMaskGirl(w: Walker, moving: boolean, dt: number) {
+    const p = this.player, d = Math.hypot(p.x - w.x, p.y - w.y);
+    w.target = null;
+    if (d < 9 && !w.bubble && Math.random() < dt * 0.05) { const c = t().maskCalls; this.bubble(w, c[Math.floor(Math.random() * c.length)]); }
+    if (!moving && d < 3) { w.dir = dirFromTile(p.x - w.x, p.y - w.y, w.dir); return; } // 손님이 오면 멈춰 선다
+    w.wait -= dt;
+    if (!moving && w.wait <= 0) {
+      const to = this.maskGirlSpot();
+      if (to) w.path = findPath(this.zone, Math.floor(w.x), Math.floor(w.y), to[0], to[1]) ?? [];
+      w.wait = 4 + Math.random() * 7;
+    }
+  }
   private thinkGoat(w: Walker, moving: boolean, dt: number) {
     const p = this.player;
     const d = Math.hypot(p.x - w.x, p.y - w.y);
@@ -2173,6 +2198,14 @@ export class WorldScene {
       this.dotArt(tw, 'sprite-talus');
       tw.dir = 'sw'; tw.wait = 1e9; tw.maxHp = tw.hp = 99999; tw.shotT = 0;
       this.walkers.push(tw);
+    }
+    // 25차: 1층 마을 바깥을 맴도는 마스크 팔이 소녀 (아무도 치지 않고, 아무도 그를 치지 못한다)
+    if (h.floor === 1) {
+      const at = this.maskGirlSpot() ?? [h.rest.i + h.rest.r + 4, h.rest.j];
+      const mg = this.makeWalker(MASKGIRL_LOOK, at[0], at[1], 'maskgirl');
+      this.dotArt(mg, 'sprite-maskgirl');
+      mg.home = [h.rest.i, h.rest.j]; mg.speed = 0.8; mg.wait = 2; mg.maxHp = mg.hp = 99999;
+      this.walkers.push(mg);
     }
     const gk = floorDef(h.floor).guard;
     if (gk && GUARDS[gk]) for (let k = 0; k < 2; k++) this.walkers.push(this.makeGuard(GUARDS[gk], k));
@@ -3576,6 +3609,13 @@ export class WorldScene {
       this.hooks.elder(this.npcName(w));
       return;
     }
+    if (w.kind === 'maskgirl') {
+      w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir);
+      w.path = []; w.wait = 6;
+      if (pd.kind === 'look') { this.hooks.say(this.npcName(w), L.maskLook); return; }
+      this.hooks.maskGirl();
+      return;
+    }
     if (w.kind === 'talus') {
       w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir);
       if (pd.kind === 'look') { this.hooks.say(this.npcName(w), L.talusLook); return; }
@@ -3627,6 +3667,7 @@ export class WorldScene {
     if (w.mdef) return w.mdef.name[lang()];
     if (w.gdef) return w.gdef.name[lang()];
     if (w.kind === 'talus') return L.talus;
+    if (w.kind === 'maskgirl') return L.maskGirl;
     if (w.kind === 'elder') return L.elderName[(this.zone.interior?.kind ?? 'temple') as 'temple'];
     if (w.kind === 'pashar') return L.pashar;
     if (w.kind === 'soul') return L.soulTired;
@@ -3657,11 +3698,12 @@ export class WorldScene {
     if (w.cards) return L.cardSub;
     if (w.kind === 'goat') return L.goatSub;
     if (w.kind === 'clerk') return this.zone.interior?.kind === 'terrace' ? L.officerSub : L.clerkSub[(this.zone.interior?.kind ?? 'shop') as keyof typeof L.clerkSub] ?? '';
-    if (w.mdef) return w.mdef.boss ? L.hellBoss.replace('{n}', String(this.zone.hell?.floor ?? 1)) : L.hellMonster;
+    if (w.mdef) return w.mdef.title ? `${L.hellBoss.replace('{n}', String(this.zone.hell?.floor ?? 1))} · ${w.mdef.title[lang()]}` : w.mdef.boss ? L.hellBoss.replace('{n}', String(this.zone.hell?.floor ?? 1)) : L.hellMonster;
     if (w.kind === 'pashar') return L.pasharSub;
     if (w.kind === 'elder') return L.elderSub;
     if (w.gdef) return L.guardSub;
     if (w.kind === 'talus') return L.talusSub;
+    if (w.kind === 'maskgirl') return L.maskGirlSub;
     if (w.kind === 'soul') return L.soulTiredSub;
     if (w.vend === 'heaven') return this.nameOf(this.zone.buildings[w.shopK ?? 0]);
     if (w.kind === 'vendor' && w.vend && w.vend in L.hvName) return L.hvName[w.vend as keyof typeof L.hvName][1];
@@ -3729,6 +3771,7 @@ export class WorldScene {
     if (this.invisible) { this.bubble(this.player, t().invisibleNoFight); return; } // 투명한 관리자는 싸우지 않는다
     if (w.kind === 'remote' && (this.safeAt(w.x, w.y) || this.safeAt(this.player.x, this.player.y))) { this.hooks.say('', t().pvpSafe); return; }
     if (w.kind === 'talus') { w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); this.bubble(w, t().talusNoFight); return; } // 총구 앞에서는 손을 들 수 없다
+    if (w.kind === 'maskgirl') { w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); this.bubble(w, t().maskNoFight); return; } // 25차: 중립 — 맞지도 때리지도 않는다
     if (w.down > 0) return;
     // 22차: 싸우는 중인 상대를 계속 누르면 — 다섯 번에 한 번, 다음 공격이 반 박자 빨리 나간다 (자동 공격보다 시간당 피해가 조금 많다).
     // 누를 때마다 쿨타임을 지우던 것은 막았다 (연타로 무한히 빨라지지 않게)
@@ -3839,6 +3882,7 @@ export class WorldScene {
     return rollToHit(bonus, armorClass(this.gear.def, this.stats.agi)).hit;
   }
   private hit(from: Walker, to: Walker, dmg: number, crit = false, kind?: sfx.HitKind) {
+    if (to.kind === 'maskgirl') return; // 25차: 소녀는 맞지 않는다
     if (to.down > 0 || this.dead) return;
     // 17차 회피: 공격자가 d20 + 명중 보너스를 굴려 내 회피 등급(10 + 방어력 ÷ 2 + 민첩 ÷ 5)을 넘어야 맞는다. 방어력은 피해를 줄이지 않는다
     if (to.isPlayer && from !== to && !this.rollHits(this.toHitBonus(from))) { this.float(to, t().miss, '#d8e8ff'); return; }
@@ -4202,7 +4246,63 @@ export class WorldScene {
 
   /** 휘두르는 순간의 짧은 빛 줄 */
   /** 맞는 순간의 효과: 근접은 베는 선, 총은 총구 불꽃과 탄도 */
-  private swing(from: Walker, to: Walker, ranged = false) {
+  /** 25차: 불을 뿜는 이 — 화염방사기를 든 나(연료가 남았을 때) · 불씨귀 */
+  private flames(w: Walker) {
+    return w.isPlayer ? !!this.gear.flame && this.gear.ranged : !!w.mdef?.flame;
+  }
+  private fires: { x: number; y: number; vx: number; vy: number; t: number; T: number; d: number; r: number }[] = [];
+  private jets: { x0: number; y0: number; x1: number; y1: number; t: number; w: number }[] = [];
+  private fireG = new Graphics();
+  /** 불길: 분사구에서 표적까지 불덩이가 부풀며 흘러가고, 끝은 그을음이 되어 떠오른다 */
+  private flameJet(from: Walker, to: Walker) {
+    if (!this.fireG.parent) { this.fireG.zIndex = 1e6 - 3; this.objects.addChild(this.fireG); }
+    const [ax, ay] = iso(from.x, from.y), [bx, by] = iso(to.x, to.y);
+    const dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy) || 1;
+    const mx = ax + (dx / L) * 16, my = ay - 24 + (dy / L) * 6;
+    // 불길은 표적을 지나 조금 더 뻗는다
+    const tx = bx + (dx / L) * 10, ty = by - 20 + (dy / L) * 5;
+    const big = from.isPlayer ? 1.15 : 0.85;
+    this.jets.push({ x0: mx, y0: my, x1: tx, y1: ty, t: 0.28, w: big });
+    for (let k = 0; k < 34; k++) {
+      const T = 0.3 + Math.random() * 0.22, go = T * 0.7;
+      const nx = -(ty - my) / L, ny = (tx - mx) / L, sp = (Math.random() - 0.5) * 34;
+      this.fires.push({ x: mx, y: my, vx: (tx - mx) / go + nx * sp, vy: (ty - my) / go + ny * sp * 0.6, t: T, T, d: k * 0.008, r: big * (0.6 + Math.random() * 0.6) });
+    }
+  }
+  private drawFire(dt: number) {
+    const g = this.fireG;
+    if (!this.fires.length && !this.jets.length) { if (g.parent) g.clear(); return; }
+    g.clear();
+    // 분사구에서 뻗는 불줄기: 바깥 주황, 안쪽 노란 심지 (끝으로 갈수록 넓어진다)
+    for (let k = this.jets.length - 1; k >= 0; k--) {
+      const j = this.jets[k];
+      j.t -= dt;
+      if (j.t <= 0) { this.jets.splice(k, 1); continue; }
+      const L = Math.hypot(j.x1 - j.x0, j.y1 - j.y0) || 1, nx = -(j.y1 - j.y0) / L, ny = (j.x1 - j.x0) / L, a = Math.min(1, j.t / 0.12);
+      for (const [wd, col, al] of [[9, 0xe8481a, 0.55], [5.5, 0xffa030, 0.75], [2.2, 0xfff4c0, 0.9]] as [number, number, number][]) {
+        const w0 = 1.2 * j.w, w1 = wd * j.w;
+        g.poly([j.x0 + nx * w0, j.y0 + ny * w0, j.x1 + nx * w1, j.y1 + ny * w1, j.x1 - nx * w1, j.y1 - ny * w1, j.x0 - nx * w0, j.y0 - ny * w0]).fill({ color: col, alpha: al * a });
+      }
+    }
+    for (let k = this.fires.length - 1; k >= 0; k--) {
+      const f = this.fires[k];
+      if (f.d > 0) { f.d -= dt; continue; }
+      f.t -= dt;
+      if (f.t <= 0) { this.fires.splice(k, 1); continue; }
+      const a = 1 - f.t / f.T; // 0 → 1
+      const slow = a > 0.7 ? 0.25 : 1;
+      f.x += f.vx * dt * slow; f.y += f.vy * dt * slow;
+      if (a > 0.7) f.y -= 38 * dt;
+      const r = (2.2 + a * 7.5) * f.r;
+      const col = a < 0.22 ? 0xfff4b0 : a < 0.5 ? 0xffb03a : a < 0.78 ? 0xe8481a : 0x3a2a26;
+      const al = a < 0.78 ? 0.9 - a * 0.4 : (1 - a) * 1.6;
+      if (a < 0.6) g.circle(f.x, f.y, r * 1.6).fill({ color: 0xff7a1a, alpha: 0.12 });
+      g.circle(f.x, f.y, r).fill({ color: col, alpha: al });
+    }
+  }
+
+  private swing(from: Walker, to: Walker, ranged = false, flame = false) {
+    if (flame) { this.flameJet(from, to); return; }
     const g = new Graphics();
     if (ranged && (from.isPlayer ? this.bowOn() : false)) {
       // 24차: 활 — 화살이 날아가 꽂힌다 (총구 불꽃 대신)
@@ -4296,8 +4396,9 @@ export class WorldScene {
     if (!tg) return;
     if (tg.down > 0 || (tg.isPlayer && this.dead)) { w.target = null; return; }
     const dist = Math.hypot(tg.x - w.x, tg.y - w.y);
-    const ranged = w.isPlayer ? this.gear.ranged : w.weapon === 'pistol';
-    const reach = ranged ? RANGED : MELEE;
+    const flame = this.flames(w);
+    const ranged = w.isPlayer ? this.gear.ranged : w.weapon === 'pistol' || flame;
+    const reach = flame ? FLAME : ranged ? RANGED : MELEE;
     // 불량배는 자기 골목에서 너무 멀어지면 포기한다
     if (w.kind === 'thug' && Math.hypot(w.x - w.home[0], w.y - w.home[1]) > (this.gangZone() ? 22 : 14)) { w.target = null; w.path = []; return; }
     // 괴물: 영혼이 휴식 공간에 들어가면 포기, 층주는 자리에서 10칸 넘게 쫓지 않는다
@@ -4373,11 +4474,13 @@ export class WorldScene {
     w.pend = null;
     const tg = pd.to;
     if (tg.down > 0 || (tg.isPlayer && this.dead) || w.down > 0) return;
-    const ranged = w.isPlayer ? this.gear.ranged : w.weapon === 'pistol';
-    if (ranged && (w.isPlayer ? this.gear.weapon : w.weapon) !== 'bow') sfx.gunshot(this.spotOf(w));
-    if (Math.hypot(tg.x - w.x, tg.y - w.y) > (ranged ? RANGED : MELEE) + (w.isPlayer && this.kite ? 2 : 0.6)) return;
+    const flame = this.flames(w);
+    const ranged = w.isPlayer ? this.gear.ranged : w.weapon === 'pistol' || flame;
+    if (flame) sfx.flame(this.spotOf(w));
+    else if (ranged && (w.isPlayer ? this.gear.weapon : w.weapon) !== 'bow') sfx.gunshot(this.spotOf(w));
+    if (Math.hypot(tg.x - w.x, tg.y - w.y) > (flame ? FLAME : ranged ? RANGED : MELEE) + (w.isPlayer && this.kite ? 2 : 0.6)) return;
     if (w.isPlayer) w.lungeT = ranged ? 0 : 0.1;
-    this.swing(w, tg, ranged);
+    this.swing(w, tg, ranged, flame);
     this.hit(w, tg, pd.dmg, pd.crit, this.kindOf(w));
   }
 
@@ -4412,6 +4515,7 @@ export class WorldScene {
   private update(dt: number, realDt = dt) {
     const p = this.player;
     this.drawSparks(realDt);
+    this.drawFire(realDt);
     if (this.zone.hell) { this.drawEmbers(realDt); this.updateHound(dt); this.updateTorture(dt); this.drawGuardFx(dt); this.drawLiquid(realDt); }
     if (this.realm === 'heaven') this.updateHeaven(realDt);
     if (this.shoreFx) this.updateShore(realDt);
@@ -4692,6 +4796,7 @@ export class WorldScene {
     const p = this.player;
     if (w.kind === 'guard') { this.thinkGuard(w, moving, dt); return; }
     if (w.kind === 'talus') { this.thinkTalus(w, dt); return; }
+    if (w.kind === 'maskgirl') { this.thinkMaskGirl(w, moving, dt); return; }
     if (w.pray && Math.random() < dt * 0.04 && Math.hypot(this.player.x - w.x, this.player.y - w.y) < 9) { const m = t().idolMurmur; this.bubble(w, m[Math.floor(Math.random() * m.length)]); }
     if (w.kind === 'vendor' && (w.vend === 'massage' || w.vend === 'bar' || w.vend === 'street' || w.vend === 'heaven')) {
       // 19차: 지나가는 사람을 부른다 (가까이 올수록 자주). 바 호객원은 밤에 더 바쁘다 · 21차: 천국의 천사는 공짜 음식을 권한다

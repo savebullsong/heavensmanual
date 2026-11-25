@@ -39,6 +39,8 @@ export const MISS_HWANG: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColo
 /** 유황새(지옥)의 황혼: 미스 황과는 다른 사람이라고 스스로 믿는다. 검붉은 긴 머리, 핏빛 옷, 창백한 피부 */
 /** 지옥 3층 대부업자 베스크 · 2층 들판의 노름꾼 탈루스 (관리자 도트 칸이 같은 모습을 밑그림으로 쓴다) */
 export const BESK_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'besk', cols: { 1: '#b8382a', 3: '#3a1410', 4: '#2a100c', 5: '#140a08', 6: '#e8c050', 9: '#3a1410', 10: '#e8dcc0', 12: '#f2d27a', 13: '#4a2a1a', 14: '#e0b437', 15: '#140e0c' } };
+/** 25차 지옥 1층 마스크 팔이 소녀: 헝클어진 갈색 단발, 해진 갈색 숄, 검붉은 원피스 (사용자 컨셉 그림) */
+export const MASKGIRL_LOOK: Look = { sex: 'f', build: 0, skin: 0, hair: 2, hairColor: 0, top: 0, bottom: 0, child: true, cols: { 2: '#4a2e1c', 3: '#7a6a56', 4: '#5e2a2e', 5: '#2a1e18' } };
 export const TALUS_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'talus', cols: { 1: '#d8ccb0', 3: '#5a4430', 4: '#3a2e22', 5: '#1a1410', 6: '#ffd08a', 10: '#d8ccb0', 12: '#a8281e', 13: '#2e2420', 14: '#c9a23e', 15: '#140e0c' } };
 export const HWANGHON: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'apron', cols: { 1: '#ead2c4', 2: '#3a0e12', 3: '#5a0e18', 4: '#2a0a10', 5: '#0c0808', 6: '#1a1210', 7: '#140a0c', 9: '#5a0e18', 10: '#ead2c4' } };
 
@@ -46,10 +48,10 @@ export const MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'da
 /** 양손 무기 (16차): 두 손으로 크게 들어 내려찍는다 (heavy 동작) — 느리지만 묵직하다 */
 export const TWO = new Set(['sledge', 'fireaxe', 'greatsword', 'maul']);
 /** 16차 괴물 몸: 차림 → [굽기 키, 자세] (무기를 들면 m) */
-const MON16: Record<string, [string, string, Mode]> = { ashgal: ['h', 'ashgal', 'm'], gurma: ['u', 'gurma', 'u'], cinder: ['n', 'cinder', 'm'], bloat: ['l', 'bloat', 'm'], glutton: ['e', 'glutton', 'm'], hawker: ['v', 'hawker', 'm'], debtor: ['d', 'debtor', 'm'], broker: ['k', 'besk', 'm'], forgeknight: ['z', 'forgeknight', 'm'] }; // 24차: 4층 층주 도르칸
+const MON16: Record<string, [string, string, Mode]> = { ashgal: ['h', 'ashgal', 'm'], gurma: ['u', 'gurma', 'u'], cinder: ['n', 'cinder', 'm'], bloat: ['l', 'bloat', 'm'], glutton: ['e', 'glutton', 'm'], hawker: ['v', 'hawker', 'm'], debtor: ['d', 'debtor', 'm'], broker: ['k', 'besk', 'm'], forgeknight: ['z', 'forgeknight', 'm'] }; // 24차: 4층 층주 바르칸 · 25차 철갑마
 /** 방어구 겉모습: 그리는 순서와 색 (구역 3 = 본색, 구역 5 = 신발) */
 const ARMOR_ORDER = ['workpants', 'shinguard', 'boots', 'jacket', 'vest', 'gloves', 'shield'];
-const ARMOR_COLOR: Record<string, string> = { helmet: '#b0302a', jacket: '#4a5236', vest: '#3a3f46', gloves: '#d8cfb4', workpants: '#4a4536', shinguard: '#2b2f36', boots: '#3a2a1a', shield: '#7a4a2a' };
+const ARMOR_COLOR: Record<string, string> = { mask: '#262322', helmet: '#b0302a', jacket: '#4a5236', vest: '#3a3f46', gloves: '#d8cfb4', workpants: '#4a4536', shinguard: '#2b2f36', boots: '#3a2a1a', shield: '#7a4a2a' };
 const PER_BUILD = new Set(['jacket', 'vest', 'workpants']);
 const COSTUMES = new Set(['raincoat', 'patient', 'parrot', 'robber']); // 강도: 복면이 머리를 덮는다
 /** 맨손 몸(u: 주먹질 장면)까지 구운 차림. 강도는 늘 무기를 들어 무기 자세(m) 몸만 있다 */
@@ -171,10 +173,10 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
   if (o === 'warden1') return { base: 'b-g-warden1-m', hair: null, weapon: 'w-g-knocker', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   if (o === 'warden2') return { base: 'b-o-warden2-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
   if (o === 'warden3') return { base: 'b-w-warden3-m', hair: null, weapon: 'w-w-sealstaff', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
-  if (o === 'yak') return { base: 'b-y-yak-m', hair: null, weapon: weapon === null ? null : 'w-y-club', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
+  if (o === 'yak') return { base: 'b-y-yak-m', hair: null, weapon: weapon === null ? null : `w-y-${weapon ?? 'club'}`, armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   const child = !!look.child;
-  const w = child ? null : weapon && (MELEE.includes(weapon) || TWO.has(weapon) || weapon === 'pistol' || weapon === 'bow') ? weapon : null;
-  let mode: Mode = w === 'pistol' || w === 'bow' ? 'g' : w ? 'm' : 'u'; // 권총·활은 쏘는 자세
+  const w = child ? null : weapon && (MELEE.includes(weapon) || TWO.has(weapon) || weapon === 'pistol' || weapon === 'bow' || weapon === 'flamer') ? weapon : null;
+  let mode: Mode = w === 'pistol' || w === 'bow' || w === 'flamer' ? 'g' : w ? 'm' : 'u'; // 권총·활·화염방사기는 쏘는 자세
   const sex = look.sex;
   const build = Math.max(0, Math.min(2, look.build ?? 1));
   // 우비·환자복·앵무새 옷 차림이라도 몸 방어구(재킷·조끼·작업 바지)를 입으면 그 옷 대신 방어구가 보인다
@@ -191,8 +193,9 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
   const arm: { key: string; piece: string }[] = [];
   if (mode !== 'w') {
     const ab = costume ? 1 : build;
-    for (const piece of [...ARMOR_ORDER, 'helmet']) {
+    for (const piece of [...ARMOR_ORDER, 'mask', 'helmet']) { // 25차: 검은 마스크 (헬멧 자리)
       if (!armor.includes(piece)) continue;
+      if (piece === 'mask' && o === 'parrot') continue;
       if (piece === 'helmet' && costume && o !== 'patient') continue; // 우비 모자·앵무새 머리 위에는 헬멧을 씌우지 않는다
       if (piece === 'shield' && (mode === 'g' || (!!w && TWO.has(w)))) continue; // 20차: 권총·활·양손 무기와는 방패를 들지 않는다
       arm.push({ key: `a-${sex}${PER_BUILD.has(piece) ? ab : 1}-${piece}-${mode}`, piece });
@@ -240,9 +243,10 @@ async function build0(look: Look, keys: ReturnType<typeof layerKeys>): Promise<C
     return { L: arms[k], pal: p2 };
   };
   const order: Lay[] = [{ L: base, pal }];
-  keys.armor.forEach((a, k) => { if (a.piece !== 'helmet') order.push(armorLay(k)); });
+  const overHair = (p: string) => p === 'helmet' || p === 'mask'; // 25차: 마스크도 머리카락 위에
+  keys.armor.forEach((a, k) => { if (!overHair(a.piece)) order.push(armorLay(k)); });
   order.push({ L: hair, pal });
-  keys.armor.forEach((a, k) => { if (a.piece === 'helmet') order.push(armorLay(k)); });
+  keys.armor.forEach((a, k) => { if (overHair(a.piece)) order.push(armorLay(k)); });
   order.push({ L: weap, pal });
   // 모든 층에 있는 장면만 (1배·2배가 섞여 어느 층에 상하좌우 공격 장면이 없으면 대각선 장면을 쓴다)
   const names = base ? Object.keys(base.meta).filter((n) => order.every(({ L }) => !L || n in L.meta)) : [];

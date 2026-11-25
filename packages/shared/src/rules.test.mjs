@@ -1,16 +1,21 @@
 // node --experimental-strip-types 로 rules.ts 를 직접 불러와 확인한다
 import assert from 'node:assert/strict';
-import { judge, hellFloor, evilRatio, addSoulExp, soulExpToNext, applyDeed, carHit, maxHp, isDanger, resurrectionChance, critChance } from './rules.ts';
+import { judge, hellDepth, hellNeed, evilRatio, addSoulExp, soulExpToNext, applyDeed, carHit, maxHp, isDanger, resurrectionChance, critChance } from './rules.ts';
 
 assert.deepEqual(judge({ good: 0, evil: 0 }), { world: 'border' });
 assert.deepEqual(judge({ good: 5, evil: 5 }), { world: 'border' });
 assert.equal(judge({ good: 9, evil: 1 }).world, 'heaven');
 assert.deepEqual(judge({ good: 100, evil: 0 }), { world: 'heaven' });
-assert.equal(hellFloor(51), 1);
-assert.equal(hellFloor(60), 3);
-assert.equal(hellFloor(90), 11);
-assert.equal(hellFloor(100), 13);
-assert.deepEqual(judge({ good: 0, evil: 3 }), { world: 'hell', floor: 13 });
+// 25차: 1~3층은 쉽고, 4층부터는 한 생에 큰 악행을 많이 쌓아야
+assert.equal(hellDepth({ good: 0, evil: 1 }), 1);
+assert.equal(hellDepth({ good: 0, evil: 3 }), 2);
+assert.equal(hellDepth({ good: 1, evil: 6 }), 3);
+assert.equal(hellDepth({ good: 0, evil: 19 }), 3);
+assert.equal(hellDepth({ good: 0, evil: 20 }), 4);
+assert.equal(hellDepth({ good: 10, evil: 20 }), 3); // 비율 66%: 4층(70%)에 못 미친다
+assert.equal(hellDepth({ good: 0, evil: 469 }), 13);
+assert.equal(hellNeed(8).e, 81);
+assert.deepEqual(judge({ good: 0, evil: 3 }), { world: 'hell', floor: 2 });
 assert.deepEqual(judge({ good: 4, evil: 6 }), { world: 'hell', floor: 3 });
 assert.equal(evilRatio({ good: 1, evil: 3 }), 75);
 const up = addSoulExp(1, 0, 800);

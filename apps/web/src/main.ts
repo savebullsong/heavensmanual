@@ -107,18 +107,24 @@ const hellState = () => (state.hell ??= { floor: 1, cleared: [], notes: 0 });
 // ───────────────────────── 세계마다 봉인되는 물건 ─────────────────────────
 /** 지금 가방(장착 포함)을 그 세계의 우주새에 봉인한다 */
 function seal(w: 'real' | 'hell') {
+  // 25차: 세계를 건너도 몸에 남는 물건(검은 마스크)은 봉인하지 않는다 — 끼고 있던 그대로 따라온다
+  const cross = (k: string) => !!ITEMS.find((x) => x.key === k)?.cross;
+  const keepBag: Record<string, number> = {}, keepEq: Partial<Record<Slot, string>> = {};
+  for (const [k, n] of Object.entries(state.bag ?? {})) if (n > 0 && cross(k)) keepBag[k] = n;
+  for (const [slot, k] of Object.entries(state.equip ?? {})) if (k && cross(k)) keepEq[slot as Slot] = k;
   const bag = { ...(state.bag ?? {}) };
-  for (const k of Object.values(state.equip ?? {})) if (k && !bag[k]) bag[k] = 1;
+  for (const k of Object.keys(keepBag)) delete bag[k];
+  for (const k of Object.values(state.equip ?? {})) if (k && !bag[k] && !cross(k)) bag[k] = 1;
   const keys = Object.keys(bag).filter((k) => bag[k] > 0);
-  if (!keys.length && !(state.ammo ?? 0)) return false;
+  if (!keys.length && !(state.ammo ?? 0)) { state.bag = keepBag; state.equip = keepEq; return false; }
   state.vault ??= {};
   const v: Stash = state.vault[w] ?? { bag: {}, ammo: 0 };
   for (const k of keys) v.bag[k] = (v.bag[k] ?? 0) + bag[k];
   v.ammo += state.ammo ?? 0;
   if (state.arrows) v.bag.arrows20 = (v.bag.arrows20 ?? 0) + Math.ceil(state.arrows / 20);
   state.vault[w] = v;
-  state.bag = {};
-  state.equip = {};
+  state.bag = keepBag;
+  state.equip = keepEq;
   state.ammo = 0;
   state.arrows = 0;
   return true;
@@ -172,7 +178,7 @@ async function boot() {
   setInterval(updateHud, 1000);
   setInterval(() => { snapPos(); save(state); }, 4000);
   addEventListener('pagehide', () => { snapPos(); save(state); });
-  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w) }; // 개발용 확인 창구
+  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior() }; // 개발용 확인 창구
 }
 
 // ───────────────────────── 장면 전환 ─────────────────────────
@@ -348,6 +354,7 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
   const h = hellState();
   state.realm = 'hell';
   h.floor = f;
+  h.deepest = Math.max(h.deepest ?? 0, f, ...h.cleared); // 25차: 가 본 층은 다시 계단으로 내려갈 수 있다
   save(state);
   shop.stop();
   scene = 'world';
@@ -392,7 +399,7 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
  * 관리자: 지옥 n층 휴식 마을로 바로 옮겨 간다 (지도 확인용). 지옥 밖(현실·천국·귀신)에서 왔으면 그 세계를 적어 두고
  * '원래 세계로' 단추로 돌아간다 — 환생이 아니라 시찰에서 돌아오는 것이라 몸·돈·업은 그대로다
  */
-function adminTeleport(to: number | 'back' | 'heaven') {
+function adminTeleport(to: number | 'back' | 'heaven' | 'bkk' | 'seoul') {
   if (!net.account()?.admin || busy || dlg.isOpen) return;
   document.querySelector('.set-panel')?.remove();
   closeMenus();
@@ -411,6 +418,15 @@ function adminTeleport(to: number | 'back' | 'heaven') {
   }
   // 시찰을 떠나기 전 세계를 기억한다 (이미 시찰 중이면 처음 세계를 그대로)
   if (!state.adminTrip) state.adminTrip = realm() as 'real' | 'ghost' | 'heaven' | 'hell';
+  if (to === 'bkk' || to === 'seoul') {
+    // 25차: 관리자 도시 이동 — 그 도시의 우주새 문 앞 (현실로)
+    state.region = to;
+    if (realm() !== 'real') { state.realm = 'real'; delete state.adminTrip; }
+    save(state);
+    if (world) { world.destroy(); world = null; net.leaveZone(); }
+    enterWorld('door');
+    return;
+  }
   if (to === 'heaven') {
     if (realm() === 'heaven') return;
     state.heaven ??= { admin: true };
@@ -532,8 +548,20 @@ const hooks: WorldHooks = {
   bank(name) {
     openBank(name);
   },
+  maskGirl() {
+    void talkToMaskGirl();
+  },
   useAmmo() {
     const wi = state.equip?.weapon ? itemByKey(state.equip.weapon) : null;
+    if (wi?.note === 'fuel') {
+      // 25차 화염방사기: 불을 뿜는 동안만 연료가 준다 (하루 5분)
+      if (fuelLeft() <= 0) { toast(t().fuelOut); world?.setGear(gear()); return false; }
+      const day = today();
+      state.flamer = state.flamer?.d === day ? state.flamer : { d: day, used: 0 };
+      state.flamer.used = Math.min(FLAMER_SEC, state.flamer.used + FLAME_BURST);
+      renderAmmo();
+      return true;
+    }
     if (wi?.note === 'needsArrows') {
       if ((state.arrows ?? 0) <= 0) { toast(t().noArrows); return false; }
       state.arrows = (state.arrows ?? 0) - 1;
@@ -829,6 +857,8 @@ function hellAct(kind: 'up' | 'down' | 'pashar' | 'talus') {
   if (kind === 'pashar') return; // 파샤르는 지옥 로비 안 상담 책상에 있다
   if (kind === 'up') { passUp(); return; }
   if (h.floor + 1 > OPEN_FLOORS) { toast(L.hellDeeper); return; }
+  // 25차: 계단은 가 본 층까지만. 더 깊은 곳은 악업을 쌓고 쓰러져야 떨어진다
+  if (h.floor + 1 > (h.deepest ?? h.floor)) { toast(L.hellNoStair); return; }
   enterHell(h.floor + 1, 'down');
 }
 const sleepMs = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -895,6 +925,34 @@ async function rebirthGate() {
 
 /** 지옥 2층 들판의 노름꾼 탈루스: 뼈주사위 두 개의 합이 홀인지 짝인지 노전을 건다 (맞히면 건 만큼 더, 틀리면 잃음). 불고기맛 과자도 판다 */
 const TALUS_SNACK = 3;
+/** 25차 지옥 1층 마스크 팔이 소녀: 바구니의 검은 마스크와, 등에 멘 화염방사기를 노전으로 판다 */
+async function talkToMaskGirl() {
+  if (busy) return;
+  busy = true;
+  shop.lock(true);
+  const L = t();
+  const h = hellState();
+  const mask = itemByKey('blackmask'), fire = itemByKey('flamer');
+  const label = (it: ItemDef) => `${it.name[lang()]} · ${effectText(it, lang())} · ${priceText(it.price, true)}`;
+  dlg.open({ name: L.maskGirl, portrait: 'maskgirl' });
+  await dlg.say(L.maskGreet[Math.floor(Math.random() * L.maskGreet.length)]);
+  for (;;) {
+    const c = await dlg.choose([label(mask), label(fire), L.maskBye]);
+    if (c === 2 || c < 0) break;
+    const it = c === 0 ? mask : fire;
+    await dlg.say(c === 0 ? L.maskPitch : L.flamerPitch);
+    const ok = await dlg.choose([L.maskBuy.replace('{n}', priceText(it.price, true)), L.maskNo]);
+    if (ok !== 0) continue;
+    if (h.notes < it.price) { await dlg.say(L.maskPoor); continue; }
+    h.notes -= it.price;
+    addToBag(it);
+    save(state); renderHud(); renderQuick();
+    await dlg.say(c === 0 ? L.maskSold : L.flamerSold);
+  }
+  await dlg.say(L.maskFarewell);
+  endTalk();
+}
+
 async function talkToTalus() {
   if (busy) return;
   busy = true;
@@ -1153,14 +1211,10 @@ function recordDeed(key: DeedKey, opt: { floor?: number; share?: number } = {}) 
   }
   toast(parts.join(' · '), rule.kind === 'evil' ? 'evil' : rule.kind === 'good' ? 'good' : '');
   renderHud();
-  // 지옥에서 악행이 쌓여 악업 비율이 더 깊은 층을 가리키면 그 층으로 떨어진다
+  // 25차: 지옥에서 악업이 더 깊은 층을 가리켜도 바로 떨어지지 않는다 — 쓰러질 때 가라앉는다 (한 번만 알린다)
   if (inHell() && rule.kind === 'evil') {
-    const j = judge(state.deeds!);
-    const to = j.world === 'hell' ? Math.min(OPEN_FLOORS, j.floor) : 0;
-    if (to > hellState().floor) {
-      toast(L.hellFell.replace('{n}', String(to)), 'evil');
-      setTimeout(() => { if (inHell() && !world?.isDead) enterHell(to, 'drop'); }, 900);
-    }
+    const to = sinkTo();
+    if (to > hellState().floor && to > pullWarned) { pullWarned = to; setTimeout(() => toast(L.hellPull.replace('{n}', String(to)), 'evil'), 1400); }
   }
 }
 
@@ -1403,7 +1457,12 @@ function freeSteal(it: ItemDef, shelf: { it: ItemDef; price: number }[]) {
 /** 쌀수록 쉽고 비쌀수록 어렵다 (민첩이 조금 돕는다): ฿10 ≈ 70% · ฿100 ≈ 50% · ฿1,000 ≈ 27% · ฿10,000 ≈ 5% */
 function stealChance(it: ItemDef, price: number, shelf: { it: ItemDef; price: number }[]) {
   if (freeSteal(it, shelf)) return 1;
-  return Math.max(0.04, Math.min(0.9, 0.93 - Math.log10(Math.max(1, price)) * 0.22 + stats().agi * 0.004));
+  return Math.max(0.04, Math.min(0.9, 0.93 - Math.log10(Math.max(1, price)) * 0.22 + stats().agi * 0.004)) + maskSteal();
+}
+/** 25차: 검은 마스크를 쓰면 현실과 지옥에서 훔치기 확률이 오른다 */
+function maskSteal() {
+  if (realm() !== 'real' && realm() !== 'hell') return 0;
+  return Object.values(state.equip ?? {}).reduce((s, k) => s + (k ? ITEMS.find((x) => x.key === k)?.steal ?? 0 : 0), 0);
 }
 /** 훔치기 한 번: 악행은 늘 기록된다. 성공하면 가방에 (그 자리에서 먹는 음식은 먹는다) */
 function trySteal(it: ItemDef, price: number, shelf: { it: ItemDef; price: number }[]) {
@@ -1656,7 +1715,7 @@ function chooseBody(title: string, confirm: string, initial: Look, extra: { outf
 
 // ───────────────────────── 가방 · 장착 ─────────────────────────
 // 장착 칸은 물건 종류에서 정한다 (목록을 따로 두면 새 무기가 빠진다 — 흑철 대검이 끼워지지 않던 까닭)
-const ARMOR_SLOT: Record<string, Slot> = { helmet: 'head', jacket: 'body', vest: 'body', gloves: 'hands', workpants: 'legs', shinguard: 'shins', boots: 'feet', shield: 'offhand' };
+const ARMOR_SLOT: Record<string, Slot> = { helmet: 'head', mask: 'head', jacket: 'body', vest: 'body', gloves: 'hands', workpants: 'legs', shinguard: 'shins', boots: 'feet', shield: 'offhand' };
 function slotOf(k: string): Slot | undefined {
   const it = ITEMS.find((x) => x.key === k);
   if (!it || it.note === 'ammo' || it.note === 'arrows') return undefined;
@@ -1667,6 +1726,7 @@ function slotOf(k: string): Slot | undefined {
 const itemByKey = (k: string) => ITEMS.find((x) => x.key === k)!;
 
 function addToBag(it: ItemDef) {
+  if (it.note === 'ammo' || it.note === 'arrows') delete state.unloaded; // 새로 사면 다시 끼운다
   if (it.note === 'ammo') { state.ammo = (state.ammo ?? 0) + 12; return; } // 22차: 지옥 유황 탄환·흑요석 화살도 같은 주머니로
   if (it.note === 'arrows') { state.arrows = (state.arrows ?? 0) + 20; state.arrowKey = it.key; return; } // 24차: 마지막에 산 화살이 시위에 걸린다 (화살 종류마다 공격력이 다르다)
   state.bag = state.bag ?? {};
@@ -1680,14 +1740,14 @@ function gear() {
   const eq = eq0.offhand && noShieldWith(eq0.weapon) ? { ...eq0, offhand: undefined } : eq0;
   const w = eq.weapon ? itemByKey(eq.weapon) : null;
   // 쏘는 무기: 권총은 탄약, 활은 화살이 있어야 멀리서 쏜다 (없으면 휘둘러 치는 셈)
-  const shots = w?.note === 'needsAmmo' ? state.ammo ?? 0 : w?.note === 'needsArrows' ? state.arrows ?? 0 : 0; // 22차: 지옥의 뼈활·화승총도
-  const ranged = !!w?.ranged && shots > 0;
+  const shots = w?.note === 'needsAmmo' ? state.ammo ?? 0 : w?.note === 'needsArrows' ? state.arrows ?? 0 : w?.note === 'fuel' ? fuelLeft() : 0; // 22차: 지옥의 뼈활·화승총도 · 25차 화염방사기는 오늘 남은 연료
+  const ranged = !!w?.ranged && shots > 0 && !(state.unloaded && w.note !== 'fuel'); // 25차: 화살·탄약을 빼 두면 쏘지 않는다
   const def = Object.entries(eq).reduce((s, [slot, k]) => (slot === 'weapon' || !k ? s : s + (itemByKey(k)?.def ?? 0)), 0);
   const dr = Object.entries(eq).reduce((s, [, k]) => (!k ? s : s + (itemByKey(k)?.dr ?? 0)), 0);
   const armor = Object.entries(eq).filter(([slot, k]) => slot !== 'weapon' && k && itemByKey(k)).map(([, k]) => itemByKey(k as string).sprite ?? (k as string));
   // 24차: 활과 화살이 공격력을 반씩 나눈다 (활 < 근접 < 총)
   const arrowAtk = w?.note === 'needsArrows' ? itemByKey(state.arrowKey ?? (inHell() ? 'harrows' : 'arrows'))?.atk ?? 3 : 0;
-  return { atk: w?.ranged ? (ranged ? (w.atk ?? 0) + arrowAtk : 1) : w?.atk ?? 0, def, dr, ranged, weapon: w ? w.sprite ?? w.key : null, armor };
+  return { atk: w?.ranged ? (ranged ? (w.atk ?? 0) + arrowAtk : 1) : w?.atk ?? 0, def, dr, ranged, flame: w?.note === 'fuel', weapon: w ? w.sprite ?? w.key : null, armor };
 }
 /** 실시간으로 남에게 보이는 나 */
 function myInfo(): RemoteInfo {
@@ -1705,6 +1765,9 @@ function toggleBag() {
 
 /** 가방의 두 칸: 소비(먹고 쓰는 것) · 장비(무기·방어구) */
 let bagTab: 'use' | 'gear' = 'use';
+/** 25차: 장비 몸 그림에서 눌러 둔 칸 (자세한 효과를 아래에 보인다) */
+type DollSel = Slot | 'ammo';
+let dollSel: DollSel | null = null;
 const isGearItem = (it: ItemDef) => it.cat === 'weapon' || it.cat === 'armor';
 /** 하나를 먹거나 감는다 (가방 · 빠른 칸 공통) */
 function useItem(k: string) {
@@ -1840,37 +1903,77 @@ function renderBag() {
     doll.className = 'bag-doll';
     doll.innerHTML = dollSvg(bodyLook().sex === 'f' ? 'f' : 'm');
     const equip = state.equip ?? {};
+    // 25차: 칸을 누르면 아래에 그 물건의 자세한 효과 · 벗는 것은 ✕를 정확히 눌렀을 때만. 공격력·방어력은 칸에 늘 보인다
+    const pick = (k: DollSel) => { dollSel = dollSel === k ? null : k; renderBag(); };
+    const offBtn = (act: () => void, title: string) => {
+      const x = document.createElement('button');
+      x.className = 'off'; x.textContent = '✕'; x.title = title; x.setAttribute('aria-label', title);
+      x.onclick = (e) => { e.stopPropagation(); dollSel = null; act(); };
+      return x;
+    };
+    const statOf = (it: ItemDef) => {
+      const parts = [it.atk ? L.atkShort.replace('{n}', String(it.atk)) : '', it.def ? L.defShort.replace('{n}', String(it.def)) : ''].filter(Boolean);
+      if (!parts.length) return null;
+      const b = document.createElement('b'); b.className = 'stat'; b.textContent = parts.join(' '); return b;
+    };
+    const unwear = (sl: Slot) => {
+      if (!state.equip?.[sl]) return;
+      delete state.equip[sl];
+      world?.setGear(gear());
+      if (scene === 'shop') shop.setLook(bodyLook(), gear());
+      net.nudge();
+      save(state);
+      renderBag(); renderHud(); renderAmmo();
+    };
     for (const sl of ['weapon', 'offhand', 'head', 'body', 'hands', 'legs', 'shins', 'feet'] as Slot[]) {
-      const cell = document.createElement('button');
-      cell.className = `doll-slot ds-${sl}` + (equip[sl] ? ' on' : '');
+      const cell = document.createElement('div');
       const k = equip[sl];
       const it = k ? itemByKey(k) : null;
+      cell.className = `doll-slot ds-${sl}` + (it ? ' on' : '') + (it && dollSel === sl ? ' sel' : '');
       const lb = document.createElement('small');
       lb.textContent = L.slotNames[sl];
       cell.appendChild(lb);
-      if (it) { const ic = iconFor(it); ic.className = 'icon'; const nm = document.createElement('span'); nm.textContent = it.name[lang()]; const x = document.createElement('i'); x.className = 'off'; x.textContent = '✕'; cell.append(ic, nm, x); cell.title = L.unequip; }
-      else { const nm = document.createElement('span'); nm.className = 'empty'; nm.textContent = '—'; cell.appendChild(nm); cell.disabled = true; }
-      cell.onclick = () => {
-        if (!state.equip?.[sl]) return;
-        delete state.equip[sl];
-        world?.setGear(gear());
-        if (scene === 'shop') shop.setLook(bodyLook(), gear());
-        net.nudge();
-        save(state);
-        renderBag(); renderHud();
-      };
+      if (it) {
+        const ic = iconFor(it); ic.className = 'icon';
+        const tx = document.createElement('div'); tx.className = 'ds-text';
+        const nm = document.createElement('span'); nm.textContent = it.name[lang()];
+        tx.appendChild(nm);
+        const st = statOf(it); if (st) tx.appendChild(st);
+        cell.append(ic, tx, offBtn(() => unwear(sl), L.unequip));
+        cell.tabIndex = 0; cell.setAttribute('role', 'button');
+        cell.onclick = () => pick(sl);
+      } else { const nm = document.createElement('span'); nm.className = 'empty'; nm.textContent = '—'; cell.appendChild(nm); }
       doll.appendChild(cell);
     }
-    // 23차: 화살·탄약 칸 — 활이면 화살, 총이면 탄약, 둘 다 아니면 가진 것
+    // 23차: 화살·탄약 칸 — 활이면 화살, 총이면 탄약, 둘 다 아니면 가진 것 · 25차: ✕로 빼 두고 '끼우기'로 다시 (빼 두면 쏘지 않는다)
     const am = pouch();
-    const ac = document.createElement('button');
-    ac.className = 'doll-slot ds-ammo' + (am.length ? ' on' : '') + (am.some((x) => x.need && x.n <= 0) ? ' dry' : '');
-    ac.disabled = true;
+    const ac = document.createElement('div');
+    const loadable = am.some((x) => x.it.note === 'arrows' || x.it.note === 'ammo');
+    ac.className = 'doll-slot ds-ammo' + (am.length ? ' on' : '') + (am.some((x) => x.need && x.n <= 0) ? ' dry' : '') + (state.unloaded && loadable ? ' unloaded' : '') + (dollSel === 'ammo' && am.length ? ' sel' : '');
     const al = document.createElement('small');
-    al.textContent = L.ammoSlot;
+    al.textContent = am[0]?.text ? L.fuelSlot : L.ammoSlot;
     ac.appendChild(al);
-    if (am.length) for (const x of am) { const ic = iconFor(x.it); ic.className = 'icon'; const nm = document.createElement('span'); nm.textContent = x.label; ac.append(ic, nm); }
-    else { const nm = document.createElement('span'); nm.className = 'empty'; nm.textContent = '—'; ac.appendChild(nm); }
+    if (am.length) {
+      for (const x of am) { const ic = iconFor(x.it); ic.className = 'icon'; const nm = document.createElement('span'); nm.textContent = x.text ?? x.label; ac.append(ic, nm); }
+      const at = am[0].it.atk; if (at && am[0].it.note === 'arrows') { const b = document.createElement('b'); b.className = 'stat'; b.textContent = L.atkShort.replace('{n}', String(at)); ac.appendChild(b); }
+      if (loadable && !state.unloaded) ac.appendChild(offBtn(() => { state.unloaded = true; world?.setGear(gear()); save(state); renderBag(); renderAmmo(); toast(L.unloadedToast); }, L.unload));
+      if (loadable && state.unloaded) { const rl = document.createElement('button'); rl.className = 'reload'; rl.textContent = L.reload; rl.onclick = (e) => { e.stopPropagation(); state.unloaded = false; world?.setGear(gear()); save(state); renderBag(); renderAmmo(); }; ac.appendChild(rl); }
+      ac.tabIndex = 0; ac.setAttribute('role', 'button');
+      ac.onclick = () => pick('ammo');
+    } else { const nm = document.createElement('span'); nm.className = 'empty'; nm.textContent = '—'; ac.appendChild(nm); }
+    doll.appendChild(ac);
+    // 고른 칸의 자세한 효과 (칸에 이미 보이는 이름·공격력·방어력은 되풀이하지 않는다). 고른 칸이 없으면 끼고 있는 것의 합
+    const det = document.createElement('div');
+    det.className = 'doll-info';
+    const selIt = dollSel === 'ammo' ? am[0]?.it : dollSel ? (equip[dollSel] ? itemByKey(equip[dollSel]!) : null) : null;
+    if (selIt) {
+      const more = effectText(selIt, lang(), true);
+      det.textContent = more || L.dollNoMore;
+    } else {
+      const g = gear();
+      det.textContent = L.dollTotal.replace('{a}', String(g.atk)).replace('{d}', String(g.def)) + (g.dr ? ' · ' + L.dollDr.replace('{n}', String(g.dr)) : '');
+    }
+    doll.appendChild(det);
     doll.appendChild(ac);
     el.append(head, info, doll, list);
   } else el.append(head, info, list);
@@ -1918,9 +2021,18 @@ function dollSvg(sex: 'm' | 'f') {
 }
 
 /** 23차: 화살 주머니·탄약 주머니. 쏘는 무기를 들었으면 그 무기에 맞는 것만(0이어도), 아니면 가진 것 */
-function pouch(): { it: ItemDef; n: number; label: string; need: boolean }[] {
+/** 25차 화염방사기 연료: 하루(UTC 날짜) 5분 = 300초. 불을 한 번 뿜을 때마다 FLAME_BURST초 */
+const FLAMER_SEC = 300;
+const FLAME_BURST = 0.62;
+function fuelLeft() {
+  const f = state.flamer;
+  return Math.max(0, FLAMER_SEC - (f && f.d === today() ? f.used : 0));
+}
+const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+function pouch(): { it: ItemDef; n: number; label: string; need: boolean; text?: string }[] {
   const L = t();
   const w = state.equip?.weapon ? itemByKey(state.equip.weapon) : null;
+  if (w?.note === 'fuel') { const n = fuelLeft(); return [{ it: w, n: Math.ceil(n), label: L.fuelLeft.replace('{t}', mmss(n)), need: true, text: mmss(n) }]; }
   const hell = inHell();
   const arrows = { it: itemByKey(state.arrowKey ?? (hell ? 'harrows' : 'arrows')), n: state.arrows ?? 0, label: L.arrowsLeft.replace('{n}', String(state.arrows ?? 0)), need: w?.note === 'needsArrows' };
   const ammo = { it: itemByKey(hell ? 'hshot' : 'ammo'), n: state.ammo ?? 0, label: L.ammoLeft.replace('{n}', String(state.ammo ?? 0)), need: w?.note === 'needsAmmo' };
@@ -1938,7 +2050,7 @@ let ammoShown = '';
 function renderAmmo() {
   const x = pouch().find((p) => p.need);
   const on = !!x && scene === 'world' && realm() !== 'ghost';
-  const key = on ? `${x.it.key}|${x.n}` : '';
+  const key = on ? `${x.it.key}|${x.n}|${state.unloaded ? 1 : 0}` : '';
   if (key === ammoShown) return;
   ammoShown = key;
   ammoChip.hidden = !on;
@@ -1947,10 +2059,11 @@ function renderAmmo() {
   const ic = iconFor(x.it);
   ic.className = 'icon';
   const c = document.createElement('b');
-  c.textContent = String(x.n);
+  c.textContent = x.text ?? String(x.n);
   ammoChip.append(ic, c);
   ammoChip.classList.toggle('dry', x.n <= 0);
-  ammoChip.classList.toggle('low', x.n > 0 && x.n <= 5);
+  ammoChip.classList.toggle('low', x.n > 0 && x.n <= (x.text ? 30 : 5));
+  ammoChip.classList.toggle('off', !!state.unloaded && !x.text); // 25차: 빼 둔 화살·탄약
   ammoChip.title = x.label;
 }
 /** 빠른 칸: 가방에서 별표한 소비품 하나. 누르면 바로 먹는다 (다 떨어지면 빈 칸) */
@@ -2359,11 +2472,19 @@ function heavenFaint() {
  * 지옥에서 쓰러지면: 들고 있던 노전은 모두 그 자리에 떨어진다 (10분 안에 가서 주울 수 있다, 은행에 맡긴 것은 그대로).
  * 장비는 운이 없으면 하나 떨어뜨린다 (35%). 그 층의 휴식 마을에서 다시 일어난다
  */
+/** 25차: 지금 악업으로 쓰러지면 가라앉을 층 (열린 층까지) — 지옥이 아니면 0 */
+let pullWarned = 0;
+function sinkTo() {
+  const j = judge(state.deeds ?? { good: 0, evil: 0 });
+  return j.world === 'hell' ? Math.min(OPEN_FLOORS, j.floor) : 0;
+}
 function showHellDeath() {
   const L = t();
   closeMenus();
   document.querySelector('.bag-panel')?.remove();
   const h = hellState();
+  const sink = sinkTo();
+  const deeper = sink > h.floor ? sink : 0;
   const dropped = Math.floor(h.notes);
   h.notes -= dropped;
   // 운이 없으면 장비 하나: 끼고 있던 것 중 하나 (없으면 가방의 장비 중 하나)
@@ -2382,18 +2503,19 @@ function showHellDeath() {
   el.className = 'death hell';
   el.innerHTML = `<div class="death-box"><h1></h1><p class="cause"></p><p class="money"></p><button class="primary"></button></div>`;
   el.querySelector('h1')!.textContent = L.hellPlace.replace('{n}', String(h.floor)).replace('{name}', floorDef(h.floor).name[lang()]);
-  el.querySelector('.cause')!.textContent = L.hellDeath;
+  el.querySelector('.cause')!.textContent = deeper ? L.hellSink.replace('{n}', String(deeper)) : L.hellDeath;
   el.querySelector('.money')!.textContent = [
     dropped > 0 ? L.hellDeathDrop.replace('{n}', dropped.toLocaleString('en-US')) : '',
     lost ? L.hellDeathItem.replace('{item}', itemByKey(lost).name[lang()]) : '',
     (h.bank ?? 0) > 0 ? L.hellDeathBank.replace('{n}', Math.floor(h.bank ?? 0).toLocaleString('en-US')) : '',
   ].filter(Boolean).join(' ');
   const btn = el.querySelector('button')!;
-  btn.textContent = L.hellRise;
+  btn.textContent = deeper ? L.hellSinkBtn.replace('{n}', String(deeper)) : L.hellRise;
   btn.onclick = () => {
     el.remove();
     if (!world) return;
     world.revive(bodyLook());
+    if (deeper) { pullWarned = 0; enterHell(deeper, 'drop'); return; }
     const zh = world.zone.hell!;
     world.placeNear(zh.rest.i, zh.rest.j, maxHp());
     renderHud();
@@ -2543,7 +2665,7 @@ function openHellStore(kind: HellVendor) {
     list.innerHTML = '';
     const of = (st: ItemDef['store']) => ITEMS.filter((x) => x.store === st).map((x): [ItemDef, number] => [x, x.price]);
     // 장사꾼: 이름만 장사꾼 — 날마다 바뀌는 잡동사니 넷 (값은 조금 비싸게)
-    const odd = ITEMS.filter((x) => x.hell && !x.floor && x.store !== 'drop' && x.note !== 'ammo' && x.note !== 'arrows' && !x.bloodFloor).sort((a, b) => ((a.key.charCodeAt(1) * 31 + day * 17 + h.floor * 7 + a.price) % 13) - ((b.key.charCodeAt(1) * 31 + day * 17 + h.floor * 7 + b.price) % 13)).slice(0, 4);
+    const odd = ITEMS.filter((x) => x.hell && !x.floor && x.store !== 'drop' && x.store !== 'maskgirl' && x.note !== 'ammo' && x.note !== 'arrows' && !x.bloodFloor).sort((a, b) => ((a.key.charCodeAt(1) * 31 + day * 17 + h.floor * 7 + a.price) % 13) - ((b.key.charCodeAt(1) * 31 + day * 17 + h.floor * 7 + b.price) % 13)).slice(0, 4);
     const stock: [ItemDef, number][] =
       kind === 'butcher' ? of('hmeat')
       : kind === 'water' ? [...of('hwater').filter(([x]) => !x.bloodFloor || x.bloodFloor === h.floor)]
@@ -2697,7 +2819,7 @@ function renderSettings() {
     <section class="set-sec"><h4 class="h-fight"></h4><div class="set-row"><span class="lbl l-counter"></span><div class="seg s-counter"></div></div><p class="note n-counter"></p></section>
     <section class="set-sec"><h4 class="h-lang"></h4><div class="seg s-lang wide"></div></section>
     <section class="set-sec set-acc"><h4 class="h-acc"></h4><div class="acc"></div></section>
-    ${net.account()?.admin ? `<section class="set-sec set-admin"><h4 class="h-admin"></h4><div class="set-row"><span class="lbl l-inv"></span><div class="seg s-inv"></div></div><div class="set-row"><span class="lbl l-tp"></span><div class="seg s-tp"></div></div><div class="set-row"><span class="lbl"></span><button class="tp-heaven"></button></div>${state.adminTrip && state.adminTrip !== realm() ? '<div class="set-row"><span class="lbl"></span><button class="tp-back"></button></div>' : ''}<p class="note n-admin"></p></section>` : ''}`;
+    ${net.account()?.admin ? `<section class="set-sec set-admin"><h4 class="h-admin"></h4><div class="set-row"><span class="lbl l-inv"></span><div class="seg s-inv"></div></div><div class="set-row"><span class="lbl l-tp"></span><div class="seg s-tp"></div></div><div class="set-row"><span class="lbl l-city"></span><div class="seg s-city"></div></div><div class="set-row"><span class="lbl"></span><button class="tp-heaven"></button></div>${state.adminTrip && state.adminTrip !== realm() ? '<div class="set-row"><span class="lbl"></span><button class="tp-back"></button></div>' : ''}<p class="note n-admin"></p></section>` : ''}`;
   el.querySelector('.menu-head b')!.textContent = L.settings;
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
   el.querySelector('.set-sec h4')!.textContent = L.setSound;
@@ -2744,6 +2866,9 @@ function renderSettings() {
     seg(el.querySelector('.s-tp')!, floors, floors.map((f) => L.adminFloor.replace('{n}', f)), () => (inHell() ? String(hellState().floor) : ''), (v) => adminTeleport(Number(v)));
     const back = el.querySelector<HTMLButtonElement>('.tp-back');
     if (back) { back.textContent = L.adminBack.replace('{w}', state.adminTrip === 'heaven' ? L.tripHeaven : state.adminTrip === 'ghost' ? L.tripGhost : state.adminTrip === 'hell' ? L.tripHell : L.tripReal); back.onclick = () => adminTeleport('back'); }
+    // 25차: 도시 이동 (현실의 우주새 문 앞으로)
+    el.querySelector('.l-city')!.textContent = L.adminCity;
+    seg(el.querySelector('.s-city')!, ['bkk', 'seoul'], [L.regions.bkk, L.regions.seoul], () => (realm() === 'real' && !inHell() ? (world?.zone.city === 'seoul' || (world?.zone.interior && street?.zone.city === 'seoul') ? 'seoul' : 'bkk') : ''), (v) => adminTeleport(v === 'seoul' ? 'seoul' : 'bkk'));
     const hv = el.querySelector<HTMLButtonElement>('.tp-heaven')!;
     hv.textContent = L.adminHeaven;
     hv.disabled = realm() === 'heaven';

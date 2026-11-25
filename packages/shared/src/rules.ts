@@ -31,12 +31,23 @@ export function evilRatio(d: Deeds): number | null {
 }
 
 /**
- * 지옥 시작 층 = ⌈(r − 50) / 50 × 13⌉  (r = 악행 비율, 50 초과일 때)
- * 예: 51% → 1층, 60% → 3층, 90% → 11층, 100% → 13층
+ * 25차 지옥 깊이 공식 — 이번 생에 쌓은 악행 점수 E(죽지 않고 한 생 동안)와 악행 비율 r(%)로 정한다.
+ *   1~3층은 쉽다: 1층 = 악행이 선행보다 많으면 · 2층 = E ≥ 2 · 3층 = E ≥ 5
+ *   4층부터는 어렵다: f층에 떨어지려면 E ≥ 20 × 1.42^(f−4) 이고 r ≥ 70 + 2.5 × (f−4)
+ *     4층 E 20·70% (유저 살해 10번쯤) · 5층 28 · 6층 40 · 7층 57 · 8층 81·80% · 9층 115 · 10층 164 · 11층 232 · 12층 330 · 13층 469·92.5%
+ *   (악행 점수 = 행위표 × 0.2: 먼저 때리기 0.4 · 훔치기 0.6 · 빼앗기 0.8 · 살해 2)
+ * 설정상 지옥은 144층의 어비스(지옥의 주인)까지 있으나, 지금은 13층까지만 셈한다
  */
-export function hellFloor(ratio: number): number {
-  const f = Math.ceil(((ratio - 50) / 50) * HELL_FLOORS);
-  return Math.min(HELL_FLOORS, Math.max(1, f));
+export const HELL_EASY = [0, 2, 5]; // 1·2·3층에 필요한 E
+export function hellNeed(f: number): { e: number; r: number } {
+  if (f <= 3) return { e: HELL_EASY[Math.max(0, f - 1)], r: 50 };
+  return { e: Math.round(20 * Math.pow(1.42, f - 4)), r: 70 + 2.5 * (f - 4) };
+}
+export function hellDepth(d: Deeds): number {
+  const r = evilRatio(d) ?? 0;
+  let floor = 1;
+  for (let f = 2; f <= HELL_FLOORS; f++) { const n = hellNeed(f); if (d.evil >= n.e && r >= n.r) floor = f; else break; }
+  return floor;
 }
 
 // 19차: 천국에서 환생하는 혜택은 없다 — 천국을 떠나 다시 태어나는 것은 영혼의 강등이다 (환생관 루엔이 말린다)
@@ -46,7 +57,7 @@ export function judge(d: Deeds): Afterlife {
   const r = evilRatio(d);
   if (r === null || r === 50) return { world: 'border' };
   if (r < 50) return { world: 'heaven' };
-  return { world: 'hell', floor: hellFloor(r) };
+  return { world: 'hell', floor: hellDepth(d) };
 }
 
 /**

@@ -184,9 +184,12 @@ const DETAIL = (t) => {
   if (l === 'fitness_centre' || l === 'sports_centre') return 'fitness_centre';
   if (h === 'clinic' || h === 'dentist') return h;
   if (t.office === 'coworking') return 'coworking_space';
+  if (a === 'karaoke_box' || l === 'karaoke') return 'karaoke'; // 24차 서울: 노래방
+  if (a === 'internet_cafe' || l === 'amusement_arcade' && /pc|피시|PC방/i.test(t.name || '')) return 'internet_cafe';
+  if (a === 'prep_school' || a === 'language_school' || a === 'driving_school' || a === 'music_school') return 'academy'; // 학원
   return null;
 };
-const BRAND_WORDS = /7-?eleven|seven eleven|familymart|lawson|tops|foodland|villa market|big ?c|lotus|starbucks|amazon|coffee world|mcdonald|kfc|burger king|subway|pizza company|swensen|dairy queen|boots|watsons|uniqlo|zara|h&m|central|robinson|emporium|terminal 21|bangkok bank|kasikorn|krungsri|siam commercial|krung thai|uob|citibank|ttb|tmb|gsb|superrich|ธนาคาร|เซเว่น|แฟมิลี่มาร์ท|สตาร์บัคส์|คาเฟ่ อเมซอน|ท็อปเจริญ/i;
+const BRAND_WORDS = /7-?eleven|seven eleven|familymart|lawson|tops|foodland|villa market|big ?c|lotus|starbucks|amazon|coffee world|mcdonald|kfc|burger king|subway|pizza company|swensen|dairy queen|boots|watsons|uniqlo|zara|h&m|central|robinson|emporium|terminal 21|bangkok bank|kasikorn|krungsri|siam commercial|krung thai|uob|citibank|ttb|tmb|gsb|superrich|ธนาคาร|เซเว่น|แฟมิลี่มาร์ท|สตาร์บัคส์|คาเฟ่ อเมซอน|ท็อปเจริญ|gs25|\bcu\b|씨유|세븐일레븐|이마트|emart|미니스톱|ministop|홈플러스|homeplus|롯데|lotte|스타벅스|투썸|twosome|이디야|ediya|메가커피|mega ?coffee|빽다방|컴포즈|compose coffee|할리스|hollys|커피빈|coffee bean|폴바셋|paul bassett|엔제리너스|angel-in-us|파스쿠찌|pascucci|파리바게뜨|paris baguette|뚜레쥬르|tous les jours|던킨|dunkin|배스킨|baskin|공차|gong ?cha|맥도날드|버거킹|롯데리아|lotteria|맘스터치|mom's touch|교촌|kyochon|bbq|bhc|굽네|도미노|domino|피자헛|pizza hut|서브웨이|올리브영|olive ?young|다이소|daiso|이니스프리|innisfree|아리따움|국민은행|kb|신한|shinhan|우리은행|woori|하나은행|hana bank|농협|nonghyup|\bnh\b|기업은행|ibk|sc제일|cgv|메가박스|megabox|교보|kyobo|유니클로|abc마트|아트박스|artbox|무신사|musinsa|카카오|kakao|삼성|samsung|lg|현대|hyundai|sk|kt/i;
 // 음식점·카페의 메뉴 묶음 (cuisine 태그 → 없으면 이름으로 짐작). 게임에서 파는 음식이 달라진다
 const CUISINE = [
   ['italian', /pizza|italian|pasta|pizzeria/], ['burger', /burger|american|diner|fish_and_chips/], ['steak', /steak|grill|barbecue|bbq/],

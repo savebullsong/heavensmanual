@@ -9,9 +9,13 @@ export interface ItemDef {
   heal?: number; // 체력 회복
   atk?: number; // 공격력
   def?: number; // 방어력
-  note?: 'rope' | 'needsAmmo' | 'ammo' | 'needsArrows' | 'arrows';
+  note?: 'rope' | 'needsAmmo' | 'ammo' | 'needsArrows' | 'arrows' | 'fuel';
+  /** 25차: 세계를 건너가도 봉인되지 않고 몸에 남는다 (마스크 팔이 소녀의 검은 마스크) */
+  cross?: boolean;
+  /** 25차: 쓴 세계(현실·지옥)에서 훔치기 확률이 오른다 (0.02 = 2%) */
+  steal?: number;
   name: Record<Lang, string>;
-  store?: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'talus' | 'hmeat' | 'tools' | 'dept' | 'hjunk' | 'drop' | 'hwater' | 'hmed' | 'harms'; // 22차: 지옥 물장수 · 약장수 · 무기상 // drop = 어디서도 팔지 않는다 (괴물이 떨어뜨릴 뿐) // 우주새가 아니라 거리 가게(철물점·백화점) · 지옥 탈루스·고깃간·넝마장수에서 파는 것
+  store?: 'maskgirl' | 'mart' | 'pharmacy' | 'food' | 'cafe' | 'talus' | 'hmeat' | 'tools' | 'dept' | 'hjunk' | 'drop' | 'hwater' | 'hmed' | 'harms'; // 22차: 지옥 물장수 · 약장수 · 무기상 // drop = 어디서도 팔지 않는다 (괴물이 떨어뜨릴 뿐) // 우주새가 아니라 거리 가게(철물점·백화점) · 지옥 탈루스·고깃간·넝마장수에서 파는 것
   now?: boolean; // 가게에서 바로 먹는다 (가방에 넣지 않음)
   hell?: boolean; // 지옥의 우주새(황혼)에서만, 노전으로 판다
   sprite?: string; // 몸에 그릴 때 쓰는 그림 (지옥 무기·방어구는 현실 그림을 빌려 쓴다)
@@ -105,6 +109,7 @@ export const ITEMS: ItemDef[] = [
   { key: 'slagbread', cat: 'goods', price: 26, heal: 520, hell: true, floor: 4, store: 'drop', icon: 'cake', name: { ko: '모루에 구운 쇠빵', th: 'ขนมปังอบบนทั่ง', en: 'Anvil-baked ironbread' } },
   { key: 'forgegloves', cat: 'armor', price: 260, def: 9, hell: true, floor: 4, store: 'drop', sprite: 'gloves', icon: 'gloves', name: { ko: '대장장이 쇠장갑', th: 'ถุงมือเหล็กช่างตีเหล็ก', en: "Smith's iron gauntlets" } },
   { key: 'slagmaul', cat: 'weapon', price: 420, atk: 20, two: true, hell: true, floor: 4, store: 'drop', sprite: 'sledge', icon: 'sledge', name: { ko: '쇳물 오함마', th: 'ค้อนปอนด์น้ำเหล็ก', en: 'Slag sledge' } },
+  { key: 'ironblade', cat: 'weapon', price: 560, atk: 24, two: true, hell: true, floor: 4, store: 'drop', sprite: 'greatsword', icon: 'greatsword', name: { ko: '철갑마의 대검', th: 'ดาบใหญ่ของอัศวินเกราะเหล็ก', en: "Ironclad's greatsword" } }, // 25차: 철갑마가 드물게 떨어뜨린다
   // 22차 지옥 휴게소: 물장수 · 약장수 · 무기상(원거리)
   { key: 'hmurky', cat: 'goods', price: 2, heal: 40, hell: true, store: 'hwater', icon: 'water', name: { ko: '탁한 물', th: 'น้ำขุ่น', en: 'Murky water' } },
   { key: 'hboiled', cat: 'goods', price: 6, heal: 120, hell: true, store: 'hwater', icon: 'water', name: { ko: '끓인 강물', th: 'น้ำแม่น้ำต้มสุก', en: 'Boiled river water' } },
@@ -144,6 +149,9 @@ export const ITEMS: ItemDef[] = [
     ['croissant', 90, 60, '크루아상', 'ครัวซองต์', 'Croissant'], ['donut', 45, 45, '도넛', 'โดนัท', 'Donut'],
     ['icecream', 80, 50, '아이스크림', 'ไอศกรีม', 'Ice cream'], ['bubbletea', 60, 40, '버블티', 'ชานมไข่มุก', 'Bubble tea'],
   ] as [string, number, number, string, string, string][]).map(([key, price, heal, ko, th, en]): ItemDef => ({ key, cat: 'goods', price, heal, store: 'cafe', now: true, name: { ko, th, en } })),
+  // 25차 지옥 1층 마스크 팔이 소녀의 바구니: 검은 마스크(헬멧 자리 · 현실로도 가져간다 · 훔치기 +2%) · 화염방사기(하루 5분)
+  { key: 'blackmask', cat: 'armor', price: 1845, def: 1, hell: true, store: 'maskgirl', sprite: 'mask', icon: 'blackmask', cross: true, steal: 0.02, name: { ko: '검은 마스크', th: 'หน้ากากผ้าสีดำ', en: 'Black mask' } },
+  { key: 'flamer', cat: 'weapon', price: 99999, atk: 58, ranged: true, note: 'fuel', hell: true, store: 'maskgirl', name: { ko: '화염방사기', th: 'เครื่องพ่นไฟ', en: 'Flamethrower' } },
 ];
 
 // 회복은 말로, 무기·방어구는 숫자로 (17차: 공격력·방어력 표시)
@@ -189,21 +197,23 @@ export const STORES: Record<'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'd
   dept: [{ key: 'knife', price: 390 }, { key: 'bat', price: 850 }, { key: 'cola', price: 20 }, { key: 'chips', price: 35 }], // 백화점·쇼핑몰: 주방칼·운동용품
 };
 
-const EFFECT: Record<Lang, { heal: string[]; atkN: string; defN: string; rope: string; needsAmmo: string; ammo: string; two: string; ranged: string; needsArrows: string; arrows: string }> = {
-  ko: { heal: ['조금 회복', '회복', '많이 회복', '크게 회복'], atkN: '공격력 {n}', defN: '방어력 {n}', rope: '추락을 한 번 막아 줌', needsAmmo: '탄약 필요', ammo: '권총에 넣는 탄약', two: '양손 · 느리지만 묵직하게 내려찍음', ranged: '원거리 · 민첩이 더해짐', needsArrows: '화살 필요', arrows: '활에 메기는 화살' },
-  th: { heal: ['ฟื้นฟูเล็กน้อย', 'ฟื้นฟู', 'ฟื้นฟูมาก', 'ฟื้นฟูมหาศาล'], atkN: 'พลังโจมตี {n}', defN: 'พลังป้องกัน {n}', rope: 'กันตกจากที่สูงได้หนึ่งครั้ง', needsAmmo: 'ต้องใช้กระสุน', ammo: 'กระสุนสำหรับปืนพก', two: 'สองมือ · ช้าแต่ฟาดลงหนักหน่วง', ranged: 'ระยะไกล · ความว่องไวช่วยเพิ่มพลัง', needsArrows: 'ต้องใช้ลูกธนู', arrows: 'ลูกธนูสำหรับธนู' },
-  en: { heal: ['Heals a little', 'Heals', 'Heals a lot', 'Heals greatly'], atkN: 'Attack {n}', defN: 'Defense {n}', rope: 'Saves you from one fall', needsAmmo: 'Needs ammo', ammo: 'Rounds for the pistol', two: 'Two-handed · slow, crushing overhead blows', ranged: 'Ranged · agility adds power', needsArrows: 'Needs arrows', arrows: 'Arrows for the bow' },
+const EFFECT: Record<Lang, { heal: string[]; atkN: string; defN: string; rope: string; needsAmmo: string; ammo: string; two: string; ranged: string; needsArrows: string; arrows: string; fuel: string; cross: string; steal: string }> = {
+  ko: { heal: ['조금 회복', '회복', '많이 회복', '크게 회복'], atkN: '공격력 {n}', defN: '방어력 {n}', rope: '추락을 한 번 막아 줌', needsAmmo: '탄약 필요', ammo: '권총에 넣는 탄약', two: '양손 · 느리지만 묵직하게 내려찍음', ranged: '원거리 · 민첩이 더해짐', needsArrows: '화살 필요', arrows: '활에 메기는 화살', fuel: '세 칸 앞까지 불길 · 연료는 하루 5분', cross: '현실로도 가져간다', steal: '현실·지옥에서 훔치기 +{n}%' },
+  th: { heal: ['ฟื้นฟูเล็กน้อย', 'ฟื้นฟู', 'ฟื้นฟูมาก', 'ฟื้นฟูมหาศาล'], atkN: 'พลังโจมตี {n}', defN: 'พลังป้องกัน {n}', rope: 'กันตกจากที่สูงได้หนึ่งครั้ง', needsAmmo: 'ต้องใช้กระสุน', ammo: 'กระสุนสำหรับปืนพก', two: 'สองมือ · ช้าแต่ฟาดลงหนักหน่วง', ranged: 'ระยะไกล · ความว่องไวช่วยเพิ่มพลัง', needsArrows: 'ต้องใช้ลูกธนู', arrows: 'ลูกธนูสำหรับธนู', fuel: 'พ่นไฟไกลสามช่อง · เชื้อเพลิงวันละ 5 นาที', cross: 'พากลับไปโลกจริงได้', steal: 'ขโมยในโลกจริง·นรก +{n}%' },
+  en: { heal: ['Heals a little', 'Heals', 'Heals a lot', 'Heals greatly'], atkN: 'Attack {n}', defN: 'Defense {n}', rope: 'Saves you from one fall', needsAmmo: 'Needs ammo', ammo: 'Rounds for the pistol', two: 'Two-handed · slow, crushing overhead blows', ranged: 'Ranged · agility adds power', needsArrows: 'Needs arrows', arrows: 'Arrows for the bow', fuel: 'Flames three tiles out · 5 minutes of fuel a day', cross: 'Comes with you to the real world', steal: 'Stealing +{n}% in reality and hell' },
 };
 
-export function effectText(it: ItemDef, l: Lang): string {
+export function effectText(it: ItemDef, l: Lang, skipStats = false): string {
   const E = EFFECT[l];
   const parts: string[] = [];
   if (it.heal) parts.push(E.heal[it.heal <= 30 ? 0 : it.heal <= 80 ? 1 : it.heal <= 160 ? 2 : 3]);
-  if (it.atk) parts.push(E.atkN.replace('{n}', String(it.atk)));
-  if (it.def) parts.push(E.defN.replace('{n}', String(it.def)));
+  if (it.atk && !skipStats) parts.push(E.atkN.replace('{n}', String(it.atk)));
+  if (it.def && !skipStats) parts.push(E.defN.replace('{n}', String(it.def)));
   if (it.two) parts.push(E.two);
-  if (it.ranged && it.key !== 'pistol') parts.push(E.ranged);
+  if (it.ranged && it.key !== 'pistol' && it.note !== 'fuel') parts.push(E.ranged);
   if (it.note) parts.push(E[it.note]);
+  if (it.steal) parts.push(E.steal.replace('{n}', String(Math.round(it.steal * 100))));
+  if (it.cross) parts.push(E.cross);
   if (it.floor) parts.push(({ ko: '지옥 {n}층 고유', th: 'เฉพาะนรกชั้น {n}', en: 'Hell F{n} only' } as Record<Lang, string>)[l].replace('{n}', String(it.floor)));
   return parts.join(' · ');
 }
@@ -361,6 +371,19 @@ export function itemIcon(key: string): HTMLCanvasElement {
       P([[4, 9], [28, 9], [28, 15], [13, 15], [12, 26], [5, 26], [7, 15], [4, 15]], '#25272b');
       R(4, 9, 24, 2, '#4a4e55'); R(6, 18, 5, 7, '#3a2f28'); P([[13, 15], [17, 15], [17, 20], [13, 19]], '#1a1b1e');
       R(14, 16, 2, 2, '#4a4e55'); R(26, 8, 2, 1, '#4a4e55'); R(9, 12, 12, 1, '#3a3d42');
+      break;
+    case 'blackmask': // 25차: 코와 입을 덮는 검은 천 마스크, 귀걸이 끈 둘
+      for (const sx of [-1, 1]) for (let k = 0; k < 12; k++) { const a = Math.PI * (0.5 + (k / 11) * 1.0) * sx, x = Math.round(16 + sx * 11 + Math.cos(a) * 3 * sx), y = Math.round(15 + Math.sin(a) * 5); R(x, y, 1, 1, '#3a3836'); }
+      P([[5, 10], [16, 7], [27, 10], [26, 20], [16, 26], [6, 20]], '#1c1b1a');
+      P([[16, 7], [27, 10], [26, 20], [16, 26]], '#262422');
+      Ln(16, 8, 16, 25, 1, '#363330'); R(8, 12, 16, 1, '#302e2c'); R(8, 19, 16, 1, '#302e2c');
+      break;
+    case 'flamer': // 25차: 국방색 연료통 둘 + 호스 + 긴 분사관
+      R(3, 6, 6, 20, '#4e5a2e'); R(9, 8, 6, 18, '#5c6a36'); R(3, 6, 6, 2, '#6e7c44'); R(4, 3, 4, 3, '#3a4222'); R(10, 5, 4, 3, '#3a4222');
+      R(3, 14, 12, 2, '#6a6a4a');
+      Ln(9, 27, 16, 22, 2, '#2a2a2c');
+      R(14, 15, 15, 4, '#8a9098'); R(14, 15, 15, 1, '#b8bec6'); R(27, 14, 4, 6, '#4a4e55'); R(17, 19, 3, 6, '#2a6a6a');
+      R(30, 16, 2, 2, '#ffb040');
       break;
     case 'bow':
       for (let k = 0; k < 26; k++) { const a = (k / 25 - 0.5) * 2.2, x = Math.round(9 + Math.cos(a) * 14 - 6), y = Math.round(16 + Math.sin(a) * 14); R(x, y, 2, 2, '#8a6238'); R(x, y, 1, 1, '#b08a52'); }
@@ -558,8 +581,11 @@ export const FLOOR_LOOT: Record<number, [string, number][]> = {
   1: [['ashcake', 18], ['cinderbread', 14], ['ashmask', 4], ['cinderaxe', 1.5]],
   2: [['bogroot', 16], ['mossboots', 4], ['leechhook', 2]],
   3: [['bloodfruit', 18], ['lanternwine', 12], ['bloodvest', 3], ['scalecleaver', 2]],
+  4: [['slagbread', 18], ['forgegloves', 4], ['slagmaul', 2.4], ['ironblade', 1.2]], // 25차: 4층 고유 물건이 빠져 있던 것을 채움
 };
-export const HELL_LOOT: Record<number, [string, number][]> = Object.fromEntries([1, 2, 3].map((f) => [f, [...FLOOR_LOOT[f], ...COMMON_LOOT]]));
+/** 25차: 깊을수록 무기·방어구가 잘 나온다 (층마다 장비 무게 +35%) */
+const gearW = (k: string, w: number, f: number) => { const it = ITEMS.find((x) => x.key === k); return it && (it.atk || it.def) ? w * (1 + 0.35 * (f - 1)) : w; };
+export const HELL_LOOT: Record<number, [string, number][]> = Object.fromEntries([1, 2, 3, 4].map((f) => [f, [...FLOOR_LOOT[f], ...COMMON_LOOT].map(([k, w]) => [k, gearW(k, w, f)] as [string, number])]));
 export function rollLoot(floor: number, rnd = Math.random): string {
   const t = HELL_LOOT[floor] ?? COMMON_LOOT;
   let s = t.reduce((a, [, w]) => a + w, 0) * rnd();

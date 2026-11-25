@@ -9,9 +9,9 @@ HAIRS = ['short', 'swept', 'bob', 'long', 'ponytail', 'buzz']
 OUTFITS = ['casual', 'apron', 'raincoat', 'patient', 'parrot']
 MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle', 'arming']   # 20차: arming = 한손검
 TWO = ['sledge', 'fireaxe', 'greatsword', 'maul']   # 16차 양손 무기 (heavy 동작)
-ARMOR = ['helmet', 'jacket', 'vest', 'gloves', 'workpants', 'shinguard', 'boots', 'shield']   # 20차: 왼팔의 둥근 방패
+ARMOR = ['helmet', 'jacket', 'vest', 'gloves', 'workpants', 'shinguard', 'boots', 'shield', 'mask']   # 25차: 검은 마스크 (헬멧 자리)   # 20차: 왼팔의 둥근 방패
 WEAPONS = MELEE + ['pistol']
-RANGED_G = ['pistol', 'shotgun', 'bow']   # 쏘는 자세(g)로 드는 것
+RANGED_G = ['pistol', 'shotgun', 'bow', 'flamer']   # 25차: 화염방사기   # 쏘는 자세(g)로 드는 것
 
 def id_color(rid):
     v = (rid * 16 + 8) / 255
@@ -880,6 +880,15 @@ class Doll:
             blob(P, hc + Vector((0, -.1, .025)), (.085 * s, .03 * s, .045 * s), metal, None, segs=10, rings=6)
             ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
             return
+        if piece == 'mask':   # 25차 마스크 팔이 소녀의 검은 마스크: 코와 입을 덮는 천, 귀에 거는 끈
+            P = Part(g)
+            hc = V(0, -.005, 1.615)
+            black = rmat('dark', .85, .1, tag='armor')
+            blob(P, hc + Vector((0, -.055, -.042)), (.094 * s, .068 * s, .064 * s), black, None, segs=16, rings=10, cut=lambda co: co.y > hc.y - .045 * s)
+            for sx in (1, -1):
+                limb(P, hc + Vector((sx * .088 * s, -.06 * s, -.02 * s)), hc + Vector((sx * .104 * s, .0, .012 * s)), [(0, .007, .007), (1, .006, .006)], black, None, segs=4)
+            ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
+            return
         if piece in ('jacket', 'vest'):
             grow = 1.12 if piece == 'jacket' else 1.18
             def fit(rings):
@@ -1143,6 +1152,15 @@ class Doll:
             pts = [c0 + (-up * math.cos(a) + d * math.sin(a)) * .08 for a in [k * math.pi / 6 for k in range(0, 9)]]
             for k in range(len(pts) - 1):
                 limb(P, pts[k], pts[k + 1], [(0, .012 - k * .001, .012 - k * .001), (1, .011 - k * .001, .011 - k * .001)], metal, None, segs=6)
+        elif name == 'flamer':   # 25차 화염방사기: 손잡이 아래 연료통, 앞으로 긴 분사관, 끝이 벌어진 노즐
+            fwd = Vector((0, -1, 0))
+            tank = rmat('raincoat', .55, .3, tag='wpn')
+            limb(P, grip + Vector((0, .01, .04)), grip + Vector((0, -.01, -.06)), [(0, .016, .024), (1, .016, .024)], dark, None, segs=6)   # 손잡이
+            limb(P, grip + Vector((0, .1, .07)), grip + Vector((0, .1, .07)) + fwd * .5, [(0, .017, .017), (1, .015, .015)], metal, None, segs=6)   # 분사관
+            limb(P, grip + Vector((0, -.4, .07)), grip + Vector((0, -.47, .07)), [(0, .02, .02), (1, .03, .03)], dark, None, segs=8)   # 노즐
+            limb(P, grip + Vector((0, .08, -.03)), grip + Vector((0, -.16, -.03)), [(0, .042, .042), (.1, .05, .05), (.9, .05, .05), (1, .042, .042)], tank, None, segs=10)   # 연료통
+            limb(P, grip + Vector((0, -.18, .07)), grip + Vector((0, -.26, -.01)), [(0, .014, .018), (1, .014, .018)], dark, None, segs=6)   # 앞 손잡이
+            blob(P, grip + Vector((0, -.445, .1)), (.012, .012, .012), rmat('crest', .25, .85), None, segs=6, rings=4)   # 불씨
         elif name == 'shotgun':   # 탈루스: 개머리판 달린 쌍대 산탄총
             fwd = Vector((0, -1, 0))
             limb(P, grip + Vector((0, .025, .035)), grip + Vector((0, .21, -.05)), [(0, .02, .03), (1, .03, .048)], wood, None, segs=6)   # 개머리판

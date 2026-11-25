@@ -11,7 +11,23 @@ export const FLOORS: FloorDef[] = [
   { floor: 1, theme: 'ash', name: { ko: '재의 문턱', th: 'ธรณีแห่งเถ้าถ่าน', en: 'Threshold of Ash' }, sin: { ko: '경미한 잘못, 책임 회피', th: 'ความผิดเล็กน้อย การหนีความรับผิดชอบ', en: 'Petty wrongs, evading responsibility' }, monsters: ['ashen', 'ember', 'bonewalker', 'gateyak'], boss: 'ashgal', guard: 'ashwarden', torturer: 'gateyak' },
   { floor: 2, theme: 'swamp', name: { ko: '굶주림의 늪', th: 'บึงแห่งความหิวโหย', en: 'Swamp of Hunger' }, sin: { ko: '탐욕', th: 'ความโลภ', en: 'Greed' }, monsters: ['pret', 'bogdead', 'glutton'], boss: 'gurma', guard: 'hollowbowl', torturer: 'glutton' },
   { floor: 3, theme: 'market', name: { ko: '피의 시장', th: 'ตลาดเลือด', en: 'Blood Market' }, sin: { ko: '사기, 기만', th: 'การฉ้อโกง การหลอกลวง', en: 'Fraud and deceit' }, monsters: ['haggler', 'debtbones', 'broker'], boss: 'serane', guard: 'waxseal', torturer: 'broker' },
-  { floor: 4, theme: 'forge', name: { ko: '용광로', th: 'เตาหลอม', en: 'The Furnace' }, sin: { ko: '분노와 폭력', th: 'ความโกรธและความรุนแรง', en: 'Wrath and violence' }, monsters: ['slagdead', 'chainbones', 'bellows'], boss: 'dorkan', guard: 'anvilward', torturer: 'bellows' },
+  // 25차: 설정집대로 — 비명의 용광로 · 고의적인 폭력과 상해 · 불씨귀(불을 뿜는다) · 쇠망치병(거대한 망치) · 철갑마(쇠로 덮인 전사) / 층주 바르칸, 용광로의 장군
+  { floor: 4, theme: 'forge', name: { ko: '비명의 용광로', th: 'เตาหลอมแห่งเสียงกรีดร้อง', en: 'Furnace of Screams' }, sin: { ko: '고의적인 폭력과 상해', th: 'ความรุนแรงและการทำร้ายโดยเจตนา', en: 'Deliberate violence and injury' }, monsters: ['cinderimp', 'hammerman', 'ironclad'], boss: 'barkan', guard: 'anvilward', torturer: 'hammerman' },
+];
+/**
+ * 25차: 아직 열지 않은 5~13층 계획 (지옥 설정집). 악업 띠 — 1~4층 개인의 죄 · 5~8층 남을 고의로 망가뜨린 죄 · 9~12층 오래 이어진 학대와 조직적 착취 · 13층 절멸.
+ * 설정상 지옥은 144층, 지옥의 주인이 사는 어비스까지 이어지지만 지금 계획은 13층까지. 떨어지는 깊이는 packages/shared rules.ts의 hellNeed()
+ */
+export const HELL_PLAN: { floor: number; name: string; monsters: string[]; boss: string }[] = [
+  { floor: 5, name: '가면의 도시', monsters: ['가면귀', '속삭임꾼', '인형병사'], boss: '마르시온' },
+  { floor: 6, name: '거울 미궁', monsters: ['유리거미', '모방귀', '파편기사'], boss: '릴미르' },
+  { floor: 7, name: '사슬의 감옥해', monsters: ['사슬귀', '익사망령', '검은 간수'], boss: '도르카인' },
+  { floor: 8, name: '검은 사냥숲', monsters: ['그림자늑대', '뿔사냥꾼', '목 없는 기사'], boss: '펜르자' },
+  { floor: 9, name: '멈춘 시간의 도시', monsters: ['초침충', '반복망령', '시계기사'], boss: '크로벨' },
+  { floor: 10, name: '부패의 궁정', monsters: ['부패충', '검은 시종', '타락기사'], boss: '모르비아' },
+  { floor: 11, name: '무명의 서고', monsters: ['종이망령', '백지귀', '기억수집가'], boss: '에노크라' },
+  { floor: 12, name: '왕관 없는 황궁', monsters: ['철면병', '지배귀', '황궁거인'], boss: '타나토르' },
+  { floor: 13, name: '심연의 옥좌', monsters: ['무형귀', '공허거인', '심연의 그림자'], boss: '무형왕' },
 ];
 export const floorDef = (f: number) => FLOORS[Math.max(1, Math.min(FLOORS.length, f)) - 1];
 
@@ -59,7 +75,7 @@ export const GUARDS: Record<string, GuardDef> = {
     line: { ko: '여기선 쇠만 두드린다. 사람은 아니다.', th: 'ที่นี่ตีแต่เหล็ก ไม่ตีคน', en: 'Here we strike iron. Not people.' },
     look: { ko: '쇳물에 그을린 쇠 두건, 가슴에 박힌 모루 모양의 쇳덩이, 손에는 쇠똥이 엉겨 붙은 무거운 곤봉. 두건 틈으로 불티가 샌다.', th: 'ผ้าคลุมหัวเหล็กไหม้เกรียมจากน้ำเหล็ก ก้อนเหล็กรูปทั่งฝังที่อก ในมือคือกระบองหนักมีตะกรันติด ประกายไฟลอดออกจากรอยผ้า', en: 'An iron hood scorched by molten metal, an anvil-shaped lump of iron set in its chest, a heavy club crusted with slag. Sparks leak from the hood.' },
     cols: { 1: '#3a3634', 3: '#2a2624', 4: '#1a1716', 10: '#5a524c', 14: '#8a7e6e', 15: '#060404', 12: '#ff8a1a', 6: '#ff8a1a' },
-    hp: 5400, dmg: [34, 46], atk: 1.0, speed: 0.6, special: 'push', // 층주 도르칸만큼
+    hp: 5400, dmg: [34, 46], atk: 1.0, speed: 0.6, special: 'push', // 층주 바르칸만큼
   },
 };
 
@@ -73,6 +89,10 @@ export interface MonsterDef {
   skin: string; cloth: string; glow: string; // 살·옷·빛나는 곳 색
   hp: number; dmg: [number, number]; speed: number; notice: number; atk: number; scale: number; notes: [number, number];
   boss?: boolean; weapon?: string | null;
+  /** 25차: 불을 뿜는다 — 몇 칸 떨어진 곳에서 불길로 공격한다 (불씨귀) */
+  flame?: boolean;
+  /** 이름 뒤에 붙는 칭호 (살펴보기) */
+  title?: Record<Lang, string>;
   /** 몸 구역 색 덮어쓰기 (가면·금붙이·뿔처럼 살·옷·빛 셋으로 모자란 곳) */
   cols?: Record<number, string>;
 }
@@ -96,12 +116,12 @@ export const MONSTERS: Record<string, MonsterDef> = Object.fromEntries([
   M('debtbones', 'debtor', '빚쟁이 해골', 'โครงกระดูกลูกหนี้', 'Debtor bones', '#c9b89a', '#6a5a3a', '#f2c84a', 360, [13, 21], 1.2, 7, 0.9, 1, [7, 13], { weapon: 'hook', cols: { 10: '#e8dcc0' } }),
   M('broker', 'broker', '살점 거간꾼', 'นายหน้าเนื้อ', 'Flesh broker', '#8a5a4a', '#2a1a12', '#f2c84a', 800, [19, 29], 0.9, 5, 1.1, 1.1, [15, 26], { weapon: 'cleaver', cols: { 14: '#c9a23e' } }),
   // 세라네: 피의 시장 끝 나루터 앞에 도사린 거대한 살덩이 애벌레. 세로로 찢어진 아가리에 이빨이 세 겹 (맨손 = 발톱 팔)
-  // 4층 용광로 (24차): 쇳물에 반쯤 녹은 망자 · 사슬에 묶인 그을린 해골 · 풀무를 등에 진 거한
-  M('slagdead', 'ash', '쇳물 망자', 'ผีน้ำเหล็ก', 'Slag dead', '#3a3634', '#1e1a18', '#ff8a1a', 420, [15, 23], 1.0, 6, 0.95, 1, [8, 15], { weapon: 'pickaxe', cols: { 12: '#ffb02a', 14: '#6a625a' } }),
-  M('chainbones', 'debtor', '사슬 해골', 'โครงกระดูกโซ่', 'Chained bones', '#4a423c', '#2a2420', '#ff6a1a', 400, [15, 24], 1.25, 7, 0.88, 1, [8, 15], { weapon: 'hook', cols: { 10: '#5e5650', 14: '#8a8078' } }),
-  M('bellows', 'glutton', '풀무 거한', 'ยักษ์สูบลม', 'Bellows brute', '#2e2826', '#5a4a3a', '#ff7a2a', 900, [22, 32], 0.85, 5, 1.15, 1.15, [18, 30], { weapon: 'club', cols: { 4: '#1a1412', 14: '#8a6a3a' } }),
-  // 도르칸: 용광로의 집행자. 뿔 달린 검은 가시 갑옷, 해골 얼굴에 붉은 눈, 쇠사슬 감긴 철퇴 지팡이, 해진 붉은 망토 (사용자 컨셉 그림)
-  M('dorkan', 'forgeknight', '도르칸', 'ดอร์คาน', 'Dorkan', '#2a2422', '#5a0e10', '#ff4a1a', 5400, [34, 48], 0.9, 8, 1.05, 1.6, [520, 640], { boss: true, weapon: 'chainmace', cols: { 13: '#7a1014', 14: '#5a5250', 15: '#0a0606' } }),
+  // 4층 비명의 용광로 (25차, 설정집): 불을 뿜는 숯불 꼬마 악귀 · 거대한 쇠망치를 멘 야크 병사 · 온몸을 쇠로 덮은 전사
+  M('cinderimp', 'cinder', '불씨귀', 'ผีลูกไฟ', 'Cinder imp', '#2a2220', '#3a1a10', '#ff9a1a', 380, [14, 22], 1.35, 7, 1.15, 0.95, [8, 15], { weapon: 'brand', flame: true, cols: { 12: '#ffcf4a', 14: '#5a4a40' } }),
+  M('hammerman', 'yak', '쇠망치병', 'ทหารค้อนเหล็ก', 'Hammer soldier', '#4a4644', '#2a2422', '#ff7a2a', 950, [24, 34], 0.85, 5, 1.3, 1.14, [18, 30], { weapon: 'sledge', cols: { 13: '#3a2a20', 14: '#7a7470' } }),
+  M('ironclad', 'forgeknight', '철갑마', 'อัศวินเกราะเหล็ก', 'Ironclad', '#3e3c3a', '#4a4846', '#ffb04a', 1100, [24, 36], 0.9, 6, 1.15, 1.05, [20, 34], { weapon: 'greatsword', cols: { 13: '#5a5856', 14: '#8a8682', 15: '#141210' } }),
+  // 바르칸, 용광로의 장군: 뿔 달린 검은 가시 갑옷, 해골 얼굴에 붉은 눈, 쇠사슬 감긴 철퇴 지팡이, 해진 붉은 망토 (사용자 컨셉 그림)
+  M('barkan', 'forgeknight', '바르칸', 'บาร์คาน', 'Barkan', '#2a2422', '#5a0e10', '#ff4a1a', 5400, [34, 48], 0.9, 8, 1.05, 1.6, [520, 640], { boss: true, weapon: 'chainmace', title: { ko: '용광로의 장군', th: 'แม่ทัพแห่งเตาหลอม', en: 'General of the Furnace' }, cols: { 13: '#7a1014', 14: '#5a5250', 15: '#0a0606' } }),
   M('serane', 'serane', '세라네', 'เซราเน', 'Serane', '#5e1a20', '#360a0e', '#e0281e', 4200, [30, 42], 0.8, 6, 1.0, 1.85, [380, 460], { boss: true, weapon: null }),
 ].map((m) => [m.key, m]));
 
