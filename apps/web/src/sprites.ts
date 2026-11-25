@@ -41,6 +41,15 @@ export const MISS_HWANG: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColo
 export const BESK_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'besk', cols: { 1: '#b8382a', 3: '#3a1410', 4: '#2a100c', 5: '#140a08', 6: '#e8c050', 9: '#3a1410', 10: '#e8dcc0', 12: '#f2d27a', 13: '#4a2a1a', 14: '#e0b437', 15: '#140e0c' } };
 /** 25차 지옥 1층 마스크 팔이 소녀: 헝클어진 갈색 단발, 해진 갈색 숄, 검붉은 원피스 (사용자 컨셉 그림) */
 export const MASKGIRL_LOOK: Look = { sex: 'f', build: 0, skin: 0, hair: 2, hairColor: 0, top: 0, bottom: 0, child: true, cols: { 2: '#4a2e1c', 3: '#7a6a56', 4: '#5e2a2e', 5: '#2a1e18' } };
+/** 28차 유내: 내 집의 동양인 여성. 올 때마다 10대 · 20대 · 30대 후반 중 한 시절로 나온다
+ *  10대 — 질끈 묶은 말총머리, 노란 후드 집업, 청바지 (아이 몸이 아니라 키가 다 자란 열몇 살)
+ *  20대 — 갈색으로 물들인 긴 머리, 검은 앞치마 같은 윗옷, 밝은 통바지, 붉은 구두 (동네 미용실 원장)
+ *  30대 후반 — 단발, 팥죽색 카디건, 짙은 바지, 회색 슬리퍼 (밥상을 차려 놓고 기다리는 사람) */
+export function yunaeLook(age: 0 | 1 | 2): Look {
+  if (age === 0) return { sex: 'f', build: 0, skin: 0, hair: 4, hairColor: 0, top: 0, bottom: 0, cols: { 2: '#17110e', 3: '#e2b84e', 9: '#e2b84e', 4: '#46587e', 5: '#ecebe6' } };
+  if (age === 1) return { sex: 'f', build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, cols: { 2: '#6a3a24', 3: '#24212a', 9: '#24212a', 4: '#d6c8b4', 5: '#9a2a36' } };
+  return { sex: 'f', build: 0, skin: 0, hair: 2, hairColor: 0, top: 0, bottom: 0, cols: { 2: '#241a16', 3: '#7e4e4a', 9: '#7e4e4a', 4: '#34343e', 5: '#8a8e96' } };
+}
 export const TALUS_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'talus', cols: { 1: '#d8ccb0', 3: '#5a4430', 4: '#3a2e22', 5: '#1a1410', 6: '#ffd08a', 10: '#d8ccb0', 12: '#a8281e', 13: '#2e2420', 14: '#c9a23e', 15: '#140e0c' } };
 export const HWANGHON: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'apron', cols: { 1: '#ead2c4', 2: '#3a0e12', 3: '#5a0e18', 4: '#2a0a10', 5: '#0c0808', 6: '#1a1210', 7: '#140a0c', 9: '#5a0e18', 10: '#ead2c4' } };
 

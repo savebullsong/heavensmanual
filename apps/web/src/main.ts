@@ -555,6 +555,9 @@ const hooks: WorldHooks = {
   bank(name) {
     openBank(name);
   },
+  yunaeOut() {
+    void talkToYunaeOut();
+  },
   maskGirl() {
     void talkToMaskGirl();
   },
@@ -670,7 +673,9 @@ function enterInterior(k: number, out: { i: number; j: number }, chaser: { monst
   if (!world || world.zone.interior || busy) return;
   const b = world.zone.buildings[k];
   const L0 = t();
-  openRoom(interiorZone(b, k, out, b.cat === 'loan' ? L0.beskHouse : b.cat === 'hbank' ? L0.hbankName : b.cat === 'atone' ? L0.atoneName : b.cat === 'rebirth' ? L0.rebirthName : buildingName(b, lang())), chaser, work);
+  openRoom(interiorZone(b, k, out, b.cat === 'loan' ? L0.beskHouse : b.cat === 'hbank' ? L0.hbankName : b.cat === 'atone' ? L0.atoneName : b.cat === 'rebirth' ? L0.rebirthName : buildingName(b, lang()), b.cat === 'home' ? world.yunaeAge : undefined), chaser, work);
+  // 28차: 20대 유내의 날에는 방이 비어 있다 — 들어서면 짧은 혼잣말
+  if (b.cat === 'home' && street?.yunaeAge === 1 && !busy) void (async () => { busy = true; dlg.open({ name: '', monologue: true }); await dlg.say(pick(L0.yunaeEmpty)); dlg.close(); busy = false; })();
 }
 /** 19차: 천국의 구름 계단 → 환생의 테라스. 거리의 건물이 아니라 구름 위에 따로 떠 있는 단 (환생관 루엔은 여기에만 있다) */
 function enterTerrace() {
@@ -1187,16 +1192,39 @@ async function talkToBulda(force = false) {
   dlg.close();
   busy = false;
 }
-/** 24차 유내: 내 집에 있는 사람. 올 때마다 나이가 다르다 (여자아이 · 어른 · 중년). 누구인지는 아무도 말하지 않는다 */
+/** 24차 유내: 내 집에 있는 사람. 누구인지는 아무도 말하지 않는다
+ *  28차: 올 때마다 한 시절 — 10대(집 안, 놀러 나가자고 조른다) · 20대(대문 앞, 동네 미용실 · 말을 다 하면 그 사람 만나러 떠난다) · 30대 후반(집 안, 늦었다고 나무라고 밥부터 먹인다)
+ *  같은 장면이 연달아 나오지 않게 시절마다 지난번 장면을 기억해 둔다 */
+const yunaeLast: number[] = [-1, -1, -1, -1];
+function yunaePick<T>(slot: number, a: readonly T[]): T {
+  let k = Math.floor(Math.random() * a.length);
+  if (a.length > 1 && k === yunaeLast[slot]) k = (k + 1 + Math.floor(Math.random() * (a.length - 1))) % a.length;
+  yunaeLast[slot] = k;
+  return a[k];
+}
 async function talkToYunae() {
   const L = t();
   if (busy) return;
-  const age = world?.zone.interior?.age ?? 1;
+  const age = world?.zone.interior?.age ?? 0;
+  if (age === 1) return; // 20대의 유내는 집 안에 없다 (대문 앞 · talkToYunaeOut)
   busy = true;
-  dlg.open({ name: L.yunae, portrait: (['yunae-child', 'yunae-young', 'yunae-middle'] as const)[age] ?? 'yunae' }); // 27차: 나이마다 다른 그림 (비면 공통 그림)
-  for (const line of L.yunaeLines[age]) await dlg.say(line);
+  dlg.open({ name: L.yunae, portrait: age === 0 ? 'yunae-teen' : 'yunae-30s' }); // 시절마다 다른 그림 (비면 공통 그림)
+  for (const line of yunaePick(age, age === 0 ? L.yunaeTeen : L.yunae30)) await dlg.say(line);
   dlg.close();
   busy = false;
+}
+/** 28차: 대문 앞의 20대 유내 — 머리 자르러 안 오냐고 타박하다가, 약속이 있다며 골목 아래로 내려간다 */
+async function talkToYunaeOut() {
+  const L = t();
+  if (busy || !world) return;
+  const w = world;
+  busy = true;
+  dlg.open({ name: L.yunae, portrait: 'yunae-20s' });
+  for (const line of yunaePick(1, L.yunae20)) await dlg.say(line);
+  await dlg.say(yunaePick(3, L.yunae20Go));
+  dlg.close();
+  busy = false;
+  w.yunaeGo();
 }
 /** 물속으로 걸어 들어가 다시 태어난다 */
 function leaveBorder() {

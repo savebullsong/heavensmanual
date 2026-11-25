@@ -9,7 +9,7 @@ import { wingTexture, cloudTexture, heavenVignette, cloudStairTexture, heavenTow
 import { hellDecor } from './hellprops.ts';
 import { Application, ColorMatrixFilter, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture, TilingSprite } from 'pixi.js';
 import { type Look } from './character.ts';
-import { MISS_HWANG, TALUS_LOOK, MASKGIRL_LOOK, charSet, frameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, ANIM_FPS, IMPACT, TWO, type CharSet, type Dir, type Anim, type Frame } from './sprites.ts';
+import { MISS_HWANG, TALUS_LOOK, MASKGIRL_LOOK, yunaeLook, charSet, frameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, ANIM_FPS, IMPACT, TWO, type CharSet, type Dir, type Anim, type Frame } from './sprites.ts';
 import { type Zone, type Building, type Lane, type Prop, type HellVendor, type Furn, findPath, walkable, randomWalkTileNear, tileAt } from './zone.ts';
 import { iso, TW, TH, drawBuilding, drawGroundChunk, buildingHeight } from './gfx.ts';
 import { drawBuildingKit, drawGroundKit, buildingTop, upperFloors, carSprite, propSprite, CAR_MODELS, CHUNK, kitOk } from './street.ts';
@@ -76,7 +76,7 @@ function loadBuildingArt() {
 }
 import { streetProp, type PropPic } from './propgfx.ts';
 import { decorOf } from './decor.ts';
-import { canEnter, drawRoom, drawFurn, clerkLook, grandpaLook, yunaeLook, roomKind as roomKindOf } from './interior.ts';
+import { canEnter, drawRoom, drawFurn, clerkLook, grandpaLook, roomKind as roomKindOf } from './interior.ts';
 import { carHit, isDanger, DANGER_SPEED, critChance, CRIT_MULTIPLIER, regenPerMinute, restRegenPerMinute, OUT_OF_COMBAT_S, armorClass, rollToHit, maxHp as maxHpFor, newStats, type DeedKey, type Stats } from '../../../packages/shared/src/rules.ts';
 
 function tex(c: HTMLCanvasElement): Texture {
@@ -85,7 +85,7 @@ function tex(c: HTMLCanvasElement): Texture {
   return tx;
 }
 
-export type NpcKind = 'passer' | 'thug' | 'suturer' | 'monster' | 'pashar' | 'clerk' | 'angel' | 'yellowwing' | 'officer' | 'guard' | 'talus' | 'soul' | 'vendor' | 'fighter' | 'elder' | 'sleeper' | 'goat' | 'maskgirl';
+export type NpcKind = 'passer' | 'thug' | 'suturer' | 'monster' | 'pashar' | 'clerk' | 'angel' | 'yellowwing' | 'officer' | 'guard' | 'talus' | 'soul' | 'vendor' | 'fighter' | 'elder' | 'sleeper' | 'goat' | 'maskgirl' | 'yunae';
 export type Realm = 'real' | 'ghost' | 'hell' | 'heaven' | 'border'; // 24차: border = 경계의 해변 (귀신 대신)
 export type Stance = 'talk' | 'hostile' | 'all';
 /** name = 아이디(프로필·신고에 쓰는 열쇠), nick = 게임 속 이름(보이는 이름) */
@@ -153,6 +153,7 @@ interface Walker {
   kid?: boolean; // 26차: 떼의 곁가지 (재충) — 쓰러지거나 멀어지면 다시 나지 않는다
   brave?: boolean; // 27차: 맞으면 달아나지 않고 맞선다 (행인·관광객의 절반)
   hidden?: string | null; // 27차: 품에 숨긴 무기 (단검·권총) — 싸울 때 꺼낸다
+  leave?: number; // 28차: 대문 앞의 유내가 약속 때문에 떠나는 중 (떠난 뒤 흐른 시간)
   gunman?: boolean; // 27차: 드물게 권총을 숨긴 센 행인
   pray?: boolean; // 1층 악마상 앞에 엎드려 비는 영혼
   still?: 'sit' | 'lie' | 'lotus'; // 마을의 지친 영혼: 앉아 있거나 누워 있다 · 24차 가부좌 (경계의 완성자·카드 치는 천사)
@@ -227,6 +228,7 @@ export interface WorldHooks {
   hellAct(kind: 'up' | 'down' | 'pashar' | 'talus'): void;
   /** 25차: 지옥 1층 마스크 팔이 소녀의 바구니 */
   maskGirl(): void;
+  yunaeOut(): void; // 28차: 대문 앞의 20대 유내에게 말을 건다
   /** 26차: 초심자 야구 배트를 떨어뜨려도 되나 (돈·장비 없음 · 아직 받은 적 없음) */
   beginnerBat(): boolean;
   /** 지옥: 층주를 쓰러뜨렸다 */
@@ -472,6 +474,7 @@ export class WorldScene {
       for (let n = 0; n < (this.realm === 'real' ? THUG_COUNT + DRUNK_COUNT + ROBBER_COUNT + MAFIA_COUNT : THUG_COUNT); n++) this.spawnNpc('thug');
       if (this.realm === 'real') { this.setupStreetLife(decProps); for (let n = 0; n < 6; n++) this.spawnNpc('passer'); } // 19차: 사람이 더 북적이게
       if (this.realm === 'real' && Math.random() < 0.7) this.spawnGoat(); // 24차: 떠도는 염소 (구역마다 있을 수도, 없을 수도)
+      if (this.realm === 'real' && this.zone.home) this.placeYunae();
     }
     if (this.realm === 'ghost') {
       // 귀신: 세상이 잿빛으로. 돌아다니기만 하고 우주새 말고는 아무것도 만질 수 없다
@@ -1675,6 +1678,9 @@ export class WorldScene {
   /** 24차 사나운 염소: 아무 데서나 나타나 사람을 보면 들이받고, 죽기 직전엔 무섭게 빨리 달아난다. 가끔은 죽는다. 그래도 다시 나타난다 */
   private goatT = -1;
   private inAlley = false;
+  /** 28차: 오늘 집에 있는 유내의 시절 (0 = 10대 · 1 = 20대 · 2 = 30대 후반). 골목 들머리를 지날 때마다 다시 정해진다 */
+  yunaeAge: 0 | 1 | 2 = Math.floor(Math.random() * 3) as 0 | 1 | 2;
+  private yunaeW: Walker | null = null;
   private ambushT = 0;
   private spawnGoat() {
     const p0 = this.player;
@@ -1710,6 +1716,40 @@ export class WorldScene {
       if (to) w.path = findPath(this.zone, Math.floor(w.x), Math.floor(w.y), to[0], to[1]) ?? [];
       w.wait = 4 + Math.random() * 7;
     }
+  }
+  /** 28차: 스무 살 무렵의 유내는 집 안이 아니라 대문 앞에 서 있다 (동네 미용실을 한다). 다른 시절이면 집 안 밥상 앞에 있다 */
+  private placeYunae() {
+    const hm = this.zone.home;
+    if (!hm) return;
+    if (this.yunaeW) { this.removeWalker(this.yunaeW); this.yunaeW = null; }
+    if (this.yunaeAge !== 1) return;
+    const spot = ([[1, 0], [-1, 0], [1, 1], [-1, 1], [0, 1]] as const).map(([a, c]) => [hm.i + a, hm.j + c] as [number, number]).find(([a, c]) => walkable(this.zone, a, c));
+    if (!spot) return;
+    const w = this.makeWalker(yunaeLook(1), spot[0], spot[1], 'yunae');
+    this.dotArt(w, 'sprite-yunae-20s');
+    w.dir = 'sw'; w.wait = 1e9; w.maxHp = w.hp = 99999; w.home = [spot[0], spot[1]];
+    this.walkers.push(w);
+    this.yunaeW = w;
+  }
+  /** 말을 다 하고 나면 — 그 사람 만나러 간다며 골목 아래로 총총 내려간다. 눈에서 멀어지면 사라진다 */
+  yunaeGo() {
+    const w = this.yunaeW;
+    if (!w || w.leave !== undefined) return;
+    w.leave = 0; w.speed = 1.3; w.bubbleT = 0;
+    const a = this.zone.homeAlley;
+    const to = a ? [Math.floor((a.i0 + a.i1) / 2), Math.floor((a.j0 + a.j1) / 2)] : randomWalkTileNear(this.zone, Math.floor(w.x), Math.floor(w.y), 18);
+    if (to) w.path = findPath(this.zone, Math.floor(w.x), Math.floor(w.y), to[0], to[1]) ?? [];
+  }
+  private thinkYunae(w: Walker, moving: boolean, dt: number) {
+    const p = this.player, d = Math.hypot(p.x - w.x, p.y - w.y);
+    w.target = null;
+    if (w.leave !== undefined) {
+      w.leave += dt;
+      if (d > 10 || w.leave > 40 || (!moving && !w.path.length && w.leave > 1)) { this.removeWalker(w); if (this.yunaeW === w) this.yunaeW = null; }
+      return;
+    }
+    if (d < 8 && !w.bubble && Math.random() < dt * 0.07) { const c = t().yunaeCalls; this.bubble(w, c[Math.floor(Math.random() * c.length)]); }
+    if (d < 5) w.dir = dirFromTile(p.x - w.x, p.y - w.y, w.dir);
   }
   private thinkGoat(w: Walker, moving: boolean, dt: number) {
     const p = this.player;
@@ -2115,6 +2155,7 @@ export class WorldScene {
       this.walkers.push(w);
       this.clerkW = w;
       if (info.kind === 'loan') this.dotArt(w, 'sprite-besk'); // 관리자가 손본 베스크 도트
+      if (info.kind === 'home' && !this.grandpa) this.dotArt(w, info.age === 0 ? 'sprite-yunae-teen' : 'sprite-yunae-30s'); // 28차: 시절별 유내 도트
       if (info.kind === 'shore') { this.dotArt(w, 'sprite-bulda'); w.dir = 'se'; }
       if (info.kind === 'terrace' && !this.grandpa) this.giveWings(w, 0xf4efe4); // 루엔의 흰 날개
       if (this.grandpa) this.wearGlasses(w);
@@ -3722,6 +3763,14 @@ export class WorldScene {
       this.hooks.elder(this.npcName(w));
       return;
     }
+    if (w.kind === 'yunae') {
+      if (w.leave !== undefined) return;
+      w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir);
+      w.bubbleT = 0;
+      if (pd.kind === 'look') { this.hooks.say(this.npcName(w), L.yunaeLook[1]); return; }
+      this.hooks.yunaeOut();
+      return;
+    }
     if (w.kind === 'maskgirl') {
       w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir);
       w.path = []; w.wait = 6;
@@ -3774,6 +3823,7 @@ export class WorldScene {
     if (w.kind === 'clerk' && this.zone.interior?.kind === 'shore') return L.bulda;
     if (w.kind === 'clerk' && this.grandpa) return L.grandpaName;
     if (w.kind === 'clerk' && this.zone.interior?.kind === 'home') return L.yunae;
+    if (w.kind === 'yunae') return L.yunae;
     if (w.cards) return L.angel;
     if (w.kind === 'goat') return L.goatName;
     if (w.kind === 'clerk') return this.zone.interior?.kind === 'loan' ? L.besk : this.zone.interior?.kind === 'rebirth' ? L.pashar : this.zone.interior?.kind === 'terrace' ? L.officer : this.zone.interior?.name ?? '';
@@ -3808,6 +3858,7 @@ export class WorldScene {
     if (w.kind === 'clerk' && this.zone.interior?.kind === 'shore') return L.buldaSub;
     if (w.kind === 'clerk' && this.grandpa) return L.grandpaSub;
     if (w.kind === 'clerk' && this.zone.interior?.kind === 'home') return L.yunaeSub[this.zone.interior.age ?? 1];
+    if (w.kind === 'yunae') return L.yunaeSub[1];
     if (w.cards) return L.cardSub;
     if (w.kind === 'goat') return L.goatSub;
     if (w.kind === 'clerk') return this.zone.interior?.kind === 'terrace' ? L.officerSub : L.clerkSub[(this.zone.interior?.kind ?? 'shop') as keyof typeof L.clerkSub] ?? '';
@@ -3885,6 +3936,7 @@ export class WorldScene {
     if (w.kind === 'remote' && (this.safeAt(w.x, w.y) || this.safeAt(this.player.x, this.player.y))) { this.hooks.say('', t().pvpSafe); return; }
     if (w.kind === 'talus') { w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); this.bubble(w, t().talusNoFight); return; } // 총구 앞에서는 손을 들 수 없다
     if (w.kind === 'maskgirl') { w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); this.bubble(w, t().maskNoFight); return; } // 25차: 중립 — 맞지도 때리지도 않는다
+    if (w.kind === 'yunae') { w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); const n = t().yunaeNoFight; this.bubble(w, n[Math.floor(Math.random() * n.length)]); return; } // 28차: 유내에게는 손을 들 수 없다
     if (w.down > 0) return;
     // 22차: 싸우는 중인 상대를 계속 누르면 — 다섯 번에 한 번, 다음 공격이 반 박자 빨리 나간다 (자동 공격보다 시간당 피해가 조금 많다).
     // 누를 때마다 쿨타임을 지우던 것은 막았다 (연타로 무한히 빨라지지 않게)
@@ -3995,7 +4047,7 @@ export class WorldScene {
     return rollToHit(bonus, armorClass(this.gear.def, this.stats.agi)).hit;
   }
   private hit(from: Walker, to: Walker, dmg: number, crit = false, kind?: sfx.HitKind) {
-    if (to.kind === 'maskgirl') return; // 25차: 소녀는 맞지 않는다
+    if (to.kind === 'maskgirl' || to.kind === 'yunae') return; // 25차: 소녀는 맞지 않는다 · 28차: 유내도
     if (to.down > 0 || this.dead) return;
     // 17차 회피: 공격자가 d20 + 명중 보너스를 굴려 내 회피 등급(10 + 방어력 ÷ 2 + 민첩 ÷ 5)을 넘어야 맞는다. 방어력은 피해를 줄이지 않는다
     if (to.isPlayer && from !== to && !this.rollHits(this.toHitBonus(from))) { this.float(to, t().miss, '#d8e8ff'); return; }
@@ -4756,7 +4808,7 @@ export class WorldScene {
     if (this.zone.homeAlley && !this.zone.interior && this.realm === 'real') {
       const a = this.zone.homeAlley, pl = this.player;
       const inA = pl.x >= a.i0 && pl.x <= a.i1 + 1 && pl.y >= a.j0 && pl.y <= a.j1 + 1;
-      if (inA && !this.inAlley) { this.inAlley = true; this.hooks.homeAlley(); if (Math.random() < 0.22) this.ambushT = 2.2 + Math.random() * 2; } // 가끔 집 가는 길에 대식자
+      if (inA && !this.inAlley) { this.inAlley = true; this.yunaeAge = Math.floor(Math.random() * 3) as 0 | 1 | 2; this.placeYunae(); this.hooks.homeAlley(); if (Math.random() < 0.22) this.ambushT = 2.2 + Math.random() * 2; } // 가끔 집 가는 길에 대식자
       else if (!inA && this.inAlley && (pl.x > a.i1 + 6 || pl.y > a.j1 + 6)) this.inAlley = false;
     }
     if (this.ambushT > 0 && (this.ambushT -= dt) <= 0 && !this.zone.interior) this.spawnSuturer();
@@ -5031,6 +5083,7 @@ export class WorldScene {
     if (w.kind === 'guard') { this.thinkGuard(w, moving, dt); return; }
     if (w.kind === 'talus') { this.thinkTalus(w, dt); return; }
     if (w.kind === 'maskgirl') { this.thinkMaskGirl(w, moving, dt); return; }
+    if (w.kind === 'yunae') { this.thinkYunae(w, moving, dt); return; }
     if (w.pray && Math.random() < dt * 0.04 && Math.hypot(this.player.x - w.x, this.player.y - w.y) < 9) { const m = t().idolMurmur; this.bubble(w, m[Math.floor(Math.random() * m.length)]); }
     if (w.kind === 'vendor' && (w.vend === 'massage' || w.vend === 'bar' || w.vend === 'street' || w.vend === 'heaven')) {
       // 19차: 지나가는 사람을 부른다 (가까이 올수록 자주). 바 호객원은 밤에 더 바쁘다 · 21차: 천국의 천사는 공짜 음식을 권한다

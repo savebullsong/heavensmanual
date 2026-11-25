@@ -84,7 +84,7 @@ const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
 };
 
 /** 거리의 건물 k에 들어갈 때 방을 만든다 (같은 건물이면 늘 같은 방) */
-export function interiorZone(b: Building, k: number, out: { i: number; j: number }, name: string): Zone {
+export function interiorZone(b: Building, k: number, out: { i: number; j: number }, name: string, yunaeAge?: 0 | 1 | 2): Zone {
   const kind = roomKind(b);
   const [W, H] = SIZE[kind];
   const tiles = new Uint8Array(W * H);
@@ -219,7 +219,7 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
       break;
     }
     case 'home': {
-      // 24차 내 집 (서울 달동네): 작은 방 하나 — 앉은뱅이 밥상 · 개어 둔 이불 · 낡은 텔레비전 · 옷장 · 창가 화분. 유내가 밥상 앞에 있다
+      // 24차 내 집 (서울 달동네): 작은 방 하나 — 앉은뱅이 밥상 · 개어 둔 이불 · 낡은 텔레비전 · 옷장 · 창가 화분. 유내가 밥상 앞에 있다 (28차: 10대·30대 후반일 때만)
       // 25차: 칸마다 제 모양 — 자개 옷장 · 브라운관 텔레비전 · 개어 둔 이불 · 앉은뱅이 밥상(공기·반찬) · 밥상 밑 꽃무늬 깔개 · 선풍기 · 문 앞 신발
       F(2, 1, 2, 1, 46, 'wardrobe'); F(W - 3, 1, 1, 1, 22, 'tv'); F(1, 4, 1, 2, 12, 'futon'); F(mid, 4, 2, 1, 8, 'lowtable', 3); F(x1, 5, 1, 1, 26, 'plant');
       F(mid - 1, 3, 4, 3, 1, 'rug', 1); F(x1, 2, 1, 1, 34, 'fan');
@@ -319,7 +319,8 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
   tiles[exit.j * W + exit.i] = TI.walk;
   const look = LOOKS[kind];
   const info: InteriorInfo = {
-    kind, rest: REST_ROOMS.has(kind), name, ...look, exit, clerk, counter, furn, age: kind === 'home' ? (Math.floor(Math.random() * 3) as 0 | 1 | 2) : undefined,
+    // 28차: 내 집의 유내 — 거리에서 정해 둔 시절을 따른다. 20대(1)면 방은 비어 있다 (대문 앞에 나가 있거나, 그 사람 만나러 갔다)
+    kind, rest: REST_ROOMS.has(kind), name, ...look, exit, clerk: kind === 'home' && (yunaeAge ?? 1) === 1 ? undefined : clerk, counter, furn, age: kind === 'home' ? (yunaeAge ?? (Math.floor(Math.random() * 3) as 0 | 1 | 2)) : undefined,
     from: { b: k, out, bd: b }, store: kind === 'bank' ? 'bank' : ['mart', 'pharmacy', 'food', 'cafe'].includes(kind) ? kind : streetSeller(b), cuisine: cuisineOf(b), seats: seats.filter(([i, j]) => tiles[j * W + i] === TI.walk),
   };
   return finalize({ id: `in-${k}`, W, H, tiles, buildings: [], props: [], lanes: [], door: exit, spawn: { i: exit.i, j: exit.j - 1 }, interior: info });
@@ -1020,12 +1021,6 @@ const STAFF: Record<string, [string, string]> = {
 export const PASHAR_LOOK: Look = { sex: 'm', build: 0, skin: 0, hair: 1, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: '#e8d6c8', 10: '#e8d6c8', 2: '#9a9aa2', 3: '#1c1c22', 4: '#22222a', 9: '#1c1c22', 5: '#141418' } };
 /** 천국의 환생관 루엔 (컨셉 아트: 길고 흰 머리, 흰 법의에 옅은 푸른 띠, 흰 날개, 등불) */
 export const LUEN_LOOK: Look = { sex: 'f', build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, cols: { 1: '#f2dccc', 10: '#f2dccc', 2: '#e8e6f2', 3: '#f8f6f2', 4: '#b8c4e2', 9: '#f8f6f2', 5: '#d8ccb0' } };
-/** 24차 유내: 내 집에 있는 동양인 여성. 올 때마다 여자아이 · 어른 · 중년 여성 중 하나 */
-export function yunaeLook(age: 0 | 1 | 2): Look {
-  if (age === 0) return { sex: 'f', child: true, build: 0, skin: 0, hair: 4, hairColor: 0, top: 0, bottom: 0, cols: { 3: '#e8a0a8', 9: '#e8a0a8', 4: '#3a4a6a', 2: '#1a1412' } };
-  if (age === 1) return { sex: 'f', build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, cols: { 3: '#e4dccc', 9: '#e4dccc', 4: '#3a3a40', 2: '#161210' } };
-  return { sex: 'f', build: 1, skin: 0, hair: 2, hairColor: 0, top: 0, bottom: 0, cols: { 3: '#8a5a6a', 9: '#8a5a6a', 4: '#4a3a3a', 2: '#2a2220' } };
-}
 /** 24차: 환생관 할아버지 — 안경 쓴 아주 늙은 사람 (천국은 흰 옷, 지옥은 잿빛 외투). 그림은 관리자 'grandpa' 칸 */
 export function grandpaLook(hell: boolean): Look {
   const skin = '#e6c9ae';
