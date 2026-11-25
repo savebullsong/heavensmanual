@@ -1124,7 +1124,25 @@ export class WorldScene {
       const [sx, sy] = iso(this.heavenStair.i + 0.5, this.heavenStair.j + 0.5);
       st.position.set(Math.round(sx), Math.round(sy) + 10);
       st.zIndex = this.heavenStair.i + this.heavenStair.j + 0.4;
+      st.scale.set(1.45);
       this.objects.addChild(st);
+      this.stairBox = [sx - 87, sy + 10 - 275, sx + 87, sy + 10];
+      // 21차: 멀리서도 보이게 — 하늘로 솟는 빛기둥과 늘 떠 있는 이름 (누르면 테라스로)
+      const beam = new Sprite(this.glowTex());
+      beam.anchor.set(0.5, 1);
+      beam.scale.set(1.1, 5.5);
+      beam.tint = 0xfff0b8;
+      beam.alpha = 0.55;
+      beam.blendMode = 'add';
+      beam.position.set(Math.round(sx), Math.round(sy) - 30);
+      beam.zIndex = st.zIndex - 0.01;
+      this.objects.addChild(beam);
+      const L = t();
+      const tag = new Text({ text: `☁ ${L.cloudStair}`, style: { fontFamily: 'system-ui, sans-serif', fontSize: 14, fontWeight: '800', fill: '#fff4c8', stroke: { color: '#5a4418', width: 4, join: 'round' } } });
+      tag.anchor.set(0.5, 1);
+      tag.position.set(Math.round(sx), Math.round(sy) - 296);
+      tag.zIndex = 1e7 - 1;
+      this.objects.addChild(tag);
     }
     if (home) {
       // 황색날개: 미스 황과 같은 얼굴, 흰 옷에 금빛 띠, 노란 날개. 우주새 둘레를 거닌다 (처음 온 영혼에게는 안내천사로 따라붙는다)
@@ -1420,12 +1438,25 @@ export class WorldScene {
   }
   /** 구름 계단 자리: 우주새 문에서 6~12칸, 황색날개가 거니는 곳과 떨어진 보도 (늘 같은 곳) */
   heavenStair: { i: number; j: number } | null = null;
+  /** 21차: 구름 계단 그림의 화면 상자 (누르면 걸어가 올라간다) · 걸어가는 중인가 */
+  private stairBox: [number, number, number, number] | null = null;
+  private stairWant = false;
+  /** 21차: 구름 계단 자리 — 우주새 앞쪽(화면에 잘 보이는 남·동쪽)의 트인 칸. 계단 앞을 가리는 건물이 없을수록, 문에서 가까울수록 좋다 */
   private findStairSpot(di: number, dj: number): { i: number; j: number } | null {
     const ok = (i: number, j: number) => walkable(this.zone, i, j) && ['walk', 'lot', 'soi', 'park'].includes(tileAt(this.zone, i, j)) && [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1]].every(([a, b]) => walkable(this.zone, i + a, j + b));
-    for (let r = 6; r <= 14; r++) for (let a = -r; a <= r; a++) for (const [i, j] of [[di + a, dj - r], [di - r, dj + a], [di + a, dj + r], [di + r, dj + a]] as [number, number][]) {
-      if (Math.hypot(i - di, j - (dj + 2)) < 6) continue;
-      if (ok(i, j) && findPath(this.zone, di, dj, i, j)) return { i, j };
-    }
+    const blocked = (i: number, j: number) => !walkable(this.zone, i, j) && !['water', 'void'].includes(tileAt(this.zone, i, j));
+    const cands: [number, number, number][] = [];
+    for (let j = dj - 16; j <= dj + 16; j++)
+      for (let i = di - 16; i <= di + 16; i++) {
+        const dd = Math.hypot(i - di, j - (dj + 2));
+        if (dd < 5 || dd > 16 || this.heavenOut(i, j) || !ok(i, j)) continue;
+        let n = 0;
+        const d0 = i - j, s0 = i + j;
+        for (let ss = s0 + 1; ss <= s0 + 9; ss++) for (let d = d0 - 3; d <= d0 + 3; d++) { if ((ss + d) & 1) continue; if (blocked((ss + d) / 2, (ss - d) / 2)) n++; }
+        cands.push([i, j, n * 40 + dd + (i + j < di + dj ? 12 : 0)]);
+      }
+    cands.sort((a, b) => a[2] - b[2]);
+    for (const [i, j] of cands.slice(0, 40)) if (findPath(this.zone, di, dj, i, j)) return { i, j };
     return null;
   }
   /** 구름과 금빛 기운: 세상을 밝고 따뜻하게, 화면 가장자리에 흘러가는 구름 (테라스: 둘레가 하늘) */
@@ -2756,6 +2787,17 @@ export class WorldScene {
     }
     // 1) 사람: 메뉴 (컨트롤·시프트를 누르고 누르면 바로 공격 = 강제 공격). 고문하던 야크도 누르면 고문을 멈추고 덤빈다
     const w = this.walkerAt(gx, gy) ?? this.torturerAt(gx, gy);
+    // 21차: 천국의 구름 계단을 누르면 그 앞까지 걸어가 테라스로 올라간다
+    if (!w && this.stairBox && this.heavenStair && this.realm === 'heaven' && !this.zone.interior) {
+      const wx = gx - this.camera.x, wy = gy - this.camera.y, b = this.stairBox;
+      if (wx >= b[0] && wx <= b[2] && wy >= b[1] && wy <= b[3]) {
+        const st = this.heavenStair;
+        this.cancelActs();
+        this.hooks.place(L.cloudStair, L.cloudStairSub);
+        if (Math.hypot(st.i + 0.5 - this.player.x, st.j + 0.5 - this.player.y) < 1.6) { this.hooks.heavenAct('terrace'); return; }
+        if (this.walkTo(st.i, st.j + 1) || this.walkTo(st.i, st.j)) { this.stairWant = true; this.rippleAt(st.i, st.j); return; }
+      }
+    }
     if (w && w.kind === 'remote' && w.rid && w.rinfo) {
       const hostile = this.recentAttacker(w.rid) || !!w.rpos?.c;
       if (w.down <= 0 && (force || this.stance === 'all' || (this.stance === 'hostile' && hostile))) { this.attack(w); return; }
@@ -3041,6 +3083,7 @@ export class WorldScene {
     this.hooks.away();
     this.player.target = null;
     this.pending = null;
+    this.stairWant = false;
     this.wantShop = false;
     this.storeWant = null;
     this.edgeWant = null;
@@ -3874,6 +3917,11 @@ export class WorldScene {
     if (this.kerb) this.updateKerberos(dt);
     if (this.guide) this.updateGuide(dt);
     this.updateLandmarks(dt);
+    if (this.stairWant && this.heavenStair) {
+      const st = this.heavenStair;
+      if (Math.hypot(st.i + 0.5 - this.player.x, st.j + 0.5 - this.player.y) < 1.6) { this.stairWant = false; this.hooks.heavenAct('terrace'); }
+      else if (!this.player.path.length) this.stairWant = false;
+    }
     if (this.overHp > 0) { this.overHp = Math.max(0, this.overHp - (this.overMax / 600) * dt); if (Math.floor(this.time * 2) !== Math.floor((this.time - dt) * 2)) this.hooks.over(this.overHp); }
     if (this.portal) this.updatePortal(dt);
     this.time += dt;
