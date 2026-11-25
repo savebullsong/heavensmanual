@@ -1,7 +1,7 @@
 // 관리자 페이지: 주요 인물 그림(대화창) · 게임 속 도트 그림 교체 — 두 메뉴로 나눔
 import './admin.css';
 import { PORTRAIT_SLOTS, SPRITE_SLOTS, DEFAULT_PORTRAITS, type PortraitSlot } from './portraits.ts';
-import { charSet, frameOf, MISS_HWANG, HWANGHON, PX } from './sprites.ts';
+import { charSet, frameOf, MISS_HWANG, HWANGHON, BESK_LOOK, TALUS_LOOK, PX } from './sprites.ts';
 import { drawCosmicBird, drawCosmicBirdHeaven } from './ujusae.ts';
 import { drawYuhwang } from './yuhwang.ts';
 import { drawLoanHouse } from './loanhouse.ts';
@@ -21,6 +21,8 @@ const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   'sprite-hwanghon': { name: '황혼', where: '유황새(지옥) 카운터 뒤에 서 있는 모습 (왼쪽 아래를 봄)' },
   'sprite-parrot': { name: '앵무새 · 볏 내림', where: '카운터 끝 횃대 · 평소 모습' },
   'sprite-parrot-up': { name: '앵무새 · 볏 세움', where: '가끔 머리깃을 세울 때 (비워 두면 볏 내림 그림을 그대로 씀)' },
+  'sprite-besk': { name: '베스크', where: '지옥 3층 · 베스크 대부소 카운터 뒤에 서 있는 모습 (왼쪽 아래를 봄 · 오른쪽 아래를 볼 때는 좌우를 뒤집어 씀)' },
+  'sprite-talus': { name: '탈루스', where: '지옥 2층 들판 · 산탄총을 든 채 서 있는 모습 (왼쪽 아래를 봄 · 오른쪽 아래는 좌우 뒤집기 · 총을 쏠 때는 구운 그림)' },
   'bld-ujusae': { name: '우주새 건물 · 낮', where: '현실·천국의 우주새 · 바닥 2×2칸' },
   'bld-ujusae-night': { name: '우주새 건물 · 밤', where: '창에 불이 켜진 밤 모습 (비워 두면 낮 그림을 밤에도 씀)' },
   'bld-ujusae-heaven': { name: '우주새 건물 · 천국', where: '천국의 우주새 (늘 낮) · 바닥 2×2칸 · 비워 두면 볕에 바랜 흰·금빛 기본 그림' },
@@ -47,8 +49,8 @@ function dotSpec(slot: PortraitSlot): Promise<DotSpec | null> {
         const d = slot === 'bld-loan' ? drawLoanHouse(b) : slot.startsWith('bld-hell-') ? drawYuhwang(b, Number(slot.slice(9))) : slot === 'bld-ujusae-heaven' ? drawCosmicBirdHeaven(b) : drawCosmicBird(b, slot === 'bld-ujusae-night');
         return { canvas: d.canvas, w: d.canvas.width, h: d.canvas.height };
       }
-      if (slot === 'sprite-miss-hwang' || slot === 'sprite-hwanghon') {
-        const cs = await charSet(slot === 'sprite-hwanghon' ? HWANGHON : MISS_HWANG);
+      if (slot === 'sprite-miss-hwang' || slot === 'sprite-hwanghon' || slot === 'sprite-besk' || slot === 'sprite-talus') {
+        const cs = await (slot === 'sprite-talus' ? charSet(TALUS_LOOK, 'shotgun') : charSet(slot === 'sprite-besk' ? BESK_LOOK : slot === 'sprite-hwanghon' ? HWANGHON : MISS_HWANG));
         const f = frameOf(cs, 'idle', 'sw', 0);
         if (!f) return null;
         const src = f.tex.source.resource as HTMLCanvasElement;

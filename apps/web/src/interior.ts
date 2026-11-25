@@ -5,6 +5,8 @@ import { TYPES, finalize, type Zone, type Building, type Furn, type InteriorInfo
 import { kindOf, mainPoi, hasBank, storeOf, cuisineOf } from './names.ts';
 import { faithOf } from './street.ts';
 import { TW, TH } from './gfx.ts';
+import { BESK_LOOK } from './sprites.ts';
+export { BESK_LOOK };
 
 const TI = Object.fromEntries(TYPES.map((t, k) => [t, k])) as Record<(typeof TYPES)[number], number>;
 
@@ -771,7 +773,6 @@ const STAFF: Record<string, [string, string]> = {
   gym: ['#1e1e22', '#1e1e22'],
 };
 /** 대부업자 베스크: 붉은 피부·대머리·아주 뚱뚱·금 장신구·장부 */
-export const BESK_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'besk', cols: { 1: '#b8382a', 3: '#3a1410', 4: '#2a100c', 5: '#140a08', 6: '#e8c050', 9: '#3a1410', 10: '#e8dcc0', 12: '#f2d27a', 13: '#4a2a1a', 14: '#e0b437', 15: '#140e0c' } };
 /** 지옥 로비의 환생관 파샤르 (컨셉 아트: 잿빛 머리, 검은 망토 코트에 은 장식, 낡은 장부와 깃펜) */
 export const PASHAR_LOOK: Look = { sex: 'm', build: 0, skin: 0, hair: 1, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: '#e8d6c8', 10: '#e8d6c8', 2: '#9a9aa2', 3: '#1c1c22', 4: '#22222a', 9: '#1c1c22', 5: '#141418' } };
 /** 천국의 환생관 루엔 (컨셉 아트: 길고 흰 머리, 흰 법의에 옅은 푸른 띠, 흰 날개, 등불) */
