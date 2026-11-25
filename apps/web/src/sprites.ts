@@ -49,6 +49,8 @@ const ARMOR_ORDER = ['workpants', 'shinguard', 'boots', 'jacket', 'vest', 'glove
 const ARMOR_COLOR: Record<string, string> = { helmet: '#b0302a', jacket: '#4a5236', vest: '#3a3f46', gloves: '#d8cfb4', workpants: '#4a4536', shinguard: '#2b2f36', boots: '#3a2a1a', shield: '#7a4a2a' };
 const PER_BUILD = new Set(['jacket', 'vest', 'workpants']);
 const COSTUMES = new Set(['raincoat', 'patient', 'parrot', 'robber']); // 강도: 복면이 머리를 덮는다
+/** 맨손 몸(u: 주먹질 장면)까지 구운 차림. 강도는 늘 무기를 들어 무기 자세(m) 몸만 있다 */
+const COSTUME_BARE = new Set(['raincoat', 'patient', 'parrot']);
 
 /** 동작 속도 (초당 장면 수)와 맞히는 장면 */
 export const ANIM_FPS: Record<Anim, number> = { idle: 1, walk: 9, hit: 16, fall: 11, punch: 22, swing: 21, shoot: 16, heavy: 15, sit: 1, idle2: 1, walk2: 9 };
@@ -178,7 +180,8 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
   if (child) { base = 'b-c-casual-w'; mode = 'w'; }
   else if (o === 'apron' && sex === 'f' && !w) { base = 'b-f1-apron-w'; mode = 'w'; }
   else if (o === 'mafia') { if (mode === 'u') mode = 'm'; base = `b-${sex}1-mafia-${mode}`; } // 마피아 정장 (머리카락은 보인다)
-  else if (costume) base = `b-${sex}1-${o}-${mode === 'u' ? 'm' : mode}`;
+  // 맨손이면 맨손 몸을 써야 주먹질 장면이 있다 (무기 자세 몸에는 휘두르기만 있어 공격 동작이 비었다)
+  else if (costume) base = `b-${sex}1-${o}-${mode === 'u' && !COSTUME_BARE.has(o) ? 'm' : mode}`;
   else base = `b-${sex}${build}-casual-${mode}`;
   const style = HAIR_STYLES[look.hair] ?? 'short';
   const hair = costume ? null : child ? `h-c-${style}` : `h-${sex}-${style}`;
@@ -346,7 +349,9 @@ async function build(look: Look, keys: ReturnType<typeof layerKeys>): Promise<Ch
     if ((counts[an as Anim] ?? 0) < n) counts[an as Anim] = n;
   }
   // 양손 무기는 내려찍기 (아직 굽지 않은 그림이면 휘두르기로)
-  const attack: Anim | null = keys.two && counts.heavy ? 'heavy' : keys.mode === 'u' ? 'punch' : keys.mode === 'm' ? 'swing' : keys.mode === 'g' ? 'shoot' : null;
+  let attack: Anim | null = keys.two && counts.heavy ? 'heavy' : keys.mode === 'u' ? 'punch' : keys.mode === 'm' ? 'swing' : keys.mode === 'g' ? 'shoot' : null;
+  // 그 몸에 그 공격 장면이 없으면 (아직 굽지 않은 차림 등) 있는 공격 장면으로 — 서 있는 그대로 때리지 않게
+  if (attack && !counts[attack]) attack = (['punch', 'swing', 'heavy', 'shoot'] as Anim[]).find((a) => counts[a]) ?? attack;
   return { mode: keys.mode, attack, frames, counts, masks, eight: frames.has('hit-s-0'), hold2: !!keys.two && !!counts.idle2 && !!counts.walk2 };
 }
 
