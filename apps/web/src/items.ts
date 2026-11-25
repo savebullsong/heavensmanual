@@ -492,6 +492,19 @@ export function itemIcon(key: string): HTMLCanvasElement {
       if (key === 'somtam') { for (let k = 0; k < 5; k++) R(10 + k * 3, 17, 2, 1, '#f2a03a'); E(20, 19, 1.5, 1.5, '#c9302a'); }
       break;
     }
+    case 'steal': {
+      // 훔치기 단추: 도둑 복면 (눈가리개 + 휘날리는 끈)
+      const M = '#26212b';
+      Ln(3, 18, 0, 22, 2, M); Ln(29, 18, 31, 23, 2, M);
+      E(10, 16, 8.5, 6, M); E(22, 16, 8.5, 6, M); R(12, 12, 8, 7, M);
+      E(10, 13, 6, 1.6, '#4c4558'); E(22, 13, 6, 1.6, '#4c4558');
+      g.globalCompositeOperation = 'destination-out';
+      P([[13, 23], [19, 23], [16, 19]], '#000');
+      g.globalCompositeOperation = 'source-over';
+      E(10, 16.5, 3.4, 2.3, '#efe6d2'); E(22, 16.5, 3.4, 2.3, '#efe6d2');
+      R(10, 16, 2, 2, '#1a1418'); R(21, 16, 2, 2, '#1a1418');
+      break;
+    }
     case 'boots':
       P([[6, 6], [16, 6], [17, 19], [28, 21], [29, 27], [5, 27]], '#5a3a22'); R(5, 27, 25, 3, '#1c1410');
       E(25, 23, 4, 3, '#7c8492'); R(7, 6, 9, 2, '#3a2416');
