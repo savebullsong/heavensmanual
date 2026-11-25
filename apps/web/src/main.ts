@@ -528,10 +528,12 @@ const hooks: WorldHooks = {
     if (wi?.note === 'needsArrows') {
       if ((state.arrows ?? 0) <= 0) { toast(t().noArrows); return false; }
       state.arrows = (state.arrows ?? 0) - 1;
+      renderAmmo();
       return true;
     }
     if ((state.ammo ?? 0) <= 0) { toast(t().noAmmo); return false; }
     state.ammo = (state.ammo ?? 0) - 1;
+    renderAmmo();
     return true;
   },
   hellAct(kind) {
@@ -1464,6 +1466,8 @@ function itemRow(it: ItemDef, right: string, onClick: () => void, dim = false) {
   const ef = document.createElement('span');
   ef.className = 'effect';
   ef.textContent = effectText(it, lang());
+  // 23차: 화살·탄약은 가방에 따로 안 보이니 지금 가진 수를 함께
+  if (it.note === 'arrows' || it.note === 'ammo') ef.textContent += ' · ' + (it.note === 'arrows' ? t().haveArrows : t().haveAmmo).replace('{n}', String((it.note === 'arrows' ? state.arrows : state.ammo) ?? 0));
   const pr = document.createElement('span');
   pr.className = 'price';
   pr.textContent = right;
@@ -1609,8 +1613,7 @@ function renderBag() {
   head.append(tabs, close);
   const info = document.createElement('div');
   info.className = 'bag-info';
-  info.textContent = [(state.ammo ?? 0) > 0 ? L.ammoLeft.replace('{n}', String(state.ammo)) : '', (state.arrows ?? 0) > 0 ? L.arrowsLeft.replace('{n}', String(state.arrows)) : ''].filter(Boolean).join(' · ');
-  info.hidden = !info.textContent;
+  info.hidden = true; // 23차: 화살·탄약은 장비 몸 그림의 칸과 공격 버튼 위에만 (같은 것을 두 번 보이지 않게)
   // 19차 켈베로스 호출 (지옥 로비에서 사 온 것): 현실에서만 부를 수 있다
   if ((state.kerberos ?? 0) > 0 && bagTab === 'use') {
     const kb = document.createElement('button');
@@ -1730,6 +1733,17 @@ function renderBag() {
       };
       doll.appendChild(cell);
     }
+    // 23차: 화살·탄약 칸 — 활이면 화살, 총이면 탄약, 둘 다 아니면 가진 것
+    const am = pouch();
+    const ac = document.createElement('button');
+    ac.className = 'doll-slot ds-ammo' + (am.length ? ' on' : '') + (am.some((x) => x.need && x.n <= 0) ? ' dry' : '');
+    ac.disabled = true;
+    const al = document.createElement('small');
+    al.textContent = L.ammoSlot;
+    ac.appendChild(al);
+    if (am.length) for (const x of am) { const ic = iconFor(x.it); ic.className = 'icon'; const nm = document.createElement('span'); nm.textContent = x.label; ac.append(ic, nm); }
+    else { const nm = document.createElement('span'); nm.className = 'empty'; nm.textContent = '—'; ac.appendChild(nm); }
+    doll.appendChild(ac);
     el.append(head, info, doll, list);
   } else el.append(head, info, list);
   document.body.appendChild(el);
@@ -1775,6 +1789,42 @@ function dollSvg(sex: 'm' | 'f') {
   return `<svg class="doll-fig doll-${sex}" viewBox="0 0 60 130" aria-hidden="true"><g>${limbs}</g><g transform="matrix(-1 0 0 1 60 0)">${limbs}</g>${torso}${order}</svg>`;
 }
 
+/** 23차: 화살 주머니·탄약 주머니. 쏘는 무기를 들었으면 그 무기에 맞는 것만(0이어도), 아니면 가진 것 */
+function pouch(): { it: ItemDef; n: number; label: string; need: boolean }[] {
+  const L = t();
+  const w = state.equip?.weapon ? itemByKey(state.equip.weapon) : null;
+  const hell = inHell();
+  const arrows = { it: itemByKey(hell ? 'harrows' : 'arrows'), n: state.arrows ?? 0, label: L.arrowsLeft.replace('{n}', String(state.arrows ?? 0)), need: w?.note === 'needsArrows' };
+  const ammo = { it: itemByKey(hell ? 'hshot' : 'ammo'), n: state.ammo ?? 0, label: L.ammoLeft.replace('{n}', String(state.ammo ?? 0)), need: w?.note === 'needsAmmo' };
+  if (arrows.need) return [arrows];
+  if (ammo.need) return [ammo];
+  return [arrows, ammo].filter((x) => x.n > 0);
+}
+/** 23차: 공격 버튼 위의 남은 화살·탄약 (쏘는 무기를 들었을 때만). 누르면 장비 칸 */
+const ammoChip = document.createElement('button');
+ammoChip.className = 'ammo-chip';
+ammoChip.hidden = true;
+document.body.appendChild(ammoChip);
+ammoChip.onclick = () => { if (busy || dlg.isOpen) return; bagTab = 'gear'; bagDrop = null; closeMenus(); renderBag(); };
+let ammoShown = '';
+function renderAmmo() {
+  const x = pouch().find((p) => p.need);
+  const on = !!x && scene === 'world' && realm() !== 'ghost';
+  const key = on ? `${x.it.key}|${x.n}` : '';
+  if (key === ammoShown) return;
+  ammoShown = key;
+  ammoChip.hidden = !on;
+  if (!on) return;
+  ammoChip.innerHTML = '';
+  const ic = iconFor(x.it);
+  ic.className = 'icon';
+  const c = document.createElement('b');
+  c.textContent = String(x.n);
+  ammoChip.append(ic, c);
+  ammoChip.classList.toggle('dry', x.n <= 0);
+  ammoChip.classList.toggle('low', x.n > 0 && x.n <= 5);
+  ammoChip.title = x.label;
+}
 /** 빠른 칸: 가방에서 별표한 소비품 하나. 누르면 바로 먹는다 (다 떨어지면 빈 칸) */
 const quickBtn = document.createElement('button');
 quickBtn.className = 'quick-slot';
@@ -1789,6 +1839,7 @@ quickBtn.onclick = () => {
   if (document.querySelector('.bag-panel')) renderBag();
 };
 function renderQuick() {
+  renderAmmo();
   const k = state.quick;
   const n = k ? state.bag?.[k] ?? 0 : 0;
   quickBtn.hidden = !k || scene !== 'world';
