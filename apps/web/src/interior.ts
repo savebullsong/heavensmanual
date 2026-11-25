@@ -35,6 +35,7 @@ export function roomKind(b: Building): string {
   if (k === 'bank' || k === 'bureau_de_change') return 'bank';
   if (['clinic', 'hospital', 'dentist', 'veterinary'].includes(k) || b.cat === 'clinic') return 'clinic';
   if (['fitness_centre', 'fitness_center', 'sports_centre', 'gym', 'dojo'].includes(k)) return 'gym'; // 19차 헬스장
+  if (['department_store', 'mall'].includes(k)) return 'dept'; // 22차 백화점·쇼핑몰: 넓은 매장
   // 대표 가게(첫 POI)의 업종이 먼저 (한 건물에 식당·미용실이 같이 있으면 대표 가게의 방)
   if (['convenience', 'supermarket', 'kiosk', 'variety_store'].includes(k)) return 'mart';
   if (['pharmacy', 'chemist'].includes(k)) return 'pharmacy';
@@ -55,7 +56,7 @@ export const REST_ROOMS = new Set(['temple', 'church', 'mosque', 'gurdwara', 'ba
 const SIZE: Record<string, [number, number]> = {
   temple: [13, 11], church: [13, 11], mosque: [12, 11], gurdwara: [12, 11], bank: [12, 10], clinic: [12, 10], pharmacy: [9, 8],
   mart: [11, 9], food: [12, 10], cafe: [10, 9], bar: [10, 9], salon: [9, 8], massage: [10, 9], laundry: [9, 8], lobby: [11, 9], shop: [9, 8], loan: [10, 8],
-  hbank: [10, 8], atone: [11, 10], rebirth: [23, 17], terrace: [17, 14], gym: [13, 11],
+  hbank: [10, 8], atone: [11, 10], rebirth: [23, 17], terrace: [17, 14], gym: [13, 11], dept: [26, 20],
 };
 const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   temple: { floor: 'temple', wall: '#e9dcc0', trim: '#a8322a' }, church: { floor: 'stone', wall: '#e8e2d4', trim: '#6b4a30' },
@@ -71,6 +72,7 @@ const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   rebirth: { floor: 'marble', wall: '#dfe3e6', trim: '#56687a' },
   terrace: { floor: 'cloud', wall: '#f6f2ea', trim: '#c9a23e' },
   gym: { floor: 'rubber', wall: '#d6d8da', trim: '#c83a2a' },
+  dept: { floor: 'marble', wall: '#ece6dc', trim: '#b08a4a' },
 };
 
 /** 거리의 건물 k에 들어갈 때 방을 만든다 (같은 건물이면 늘 같은 방) */
@@ -214,6 +216,21 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
       F(x1, 1, 1, 1, 64, 'punchbag'); F(x1, 3, 1, 1, 64, 'punchbag', 1);
       F(5, 7, 2, 1, 2, 'mat'); F(8, 7, 2, 1, 2, 'mat', 1);
       seats.push([4, 6], [9, 3], [6, 8]);
+      break;
+    }
+    case 'dept': {
+      // 22차 백화점: 넓은 대리석 홀 — 뒤 벽을 따라 명품 진열장, 왼쪽 화장품 매대 줄, 오른쪽 옷걸이 숲과 거울,
+      // 가운데 분수 대신 화분 섬과 쉬는 소파, 안내 데스크(점원). 앞쪽 가운데가 입구
+      F(1, 1, 7, 1, 56, 'shelf', 8); F(9, 1, 8, 1, 60, 'display', 2); F(18, 1, W - 19, 1, 56, 'shelf', 3);
+      for (let jj = 4; jj <= 12; jj += 4) { F(2, jj, 3, 1, 24, 'counter', jj); F(2, jj + 1, 1, 1, 34, 'mirror'); }
+      for (let jj = 4; jj <= 13; jj += 3) for (const ii of [W - 7, W - 4]) F(ii, jj, 1, 2, 34, 'rack', ii + jj);
+      F(x1, 3, 1, 1, 50, 'mirror'); F(x1, 9, 1, 1, 50, 'mirror');
+      F(mid - 2, 6, 1, 1, 40, 'plant', 1); F(mid + 1, 6, 1, 1, 40, 'plant', 2); F(mid - 2, 9, 1, 1, 40, 'plant', 3); F(mid + 1, 9, 1, 1, 40, 'plant', 4);
+      F(mid - 1, 7, 2, 1, 14, 'sofa'); F(mid - 1, 9, 2, 1, 14, 'sofa', 1);
+      F(8, 5, 2, 1, 18, 'island', 2); F(8, 10, 2, 1, 18, 'island', 5); F(W - 11, 5, 2, 1, 18, 'island', 3); F(W - 11, 10, 2, 1, 18, 'island', 6);
+      F(mid + 3, y1 - 3, 3, 1, 22, 'counter', 9); clerk = { i: mid + 4, j: y1 - 4 }; counter = { i: mid + 4, j: y1 - 2 };
+      F(mid - 4, y1, 1, 1, 8, 'baskets');
+      seats.push([mid - 1, 8], [mid, 8], [6, 7], [W - 9, 8], [10, 14], [W - 12, 14], [mid - 3, 12], [mid + 3, 12]);
       break;
     }
     default:
@@ -423,6 +440,11 @@ export function drawRoom(z: Zone, night: boolean): { canvas: HTMLCanvasElement; 
     onR(mid - 1.5, mid + 1.5, 86, 92, night ? '#ff4ab0' : '#c94a8a');
   } else if (k === 'salon') {
     for (let x = 2; x < W - 3; x += 2) onR(x + 0.1, x + 0.9, 30, 70, '#c8dce4');
+  } else if (k === 'dept') {
+    // 22차 백화점: 뒤 벽 위 금빛 간판 띠와 층 안내판, 높은 유리창
+    onR(2, W - 2, 84, 92, info.trim); onR(mid - 3, mid + 3, 60, 78, '#2a2622');
+    for (let n = 0; n < 4; n++) onR(mid - 2.6, mid - 2.6 + 4.2 - n * 0.6, 63 + n * 4, 65 + n * 4, '#e8d8a8');
+    winL(2, H - 3, 30, 76, night ? '#2a3448' : '#bcd4e2');
   } else if (k === 'mart' || k === 'shop') {
     onR(W - 5, W - 2, 66, 76, info.trim);
     onR(2, W - 6, 80, 86, mixHex(info.trim, '#ffffff', 0.35)); // 19차: 뒤 벽 위 간판 띠

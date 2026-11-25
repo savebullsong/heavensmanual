@@ -220,6 +220,13 @@ export function charSet(look: Look, weapon: string | null = null, armor: string[
 }
 
 async function build(look: Look, keys: ReturnType<typeof layerKeys>): Promise<CharSet> {
+  const t0 = performance.now();
+  const r = await build0(look, keys);
+  const P = ((globalThis as { __perf?: Record<string, [number, number, number]> }).__perf ??= {});
+  const e = (P.charset ??= [0, 0, 0]); e[0]++; const dd = performance.now() - t0; e[1] += dd; e[2] = Math.max(e[2], dd);
+  return r;
+}
+async function build0(look: Look, keys: ReturnType<typeof layerKeys>): Promise<CharSet> {
   const [base, hair, weap, ...arms] = await Promise.all([loadLayer(keys.base), keys.hair ? loadLayer(keys.hair) : null, keys.weapon ? loadLayer(keys.weapon) : null, ...keys.armor.map((a) => loadLayer(a.key))]);
   const pal = palette(look);
   // 그리는 순서: 몸 → 옷 방어구 → 머리카락 → 헬멧 → 무기. 방어구는 자기 색을 쓴다
@@ -269,7 +276,10 @@ async function build(look: Look, keys: ReturnType<typeof layerKeys>): Promise<Ch
   const img = g.createImageData(AW, AH);
   const d = img.data;
   const masks: CharSet['masks'] = new Map();
+  // 22차: 장면을 합치는 일을 한 프레임에 몰지 않는다 — 4ms마다 한 번 쉬어 가며 (새 사람이 나타날 때 끊기지 않게)
+  let slice = performance.now();
   for (const b of boxes) {
+    if (performance.now() - slice > 4) { await new Promise((r) => setTimeout(r, 0)); slice = performance.now(); }
     const [px, py] = place.get(b.name)!;
     const w = b.x1 - b.x0, h = b.y1 - b.y0;
     for (const { L, pal } of order) {

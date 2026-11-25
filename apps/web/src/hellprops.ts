@@ -219,6 +219,24 @@ export function hellDecor(kind: string, theme: Theme, v: number, o = 0): HPic {
     out = rock(theme, r);
   } else if (kind === 'crack') {
     out = groundMark(theme, r);
+  } else if (kind === 'mattress') {
+    // 22차 지옥호텔: 바깥 공터에 깔아 둔 낡은 매트리스 (얼룩·찢어진 솔기·삐져나온 짚). 층마다 때가 다르다
+    const p = pen(64, 42);
+    const base = theme === 'market' ? '#8a5a50' : theme === 'swamp' ? '#6e7458' : '#8a8274';
+    const side = theme === 'market' ? '#5a3430' : theme === 'swamp' ? '#465038' : '#5e584c';
+    const cx = 64, cy = 52, hw = 50, hh = 25, th = 7;
+    p.E(cx, cy + 6, hw + 4, hh * 0.5 + 6, '#120c0a');
+    p.poly([[cx - hw, cy], [cx, cy + hh], [cx, cy + hh + th], [cx - hw, cy + th]], side);
+    p.poly([[cx, cy + hh], [cx + hw, cy], [cx + hw, cy + th], [cx, cy + hh + th]], side);
+    p.poly([[cx, cy - hh], [cx + hw, cy], [cx, cy + hh], [cx - hw, cy]], base);
+    // 누빈 자국 (격자 단추)
+    for (let a = -2; a <= 2; a++) for (let b = -1; b <= 1; b++) { const x = cx + a * 16 - b * 16, y = cy + a * 5 + b * 8; p.R(x - 1, y, 2, 1, side); }
+    // 얼룩
+    for (let k = 0; k < 3; k++) p.E(cx - 26 + r(k + 1) * 52, cy - 8 + r(k + 5) * 16, 6 + r(k + 9) * 8, 3 + r(k + 12) * 4, theme === 'market' ? '#5a1a14' : theme === 'swamp' ? '#3e4a2a' : '#4a4036');
+    // 찢어진 솔기에서 삐져나온 짚
+    for (let k = 0; k < 5; k++) { const x = cx + 20 + r(k + 20) * 20, y = cy + 4 + r(k + 25) * 8; p.L(x, y, x + 3 + r(k + 30) * 5, y - 2 - r(k + 35) * 4, 1, '#c8a85a'); }
+    p.finish([18, 12, 10]);
+    out = { canvas: p.c, ax: 0.5, ay: 52 / 84, flat: true };
   } else if (kind === 'junk') {
     // 시장 쓰레기 더미: 부서진 궤짝·자루·깨진 항아리·누더기·뼈다귀, 파리 (깊은 층일수록 더 썩었다)
     const p = pen(40, 34);

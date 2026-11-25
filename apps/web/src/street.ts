@@ -408,7 +408,7 @@ const GRAIN: Record<string, { hi: Rgb; lo: Rgb; k: number }> = {
   water: { hi: [210, 236, 240], lo: [20, 40, 60], k: 0.14 },
 };
 function paintGrain(g: CanvasRenderingContext2D, z: Zone, minX: number, minY: number, W: number, H: number, heaven: boolean) {
-  const R = 8, lw = Math.ceil(W / R), lh = Math.ceil(H / R);
+  const R = 16, lw = Math.ceil(W / R), lh = Math.ceil(H / R); // 22차: 16px마다 한 점 (결은 넓어서 충분, 덩어리당 비용 1/4)
   const low = document.createElement('canvas');
   low.width = lw; low.height = lh;
   const lg = low.getContext('2d')!;
@@ -539,11 +539,22 @@ export function drawGroundKit(z: Zone, i0: number, j0: number, clip?: { i0: numb
         }
       }
       if (t === 'cross') {
-        g.strokeStyle = 'rgba(236,232,222,0.92)'; g.lineWidth = 7;
-        for (let k = 0; k < 2; k++) {
-          const a = S(i + 0.2 + k * 0.5, j + 0.12), b = S(i + 0.2 + k * 0.5, j + 0.88);
-          g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
-        }
+        // 22차: 얼룩말 무늬 — 줄무늬는 차가 달리는 방향과 나란히, 건너는 방향으로 촘촘히. 군데군데 닳았다
+        const runI = (tileAt(z, i - 1, j) === 'cross' ? 1 : 0) + (tileAt(z, i + 1, j) === 'cross' ? 1 : 0);
+        const runJ = (tileAt(z, i, j - 1) === 'cross' ? 1 : 0) + (tileAt(z, i, j + 1) === 'cross' ? 1 : 0);
+        const alongI = runJ >= runI; // 건널목 띠가 j로 길면 차는 i로 달린다 → 줄무늬는 i 방향
+        const quad = (a0: number, a1: number, b0: number, b1: number) => {
+          const p = alongI ? [S(i + a0, j + b0), S(i + a1, j + b0), S(i + a1, j + b1), S(i + a0, j + b1)] : [S(i + b0, j + a0), S(i + b0, j + a1), S(i + b1, j + a1), S(i + b1, j + a0)];
+          g.beginPath(); g.moveTo(p[0][0], p[0][1]); for (const q of p.slice(1)) g.lineTo(q[0], q[1]); g.closePath(); g.fill();
+        };
+        const wear = hash(i * 3 + 1, j * 5 + 2) % 5;
+        g.fillStyle = 'rgba(240,238,230,0.94)';
+        quad(0.06, 0.94, 0.08, 0.34);
+        quad(0.06, 0.94, 0.58, 0.84);
+        // 닳은 자리 (타이어 지나는 곳이 벗겨진다)
+        g.fillStyle = 'rgba(70,72,78,0.5)';
+        if (wear < 2) quad(0.3 + wear * 0.2, 0.42 + wear * 0.2, 0.08, 0.34);
+        if (wear === 3) quad(0.55, 0.7, 0.58, 0.84);
       }
     }
   // 21차: 프랙탈 결 + 흔적

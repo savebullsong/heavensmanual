@@ -1,6 +1,6 @@
 // 지옥 (2단계): 1~3층. 층마다 새 지도·일반 괴물·층주 1명. 휴식 공간 = 울타리 마을 안 황혼의 유황새.
 // 지도는 층 번호로 정해진 씨앗에서 만든다 (모두에게 같은 지도).
-import { TYPES, finalize, type Zone, type Building, type HellBuildKind, type Prop, type TileType } from './zone.ts';
+import { TYPES, finalize, type Zone, type Building, type HellBuildKind, type Prop, type TileType , type HellVendor} from './zone.ts';
 import type { Lang } from './i18n.ts';
 
 export const OPEN_FLOORS = 3; // 지금 열린 층 (4~13층은 하나씩 업데이트)
@@ -349,8 +349,16 @@ export function hellZone(floor: number): Zone {
   }
   const door = { i: shop!.i0 + 1, j: shop!.j0 + shop!.d };
   // 장사꾼은 좌판 앞(마을 쪽)에 선다
-  const vendors: { i: number; j: number; kind: 'butcher' | 'junk' }[] = [];
-  for (const b of buildings) if (b.hk === 'butcher' || b.hk === 'stall') vendors.push({ i: b.w >= b.d ? b.i0 + 1 : b.i0 - 1, j: b.w >= b.d ? b.j0 - 1 : b.j0 + 1, kind: b.hk === 'butcher' ? 'butcher' : 'junk' });
+  // 22차: 장사꾼은 종류마다 한 명 (겹치던 고깃간·넝마를 정리) — 고깃간 좌판에 고깃간 하나, 나머지 좌판엔 물장수·넝마·약장수·장사꾼·무기상 차례로.
+  // 좌판이 모자란 층은 뒤에서 빈 땅에 자리를 편다
+  const vendors: { i: number; j: number; kind: HellVendor }[] = [];
+  const STALL_KINDS: HellVendor[] = ['water', 'junk', 'medic', 'trader', 'arms'];
+  const stalls = buildings.filter((b) => b.hk === 'butcher' || b.hk === 'stall').sort((a, b) => (a.hk === 'butcher' ? 0 : 1) - (b.hk === 'butcher' ? 0 : 1));
+  for (const b of stalls) {
+    const kind: HellVendor | undefined = b.hk === 'butcher' && !vendors.some((v) => v.kind === 'butcher') ? 'butcher' : STALL_KINDS.find((k) => !vendors.some((v) => v.kind === k));
+    if (!kind) continue;
+    vendors.push({ i: b.w >= b.d ? b.i0 + 1 : b.i0 - 1, j: b.w >= b.d ? b.j0 - 1 : b.j0 + 1, kind });
+  }
   // 1층 북쪽: 불탄 도시 — 그을린 건물 껍데기가 늘어선 띠, 가운데 골목 끝에 환생 로비 (멀쩡한 현대식 문, 흰 빛)
   if (T === 'ash') {
     buildings.push({ i0: U.i - 2, j0: EDGE, w: 5, d: 3, h: 96, cat: 'rebirth', sign: 'left', color: '#2a2a2e' });
@@ -446,6 +454,36 @@ export function hellZone(floor: number): Zone {
   const pickV = () => vin.splice(Math.floor(r() * vin.length), 1)[0];
   for (let k = 0; k < (T === 'ash' ? 7 : T === 'swamp' ? 8 : 9) && vin.length; k++) { const [i, j] = pickV(); if (!taken(i, j)) props.push({ i, j, kind: 'junk' }); }
   if (T === 'market') for (const [di, dj] of [[3, 3], [-4, 2]]) props.push({ i: C.i + di, j: C.j + dj, kind: 'skulls' }); // 광장의 해골 더미 (촛불)
+  // 22차: 좌판 없이 자리 편 장사꾼 · 지옥호텔(바깥 공터에 매트리스만, 지배인 하나) · 서큐버스 (층마다 하나)
+  // 마을이 좁은 층(2·3층)도 자리가 나도록: 처음엔 넉넉한 조건, 안 되면 조금씩 느슨하게
+  const freeSpot = (minD: number, maxD: number, ok: (i: number, j: number) => boolean = () => true): [number, number] | null => {
+    for (const [m, gap, dd] of [[2, 3, 4], [1, 2, 3], [1, 2, 2]] as const)
+      for (let t = 0; t < 600; t++) {
+        const a = r() * Math.PI * 2, rr = Math.max(1.5, minD - (m === 1 ? 1 : 0)) + r() * (maxD + (m === 1 ? 1 : 0) - minD);
+        const i = Math.round(C.i + Math.cos(a) * rr), j = Math.round(C.j + Math.sin(a) * rr);
+        if (!inV(i, j, m) || taken(i, j) || Math.abs(i - door.i) + Math.abs(j - door.j) < dd || vendors.some((v) => Math.abs(v.i - i) + Math.abs(v.j - j) < gap) || !ok(i, j)) continue;
+        return [i, j];
+      }
+    return null;
+  };
+  for (const kind of ['butcher', ...STALL_KINDS] as HellVendor[]) {
+    if (vendors.some((v) => v.kind === kind)) continue;
+    const at = freeSpot(3, VR - 3);
+    if (at) vendors.push({ i: at[0], j: at[1], kind });
+  }
+  // 지옥호텔: 매트리스 셋이 한 줄 (사이를 한 칸씩 띄워 밟고 지나갈 수 있다)
+  // 좁으면 두 장, 그래도 안 되면 세로로
+  let hotel: { at: [number, number]; cells: [number, number][] } | null = null;
+  for (const cells of [[[0, 0], [2, 0], [4, 0]], [[0, 0], [0, 2], [0, 4]], [[0, 0], [2, 0]], [[0, 0], [0, 2]]] as [number, number][][]) {
+    const at = freeSpot(3, VR - 1, (i, j) => cells.every(([a, b]) => inV(i + a, j + b, 1) && !taken(i + a, j + b)) && !taken(i - 1, j + 1));
+    if (at) { hotel = { at, cells }; break; }
+  }
+  if (hotel) {
+    for (const [a, b] of hotel.cells) props.push({ i: hotel.at[0] + a, j: hotel.at[1] + b, kind: 'mattress' });
+    vendors.push({ i: hotel.at[0] - 1, j: hotel.at[1] + 1, kind: 'hotel' });
+  }
+  const sucAt = freeSpot(3, VR - 3);
+  if (sucAt) vendors.push({ i: sucAt[0], j: sucAt[1], kind: 'succubus' });
   // 앉거나 누운 영혼들: 모닥불 둘레와 좌판 앞, 담 밑 (1층 많이 · 깊을수록 지쳐 누운 이가 많다)
   const souls: { i: number; j: number; pose: 'sit' | 'lie' | 'stand'; d: number; pray?: boolean }[] = [];
   const idol = buildings.find((b) => b.hk === 'idol')!;

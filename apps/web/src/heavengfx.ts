@@ -239,3 +239,45 @@ export function bedTexture(v: number): Texture {
   bedTex.set(k, Texture.from(c));
   return bedTex.get(k)!;
 }
+
+/** 22차: 서큐버스의 박쥐 날개 — 뼈대 넷에 얇은 막, 끝이 톱니처럼 패였다 (giveWings와 같은 크기·기준점) */
+const batTex = new Map<number, Texture>();
+export function batWingTexture(color: number): Texture {
+  const hit = batTex.get(color);
+  if (hit) return hit;
+  const W = 160, H = 90;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d')!;
+  const hex = '#' + color.toString(16).padStart(6, '0');
+  const side = (sgn: number) => {
+    const cx = W / 2, cy = 56;
+    const tip = (k: number): [number, number] => [cx + sgn * (26 + k * 13), 8 + k * 9];
+    g.fillStyle = hex; g.globalAlpha = 0.92;
+    g.beginPath(); g.moveTo(cx + sgn * 6, cy - 14);
+    g.lineTo(...tip(0));
+    for (let k = 1; k < 4; k++) { const a = tip(k - 1), b = tip(k); g.quadraticCurveTo((a[0] + b[0]) / 2 - sgn * 4, (a[1] + b[1]) / 2 + 10, b[0], b[1]); }
+    g.quadraticCurveTo(cx + sgn * 40, cy + 18, cx + sgn * 6, cy + 4);
+    g.closePath(); g.fill();
+    g.globalAlpha = 1;
+    g.strokeStyle = 'rgba(0,0,0,0.55)'; g.lineWidth = 1.6;
+    for (let k = 0; k < 4; k++) { const t = tip(k); g.beginPath(); g.moveTo(cx + sgn * 6, cy - 12); g.lineTo(t[0], t[1]); g.stroke(); }
+  };
+  side(-1); side(1);
+  batTex.set(color, Texture.from(c));
+  return batTex.get(color)!;
+}
+/** 22차: 머리 위의 작은 뿔 한 쌍 */
+const hornTex = new Map<number, Texture>();
+export function hornTexture(color: number): Texture {
+  const hit = hornTex.get(color);
+  if (hit) return hit;
+  const c = document.createElement('canvas');
+  c.width = 40; c.height = 24;
+  const g = c.getContext('2d')!;
+  const hex = '#' + color.toString(16).padStart(6, '0');
+  g.fillStyle = hex;
+  for (const s of [-1, 1]) { g.beginPath(); g.moveTo(20 + s * 6, 24); g.quadraticCurveTo(20 + s * 16, 16, 20 + s * 13, 2); g.quadraticCurveTo(20 + s * 11, 14, 20 + s * 2, 22); g.closePath(); g.fill(); }
+  hornTex.set(color, Texture.from(c));
+  return hornTex.get(color)!;
+}

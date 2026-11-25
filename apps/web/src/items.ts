@@ -11,7 +11,7 @@ export interface ItemDef {
   def?: number; // 방어력
   note?: 'rope' | 'needsAmmo' | 'ammo' | 'needsArrows' | 'arrows';
   name: Record<Lang, string>;
-  store?: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'talus' | 'hmeat' | 'tools' | 'dept' | 'hjunk' | 'drop'; // drop = 어디서도 팔지 않는다 (괴물이 떨어뜨릴 뿐) // 우주새가 아니라 거리 가게(철물점·백화점) · 지옥 탈루스·고깃간·넝마장수에서 파는 것
+  store?: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'talus' | 'hmeat' | 'tools' | 'dept' | 'hjunk' | 'drop' | 'hwater' | 'hmed' | 'harms'; // 22차: 지옥 물장수 · 약장수 · 무기상 // drop = 어디서도 팔지 않는다 (괴물이 떨어뜨릴 뿐) // 우주새가 아니라 거리 가게(철물점·백화점) · 지옥 탈루스·고깃간·넝마장수에서 파는 것
   now?: boolean; // 가게에서 바로 먹는다 (가방에 넣지 않음)
   hell?: boolean; // 지옥의 우주새(황혼)에서만, 노전으로 판다
   sprite?: string; // 몸에 그릴 때 쓰는 그림 (지옥 무기·방어구는 현실 그림을 빌려 쓴다)
@@ -20,6 +20,7 @@ export interface ItemDef {
   ranged?: boolean; // 멀리서 쏜다 (권총·활) — 민첩이 공격력에 더해진다
   dr?: number; // 피해 감소 (17차: 방어력은 회피만 올린다. 피해를 줄이는 건 이 값이 있는 물건뿐)
   floor?: number; // 20차: 지옥 그 층의 괴물만 떨어뜨리는 고유 물건 (가게에서 팔지 않는다)
+  bloodFloor?: number; // 22차: 물장수가 파는 '그 층 괴물의 피' (그 층에서만 판다)
 }
 
 export const ITEMS: ItemDef[] = [
@@ -100,6 +101,17 @@ export const ITEMS: ItemDef[] = [
   { key: 'lanternwine', cat: 'goods', price: 20, heal: 400, hell: true, floor: 3, store: 'drop', icon: 'choco', name: { ko: '홍등 술', th: 'สุราโคมแดง', en: 'Red-lantern wine' } },
   { key: 'bloodvest', cat: 'armor', price: 220, def: 8, hell: true, floor: 3, store: 'drop', sprite: 'vest', icon: 'vest', name: { ko: '핏빛 가죽 조끼', th: 'เสื้อกั๊กหนังสีเลือด', en: 'Blood-leather vest' } },
   { key: 'scalecleaver', cat: 'weapon', price: 320, atk: 15, hell: true, floor: 3, store: 'drop', sprite: 'cleaver', icon: 'hatchet', name: { ko: '저울추 고기칼', th: 'มีดสับตุ้มตาชั่ง', en: 'Scale-weight cleaver' } },
+  // 22차 지옥 휴게소: 물장수 · 약장수 · 무기상(원거리)
+  { key: 'hmurky', cat: 'goods', price: 2, heal: 40, hell: true, store: 'hwater', icon: 'water', name: { ko: '탁한 물', th: 'น้ำขุ่น', en: 'Murky water' } },
+  { key: 'hboiled', cat: 'goods', price: 6, heal: 120, hell: true, store: 'hwater', icon: 'water', name: { ko: '끓인 강물', th: 'น้ำแม่น้ำต้มสุก', en: 'Boiled river water' } },
+  { key: 'hsalve', cat: 'goods', price: 12, heal: 180, hell: true, store: 'hmed', icon: 'bandage', name: { ko: '유황 연고', th: 'ขี้ผึ้งกำมะถัน', en: 'Sulfur salve' } },
+  { key: 'hstitch', cat: 'goods', price: 28, heal: 360, hell: true, store: 'hmed', icon: 'bandage', name: { ko: '망자의 실 꿰매기', th: 'ด้ายเย็บของผู้ตาย', en: 'Dead man’s stitches' } },
+  { key: 'hbitter', cat: 'goods', price: 60, heal: 700, hell: true, store: 'hmed', icon: 'painkiller', name: { ko: '쓴 약 한 병', th: 'ยาขมหนึ่งขวด', en: 'Vial of bitter cure' } },
+  { key: 'hbonebow', cat: 'weapon', price: 180, atk: 12, ranged: true, note: 'needsArrows', hell: true, store: 'harms', sprite: 'bow', icon: 'bow', name: { ko: '뼈활', th: 'ธนูกระดูก', en: 'Bone bow' } },
+  { key: 'hlongbow', cat: 'weapon', price: 420, atk: 17, ranged: true, note: 'needsArrows', hell: true, store: 'harms', sprite: 'bow', icon: 'bow', name: { ko: '힘줄 장궁', th: 'ธนูยาวเอ็น', en: 'Sinew longbow' } },
+  { key: 'hmatchlock', cat: 'weapon', price: 900, atk: 26, ranged: true, note: 'needsAmmo', hell: true, store: 'harms', sprite: 'pistol', icon: 'pistol', name: { ko: '유황 화승총', th: 'ปืนคาบชุดกำมะถัน', en: 'Sulfur matchlock' } },
+  { key: 'harrows', cat: 'weapon', price: 18, note: 'arrows', hell: true, store: 'harms', icon: 'arrows', name: { ko: '흑요석 화살 20대', th: 'ลูกธนูหินออบซิเดียน 20 ดอก', en: 'Obsidian arrows ×20' } },
+  { key: 'hshot', cat: 'weapon', price: 40, note: 'ammo', hell: true, store: 'harms', icon: 'ammo', name: { ko: '유황 탄환 12발', th: 'กระสุนกำมะถัน 12 นัด', en: 'Sulfur shot ×12' } },
   { key: 'hjerky', cat: 'goods', price: 3, heal: 50, hell: true, store: 'hmeat', icon: 'chips', name: { ko: '말린 고기', th: 'เนื้อแห้ง', en: 'Dried meat' } },
   { key: 'hskewer', cat: 'goods', price: 5, heal: 100, hell: true, store: 'hmeat', icon: 'ricebox', name: { ko: '고기 꼬치', th: 'เนื้อเสียบไม้', en: 'Meat skewer' } },
   { key: 'hstew', cat: 'goods', price: 10, heal: 220, hell: true, store: 'hmeat', icon: 'noodle', name: { ko: '뼈국', th: 'ซุปกระดูก', en: 'Bone broth' } },

@@ -14,7 +14,8 @@ import { streetReady } from './street.ts';
 import { ARRIVALS, rollArrival, arrivalLook, type Arrival, type Look, type Outfit } from './character.ts';
 import { t, lang, setLang, LANGS, type Lang } from './i18n.ts';
 import { load, save, type Slot, type Stash } from './state.ts';
-import { hellZone, OPEN_FLOORS, floorDef, MONSTERS, GUARDS, TOLL, ATONE_GOAL, GURMA_FULL, setRaidForce } from './hell.ts';
+import { hellZone, OPEN_FLOORS, floorDef, MONSTERS, GUARDS, TOLL, ATONE_GOAL, GURMA_FULL, setRaidForce, FLOORS } from './hell.ts';
+import type { HellVendor } from './zone.ts';
 import { interiorZone, roomKind as roomKindOf, canEnter } from './interior.ts';
 import { TWO } from './sprites.ts';
 import { buildingName, hasBank } from './names.ts';
@@ -523,7 +524,8 @@ const hooks: WorldHooks = {
     openBank(name);
   },
   useAmmo() {
-    if (state.equip?.weapon === 'bow') {
+    const wi = state.equip?.weapon ? itemByKey(state.equip.weapon) : null;
+    if (wi?.note === 'needsArrows') {
       if ((state.arrows ?? 0) <= 0) { toast(t().noArrows); return false; }
       state.arrows = (state.arrows ?? 0) - 1;
       return true;
@@ -1155,8 +1157,8 @@ async function talkToHwang() {
   endTalk();
 }
 
-/** 유황새의 대부업자 베스크: 최대 100닢, 갚을 땐 두 배. 빚이 남으면 미납귀가 따라다닌다 */
-const DEBT_MAX = 100;
+/** 유황새의 대부업자 베스크: 22차 — 최대 1000닢, 갚을 땐 두 배. 빚이 남으면 미납귀가 따라다닌다 */
+const DEBT_MAX = 1000;
 async function talkToBesk() {
   busy = true;
   shop.lock(true);
@@ -1167,7 +1169,7 @@ async function talkToBesk() {
   if (debt() > 0) await dlg.say(L.beskOwe.replace('{n}', String(debt())));
   else { await dlg.say(L.beskGreet); await dlg.say(L.beskTerms); }
   const room = Math.floor((DEBT_MAX * 2 - debt()) / 2); // 더 빌릴 수 있는 원금
-  const amounts = [...new Set([30, 60, DEBT_MAX].map((n) => Math.min(n, room)))].filter((n) => n > 0);
+  const amounts = [...new Set([50, 200, 500, DEBT_MAX].map((n) => Math.min(n, room)))].filter((n) => n > 0);
   const opts = amounts.map((n) => L.beskBorrow.replace('{n}', String(n)));
   if (debt() > 0) opts.push(L.beskRepay.replace('{n}', String(debt())));
   opts.push(L.beskNo);
@@ -1524,8 +1526,8 @@ function slotOf(k: string): Slot | undefined {
 const itemByKey = (k: string) => ITEMS.find((x) => x.key === k)!;
 
 function addToBag(it: ItemDef) {
-  if (it.key === 'ammo') { state.ammo = (state.ammo ?? 0) + 12; return; }
-  if (it.key === 'arrows') { state.arrows = (state.arrows ?? 0) + 20; return; }
+  if (it.note === 'ammo') { state.ammo = (state.ammo ?? 0) + 12; return; } // 22차: 지옥 유황 탄환·흑요석 화살도 같은 주머니로
+  if (it.note === 'arrows') { state.arrows = (state.arrows ?? 0) + 20; return; }
   state.bag = state.bag ?? {};
   state.bag[it.key] = (state.bag[it.key] ?? 0) + 1;
 }
@@ -1537,7 +1539,7 @@ function gear() {
   const eq = eq0.offhand && noShieldWith(eq0.weapon) ? { ...eq0, offhand: undefined } : eq0;
   const w = eq.weapon ? itemByKey(eq.weapon) : null;
   // 쏘는 무기: 권총은 탄약, 활은 화살이 있어야 멀리서 쏜다 (없으면 휘둘러 치는 셈)
-  const shots = w?.key === 'pistol' ? state.ammo ?? 0 : w?.key === 'bow' ? state.arrows ?? 0 : 0;
+  const shots = w?.note === 'needsAmmo' ? state.ammo ?? 0 : w?.note === 'needsArrows' ? state.arrows ?? 0 : 0; // 22차: 지옥의 뼈활·화승총도
   const ranged = !!w?.ranged && shots > 0;
   const def = Object.entries(eq).reduce((s, [slot, k]) => (slot === 'weapon' || !k ? s : s + (itemByKey(k)?.def ?? 0)), 0);
   const dr = Object.entries(eq).reduce((s, [, k]) => (!k ? s : s + (itemByKey(k)?.dr ?? 0)), 0);
@@ -1694,7 +1696,7 @@ function renderBag() {
   if (bagTab === 'gear') {
     const doll = document.createElement('div');
     doll.className = 'bag-doll';
-    doll.innerHTML = `<svg class="doll-fig" viewBox="0 0 60 130" aria-hidden="true"><circle cx="30" cy="13" r="9"/><path d="M18 26h24l5 30-6 2-3-20v32H22V38l-3 20-6-2z"/><path d="M22 70h7l-1 54h-7zM31 70h7l1 54h-7z"/></svg>`;
+    doll.innerHTML = dollSvg(bodyLook().sex === 'f' ? 'f' : 'm');
     const equip = state.equip ?? {};
     for (const sl of ['weapon', 'offhand', 'head', 'body', 'hands', 'legs', 'shins', 'feet'] as Slot[]) {
       const cell = document.createElement('button');
@@ -1724,6 +1726,42 @@ function renderBag() {
   const hudBottom = document.getElementById('hud')?.getBoundingClientRect().bottom ?? 56;
   el.style.top = `${Math.round(hudBottom + 6)}px`;
   el.style.maxHeight = `calc(100vh - ${Math.round(hudBottom + 20)}px)`;
+}
+
+/**
+ * 22차: 장비 창 몸 그림 — 남성형(넓은 어깨·곧은 허리)과 여성형(좁은 어깨·잘록한 허리·넓은 골반·긴 머리).
+ * 왼쪽 반을 그리고 거울로 오른쪽을 만든다
+ */
+type Seg = ['L', number, number] | ['Q', number, number, number, number];
+/** 가운데 줄(x=30)에서 시작해 왼쪽 윤곽을 돌아 다시 가운데로 오는 반쪽 → 거울로 이어 붙인 온전한 윤곽 (가운데 이음선이 생기지 않게) */
+function mirrorPath(start: [number, number], segs: Seg[]) {
+  const pts: [number, number][] = [start];
+  for (const sg of segs) pts.push(sg[0] === 'L' ? [sg[1], sg[2]] : [sg[3], sg[4]]);
+  const m = (x: number) => +(60 - x).toFixed(2);
+  let d = `M${start[0]} ${start[1]}`;
+  for (const sg of segs) d += sg[0] === 'L' ? ` L${sg[1]} ${sg[2]}` : ` Q${sg[1]} ${sg[2]} ${sg[3]} ${sg[4]}`;
+  for (let k = segs.length - 1; k >= 0; k--) {
+    const sg = segs[k], prev = pts[k];
+    d += sg[0] === 'L' ? ` L${m(prev[0])} ${prev[1]}` : ` Q${m(sg[1])} ${sg[2]} ${m(prev[0])} ${prev[1]}`;
+  }
+  return `<path d="${d} Z"/>`;
+}
+function dollSvg(sex: 'm' | 'f') {
+  const torso = sex === 'm'
+    ? mirrorPath([30, 23.5], [['Q', 22, 23, 16, 25.5], ['L', 14.2, 34], ['Q', 15.5, 49, 20, 61.5], ['L', 21, 70.5], ['L', 30, 70.5]])
+    : mirrorPath([30, 23.8], [['Q', 23, 23.5, 18, 25.8], ['L', 17, 33.5], ['Q', 17.6, 43, 22, 52], ['Q', 23, 56.5, 21, 62], ['Q', 18.2, 67.5, 18.4, 72.5], ['L', 30, 72.5]]);
+  const limbs = sex === 'm'
+    ? `<path d="M15.2 27 Q10 29.5 9.6 39 L8.6 59 Q8.4 69 10.2 76 L13.2 76 Q13.8 68 14.2 60 L16.4 42 Z"/>
+       <path d="M21 70.5 H29.6 L29.1 97 L28.2 121.5 Q28.4 125.5 24.8 125.5 L20.6 125.5 Q19.4 123.5 22 121.2 L22.2 97 Q20.6 84 21 70.5 Z"/>`
+    : `<path d="M18 27.2 Q13 29.5 12.6 39 L12.2 59.5 Q12.1 68.5 13.8 75 L16.3 75 Q16.5 67 16.6 60 L18.6 42 Z"/>
+       <path d="M18.6 72.5 H29.6 L29.1 98.5 L28.6 121.5 Q28.6 125.5 25.6 125.5 L22.4 125.5 Q21.3 123.5 23.6 121.2 L22.6 98.5 Q19.4 86 18.6 72.5 Z"/>`;
+  // 머리: 남자는 짧은 머리, 여자는 어깨 너머로 흘러내리는 긴 머리 (얼굴 뒤에 그린다)
+  const hair = sex === 'm'
+    ? mirrorPath([30, 3.4], [['Q', 23, 3.4, 22.8, 11], ['Q', 26, 6.8, 30, 7.4]]).replace('<path', '<path class="hair"')
+    : mirrorPath([30, 2.8], [['Q', 22.6, 2.6, 22.4, 12], ['Q', 22.2, 20, 20.4, 27.6], ['Q', 24.4, 26, 26.4, 21.6], ['Q', 25.6, 15.4, 27.6, 12.8], ['Q', 29, 11.4, 30, 11.4]]).replace('<path', '<path class="hair"');
+  const face = sex === 'm' ? `<ellipse cx="30" cy="12.5" rx="7.2" ry="8.6"/><path d="M27.2 19.6 h5.6 v4.6 h-5.6z"/>` : `<path d="M28 19.8 h4 v4.4 h-4z"/><ellipse cx="30" cy="12.6" rx="6.5" ry="8.2"/>`;
+  const order = sex === 'm' ? `${face}${hair}` : `${hair}${face}`;
+  return `<svg class="doll-fig doll-${sex}" viewBox="0 0 60 130" aria-hidden="true"><g>${limbs}</g><g transform="matrix(-1 0 0 1 60 0)">${limbs}</g>${torso}${order}</svg>`;
 }
 
 /** 빠른 칸: 가방에서 별표한 소비품 하나. 누르면 바로 먹는다 (다 떨어지면 빈 칸) */
@@ -2255,8 +2293,20 @@ function atoneRise(f: number) {
   fx.covered.then(() => { world?.placeNear(u.i, u.j + 1, state.hp ?? maxHp()); fx.done(); setTimeout(() => rebirthGate(), 900); });
 }
 
-/** 마을 장사꾼: 고깃간(고기를 판다) · 넝마장수(헌 장비를 싸게 팔고, 가진 것을 산다) */
-function openHellStore(kind: 'butcher' | 'junk') {
+/** 22차: 물장수가 파는 '그 층 괴물의 피' — 층마다 그 층 괴물 이름이 붙는다 (가방에서도 이름이 풀리게 처음에 한 번 등록) */
+(function registerBloodItems() {
+  for (const fd of FLOORS) for (const mk of fd.monsters) {
+    const m = MONSTERS[mk];
+    const key = `blood-${mk}`;
+    if (!m || ITEMS.some((x) => x.key === key)) continue;
+    ITEMS.push({ key, cat: 'goods', price: 5 + fd.floor * 5, heal: 90 + fd.floor * 70, hell: true, store: 'hwater', bloodFloor: fd.floor, icon: 'cola', name: { ko: `${m.name.ko}의 피`, th: `เลือด${m.name.th}`, en: `${m.name.en} blood` } });
+  }
+})();
+
+/** 22차: 지옥 휴게소 장사꾼 — 종류마다 한 명. 호텔 지배인·서큐버스는 대화로 */
+function openHellStore(kind: HellVendor) {
+  if (kind === 'hotel') { talkToHotel(); return; }
+  if (kind === 'succubus') { talkToSuccubus(); return; }
   closeMenus();
   document.querySelector('.store-panel')?.remove();
   const L = t();
@@ -2264,8 +2314,8 @@ function openHellStore(kind: 'butcher' | 'junk') {
   const el = document.createElement('div');
   el.className = 'store-panel shop-menu';
   el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close">✕</button></div><p class="store-line"></p><div class="menu-list"></div>`;
-  el.querySelector('.menu-head b')!.textContent = kind === 'butcher' ? L.vendorButcher : L.vendorJunk;
-  el.querySelector('.store-line')!.textContent = kind === 'butcher' ? L.vendorButcherSub : L.vendorJunkSub;
+  el.querySelector('.menu-head b')!.textContent = L.hvName[kind][0];
+  el.querySelector('.store-line')!.textContent = L.hvLine[kind];
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
   const list = el.querySelector('.menu-list')!;
   // 넝마장수의 헌 물건: 날마다 층마다 바뀌는 네 가지 (값 7할)
@@ -2273,7 +2323,16 @@ function openHellStore(kind: 'butcher' | 'junk') {
   const used = ITEMS.filter((x) => x.hell && x.cat === 'armor' && !x.store).sort((a, b) => ((a.key.length * 7 + day * 13 + h.floor * 5 + a.price) % 11) - ((b.key.length * 7 + day * 13 + h.floor * 5 + b.price) % 11)).slice(0, 2);
   const draw = () => {
     list.innerHTML = '';
-    const stock: [ItemDef, number][] = kind === 'butcher' ? ITEMS.filter((x) => x.store === 'hmeat').map((x) => [x, x.price]) : [...ITEMS.filter((x) => x.store === 'hjunk').map((x): [ItemDef, number] => [x, x.price]), ...used.map((x): [ItemDef, number] => [x, Math.max(1, Math.round(x.price * 0.7))])];
+    const of = (st: ItemDef['store']) => ITEMS.filter((x) => x.store === st).map((x): [ItemDef, number] => [x, x.price]);
+    // 장사꾼: 이름만 장사꾼 — 날마다 바뀌는 잡동사니 넷 (값은 조금 비싸게)
+    const odd = ITEMS.filter((x) => x.hell && !x.floor && x.store !== 'drop' && x.note !== 'ammo' && x.note !== 'arrows' && !x.bloodFloor).sort((a, b) => ((a.key.charCodeAt(1) * 31 + day * 17 + h.floor * 7 + a.price) % 13) - ((b.key.charCodeAt(1) * 31 + day * 17 + h.floor * 7 + b.price) % 13)).slice(0, 4);
+    const stock: [ItemDef, number][] =
+      kind === 'butcher' ? of('hmeat')
+      : kind === 'water' ? [...of('hwater').filter(([x]) => !x.bloodFloor || x.bloodFloor === h.floor)]
+      : kind === 'medic' ? of('hmed')
+      : kind === 'arms' ? of('harms')
+      : kind === 'trader' ? odd.map((x): [ItemDef, number] => [x, Math.max(1, Math.round(x.price * 1.3))])
+      : [...of('hjunk'), ...used.map((x): [ItemDef, number] => [x, Math.max(1, Math.round(x.price * 0.7))])];
     const shelf = stock.map(([x, p]) => ({ it: x, price: p }));
     for (const [it, price] of stock) {
       const row = itemRow(it, priceText(price, true), () => {
@@ -2302,6 +2361,60 @@ function openHellStore(kind: 'butcher' | 'junk') {
   };
   draw();
   panelAt(el);
+}
+
+/** 22차 지옥호텔: 바깥 공터의 매트리스 한 장 — 층×10 노전에 한숨 자면 체력이 다 찬다 */
+async function talkToHotel() {
+  const L = t();
+  const h = hellState();
+  const price = 10 * h.floor;
+  busy = true;
+  dlg.open({ name: L.hvName.hotel[0] });
+  await dlg.say(L.hotelGreet[Math.floor(Math.random() * L.hotelGreet.length)]);
+  const c = await dlg.choose([L.hotelStay.replace('{p}', String(price)), L.hotelNo]);
+  if (c !== 0) { await dlg.say(L.hotelBye); dlg.close(); busy = false; return; }
+  if (h.notes < price) { await dlg.say(L.hotelPoor); dlg.close(); busy = false; return; }
+  h.notes -= price;
+  dlg.close();
+  const fx = worldFade('hell', false);
+  await fx.covered;
+  healFull();
+  fx.done();
+  save(state); updateHud();
+  dlg.open({ name: L.hvName.hotel[0] });
+  await dlg.say(L.hotelWake[Math.floor(Math.random() * L.hotelWake.length)]);
+  dlg.close();
+  busy = false;
+}
+/** 22차 서큐버스 (층마다 한 명, 모습도 말씨도 다르다): 곁에 머물면 노전을 받고 체력을 채워 주고 넘치게 한다 */
+async function talkToSuccubus() {
+  const L = t();
+  const h = hellState();
+  const f = Math.min(3, Math.max(1, h.floor));
+  const S = L.succubus[f - 1];
+  const price = 33 * h.floor;
+  busy = true;
+  dlg.open({ name: S.name });
+  await dlg.say(S.greet[Math.floor(Math.random() * S.greet.length)]);
+  for (;;) {
+    const c = await dlg.choose([L.sucStay.replace('{p}', String(price)), L.sucTalk, L.sucLeave]);
+    if (c === 1) { await dlg.say(S.talk[Math.floor(Math.random() * S.talk.length)]); continue; }
+    if (c !== 0) { await dlg.say(S.bye[Math.floor(Math.random() * S.bye.length)]); break; }
+    if (h.notes < price) { await dlg.say(S.poor); break; }
+    h.notes -= price;
+    dlg.close();
+    const fx = worldFade('hell', false);
+    await fx.covered;
+    healFull();
+    world?.addOverHp(Math.round(maxHp() * 0.25));
+    fx.done();
+    save(state); updateHud();
+    dlg.open({ name: S.name });
+    await dlg.say(S.after);
+    break;
+  }
+  dlg.close();
+  busy = false;
 }
 
 // ───────────────────────── 상단 표시줄 ─────────────────────────

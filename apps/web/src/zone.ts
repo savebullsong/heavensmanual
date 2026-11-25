@@ -24,7 +24,7 @@ export type HellBuildKind = 'thatch' | 'prison' | 'bonehouse' | 'carcass' | 'bon
 /** fence o: 0 = i 방향, 1 = j 방향, 2 = 모서리 기둥 */
 export interface Prop { i: number; j: number; kind: 'tree' | 'lamp' | 'pillar' | 'cart' | 'fence' | 'pole' | 'spirit' | 'moto' | 'plant' | 'bin' | 'stools' | 'pushcart' | HellDecorKind; o?: number }
 /** 지옥 소품: 경계 바위·성벽, 뼈, 해골 더미, 꼬챙이, 가마솥, 철창, 마을 불빛, 고문 장면(움직임) */
-export type HellDecorKind = 'crag' | 'bones' | 'skulls' | 'stake' | 'cauldron' | 'cage' | 'lantern' | 'bonfire' | 'torture' | 'htree' | 'rock' | 'crack' | 'dicetable' | 'campfire' | 'junk' | 'reeds';
+export type HellDecorKind = 'crag' | 'bones' | 'skulls' | 'stake' | 'cauldron' | 'cage' | 'lantern' | 'bonfire' | 'torture' | 'htree' | 'rock' | 'crack' | 'dicetable' | 'campfire' | 'junk' | 'reeds' | 'mattress';
 /** 차가 달리는 구간: j 행의 i0~i1, dir = +1 이면 +i 방향 */
 export interface Lane { j: number; i0: number; i1: number; dir: 1 | -1 }
 export interface Zone {
@@ -80,10 +80,13 @@ export interface HellInfo {
   /** 마을에 앉거나 누운 영혼들 (환생을 기다리며 지친 사람들) */
   souls: { i: number; j: number; pose: 'sit' | 'lie' | 'stand'; d: number; pray?: boolean }[];
   /** 장사꾼 자리: 고깃간 · 잡동사니 좌판 */
-  vendors: { i: number; j: number; kind: 'butcher' | 'junk' }[];
+  vendors: { i: number; j: number; kind: HellVendor }[];
   /** 문지기(경비병) 둘이 서는 곳 — 위층 길 들머리 */
   posts: [number, number][];
 }
+
+/** 22차: 지옥 마을 장사꾼 — 고깃간 · 물장수 · 넝마 · 약장수 · 장사꾼 · 무기상 · 지옥호텔 지배인 · 서큐버스 (층마다 한 명씩) */
+export type HellVendor = 'butcher' | 'water' | 'junk' | 'medic' | 'trader' | 'arms' | 'hotel' | 'succubus';
 
 export function tileAt(z: Zone, i: number, j: number): TileType {
   if (i < 0 || j < 0 || i >= z.W || j >= z.H) return 'void';
@@ -97,7 +100,7 @@ export function finalize(z: Omit<Zone, 'blocked'>): Zone {
     // 빈 땅(주차장·공터·광장)은 걸을 수 있다. 건물·물·지도 바깥만 막는다
     blocked[k] = t === 'block' || t === 'void' || t === 'water' ? 1 : 0;
   }
-  for (const p of z.props) if (p.kind !== 'tree' && p.kind !== 'bones' && p.kind !== 'crack' && p.kind !== 'reeds') blocked[p.j * z.W + p.i] = 1; // 나무·흩어진 뼈·땅의 자국은 밟고 지나간다
+  for (const p of z.props) if (p.kind !== 'tree' && p.kind !== 'bones' && p.kind !== 'crack' && p.kind !== 'reeds' && p.kind !== 'mattress') blocked[p.j * z.W + p.i] = 1; // 나무·흩어진 뼈·땅의 자국은 밟고 지나간다
   // 구역 둘레(이웃 거리가 보이기만 하는 곳)는 걸을 수 없다
   const e = z.edges;
   if (e) for (let j = 0; j < z.H; j++) for (let i = 0; i < z.W; i++) if (i < e.i0 || i >= e.i1 || j < e.j0 || j >= e.j1) blocked[j * z.W + i] = 1;
@@ -123,7 +126,41 @@ export function decodeZone(json: {
   for (let k = 0; k < json.codes.length; k++) map[json.codes.charCodeAt(k)] = TI[json.types[k] as TileType] ?? 0;
   const tiles = new Uint8Array(json.W * json.H);
   for (let k = 0; k < tiles.length; k++) tiles[k] = map[json.tiles.charCodeAt(k)];
-  return finalize({ id: json.id, W: json.W, H: json.H, tiles, buildings: json.buildings, props: json.props, lanes: json.lanes, door: json.door, spawn: json.spawn, attribution: json.attribution, shop: json.shop ?? true, edges: json.edges, origin: json.origin });
+  const lanes = widenMainWalks(tiles, json.W, json.H, json.lanes);
+  return finalize({ id: json.id, W: json.W, H: json.H, tiles, buildings: json.buildings, props: json.props, lanes, door: json.door, spawn: json.spawn, attribution: json.attribution, shop: json.shop ?? true, edges: json.edges, origin: json.origin });
+}
+
+/**
+ * 22차: 대로 보도 넓히기 — 실제보다 좁아 차가 사람 바로 옆을 스쳤다.
+ * 칸마다(세로 줄) 보도↔보도 사이의 찻길 띠(8~26칸)를 찾아 가장 바깥 차로 한 줄씩을 보도로 바꾸고,
+ * 그 줄을 달리던 차로는 지운다 (남은 찻길 위로만 차가 다닌다)
+ */
+function widenMainWalks(tiles: Uint8Array, W: number, H: number, lanes: Lane[]): Lane[] {
+  const R = TI.road, M = TI.median, C = TI.cross, WK = TI.walk;
+  const isRoad = (v: number) => v === R || v === M || v === C;
+  for (let i = 0; i < W; i++) {
+    let j = 0;
+    while (j < H) {
+      if (!isRoad(tiles[j * W + i])) { j++; continue; }
+      const a = j;
+      while (j < H && isRoad(tiles[j * W + i])) j++;
+      const b = j - 1, len = b - a + 1;
+      if (len < 8 || len > 26 || a < 1 || b >= H - 1) continue;
+      if (tiles[(a - 1) * W + i] !== WK || tiles[(b + 1) * W + i] !== WK) continue;
+      for (const r of [a, b]) if (tiles[r * W + i] === R || tiles[r * W + i] === C) tiles[r * W + i] = WK;
+    }
+  }
+  // 차로: 아직 찻길인 구간만 남긴다 (6칸 이상)
+  const out: Lane[] = [];
+  for (const l of lanes) {
+    let s = -1;
+    for (let i = l.i0; i <= l.i1 + 1; i++) {
+      const ok = i <= l.i1 && i >= 0 && i < W && isRoad(tiles[l.j * W + i]);
+      if (ok && s < 0) s = i;
+      if (!ok && s >= 0) { if (i - s >= 6) out.push({ ...l, i0: s, i1: i - 1 }); s = -1; }
+    }
+  }
+  return out;
 }
 
 /** 수쿰빗 대로를 본뜬 시험 구역 (실제 지도를 불러오지 못할 때 쓴다) */
