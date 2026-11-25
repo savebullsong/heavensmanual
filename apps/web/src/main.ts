@@ -8,7 +8,7 @@ import { Dialog } from './dialog.ts';
 import { openLookPanel, lookPanelInsets } from './lookpanel.ts';
 import { ITEMS, STORES, menuFor, iconFor, itemIcon, effectText, priceText, moneyText, setWon, HELL_FOOD, type ItemDef, type ItemCat } from './items.ts';
 import * as net from './net.ts';
-import { preloadPortrait } from './portraits.ts';
+import { preloadPortrait, type PortraitSlot } from './portraits.ts';
 import { sukhumvitTestZone, decodeZone, type Zone, type Building } from './zone.ts';
 import { streetReady } from './street.ts';
 import { ARRIVALS, rollArrival, arrivalLook, type Arrival, type Look, type Outfit } from './character.ts';
@@ -46,8 +46,13 @@ function newLife(kind?: Arrival) {
   state.arrival = { kind: k, look: arrivalLook(k) };
   delete state.look;
   state.wallet = 0;
-  state.bag = {};
-  state.equip = {};
+  // 26차: 세계를 건너도 몸에 남는 물건(검은 마스크)은 새 생에도 그대로
+  const cross = (k: string) => !!ITEMS.find((x) => x.key === k)?.cross;
+  const keepBag: Record<string, number> = {}, keepEq: Partial<Record<Slot, string>> = {};
+  for (const [k, n] of Object.entries(state.bag ?? {})) if (n > 0 && cross(k)) keepBag[k] = n;
+  for (const [slot, k] of Object.entries(state.equip ?? {})) if (k && cross(k)) keepEq[slot as Slot] = k;
+  state.bag = keepBag;
+  state.equip = keepEq;
   state.ammo = 0;
   state.arrows = 0;
   state.hp = maxHpFor(state.soul?.stats?.vit ?? 1);
@@ -178,7 +183,7 @@ async function boot() {
   setInterval(updateHud, 1000);
   setInterval(() => { snapPos(); save(state); }, 4000);
   addEventListener('pagehide', () => { snapPos(); save(state); });
-  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior() }; // 개발용 확인 창구
+  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior(), terrace: () => enterTerrace(), officer: () => talkToOfficer(), pasharTalk: () => talkToPashar() }; // 개발용 확인 창구
 }
 
 // ───────────────────────── 장면 전환 ─────────────────────────
@@ -551,6 +556,12 @@ const hooks: WorldHooks = {
   maskGirl() {
     void talkToMaskGirl();
   },
+  beginnerBat() {
+    if (state.batGiven || realm() !== 'real') return false;
+    const broke = (state.wallet ?? 0) + (state.bank ?? 0) < 50;
+    const bare = !Object.values(state.equip ?? {}).some(Boolean) && !Object.keys(state.bag ?? {}).some((k) => (state.bag![k] ?? 0) > 0 && isGearItem(itemByKey(k)));
+    return broke && bare;
+  },
   useAmmo() {
     const wi = state.equip?.weapon ? itemByKey(state.equip.weapon) : null;
     if (wi?.note === 'fuel') {
@@ -598,6 +609,7 @@ const hooks: WorldHooks = {
   loot(key) {
     const it = itemByKey(key);
     if (!it) return;
+    if (key === 'bat' && realm() === 'real') state.batGiven = true;
     addToBag(it);
     save(state);
     toast(t().lootGot.replace('{item}', it.name[lang()]), 'good');
@@ -1034,13 +1046,14 @@ async function talkToPashar() {
     const most = Math.floor((all * (100 - ratio)) / 100);
     if (most > 0) { await dlg.say(L.lobbyExchange.replace('{n}', all.toLocaleString('en-US')).replace('{m}', most.toLocaleString('en-US')).replace('{x}', String(OBOL_RATE))); carry = most; }
     else await dlg.say(L.lobbyNoObol);
-    await dlg.say(L.lobbyCity);
-    const c = await dlg.choose([L.regions.bkk, L.regions.seoul]);
-    region = c === 1 ? 'seoul' : 'bkk';
   }
   await dlg.say(L.lobbyAsk);
   const go = await dlg.choose([L.lobbyGo, L.lobbyWait]);
   if (go === 1) { dlg.close(); busy = false; return; }
+  // 26차: 다음 생의 몸·도시·가져갈 물건을 여기서 정한다 (악행 100%면 도시는 고를 수 없다)
+  if (ratio < 100) await dlg.say(L.lobbyCity);
+  await prepareNextLife({ name: L.pashar, portrait: 'pashar' }, ratio >= 100 ? (Math.random() < 0.5 ? 'seoul' : 'bkk') : null);
+  region = state.nextLife?.region ?? region;
   await dlg.say(L.lobbyBye);
   dlg.close();
   busy = false;
@@ -1064,12 +1077,23 @@ function rebirthFrom(from: 'hell' | 'ghost' | 'heaven' | 'border', carryBaht = 0
     seal('hell');
     const h = hellState();
     h.cleared = []; h.paid = []; h.fed = 0;
-  }
+  } else seal('real'); // 26차: 천국·경계에서 들고 있던 것(관리자 시찰로 가져간 현실 물건 등)도 현실 우주새에 봉인 — 사라지지 않게
   state.realm = 'real';
   delete state.pos;
-  newLife();
+  // 26차: 상담에서 미리 정한 다음 생 (모습·도시·선업으로 산 물건)
+  const nl = state.nextLife;
+  delete state.nextLife;
+  newLife(nl?.kind);
+  if (nl) {
+    state.look = nl.look;
+    state.arrival = { kind: nl.kind, look: { ...nl.look, child: nl.kind === 'child' } };
+    state.region = nl.region;
+    for (const [k, n] of Object.entries(nl.bag)) { const it = ITEMS.find((x) => x.key === k); if (it) for (let c = 0; c < n; c++) addToBag(it); }
+    state.freshLife = true;
+  }
   state.wallet = carryBaht; // 지옥 로비에서 노전을 바꿔 가져온 돈
   save(state);
+  if (vaultOf('real')) setTimeout(() => toast(t().vaultHint, 'good'), 2600); // 맡겨 둔 물건이 있으면 미스 황에게 말을 걸라고
   if (street) { street.destroy(); street = null; }
   if (world) { world.destroy(); world = null; }
   net.leaveZone();
@@ -1148,7 +1172,7 @@ async function talkToBulda(force = false) {
     else if (c === 3) {
       await dlg.say(L.buldaRebirthAsk);
       const y = await dlg.choose([L.buldaRebirthYes, L.buldaRebirthNo]);
-      if (y === 0) { await dlg.say(L.buldaRebirthGo); dlg.close(); busy = false; leaveBorder(); return; }
+      if (y === 0) { await prepareNextLife({ name: L.bulda, portrait: 'bulda' }, null); await dlg.say(L.buldaRebirthGo); dlg.close(); busy = false; leaveBorder(); return; }
       await dlg.say(L.buldaStay);
     } else break;
   }
@@ -1257,7 +1281,7 @@ async function talkToHwang() {
       if (!hellState().met) { hellState().met = true; save(state); await dlg.say(L.hwFirst); }
       await dlg.say(L.hwGreet);
     }
-    else if (!state.look) {
+    else if (!state.look || state.freshLife) {
       await dlg.say(L.greetFirst);
       await dlg.say(L.react[state.arrival!.kind]);
     } else await dlg.say(L.greetUsual);
@@ -1663,6 +1687,17 @@ function itemRow(it: ItemDef, right: string, onClick: () => void, dim = false) {
 
 /** 문으로 나간다. 이번 생의 몸이 아직 없으면 스스로 묻고, 모습·성별·지역을 다시 고른다 */
 async function goOut() {
+  if (state.look && state.freshLife) {
+    // 26차: 몸은 상담에서 이미 정했다 — 문 앞에서 한 번 스스로 묻고 나간다
+    delete state.freshLife; save(state);
+    busy = true; shop.lock(true);
+    dlg.open({ name: '', monologue: true });
+    await dlg.say(t().whoWasI);
+    dlg.close();
+    shop.lock(false); busy = false;
+    leaveShop();
+    return;
+  }
   if (state.look) { leaveShop(); return; }
   busy = true;
   shop.lock(true);
@@ -2265,10 +2300,84 @@ async function talkToOfficer() {
   const fin = await dlg.choose([L.offFinalGo, L.offReconsider]);
   if (fin !== 0) { await dlg.say(L.offRelief); dlg.close(); busy = false; return; }
   await dlg.say(L.offSigh);
+  await prepareNextLife({ name: L.officer, portrait: 'luen' }, null);
+  await dlg.say(L.offSend);
   dlg.close();
   busy = false;
   shipThenRebirth(() => rebirthFrom('heaven'));
 }
+// ───────────────────────── 26차: 다음 생 상담 ─────────────────────────
+/** 선업(이번 생의 선행 점수)으로 다음 생에 가져갈 물건과 값 — 싸움을 막 시작할 만큼부터 권총까지 */
+const GOOD_SHOP: [string, number][] = [
+  ['bandage', 0.4], ['gloves', 0.4], ['pipe', 0.6], ['knife', 0.8], ['shinguard', 0.8], ['workpants', 0.8], ['bat', 1], ['helmet', 1], ['boots', 1],
+  ['arrows', 0.5], ['bow', 2], ['jacket', 1.6], ['dagger', 2.5], ['shield', 3.5], ['arming', 4], ['vest', 4.5], ['sword', 6], ['ammo', 1.5], ['pistol', 20],
+];
+/**
+ * 환생하기로 한 영혼과 상담하는 이(루엔·파샤르·할아버지·불다)가 다음 생을 미리 정한다:
+ * 처음 모습의 운(우비·환자복·아이·앵무새 옷·광채)을 뽑고 그 위에서 몸과 도시를 고른 뒤, 선업으로 가져갈 물건을 산다
+ */
+async function prepareNextLife(who: { name: string; portrait: PortraitSlot }, fixedRegion: string | null) {
+  const L = t();
+  const kind = rollArrival();
+  const arr = arrivalLook(kind);
+  await dlg.say(L.nlLook);
+  dlg.close();
+  const start: Look = { ...arr, child: false, outfit: arr.outfit ?? 'casual' };
+  const outfits: Outfit[] = ['casual', ...(arr.outfit && arr.outfit !== 'casual' ? [arr.outfit] : [])];
+  world?.setLook(start); // 고르는 동안은 다음 생의 몸으로 보인다
+  const res = await chooseBody(L.nlLookTitle, L.nlLookConfirm, start, fixedRegion ? { outfits } : { outfits, regions: [{ id: 'bkk', label: L.regions.bkk, ready: true }, { id: 'seoul', label: L.regions.seoul, ready: true }] });
+  world?.setLook(bodyLook()); // 지금의 몸은 떠나기 전까지 그대로
+  dlg.open(who);
+  const region = fixedRegion ?? res.region ?? state.region ?? 'bkk';
+  let bag: Record<string, number> = {};
+  const good = state.deeds?.good ?? 0;
+  if (good >= Math.min(...GOOD_SHOP.map(([, p]) => p))) {
+    await dlg.say(L.nlShopIntro.replace('{n}', fmtKarma(good)));
+    dlg.close();
+    bag = await goodDeedShop();
+    dlg.open(who);
+  } else await dlg.say(L.nlShopNone);
+  state.nextLife = { kind, look: res.look, region, bag };
+  save(state);
+}
+function goodDeedShop(): Promise<Record<string, number>> {
+  return new Promise((resolve) => {
+    const L = t();
+    closeMenus();
+    document.querySelector('.store-panel')?.remove();
+    const bag: Record<string, number> = {};
+    const el = document.createElement('div');
+    el.className = 'store-panel shop-menu nl-shop';
+    el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close"></button></div><p class="store-line"></p><p class="nl-got"></p><div class="menu-list"></div>`;
+    el.querySelector('.menu-head b')!.textContent = L.nlShopTitle;
+    const done = el.querySelector('.menu-close') as HTMLButtonElement;
+    done.textContent = L.nlDone;
+    done.onclick = () => { el.remove(); resolve(bag); };
+    const list = el.querySelector('.menu-list')!;
+    const draw = () => {
+      const left = state.deeds?.good ?? 0;
+      el.querySelector('.store-line')!.textContent = L.nlLeft.replace('{n}', fmtKarma(left));
+      const got = Object.entries(bag).map(([k, n]) => `${itemByKey(k).name[lang()]}${n > 1 ? ` ×${n}` : ''}`);
+      el.querySelector('.nl-got')!.textContent = got.length ? L.nlGot.replace('{items}', got.join(', ')) : L.nlGotNone;
+      list.innerHTML = '';
+      for (const [k, price] of GOOD_SHOP) {
+        const it = itemByKey(k);
+        const short = price > left + 1e-9;
+        list.appendChild(itemRow(it, L.nlPrice.replace('{n}', fmtKarma(price)), () => {
+          const now = state.deeds?.good ?? 0;
+          if (price > now + 1e-9) { toast(L.nlPoor); return; }
+          state.deeds = { ...(state.deeds ?? { good: 0, evil: 0 }), good: Math.round((now - price) * 10) / 10 };
+          bag[k] = (bag[k] ?? 0) + 1;
+          save(state);
+          draw();
+        }, short));
+      }
+    };
+    draw();
+    panelAt(el);
+  });
+}
+
 /** 24차: 환생은 우주왕복선으로 — 걸어가 타고, 떠오르면 아래 세상으로 */
 async function shipThenRebirth(go: () => void) {
   busy = true;
@@ -2287,6 +2396,10 @@ async function talkToGrandpa(hell: boolean) {
   await dlg.say(L.grandpaAsk);
   const c = await dlg.choose([L.grandpaGo, L.grandpaWait]);
   if (c !== 0) { await dlg.say(L.grandpaStay); dlg.close(); busy = false; return; }
+  {
+    const ratio0 = Math.round(evilRatio(state.deeds ?? { good: 0, evil: 0 }) ?? 100);
+    await prepareNextLife({ name: L.grandpaName, portrait: 'grandpa' }, hell && ratio0 >= 100 ? (Math.random() < 0.5 ? 'seoul' : 'bkk') : null);
+  }
   await dlg.say(L.grandpaBye);
   dlg.close();
   busy = false;
@@ -2342,8 +2455,8 @@ async function talkToYellowWing() {
     } else if (c === 'luen') {
       if (world?.guideStair()) await dlg.say(L.ywLuenHere);
       else {
-        const here = ZONE_IDS.indexOf(world?.zone.id ?? homeZone()), home = ZONE_IDS.indexOf(homeZone());
-        await dlg.say(L.ywLuenFar.replace('{dir}', here < home ? L.dirs.e : L.dirs.w));
+        const here = ZONE_IDS.indexOf(world?.zone.id ?? homeZone()), end = ZONE_IDS.length - 1; // 26차: 루엔은 동쪽 끝
+        await dlg.say(L.ywLuenFar.replace('{dir}', here < end ? L.dirs.e : L.dirs.w));
       }
     } else if (c === 'rules') {
       for (const line of L.ywRules) await dlg.say(line);

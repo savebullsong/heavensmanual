@@ -63,6 +63,12 @@ export interface Save {
     /** 25차: 이 영혼이 가 본 가장 깊은 층 (계단으로는 여기까지만 내려간다 · 다음 생에도 남는다) */
     deepest?: number;
   };
+  /** 26차: 환생 상담에서 미리 정한 다음 생 — 처음 모습의 운, 고른 몸, 도시, 선업으로 산 물건 */
+  nextLife?: { kind: import('./character.ts').Arrival; look: import('./character.ts').Look; region: string; bag: Record<string, number> };
+  /** 26차: 방금 환생해 몸이 미리 정해진 채 우주새에 왔다 (나갈 때 '나는 누구였지.'만) */
+  freshLife?: boolean;
+  /** 26차: 초심자 야구 배트를 이미 받았다 (단 한 번) */
+  batGiven?: boolean;
   /** 25차: 화살·탄약을 빼 두었다 (활·총이 쏘지 않는다) */
   unloaded?: boolean;
   /** 25차 화염방사기: 그날(UTC 날짜) 쓴 연료 초 (하루 300초) */

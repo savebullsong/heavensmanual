@@ -8,11 +8,11 @@ export const OPEN_FLOORS = 4; // 지금 열린 층 (4~13층은 하나씩 업데�
 export type Theme = 'ash' | 'swamp' | 'market' | 'forge'; // 24차: 4층 용광로
 export interface FloorDef { floor: number; theme: Theme; name: Record<Lang, string>; sin: Record<Lang, string>; monsters: string[]; boss: string; guard?: string; /** 고문 장면의 고문자 (그 층의 큰 괴물이 몽둥이를 든다) */ torturer: string }
 export const FLOORS: FloorDef[] = [
-  { floor: 1, theme: 'ash', name: { ko: '재의 문턱', th: 'ธรณีแห่งเถ้าถ่าน', en: 'Threshold of Ash' }, sin: { ko: '경미한 잘못, 책임 회피', th: 'ความผิดเล็กน้อย การหนีความรับผิดชอบ', en: 'Petty wrongs, evading responsibility' }, monsters: ['ashen', 'ember', 'bonewalker', 'gateyak'], boss: 'ashgal', guard: 'ashwarden', torturer: 'gateyak' },
-  { floor: 2, theme: 'swamp', name: { ko: '굶주림의 늪', th: 'บึงแห่งความหิวโหย', en: 'Swamp of Hunger' }, sin: { ko: '탐욕', th: 'ความโลภ', en: 'Greed' }, monsters: ['pret', 'bogdead', 'glutton'], boss: 'gurma', guard: 'hollowbowl', torturer: 'glutton' },
-  { floor: 3, theme: 'market', name: { ko: '피의 시장', th: 'ตลาดเลือด', en: 'Blood Market' }, sin: { ko: '사기, 기만', th: 'การฉ้อโกง การหลอกลวง', en: 'Fraud and deceit' }, monsters: ['haggler', 'debtbones', 'broker'], boss: 'serane', guard: 'waxseal', torturer: 'broker' },
+  { floor: 1, theme: 'ash', name: { ko: '재의 문턱', th: 'ธรณีแห่งเถ้าถ่าน', en: 'Threshold of Ash' }, sin: { ko: '경미한 잘못, 책임 회피', th: 'ความผิดเล็กน้อย การหนีความรับผิดชอบ', en: 'Petty wrongs, evading responsibility' }, monsters: ['ashbug', 'ashen', 'gateyak', 'bonewalker'], boss: 'ashgal', guard: 'ashwarden', torturer: 'gateyak' }, // 26차 설정집: 재충 · 회색 망령 · 뼈지기 (+ 걷는 해골은 우리 것)
+  { floor: 2, theme: 'swamp', name: { ko: '굶주림의 늪', th: 'บึงแห่งความหิวโหย', en: 'Swamp of Hunger' }, sin: { ko: '탐욕과 타인의 몫을 빼앗는 행위', th: 'ความโลภและการแย่งส่วนของผู้อื่น', en: 'Greed and taking what belongs to others' }, monsters: ['mudworm', 'glutton', 'bogdead'], boss: 'gurma', guard: 'hollowbowl', torturer: 'glutton' }, // 26차 설정집: 늪충 · 탐식귀 · 진흙거인
+  { floor: 3, theme: 'market', name: { ko: '피의 시장', th: 'ตลาดเลือด', en: 'Blood Market' }, sin: { ko: '사기와 반복적인 기만', th: 'การฉ้อโกงและหลอกลวงซ้ำซาก', en: 'Fraud and repeated deceit' }, monsters: ['pactworm', 'broker', 'haggler', 'debtbones'], boss: 'serane', guard: 'waxseal', torturer: 'broker' }, // 26차 설정집: 계약충 · 피상인 · 가면도적 (+ 빚쟁이 해골)
   // 25차: 설정집대로 — 비명의 용광로 · 고의적인 폭력과 상해 · 불씨귀(불을 뿜는다) · 쇠망치병(거대한 망치) · 철갑마(쇠로 덮인 전사) / 층주 바르칸, 용광로의 장군
-  { floor: 4, theme: 'forge', name: { ko: '비명의 용광로', th: 'เตาหลอมแห่งเสียงกรีดร้อง', en: 'Furnace of Screams' }, sin: { ko: '고의적인 폭력과 상해', th: 'ความรุนแรงและการทำร้ายโดยเจตนา', en: 'Deliberate violence and injury' }, monsters: ['cinderimp', 'hammerman', 'ironclad'], boss: 'barkan', guard: 'anvilward', torturer: 'hammerman' },
+  { floor: 4, theme: 'forge', name: { ko: '비명의 용광로', th: 'เตาหลอมแห่งเสียงกรีดร้อง', en: 'Furnace of Screams' }, sin: { ko: '고의적인 폭력과 상해', th: 'ความรุนแรงและการทำร้ายโดยเจตนา', en: 'Deliberate violence and injury' }, monsters: ['cinderimp', 'hammerman', 'ironclad', 'chainbones'], boss: 'barkan', guard: 'anvilward', torturer: 'hammerman' }, // + 사슬 해골 (해골은 층마다 우리 것)
 ];
 /**
  * 25차: 아직 열지 않은 5~13층 계획 (지옥 설정집). 악업 띠 — 1~4층 개인의 죄 · 5~8층 남을 고의로 망가뜨린 죄 · 9~12층 오래 이어진 학대와 조직적 착취 · 13층 절멸.
@@ -93,36 +93,42 @@ export interface MonsterDef {
   flame?: boolean;
   /** 이름 뒤에 붙는 칭호 (살펴보기) */
   title?: Record<Lang, string>;
+  /** 26차: 떼로 나온다 — 한 마리가 나타날 때 곁에 몇 마리가 더 (재충) */
+  swarm?: number;
+  /** 26차: 반쯤 비치는 유령 — 맞으면 가던 길을 잃는다 (회색 망령) */
+  ghost?: boolean;
   /** 몸 구역 색 덮어쓰기 (가면·금붙이·뿔처럼 살·옷·빛 셋으로 모자란 곳) */
   cols?: Record<number, string>;
 }
 const M = (key: string, body: MonsterBody, ko: string, th: string, en: string, skin: string, cloth: string, glow: string, hp: number, dmg: [number, number], speed: number, notice: number, atk: number, scale: number, notes: [number, number], extra: Partial<MonsterDef> = {}): MonsterDef =>
   ({ key, body, name: { ko, th, en }, skin, cloth, glow, hp, dmg, speed, notice, atk, scale, notes, ...extra });
 export const MONSTERS: Record<string, MonsterDef> = Object.fromEntries([
-  // 1층 재의 문턱
-  M('ashen', 'ash', '잿빛 망자', 'ผีเถ้า', 'Ashen dead', '#6e6a66', '#3a3430', '#d9632a', 260, [8, 14], 1.0, 6, 1.0, 1, [3, 8], { weapon: 'pickaxe' }),
-  M('ember', 'cinder', '불씨 망자', 'ผีถ่านไฟ', 'Ember dead', '#2e2622', '#241c1a', '#ffb02a', 210, [10, 16], 1.5, 7, 0.8, 1, [4, 9], { weapon: 'brand' }),
+  // 1층 재의 문턱 (26차 설정집): 재충 — 떼 지어 덤비는 작은 벌레 · 회색 망령 — 길을 잃게 하는 유령 · 뼈지기 — 거대한 뼈 몽둥이의 경비병 · 걷는 해골(우리 것)
+  M('ashbug', 'serane', '재충', 'หนอนเถ้า', 'Ash mite', '#5a5450', '#2e2a28', '#ff8a2a', 120, [5, 9], 1.45, 7, 0.7, 0.42, [2, 5], { weapon: null, swarm: 3 }), // 곁가지는 층 전체 8마리까지
+  M('ashen', 'ash', '회색 망령', 'วิญญาณสีเทา', 'Gray wraith', '#9a9a9e', '#5a5a60', '#d8e0ff', 260, [8, 14], 1.0, 7, 1.0, 1, [3, 8], { weapon: null, ghost: true, cols: { 6: '#e8eeff', 12: '#c8d2ff' } }),
   M('bonewalker', 'bones', '걷는 해골', 'โครงกระดูกเดินได้', 'Walking bones', '#d8cfb8', '#3a3026', '#ff6a2a', 230, [9, 15], 1.2, 7, 0.9, 1, [4, 9], { weapon: 'femur' }),
-  M('gateyak', 'yak', '문지기 야크', 'ยักษ์เฝ้าประตู', 'Gate yak', '#5a6e8a', '#3a2a22', '#e0b437', 520, [14, 22], 0.9, 5, 1.15, 1.12, [10, 18], { weapon: 'club' }),
+  M('gateyak', 'yak', '뼈지기', 'ผู้เฝ้ากระดูก', 'Bone warden', '#6a6e76', '#3a2a22', '#e0b437', 520, [14, 22], 0.9, 5, 1.15, 1.12, [10, 18], { weapon: 'club', cols: { 13: '#e0d6bc', 14: '#c8bea4' } }),
   // 아쉬갈: 숯이 된 바위 거인. 갈라진 틈으로 용암이 흐르고 숫양 뿔이 말렸다. 불탄 성문의 쇠 빗장을 휘두른다
-  M('ashgal', 'ashgal', '아쉬갈', 'อัชกัล', 'Ashgal', '#4a4440', '#2a2220', '#ff6a1a', 2400, [22, 32], 1.0, 9, 1.15, 1.45, [120, 160], { boss: true, weapon: 'gatebar', cols: { 13: '#3a2a1e', 14: '#5a5652', 15: '#120c0a' } }),
-  // 2층 굶주림의 늪
-  M('pret', 'pret', '프렛', 'เปรต', 'Phi Pret', '#9aa08a', '#4a4232', '#c9d26a', 300, [10, 18], 0.8, 6, 1.0, 1, [5, 11], { weapon: 'ladle' }),
-  M('bogdead', 'bloat', '늪 망자', 'ผีบึง', 'Bog dead', '#7e8c6e', '#34401e', '#c8f08a', 320, [11, 17], 0.9, 6, 1.0, 1, [5, 10], { weapon: 'boathook', cols: { 4: '#2e2a1c' } }),
+  M('ashgal', 'ashgal', '아쉬갈', 'อัชกัล', 'Ashgal', '#4a4440', '#2a2220', '#ff6a1a', 2400, [22, 32], 1.0, 9, 1.15, 1.45, [120, 160], { boss: true, weapon: 'gatebar', title: { ko: '재의 문지기', th: 'ผู้เฝ้าประตูเถ้า', en: 'Gatekeeper of Ash' }, cols: { 13: '#3a2a1e', 14: '#5a5652', 15: '#120c0a' } }),
+  // 2층 굶주림의 늪 (26차 설정집): 늪충 — 진흙 속에서 튀어나온다 · 탐식귀 — 주변을 삼킨다 · 진흙거인 — 거대한 몸으로 길을 막는다
+  M('mudworm', 'serane', '늪충', 'หนอนบึง', 'Mud worm', '#4a5a32', '#2a3018', '#c8e05a', 300, [10, 17], 1.05, 6, 0.95, 0.72, [5, 11], { weapon: null }),
   M('glutton', 'glutton', '탐식귀', 'ผีตะกละ', 'Glutton', '#5f7a4a', '#c9b27a', '#e0b437', 640, [16, 25], 0.85, 5, 1.15, 1.1, [12, 22], { weapon: 'club', cols: { 4: '#3a2a1a' } }),
-  M('gurma', 'gurma', '구르마', 'กูร์มา', 'Gurma', '#8a8a6a', '#4a3a26', '#e8f06a', 3200, [26, 36], 0.85, 9, 1.05, 1.45, [240, 300], { boss: true, weapon: null }),
-  // 3층 피의 시장
-  M('haggler', 'hawker', '가면 흥정꾼', 'พ่อค้าหน้ากาก', 'Masked haggler', '#6a5a52', '#1a1414', '#c8281e', 380, [13, 20], 1.1, 6, 0.95, 1, [7, 14], { weapon: 'cleaver', cols: { 10: '#efe8dc', 14: '#c9a23e', 4: '#120e0e' } }),
+  M('bogdead', 'bloat', '진흙거인', 'ยักษ์โคลน', 'Mud giant', '#5a4a32', '#3a2e1c', '#a8c05a', 980, [18, 28], 0.6, 5, 1.3, 1.5, [14, 26], { weapon: 'boathook', cols: { 4: '#2e2416', 10: '#6a5a3a' } }),
+  M('gurma', 'gurma', '구르마', 'กูร์มา', 'Gurma', '#8a8a6a', '#4a3a26', '#e8f06a', 3200, [26, 36], 0.85, 9, 1.05, 1.45, [240, 300], { boss: true, weapon: null, title: { ko: '굶주림의 군주', th: 'เจ้าแห่งความหิว', en: 'Lord of Hunger' } }),
+  // 3층 피의 시장 (26차 설정집): 계약충 — 물건에 숨어드는 기생 악마 · 피상인 — 거짓 거래로 영혼을 속인다 · 가면도적 — 남의 모습으로 둔갑한다 · 빚쟁이 해골(우리 것)
+  M('pactworm', 'serane', '계약충', 'หนอนสัญญา', 'Pact worm', '#c8b48a', '#6a1a14', '#e0b437', 340, [12, 19], 1.25, 7, 0.85, 0.55, [6, 12], { weapon: null, cols: { 9: '#8a2a1e' } }),
+  M('haggler', 'hawker', '가면도적', 'โจรหน้ากาก', 'Masked thief', '#6a5a52', '#1a1414', '#c8281e', 380, [13, 20], 1.25, 6, 0.9, 1, [7, 14], { weapon: 'cleaver', cols: { 10: '#efe8dc', 14: '#c9a23e', 4: '#120e0e' } }),
   M('debtbones', 'debtor', '빚쟁이 해골', 'โครงกระดูกลูกหนี้', 'Debtor bones', '#c9b89a', '#6a5a3a', '#f2c84a', 360, [13, 21], 1.2, 7, 0.9, 1, [7, 13], { weapon: 'hook', cols: { 10: '#e8dcc0' } }),
-  M('broker', 'broker', '살점 거간꾼', 'นายหน้าเนื้อ', 'Flesh broker', '#8a5a4a', '#2a1a12', '#f2c84a', 800, [19, 29], 0.9, 5, 1.1, 1.1, [15, 26], { weapon: 'cleaver', cols: { 14: '#c9a23e' } }),
+  M('broker', 'broker', '피상인', 'พ่อค้าเลือด', 'Blood merchant', '#8a5a4a', '#2a1a12', '#f2c84a', 800, [19, 29], 0.9, 5, 1.1, 1.1, [15, 26], { weapon: 'cleaver', cols: { 14: '#c9a23e' } }),
   // 세라네: 피의 시장 끝 나루터 앞에 도사린 거대한 살덩이 애벌레. 세로로 찢어진 아가리에 이빨이 세 겹 (맨손 = 발톱 팔)
   // 4층 비명의 용광로 (25차, 설정집): 불을 뿜는 숯불 꼬마 악귀 · 거대한 쇠망치를 멘 야크 병사 · 온몸을 쇠로 덮은 전사
+  M('chainbones', 'debtor', '사슬 해골', 'โครงกระดูกโซ่', 'Chained bones', '#4a423c', '#2a2420', '#ff6a1a', 420, [15, 24], 1.25, 7, 0.88, 1, [8, 15], { weapon: 'hook', cols: { 10: '#5e5650', 14: '#8a8078' } }), // 해골은 층마다 우리 것 (24차의 사슬 해골을 되살림)
   M('cinderimp', 'cinder', '불씨귀', 'ผีลูกไฟ', 'Cinder imp', '#2a2220', '#3a1a10', '#ff9a1a', 380, [14, 22], 1.35, 7, 1.15, 0.95, [8, 15], { weapon: 'brand', flame: true, cols: { 12: '#ffcf4a', 14: '#5a4a40' } }),
   M('hammerman', 'yak', '쇠망치병', 'ทหารค้อนเหล็ก', 'Hammer soldier', '#4a4644', '#2a2422', '#ff7a2a', 950, [24, 34], 0.85, 5, 1.3, 1.14, [18, 30], { weapon: 'sledge', cols: { 13: '#3a2a20', 14: '#7a7470' } }),
   M('ironclad', 'forgeknight', '철갑마', 'อัศวินเกราะเหล็ก', 'Ironclad', '#3e3c3a', '#4a4846', '#ffb04a', 1100, [24, 36], 0.9, 6, 1.15, 1.05, [20, 34], { weapon: 'greatsword', cols: { 13: '#5a5856', 14: '#8a8682', 15: '#141210' } }),
   // 바르칸, 용광로의 장군: 뿔 달린 검은 가시 갑옷, 해골 얼굴에 붉은 눈, 쇠사슬 감긴 철퇴 지팡이, 해진 붉은 망토 (사용자 컨셉 그림)
   M('barkan', 'forgeknight', '바르칸', 'บาร์คาน', 'Barkan', '#2a2422', '#5a0e10', '#ff4a1a', 5400, [34, 48], 0.9, 8, 1.05, 1.6, [520, 640], { boss: true, weapon: 'chainmace', title: { ko: '용광로의 장군', th: 'แม่ทัพแห่งเตาหลอม', en: 'General of the Furnace' }, cols: { 13: '#7a1014', 14: '#5a5250', 15: '#0a0606' } }),
-  M('serane', 'serane', '세라네', 'เซราเน', 'Serane', '#5e1a20', '#360a0e', '#e0281e', 4200, [30, 42], 0.8, 6, 1.0, 1.85, [380, 460], { boss: true, weapon: null }),
+  M('serane', 'serane', '세라네', 'เซราเน', 'Serane', '#5e1a20', '#360a0e', '#e0281e', 4200, [30, 42], 0.8, 6, 1.0, 1.85, [380, 460], { boss: true, weapon: null, title: { ko: '붉은 시장의 주인', th: 'เจ้าตลาดแดง', en: 'Master of the Red Market' } }),
 ].map((m) => [m.key, m]));
 
 // ───────────────────────── 지도 ─────────────────────────

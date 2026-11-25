@@ -281,3 +281,78 @@ export function hornTexture(color: number): Texture {
   hornTex.set(color, Texture.from(c));
   return hornTex.get(color)!;
 }
+
+/**
+ * 26차: 지도 끝 구름 너머에 솟은 천국의 탑 — 아직 갈 수 없는 곳.
+ * 구름 바다 위 대리석 기단, 기둥이 늘어선 세 층의 회랑, 가운데 높은 탑(층마다 좁아지며 창마다 금빛), 금빛 둥근 지붕과 첨탑 끝의 별,
+ * 양옆의 작은 탑 둘. 아래는 구름에 잠겨 흐려지고, 둘레로 옅은 빛이 번진다
+ */
+let towerTex: Texture | null = null;
+export function heavenTowerTexture(): Texture {
+  if (towerTex) return towerTex;
+  const W = 560, H = 900;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d')!;
+  const cx = W / 2;
+  // 둘레 빛
+  const halo = g.createRadialGradient(cx, 300, 20, cx, 320, 330);
+  halo.addColorStop(0, 'rgba(255,240,200,0.32)'); halo.addColorStop(1, 'rgba(255,246,214,0)');
+  g.fillStyle = halo; g.fillRect(0, 0, W, H);
+  // 빛줄기 몇
+  g.globalAlpha = 0.16; g.fillStyle = '#fff6d8';
+  for (const [a, w] of [[-0.42, 24], [-0.18, 16], [0.12, 20], [0.36, 14]] as [number, number][]) { g.beginPath(); g.moveTo(cx, 120); g.lineTo(cx + Math.sin(a) * 900 - w, 120 + Math.cos(a) * 900); g.lineTo(cx + Math.sin(a) * 900 + w, 120 + Math.cos(a) * 900); g.closePath(); g.fill(); }
+  g.globalAlpha = 1;
+  const marble = (x: number, y: number, w: number, h: number, light = '#ece5d6', shade = '#c4b9a4') => {
+    g.fillStyle = shade; g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+    g.fillStyle = light; g.fillRect(Math.round(x), Math.round(y), Math.round(w * 0.62), Math.round(h));
+  };
+  const gold = '#c99a2e', goldD = '#8a6418';
+  const colonnade = (x: number, y: number, w: number, h: number, n: number) => {
+    marble(x - 6, y - 8, w + 12, 8, '#f2ece0', '#cfc5b2'); g.fillStyle = gold; g.fillRect(Math.round(x - 6), Math.round(y - 2), Math.round(w + 12), 2);
+    g.fillStyle = '#8a7a5e'; g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+    g.fillStyle = 'rgba(255,214,120,0.55)'; g.fillRect(Math.round(x + 2), Math.round(y + 4), Math.round(w - 4), Math.round(h - 8)); // 안쪽 금빛
+    for (let k = 0; k <= n; k++) { const px = x + (k * w) / n - 3; marble(px, y, 7, h, '#f4efe4', '#bfb39c'); }
+    marble(x - 6, y + h, w + 12, 7, '#f4efe6', '#d6cebf');
+  };
+  // 양옆 작은 탑
+  for (const sx of [-1, 1]) {
+    const tx = cx + sx * 168;
+    marble(tx - 26, 330, 52, 300);
+    for (let y = 360; y < 600; y += 46) { g.fillStyle = '#f2cf72'; g.fillRect(Math.round(tx - 6), y, 12, 22); g.fillStyle = '#fff2c0'; g.fillRect(Math.round(tx - 6), y, 5, 22); }
+    g.fillStyle = gold; g.beginPath(); g.ellipse(tx, 330, 30, 26, 0, Math.PI, 0); g.fill(); g.fillStyle = '#f2d27a'; g.beginPath(); g.ellipse(tx - 8, 324, 12, 14, 0, Math.PI, 0); g.fill();
+    g.fillStyle = goldD; g.fillRect(Math.round(tx - 2), 270, 4, 40);
+  }
+  // 기단과 회랑 세 층
+  colonnade(cx - 230, 640, 460, 90, 14);
+  colonnade(cx - 170, 540, 340, 92, 10);
+  colonnade(cx - 120, 450, 240, 84, 8);
+  // 가운데 탑: 위로 갈수록 좁아지는 네 마디
+  const seg: [number, number, number][] = [[96, 370, 80], [80, 290, 80], [64, 220, 70], [50, 160, 60]];
+  for (const [hw, top, h] of seg) {
+    marble(cx - hw, top, hw * 2, h, '#efe8da', '#c2b7a2');
+    g.fillStyle = gold; g.fillRect(Math.round(cx - hw - 4), top - 3, Math.round(hw * 2 + 8), 4);
+    for (let x = cx - hw + 12; x < cx + hw - 10; x += 22) { g.fillStyle = '#f2c862'; g.beginPath(); g.ellipse(x + 5, top + h * 0.45, 5, 12, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#fff4cc'; g.fillRect(Math.round(x + 2), Math.round(top + h * 0.4), 3, 10); }
+  }
+  // 금빛 둥근 지붕과 첨탑, 별
+  g.fillStyle = goldD; g.beginPath(); g.ellipse(cx, 160, 56, 58, 0, Math.PI, 0); g.fill();
+  g.fillStyle = gold; g.beginPath(); g.ellipse(cx - 6, 158, 48, 54, 0, Math.PI, 0); g.fill();
+  g.fillStyle = '#f6dc8a'; g.beginPath(); g.ellipse(cx - 20, 140, 14, 30, 0, Math.PI, 0); g.fill();
+  g.fillStyle = goldD; g.beginPath(); g.moveTo(cx - 6, 104); g.lineTo(cx + 6, 104); g.lineTo(cx, 30); g.closePath(); g.fill();
+  const star = (x: number, y: number, r: number) => { g.fillStyle = '#fffbe8'; g.beginPath(); for (let k = 0; k < 8; k++) { const a = (k * Math.PI) / 4, rr = k % 2 ? r * 0.35 : r; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } g.closePath(); g.fill(); };
+  const sg = g.createRadialGradient(cx, 30, 1, cx, 30, 40); sg.addColorStop(0, 'rgba(255,250,220,0.95)'); sg.addColorStop(1, 'rgba(255,250,220,0)');
+  g.fillStyle = sg; g.fillRect(cx - 40, -10, 80, 80);
+  star(cx, 30, 14);
+  // 아래는 구름에 잠긴다: 구름 뭉치를 겹치고, 맨 아래로 갈수록 투명하게
+  const puff = (x: number, y: number, r: number) => {
+    g.fillStyle = '#d4d8e6'; g.beginPath(); g.ellipse(x, y + r * 0.2, r, r * 0.55, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#f6f5f2'; g.beginPath(); g.ellipse(x - r * 0.08, y, r * 0.92, r * 0.5, 0, 0, Math.PI * 2); g.fill();
+  };
+  for (let k = 0; k < 26; k++) puff(20 + ((k * 97) % 520), 700 + ((k * 53) % 120), 40 + ((k * 31) % 36));
+  const fade = g.createLinearGradient(0, 640, 0, H);
+  fade.addColorStop(0, 'rgba(0,0,0,0)'); fade.addColorStop(1, 'rgba(0,0,0,1)');
+  g.globalCompositeOperation = 'destination-out'; g.fillStyle = fade; g.fillRect(0, 640, W, H - 640);
+  g.globalCompositeOperation = 'source-over';
+  towerTex = Texture.from(c);
+  return towerTex;
+}
