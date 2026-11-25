@@ -33,12 +33,12 @@ button.primary:hover { background: #e0b437; }
 .dlg-panel { position: absolute; right: max(10px, calc(50% - 490px)); bottom: 168px; width: min(430px, calc(100vw - 20px)); max-height: calc(100vh - 240px); display: flex; }
 
 /* 상품 창 */
-.shop-menu { flex: 1; display: flex; flex-direction: column; min-height: 0; background: rgba(20, 14, 10, 0.97); border: 2px solid #8a6a3a; border-radius: 6px; box-shadow: inset 0 0 0 2px #24190f; }
+.shop-menu { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; background: rgba(20, 14, 10, 0.97); border: 2px solid #8a6a3a; border-radius: 6px; box-shadow: inset 0 0 0 2px #24190f; }
 .menu-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 6px; padding: 8px 8px 0; border-bottom: 1px solid #4a3424; }
-.menu-tabs { display: flex; gap: 3px; }
-.menu-tabs button { padding: 5px 12px; font-size: 14px; border-radius: 4px 4px 0 0; border-bottom: 0; }
+.menu-tabs { display: flex; gap: 3px; flex: 1 1 auto; min-width: 0; }
+.menu-tabs button { flex: 0 1 auto; min-width: 0; padding: 5px 12px; font-size: 14px; border-radius: 4px 4px 0 0; border-bottom: 0; white-space: nowrap; }
 .menu-tabs button.on { background: #c9a23e; color: #1c140d; border-color: #e0b437; font-weight: 600; }
-.menu-close { padding: 2px 9px; margin-bottom: 4px; }
+.menu-close { flex: 0 0 auto; padding: 2px 9px; margin-bottom: 4px; }
 .menu-exit { padding: 3px 12px; margin-bottom: 4px; font-size: 13px; color: #eadfc8; background: rgba(60, 40, 26, 0.9); border-color: #8a6a3a; }
 .menu-tabs button.sell { margin-left: 6px; }
 .menu-tabs button.sell.on { background: #7aa05a; border-color: #9ac07a; color: #10140a; }
@@ -53,7 +53,7 @@ button.primary:hover { background: #e0b437; }
 .qty-quick button { padding: 4px 12px; font-size: 13px; }
 .q-go { align-self: stretch; padding: 10px; font-size: 15px; }
 .menu-list { overflow: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
-.menu-item { display: grid; grid-template-columns: 32px 1fr auto; column-gap: 12px; align-items: center; text-align: left; padding: 6px 10px; background: rgba(42, 31, 24, 0.75); border-color: #4f3a28; }
+.menu-item { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; column-gap: 12px; align-items: center; text-align: left; padding: 6px 10px; background: rgba(42, 31, 24, 0.75); border-color: #4f3a28; }
 .menu-item .icon { grid-row: 1 / span 2; width: 32px; height: 32px; image-rendering: pixelated; }
 .menu-item .name { grid-column: 2; font-size: 15px; }
 .menu-item .effect { grid-column: 2; font-size: 12px; color: #b8a888; }
@@ -77,7 +77,13 @@ button.primary:hover { background: #e0b437; }
   .dlg-portrait { left: -14vw; height: min(64vh, 620px); }
   .dlg-box { bottom: 8px; min-height: 120px; padding: 24px 16px 14px; }
   .dlg-text { font-size: 16px; }
-  .dlg-panel { right: 10px; left: 10px; width: auto; bottom: 146px; max-height: calc(100vh - 210px); }
+  /* 목록이 길면 창 안에서 넘기고, 위쪽은 인물 얼굴 자리로 남긴다 */
+  .dlg-panel { right: 10px; left: 10px; width: auto; bottom: 146px; max-height: min(calc(100vh - 210px), 52vh); }
+  .menu-head { gap: 4px; padding: 6px 6px 0; }
+  .menu-tabs { gap: 2px; }
+  .menu-tabs button { padding: 5px 8px; font-size: 13px; }
+  .menu-tabs button.sell { margin-left: 4px; }
+  .menu-item { column-gap: 10px; padding: 6px 8px; }
 }
 
 /* 월드 HUD */
@@ -367,8 +373,10 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 @keyframes soulglow { 50% { box-shadow: 0 0 12px rgba(255, 200, 80, 0.85); border-color: #e0b437; } }
 
 /* 20차: 훔치기 단추 (확률) */
-.steal-row .bag-side .b-steal { width: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; color: #e8a08a; border-color: #6a3a2a; background: rgba(48, 22, 18, 0.8); }
-.steal-row .bag-side .b-steal small { font-size: 10px; color: #d8b8a8; }
+.steal-row .bag-side .b-steal { width: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; color: #e8a08a; border-color: #6a3a2a; background: rgba(48, 22, 18, 0.8); }
+.steal-row .bag-side .b-steal .icon { width: 30px; height: 30px; margin: -8px 0 -7px; image-rendering: pixelated; } /* 복면은 그림 가운데 띠라서 위아래 빈칸을 겹친다 */
+.steal-row .bag-side .b-steal small { font-size: 10px; line-height: 1.2; color: #e8b8a4; white-space: nowrap; }
+.steal-row .bag-side .b-steal b { font-size: 11px; line-height: 1.15; color: #ffd0b8; font-variant-numeric: tabular-nums; }
 .steal-row .bag-side .b-steal:hover { color: #ffb8a0; border-color: #a84a3a; }
 
 /* 20차: 장비 탭의 몸 그림 (위) + 넘겨 보는 목록 (아래) */

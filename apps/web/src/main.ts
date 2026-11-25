@@ -6,7 +6,7 @@ import { WorldScene, type WorldHooks, type Stance, type RemoteInfo } from './wor
 import { ShopRoom, type ShopTarget } from './shoproom.ts';
 import { Dialog } from './dialog.ts';
 import { openLookPanel, lookPanelInsets } from './lookpanel.ts';
-import { ITEMS, STORES, menuFor, iconFor, effectText, priceText, HELL_FOOD, type ItemDef, type ItemCat } from './items.ts';
+import { ITEMS, STORES, menuFor, iconFor, itemIcon, effectText, priceText, HELL_FOOD, type ItemDef, type ItemCat } from './items.ts';
 import * as net from './net.ts';
 import { preloadPortrait } from './portraits.ts';
 import { sukhumvitTestZone, decodeZone, type Zone, type Building } from './zone.ts';
@@ -1301,8 +1301,16 @@ function withSteal(row: HTMLButtonElement, it: ItemDef, price: number, shelf: { 
   const b = document.createElement('button');
   b.className = 'b-steal';
   const pc = Math.round(stealChance(it, price, shelf) * 100);
-  b.innerHTML = `<span>🤏</span><small>${pc}%</small>`;
+  // 20차 → 손 이모지 대신 도트 복면 그림 + '훔치기' 글자 + 확률 (기종마다 모양이 다른 이모지는 쓰지 않는다)
+  const ic = itemIcon('steal');
+  ic.className = 'icon';
+  const lb = document.createElement('small');
+  lb.textContent = t().stealShort;
+  const pcEl = document.createElement('b');
+  pcEl.textContent = `${pc}%`;
+  b.append(ic, lb, pcEl);
   b.title = t().stealBtn.replace('{p}', String(pc));
+  b.setAttribute('aria-label', b.title);
   b.onclick = (e) => { e.stopPropagation(); act(); };
   side.appendChild(b);
   wrap.append(row, side);
@@ -1339,9 +1347,12 @@ function pickItem(hell: boolean, start: ShopTab): Promise<{ it: ItemDef; sell: b
     head.className = 'menu-head';
     const tabs = document.createElement('div');
     tabs.className = 'menu-tabs';
+    // 나가기는 탭 줄 끝의 ✕ (가방·은행 창과 같은 모양) — 좁은 화면에서 밀려나지 않게
     const closeBtn = document.createElement('button');
-    closeBtn.className = 'menu-exit';
-    closeBtn.textContent = L.exitShop;
+    closeBtn.className = 'menu-close';
+    closeBtn.textContent = '✕';
+    closeBtn.title = L.exitShop;
+    closeBtn.setAttribute('aria-label', L.exitShop);
     head.append(tabs, closeBtn);
     const list = document.createElement('div');
     list.className = 'menu-list';

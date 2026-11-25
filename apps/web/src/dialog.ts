@@ -49,6 +49,7 @@ export class Dialog {
       if (tgt.closest('button, .dlg-panel')) return;
       this.advance?.();
     });
+    window.addEventListener('resize', () => this.fitPortrait());
     window.addEventListener('keydown', (e) => {
       if (this.el.hidden || !(e.key === 'Enter' || e.key === ' ')) return;
       e.preventDefault();
@@ -151,6 +152,23 @@ export class Dialog {
     this.panelEl.innerHTML = '';
     this.panelEl.hidden = !content;
     if (content) this.panelEl.appendChild(content);
+    this.el.classList.toggle('has-panel', !!content);
+    requestAnimationFrame(() => this.fitPortrait());
+  }
+
+  /** 좁은 화면에서 상품 창이 열리면 인물 그림을 창 위로 올려 얼굴(그림 위쪽 ~38%까지)이 창에 가리지 않게 한다.
+   *  머리끝(2%)은 위쪽 HUD·가게 이름표 아래에서 시작 */
+  private fitPortrait() {
+    const st = this.portraitBox.style;
+    st.top = st.bottom = st.height = '';
+    if (this.el.hidden || this.panelEl.hidden || window.innerWidth > 640) return;
+    const panelTop = this.panelEl.getBoundingClientRect().top - 4;
+    const hudBottom = Math.min(110, document.getElementById('hud')?.getBoundingClientRect().bottom ?? 0);
+    const full = Math.min(window.innerHeight * 0.64, 620);
+    const h = Math.min(full, Math.max(220, (panelTop - hudBottom) / 0.36));
+    st.height = `${Math.round(h)}px`;
+    st.top = `${Math.round(panelTop - h * 0.38)}px`;
+    st.bottom = 'auto';
   }
 
   close() {
