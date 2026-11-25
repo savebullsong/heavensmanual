@@ -67,6 +67,8 @@ export interface Save {
   nextLife?: { kind: import('./character.ts').Arrival; look: import('./character.ts').Look; region: string; bag: Record<string, number> };
   /** 26차: 방금 환생해 몸이 미리 정해진 채 우주새에 왔다 (나갈 때 '나는 누구였지.'만) */
   freshLife?: boolean;
+  /** 27차: 저격총탄 */
+  rifle?: number;
   /** 26차: 초심자 야구 배트를 이미 받았다 (단 한 번) */
   batGiven?: boolean;
   /** 25차: 화살·탄약을 빼 두었다 (활·총이 쏘지 않는다) */

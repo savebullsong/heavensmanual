@@ -433,3 +433,7 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 /* 26차: 다음 생에 가져갈 것 (선업으로 산다) */
 .nl-shop .menu-close { width: auto; min-width: 0; padding: 0 12px; font-size: 13px; font-weight: 700; }
 .nl-shop .nl-got { margin: 0 12px 6px; font-size: 12px; color: #f2cf5a; }
+
+/* 27차 은행: '전부 맡기기' · '전부 찾기'는 바로 실행 (아랫줄에 둘) */
+.bank-quick .b-all { flex: 1 1 45%; font-weight: 700; border-color: #8a6a3a; }
+.bank-quick .flex-break { flex-basis: 100%; height: 0; }

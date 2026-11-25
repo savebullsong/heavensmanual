@@ -9,13 +9,15 @@ export interface ItemDef {
   heal?: number; // 체력 회복
   atk?: number; // 공격력
   def?: number; // 방어력
-  note?: 'rope' | 'needsAmmo' | 'ammo' | 'needsArrows' | 'arrows' | 'fuel';
+  note?: 'rope' | 'needsAmmo' | 'ammo' | 'needsArrows' | 'arrows' | 'fuel' | 'needsRifle' | 'rifleammo';
+  /** 26차: 쏘는 거리(칸, 없으면 5) · 쏘는 간격 배수 (저격총) */
+  range?: number; rate?: number;
   /** 25차: 세계를 건너가도 봉인되지 않고 몸에 남는다 (마스크 팔이 소녀의 검은 마스크) */
   cross?: boolean;
   /** 25차: 쓴 세계(현실·지옥)에서 훔치기 확률이 오른다 (0.02 = 2%) */
   steal?: number;
   name: Record<Lang, string>;
-  store?: 'maskgirl' | 'mart' | 'pharmacy' | 'food' | 'cafe' | 'talus' | 'hmeat' | 'tools' | 'dept' | 'hjunk' | 'drop' | 'hwater' | 'hmed' | 'harms'; // 22차: 지옥 물장수 · 약장수 · 무기상 // drop = 어디서도 팔지 않는다 (괴물이 떨어뜨릴 뿐) // 우주새가 아니라 거리 가게(철물점·백화점) · 지옥 탈루스·고깃간·넝마장수에서 파는 것
+  store?: 'antique' | 'maskgirl' | 'mart' | 'pharmacy' | 'food' | 'cafe' | 'talus' | 'hmeat' | 'tools' | 'dept' | 'hjunk' | 'drop' | 'hwater' | 'hmed' | 'harms'; // 22차: 지옥 물장수 · 약장수 · 무기상 // drop = 어디서도 팔지 않는다 (괴물이 떨어뜨릴 뿐) // 우주새가 아니라 거리 가게(철물점·백화점) · 지옥 탈루스·고깃간·넝마장수에서 파는 것
   now?: boolean; // 가게에서 바로 먹는다 (가방에 넣지 않음)
   hell?: boolean; // 지옥의 우주새(황혼)에서만, 노전으로 판다
   sprite?: string; // 몸에 그릴 때 쓰는 그림 (지옥 무기·방어구는 현실 그림을 빌려 쓴다)
@@ -36,22 +38,47 @@ export const ITEMS: ItemDef[] = [
   { key: 'water', cat: 'goods', price: 10, heal: 10, name: { ko: '물', th: 'น้ำเปล่า', en: 'Water' } },
   { key: 'rope', cat: 'goods', price: 120, note: 'rope', name: { ko: '밧줄', th: 'เชือก', en: 'Rope' } },
   { key: 'bandage', cat: 'goods', price: 45, heal: 120, name: { ko: '붕대', th: 'ผ้าพันแผล', en: 'Bandage' } },
-  // 무기 — 공격력 차이가 가격에 반영된다
-  { key: 'pipe', cat: 'weapon', price: 180, atk: 4, store: 'tools', name: { ko: '쇠파이프', th: 'ท่อเหล็ก', en: 'Steel pipe' } },
-  { key: 'hammer', cat: 'weapon', price: 290, atk: 4, store: 'tools', name: { ko: '장도리', th: 'ค้อนหงอน', en: 'Claw hammer' } },
-  { key: 'knife', cat: 'weapon', price: 390, atk: 5, store: 'dept', name: { ko: '식칼', th: 'มีดทำครัว', en: 'Kitchen knife' } },
-  { key: 'shovel', cat: 'weapon', price: 420, atk: 5, store: 'tools', name: { ko: '삽', th: 'พลั่ว', en: 'Shovel' } },
-  { key: 'bat', cat: 'weapon', price: 850, atk: 6, store: 'dept', name: { ko: '야구 배트', th: 'ไม้เบสบอล', en: 'Baseball bat' } },
-  { key: 'hatchet', cat: 'weapon', price: 950, atk: 7, name: { ko: '손도끼', th: 'ขวานมือ', en: 'Hatchet' } },
-  { key: 'dagger', cat: 'weapon', price: 1800, atk: 8, name: { ko: '단검', th: 'มีดสั้น', en: 'Dagger' } },
-  { key: 'sword', cat: 'weapon', price: 7500, atk: 12, name: { ko: '장검', th: 'ดาบยาว', en: 'Longsword' } },
-  { key: 'arming', cat: 'weapon', price: 4200, atk: 10, name: { ko: '한손검', th: 'ดาบมือเดียว', en: 'Arming sword' } }, // 20차: 방패와 함께
-  // 양손 무기 (16차)
-  { key: 'sledge', cat: 'weapon', price: 2600, atk: 10, store: 'tools', two: true, name: { ko: '오함마', th: 'ค้อนปอนด์', en: 'Sledgehammer' } },
-  { key: 'fireaxe', cat: 'weapon', price: 5200, atk: 13, two: true, name: { ko: '소방 도끼', th: 'ขวานดับเพลิง', en: 'Fire axe' } },
-  { key: 'pistol', cat: 'weapon', price: 68000, atk: 26, ranged: true, note: 'needsAmmo', name: { ko: '권총', th: 'ปืนพก', en: 'Pistol' } },
+  // 무기 — 26차: 공격력은 좁은 폭(3~12)에 모으고(나중에 강화로 키운다), 값은 현실 값을 따른다. 파는 곳은 겹치지 않게 나눈다
+  //  우주새: 식칼 · 단검 · 한손검 · 장검 · 대검 · 츠바이핸더 · 장인 장검 · 활 · 권총 · 저격총 셋
+  //  잡화점·철물점(tools): 망치 · 낫 · 쇠파이프 · 쇠지렛대 · 삽 · 손도끼 · 파이프 렌치 · 마체테 · 볼트 커터 · 오함마 · 소방도끼
+  //  백화점·쇼핑몰(dept): 나무·금속 야구방망이 / 편의점(mart): 장우산 / 기념품·골동품(antique): 글라디우스 · 해적검 · 세이버 · 레이피어 · 일본도 셋
+  { key: 'knife', cat: 'weapon', price: 350, atk: 4, name: { ko: '식칼', th: 'มีดทำครัว', en: 'Kitchen knife' } },
+  { key: 'umbrella', cat: 'weapon', price: 200, atk: 3, store: 'mart', name: { ko: '장우산', th: 'ร่มยาว', en: 'Long umbrella' } },
+  { key: 'pipe', cat: 'weapon', price: 250, atk: 5, store: 'tools', name: { ko: '쇠파이프', th: 'ท่อเหล็ก', en: 'Steel pipe' } },
+  { key: 'hammer', cat: 'weapon', price: 300, atk: 5, store: 'tools', name: { ko: '장도리', th: 'ค้อนหงอน', en: 'Claw hammer' } },
+  { key: 'sickle', cat: 'weapon', price: 350, atk: 5, store: 'tools', name: { ko: '낫', th: 'เคียว', en: 'Sickle' } },
+  { key: 'crowbar', cat: 'weapon', price: 500, atk: 5, store: 'tools', name: { ko: '쇠지렛대', th: 'ชะแลง', en: 'Crowbar' } },
+  { key: 'shovel', cat: 'weapon', price: 500, atk: 5, store: 'tools', name: { ko: '삽', th: 'พลั่ว', en: 'Shovel' } },
+  { key: 'hatchet', cat: 'weapon', price: 600, atk: 6, store: 'tools', name: { ko: '손도끼', th: 'ขวานมือ', en: 'Hatchet' } },
+  { key: 'wrench', cat: 'weapon', price: 750, atk: 6, store: 'tools', name: { ko: '파이프 렌치', th: 'ประแจจับท่อ', en: 'Pipe wrench' } },
+  { key: 'machete', cat: 'weapon', price: 900, atk: 6, store: 'tools', name: { ko: '마체테', th: 'มีดพร้า', en: 'Machete' } },
+  { key: 'bat', cat: 'weapon', price: 800, atk: 6, store: 'dept', name: { ko: '나무 야구방망이', th: 'ไม้เบสบอล', en: 'Wooden baseball bat' } },
+  { key: 'metalbat', cat: 'weapon', price: 1500, atk: 7, store: 'dept', name: { ko: '금속 야구방망이', th: 'ไม้เบสบอลโลหะ', en: 'Metal baseball bat' } },
+  { key: 'dagger', cat: 'weapon', price: 2500, atk: 6, name: { ko: '단검', th: 'มีดสั้น', en: 'Dagger' } },
+  { key: 'arming', cat: 'weapon', price: 6000, atk: 7, name: { ko: '한손검', th: 'ดาบมือเดียว', en: 'Arming sword' } }, // 20차: 방패와 함께
+  { key: 'gladius', cat: 'weapon', price: 7000, atk: 7, store: 'antique', sprite: 'arming', icon: 'arming', name: { ko: '로마식 단검', th: 'ดาบกลาดิอุส', en: 'Gladius' } },
+  { key: 'cutlass', cat: 'weapon', price: 8000, atk: 7, store: 'antique', sprite: 'saber', icon: 'saber', name: { ko: '해적검', th: 'ดาบโจรสลัด', en: 'Cutlass' } },
+  { key: 'saber', cat: 'weapon', price: 10000, atk: 8, store: 'antique', name: { ko: '세이버', th: 'ดาบเซเบอร์', en: 'Saber' } },
+  { key: 'rapier', cat: 'weapon', price: 15000, atk: 8, store: 'antique', name: { ko: '레이피어', th: 'ดาบเรเปียร์', en: 'Rapier' } },
+  { key: 'sword', cat: 'weapon', price: 18000, atk: 8, name: { ko: '중세 장검', th: 'ดาบยาวยุคกลาง', en: 'Longsword' } },
+  { key: 'katana', cat: 'weapon', price: 20000, atk: 9, store: 'antique', name: { ko: '일본도 복제품', th: 'ดาบคาตานะจำลอง', en: 'Katana replica' } },
+  { key: 'masterwork', cat: 'weapon', price: 100000, atk: 10, sprite: 'sword', icon: 'sword', name: { ko: '장인 제작 장검', th: 'ดาบยาวช่างฝีมือ', en: 'Masterwork longsword' } },
+  { key: 'shinsakuto', cat: 'weapon', price: 200000, atk: 10, store: 'antique', sprite: 'katana', icon: 'katana', name: { ko: '장인 제작 일본도', th: 'ดาบญี่ปุ่นช่างฝีมือ', en: 'Shinsakutō' } },
+  { key: 'nihonto', cat: 'weapon', price: 500000, atk: 10, store: 'antique', sprite: 'katana', icon: 'katana', name: { ko: '역사적 진품 일본도', th: 'ดาบญี่ปุ่นโบราณของแท้', en: 'Antique nihontō' } },
+  // 양손 무기 (16차): 느리지만 묵직하다 (한 번에 1.35배, 1.6배 느리게)
+  { key: 'boltcutter', cat: 'weapon', price: 1200, atk: 7, store: 'tools', two: true, name: { ko: '대형 볼트 커터', th: 'กรรไกรตัดเหล็ก', en: 'Bolt cutter' } },
+  { key: 'sledge', cat: 'weapon', price: 1500, atk: 8, store: 'tools', two: true, name: { ko: '오함마', th: 'ค้อนปอนด์', en: 'Sledgehammer' } },
+  { key: 'fireaxe', cat: 'weapon', price: 2500, atk: 8, store: 'tools', two: true, name: { ko: '소방 도끼', th: 'ขวานดับเพลิง', en: 'Fire axe' } },
+  { key: 'greatsword', cat: 'weapon', price: 30000, atk: 9, two: true, name: { ko: '대검', th: 'ดาบใหญ่', en: 'Greatsword' } },
+  { key: 'zweihander', cat: 'weapon', price: 45000, atk: 9, two: true, sprite: 'greatsword', icon: 'greatsword', name: { ko: '츠바이핸더', th: 'ดาบสองมือซไวฮันเดอร์', en: 'Zweihänder' } },
+  // 총 (우주새만): 권총 · 저격총 셋 — 공격력은 크게 다르지 않고, 저격총은 멀리서(8칸) 천천히 쏜다
+  { key: 'pistol', cat: 'weapon', price: 68000, atk: 9, ranged: true, note: 'needsAmmo', name: { ko: '권총', th: 'ปืนพก', en: 'Pistol' } },
   { key: 'ammo', cat: 'weapon', price: 2400, note: 'ammo', name: { ko: '권총탄 12발', th: 'กระสุนปืนพก 12 นัด', en: 'Pistol rounds ×12' } },
-  // 17차 활: 소리 없이 멀리서. 민첩이 높을수록 세다
+  { key: 'rifle', cat: 'weapon', price: 100000, atk: 10, ranged: true, note: 'needsRifle', range: 8, rate: 1.9, name: { ko: '저격총', th: 'ปืนไรเฟิลซุ่มยิง', en: 'Sniper rifle' } },
+  { key: 'milrifle', cat: 'weapon', price: 450000, atk: 11, ranged: true, note: 'needsRifle', range: 8.5, rate: 1.8, sprite: 'rifle', icon: 'rifle', name: { ko: '군용 저격총', th: 'ปืนซุ่มยิงทางทหาร', en: 'Military sniper rifle' } },
+  { key: 'toprifle', cat: 'weapon', price: 800000, atk: 12, ranged: true, note: 'needsRifle', range: 9, rate: 1.7, sprite: 'rifle', icon: 'rifle', name: { ko: '최상급 저격총', th: 'ปืนซุ่มยิงชั้นยอด', en: 'Elite sniper rifle' } },
+  { key: 'rifleammo', cat: 'weapon', price: 3000, note: 'rifleammo', name: { ko: '저격총탄 10발', th: 'กระสุนไรเฟิล 10 นัด', en: 'Rifle rounds ×10' } },
+  // 17차 활: 소리 없이 멀리서. 활과 화살이 공격력을 반씩 (민첩이 더해진다)
   { key: 'bow', cat: 'weapon', price: 2600, atk: 3, ranged: true, note: 'needsArrows', name: { ko: '사냥 활', th: 'ธนูล่าสัตว์', en: 'Hunting bow' } },
   { key: 'arrows', cat: 'weapon', price: 150, atk: 3, note: 'arrows', name: { ko: '화살 20대', th: 'ลูกธนู 20 ดอก', en: 'Arrows ×20' } },
   // 방어구
@@ -77,13 +104,13 @@ export const ITEMS: ItemDef[] = [
   { key: 'thaitea', cat: 'goods', price: 45, heal: 30, store: 'cafe', now: true, name: { ko: '타이 밀크티', th: 'ชาไทย', en: 'Thai milk tea' } },
   { key: 'cake', cat: 'goods', price: 80, heal: 60, store: 'cafe', now: true, name: { ko: '케이크', th: 'เค้ก', en: 'Cake' } },
   // 지옥 (유황새 · 노전) — 단검·둔기·장병기·검 네 갈래
-  { key: 'hdagger', cat: 'weapon', price: 30, atk: 6, hell: true, sprite: 'dagger', name: { ko: '녹슨 망자의 단검', th: 'มีดสั้นสนิมของผู้ตาย', en: 'Rusted dead man’s dagger' } },
-  { key: 'hhammer', cat: 'weapon', price: 70, atk: 8, hell: true, sprite: 'hammer', name: { ko: '뼈 망치', th: 'ค้อนกระดูก', en: 'Bone hammer' } },
-  { key: 'hspear', cat: 'weapon', price: 110, atk: 9, hell: true, sprite: 'pipe', name: { ko: '쇠사슬 창', th: 'หอกโซ่', en: 'Chain spear' } },
-  { key: 'hsword', cat: 'weapon', price: 200, atk: 12, hell: true, sprite: 'sword', name: { ko: '흑철 검', th: 'ดาบเหล็กดำ', en: 'Black-iron sword' } },
-  { key: 'hmaul', cat: 'weapon', price: 260, atk: 15, hell: true, two: true, sprite: 'maul', name: { ko: '가시 철퇴', th: 'กระบองหนาม', en: 'Spiked maul' } },
-  { key: 'hgreatsword', cat: 'weapon', price: 360, atk: 17, hell: true, two: true, sprite: 'greatsword', name: { ko: '흑철 대검', th: 'ดาบใหญ่เหล็กดำ', en: 'Black-iron greatsword' } },
-  { key: 'hblade', cat: 'weapon', price: 150, atk: 11, hell: true, sprite: 'arming', icon: 'arming', name: { ko: '망자의 한손검', th: 'ดาบมือเดียวของผู้ตาย', en: "Dead man's arming sword" } },
+  { key: 'hdagger', cat: 'weapon', price: 30, atk: 5, hell: true, sprite: 'dagger', name: { ko: '녹슨 망자의 단검', th: 'มีดสั้นสนิมของผู้ตาย', en: 'Rusted dead man’s dagger' } },
+  { key: 'hhammer', cat: 'weapon', price: 70, atk: 6, hell: true, sprite: 'hammer', name: { ko: '뼈 망치', th: 'ค้อนกระดูก', en: 'Bone hammer' } },
+  { key: 'hspear', cat: 'weapon', price: 110, atk: 6, hell: true, sprite: 'pipe', name: { ko: '쇠사슬 창', th: 'หอกโซ่', en: 'Chain spear' } },
+  { key: 'hsword', cat: 'weapon', price: 200, atk: 7, hell: true, sprite: 'sword', name: { ko: '흑철 검', th: 'ดาบเหล็กดำ', en: 'Black-iron sword' } },
+  { key: 'hmaul', cat: 'weapon', price: 260, atk: 8, hell: true, two: true, sprite: 'maul', name: { ko: '가시 철퇴', th: 'กระบองหนาม', en: 'Spiked maul' } },
+  { key: 'hgreatsword', cat: 'weapon', price: 360, atk: 9, hell: true, two: true, sprite: 'greatsword', name: { ko: '흑철 대검', th: 'ดาบใหญ่เหล็กดำ', en: 'Black-iron greatsword' } },
+  { key: 'hblade', cat: 'weapon', price: 150, atk: 7, hell: true, sprite: 'arming', icon: 'arming', name: { ko: '망자의 한손검', th: 'ดาบมือเดียวของผู้ตาย', en: "Dead man's arming sword" } },
   { key: 'hshield', cat: 'armor', price: 120, def: 5, hell: true, sprite: 'shield', icon: 'shield', name: { ko: '쇠테 망자 방패', th: 'โล่ขอบเหล็กของผู้ตาย', en: "Dead man's iron-rim shield" } },
   { key: 'hhelm', cat: 'armor', price: 45, def: 3, hell: true, sprite: 'helmet', icon: 'helmet', name: { ko: '그을린 투구', th: 'หมวกเกราะไหม้เกรียม', en: 'Scorched helm' } },
   { key: 'hvest', cat: 'armor', price: 150, def: 6, hell: true, sprite: 'vest', icon: 'vest', name: { ko: '망자의 가죽 조끼', th: 'เสื้อหนังของผู้ตาย', en: 'Dead man’s leather vest' } },
@@ -98,37 +125,37 @@ export const ITEMS: ItemDef[] = [
   // 20차: 층마다 고유한 물건 — 그 층의 괴물만 떨어뜨린다 (1층 화산재 · 2층 늪과 이끼 · 3층 핏빛 시장)
   { key: 'cinderbread', cat: 'goods', price: 9, heal: 180, hell: true, floor: 1, store: 'drop', icon: 'cake', name: { ko: '화산재 구운 빵', th: 'ขนมปังอบเถ้าภูเขาไฟ', en: 'Cinder-baked bread' } },
   { key: 'ashmask', cat: 'armor', price: 70, def: 4, hell: true, floor: 1, store: 'drop', sprite: 'helmet', icon: 'helmet', name: { ko: '재의 가면 투구', th: 'หมวกหน้ากากเถ้า', en: 'Ash-mask helm' } },
-  { key: 'cinderaxe', cat: 'weapon', price: 300, atk: 16, two: true, hell: true, floor: 1, store: 'drop', sprite: 'fireaxe', icon: 'fireaxe', name: { ko: '불씨 도끼', th: 'ขวานถ่านเพลิง', en: 'Ember axe' } },
+  { key: 'cinderaxe', cat: 'weapon', price: 300, atk: 8, two: true, hell: true, floor: 1, store: 'drop', sprite: 'fireaxe', icon: 'fireaxe', name: { ko: '불씨 도끼', th: 'ขวานถ่านเพลิง', en: 'Ember axe' } },
   { key: 'bogroot', cat: 'goods', price: 14, heal: 260, hell: true, floor: 2, store: 'drop', icon: 'water', name: { ko: '늪 뿌리즙', th: 'น้ำรากหนองบึง', en: 'Bog-root sap' } },
   { key: 'mossboots', cat: 'armor', price: 90, def: 4, hell: true, floor: 2, store: 'drop', sprite: 'boots', icon: 'boots', name: { ko: '이끼 장화', th: 'รองเท้าบูทตะไคร่', en: 'Moss boots' } },
-  { key: 'leechhook', cat: 'weapon', price: 260, atk: 13, hell: true, floor: 2, store: 'drop', sprite: 'hook', icon: 'hook', name: { ko: '거머리 갈고리', th: 'ขอปลิง', en: 'Leech hook' } },
+  { key: 'leechhook', cat: 'weapon', price: 260, atk: 8, hell: true, floor: 2, store: 'drop', sprite: 'hook', icon: 'hook', name: { ko: '거머리 갈고리', th: 'ขอปลิง', en: 'Leech hook' } },
   { key: 'lanternwine', cat: 'goods', price: 20, heal: 400, hell: true, floor: 3, store: 'drop', icon: 'choco', name: { ko: '홍등 술', th: 'สุราโคมแดง', en: 'Red-lantern wine' } },
   { key: 'bloodvest', cat: 'armor', price: 220, def: 8, hell: true, floor: 3, store: 'drop', sprite: 'vest', icon: 'vest', name: { ko: '핏빛 가죽 조끼', th: 'เสื้อกั๊กหนังสีเลือด', en: 'Blood-leather vest' } },
-  { key: 'scalecleaver', cat: 'weapon', price: 320, atk: 15, hell: true, floor: 3, store: 'drop', sprite: 'cleaver', icon: 'hatchet', name: { ko: '저울추 고기칼', th: 'มีดสับตุ้มตาชั่ง', en: 'Scale-weight cleaver' } },
+  { key: 'scalecleaver', cat: 'weapon', price: 320, atk: 8, hell: true, floor: 3, store: 'drop', sprite: 'cleaver', icon: 'hatchet', name: { ko: '저울추 고기칼', th: 'มีดสับตุ้มตาชั่ง', en: 'Scale-weight cleaver' } },
   // 24차 4층 용광로 고유 물건
   { key: 'slagbread', cat: 'goods', price: 26, heal: 520, hell: true, floor: 4, store: 'drop', icon: 'cake', name: { ko: '모루에 구운 쇠빵', th: 'ขนมปังอบบนทั่ง', en: 'Anvil-baked ironbread' } },
   { key: 'forgegloves', cat: 'armor', price: 260, def: 9, hell: true, floor: 4, store: 'drop', sprite: 'gloves', icon: 'gloves', name: { ko: '대장장이 쇠장갑', th: 'ถุงมือเหล็กช่างตีเหล็ก', en: "Smith's iron gauntlets" } },
-  { key: 'slagmaul', cat: 'weapon', price: 420, atk: 20, two: true, hell: true, floor: 4, store: 'drop', sprite: 'sledge', icon: 'sledge', name: { ko: '쇳물 오함마', th: 'ค้อนปอนด์น้ำเหล็ก', en: 'Slag sledge' } },
-  { key: 'ironblade', cat: 'weapon', price: 560, atk: 24, two: true, hell: true, floor: 4, store: 'drop', sprite: 'greatsword', icon: 'greatsword', name: { ko: '철갑마의 대검', th: 'ดาบใหญ่ของอัศวินเกราะเหล็ก', en: "Ironclad's greatsword" } }, // 25차: 철갑마가 드물게 떨어뜨린다
+  { key: 'slagmaul', cat: 'weapon', price: 420, atk: 9, two: true, hell: true, floor: 4, store: 'drop', sprite: 'sledge', icon: 'sledge', name: { ko: '쇳물 오함마', th: 'ค้อนปอนด์น้ำเหล็ก', en: 'Slag sledge' } },
+  { key: 'ironblade', cat: 'weapon', price: 560, atk: 10, two: true, hell: true, floor: 4, store: 'drop', sprite: 'greatsword', icon: 'greatsword', name: { ko: '철갑마의 대검', th: 'ดาบใหญ่ของอัศวินเกราะเหล็ก', en: "Ironclad's greatsword" } }, // 25차: 철갑마가 드물게 떨어뜨린다
   // 22차 지옥 휴게소: 물장수 · 약장수 · 무기상(원거리)
   { key: 'hmurky', cat: 'goods', price: 2, heal: 40, hell: true, store: 'hwater', icon: 'water', name: { ko: '탁한 물', th: 'น้ำขุ่น', en: 'Murky water' } },
   { key: 'hboiled', cat: 'goods', price: 6, heal: 120, hell: true, store: 'hwater', icon: 'water', name: { ko: '끓인 강물', th: 'น้ำแม่น้ำต้มสุก', en: 'Boiled river water' } },
   { key: 'hsalve', cat: 'goods', price: 12, heal: 180, hell: true, store: 'hmed', icon: 'bandage', name: { ko: '유황 연고', th: 'ขี้ผึ้งกำมะถัน', en: 'Sulfur salve' } },
   { key: 'hstitch', cat: 'goods', price: 28, heal: 360, hell: true, store: 'hmed', icon: 'bandage', name: { ko: '망자의 실 꿰매기', th: 'ด้ายเย็บของผู้ตาย', en: 'Dead man’s stitches' } },
   { key: 'hbitter', cat: 'goods', price: 60, heal: 700, hell: true, store: 'hmed', icon: 'painkiller', name: { ko: '쓴 약 한 병', th: 'ยาขมหนึ่งขวด', en: 'Vial of bitter cure' } },
-  { key: 'hbonebow', cat: 'weapon', price: 160, atk: 4, ranged: true, note: 'needsArrows', hell: true, store: 'harms', sprite: 'bow', icon: 'bow', name: { ko: '뼈활', th: 'ธนูกระดูก', en: 'Bone bow' } },
-  { key: 'hlongbow', cat: 'weapon', price: 380, atk: 6, ranged: true, note: 'needsArrows', hell: true, store: 'harms', sprite: 'bow', icon: 'bow', name: { ko: '힘줄 장궁', th: 'ธนูยาวเอ็น', en: 'Sinew longbow' } },
-  { key: 'hmatchlock', cat: 'weapon', price: 1600, atk: 32, ranged: true, note: 'needsAmmo', hell: true, store: 'harms', sprite: 'pistol', icon: 'pistol', name: { ko: '유황 화승총', th: 'ปืนคาบชุดกำมะถัน', en: 'Sulfur matchlock' } },
-  { key: 'harrows', cat: 'weapon', price: 18, atk: 4, note: 'arrows', hell: true, store: 'harms', icon: 'arrows', name: { ko: '흑요석 화살 20대', th: 'ลูกธนูหินออบซิเดียน 20 ดอก', en: 'Obsidian arrows ×20' } },
+  { key: 'hbonebow', cat: 'weapon', price: 160, atk: 3, ranged: true, note: 'needsArrows', hell: true, store: 'harms', sprite: 'bow', icon: 'bow', name: { ko: '뼈활', th: 'ธนูกระดูก', en: 'Bone bow' } },
+  { key: 'hlongbow', cat: 'weapon', price: 380, atk: 4, ranged: true, note: 'needsArrows', hell: true, store: 'harms', sprite: 'bow', icon: 'bow', name: { ko: '힘줄 장궁', th: 'ธนูยาวเอ็น', en: 'Sinew longbow' } },
+  { key: 'hmatchlock', cat: 'weapon', price: 1600, atk: 9, ranged: true, note: 'needsAmmo', hell: true, store: 'harms', sprite: 'pistol', icon: 'pistol', name: { ko: '유황 화승총', th: 'ปืนคาบชุดกำมะถัน', en: 'Sulfur matchlock' } },
+  { key: 'harrows', cat: 'weapon', price: 18, atk: 3, note: 'arrows', hell: true, store: 'harms', icon: 'arrows', name: { ko: '흑요석 화살 20대', th: 'ลูกธนูหินออบซิเดียน 20 ดอก', en: 'Obsidian arrows ×20' } },
   { key: 'hshot', cat: 'weapon', price: 150, note: 'ammo', hell: true, store: 'harms', icon: 'ammo', name: { ko: '유황 탄환 12발', th: 'กระสุนกำมะถัน 12 นัด', en: 'Sulfur shot ×12' } },
   { key: 'hjerky', cat: 'goods', price: 3, heal: 50, hell: true, store: 'hmeat', icon: 'chips', name: { ko: '말린 고기', th: 'เนื้อแห้ง', en: 'Dried meat' } },
   { key: 'hskewer', cat: 'goods', price: 5, heal: 100, hell: true, store: 'hmeat', icon: 'ricebox', name: { ko: '고기 꼬치', th: 'เนื้อเสียบไม้', en: 'Meat skewer' } },
   { key: 'hstew', cat: 'goods', price: 10, heal: 220, hell: true, store: 'hmeat', icon: 'noodle', name: { ko: '뼈국', th: 'ซุปกระดูก', en: 'Bone broth' } },
   // 17차: 마을 장사꾼만 파는 무기 (유황새와 겹치지 않는다) — 고깃간 고기 칼 · 넝마장수의 주워 온 것들
-  { key: 'hcleaver', cat: 'weapon', price: 90, atk: 10, hell: true, store: 'hmeat', sprite: 'cleaver', icon: 'hatchet', name: { ko: '푸줏간 고기 칼', th: 'มีดสับเนื้อ', en: 'Butcher’s cleaver' } },
-  { key: 'hfemur', cat: 'weapon', price: 40, atk: 7, hell: true, store: 'hjunk', sprite: 'femur', icon: 'bat', name: { ko: '넓적다리뼈 몽둥이', th: 'กระบองกระดูกต้นขา', en: 'Thighbone club' } },
-  { key: 'hpick', cat: 'weapon', price: 140, atk: 11, hell: true, store: 'hjunk', sprite: 'pickaxe', icon: 'pickaxe', name: { ko: '망자의 곡괭이', th: 'จอบของผู้ตาย', en: 'Dead man’s pickaxe' } },
-  { key: 'hhook', cat: 'weapon', price: 230, atk: 13, hell: true, store: 'hjunk', sprite: 'hook', icon: 'hook', name: { ko: '빚 갈고리', th: 'ขอเกี่ยวทวงหนี้', en: 'Debt hook' } },
+  { key: 'hcleaver', cat: 'weapon', price: 90, atk: 6, hell: true, store: 'hmeat', sprite: 'cleaver', icon: 'hatchet', name: { ko: '푸줏간 고기 칼', th: 'มีดสับเนื้อ', en: 'Butcher’s cleaver' } },
+  { key: 'hfemur', cat: 'weapon', price: 40, atk: 5, hell: true, store: 'hjunk', sprite: 'femur', icon: 'bat', name: { ko: '넓적다리뼈 몽둥이', th: 'กระบองกระดูกต้นขา', en: 'Thighbone club' } },
+  { key: 'hpick', cat: 'weapon', price: 140, atk: 7, hell: true, store: 'hjunk', sprite: 'pickaxe', icon: 'pickaxe', name: { ko: '망자의 곡괭이', th: 'จอบของผู้ตาย', en: 'Dead man’s pickaxe' } },
+  { key: 'hhook', cat: 'weapon', price: 230, atk: 7, hell: true, store: 'hjunk', sprite: 'hook', icon: 'hook', name: { ko: '빚 갈고리', th: 'ขอเกี่ยวทวงหนี้', en: 'Debt hook' } },
   // 음식점마다 실제 업종(지도의 cuisine)에 맞는 메뉴
   ...([
     ['pizza', 120, 140, '피자 한 조각', 'พิซซ่าหนึ่งชิ้น', 'Pizza slice'], ['pasta', 220, 190, '파스타', 'พาสต้า', 'Pasta'],
@@ -151,9 +178,19 @@ export const ITEMS: ItemDef[] = [
   ] as [string, number, number, string, string, string][]).map(([key, price, heal, ko, th, en]): ItemDef => ({ key, cat: 'goods', price, heal, store: 'cafe', now: true, name: { ko, th, en } })),
   // 25차 지옥 1층 마스크 팔이 소녀의 바구니: 검은 마스크(헬멧 자리 · 현실로도 가져간다 · 훔치기 +2%) · 화염방사기(하루 5분)
   { key: 'blackmask', cat: 'armor', price: 1845, def: 1, hell: true, store: 'maskgirl', sprite: 'mask', icon: 'blackmask', cross: true, steal: 0.02, name: { ko: '검은 마스크', th: 'หน้ากากผ้าสีดำ', en: 'Black mask' } },
-  { key: 'flamer', cat: 'weapon', price: 99999, atk: 58, ranged: true, note: 'fuel', hell: true, store: 'maskgirl', name: { ko: '화염방사기', th: 'เครื่องพ่นไฟ', en: 'Flamethrower' } },
+  { key: 'flamer', cat: 'weapon', price: 99999, atk: 16, ranged: true, note: 'fuel', hell: true, store: 'maskgirl', name: { ko: '화염방사기', th: 'เครื่องพ่นไฟ', en: 'Flamethrower' } },
 ];
 
+// 26차 경제: 현실 음식·약의 회복량은 값의 제곱근에 비례 (싼 것일수록 바트당 값어치가 크다 — 싸우고 사 먹고 다시 싸우게)
+//  끼니(가게 음식·컵라면·도시락) 24×√값 · 과자·음료·카페 13×√값 · 약 32×√값  →  컵라면 ฿15 = 93 · 팟타이 ฿60 = 186 · 붕대 ฿45 = 215 · 구급상자 ฿250 = 506
+{
+  const MED = new Set(['plaster', 'painkiller', 'bandage', 'firstaid']);
+  const SNACK = new Set(['water', 'cola', 'chips', 'choco', 'saline']);
+  for (const it of ITEMS) if (it.cat === 'goods' && it.heal && !it.hell && !it.store?.startsWith('talus')) {
+    const f = MED.has(it.key) ? 32 : SNACK.has(it.key) || it.store === 'cafe' ? 13 : 24;
+    it.heal = Math.round(f * Math.sqrt(it.price));
+  }
+}
 // 회복은 말로, 무기·방어구는 숫자로 (17차: 공격력·방어력 표시)
 /** 거리 가게 진열 (우주새 물건도 가게 가격으로 판다) */
 /** 음식점·카페 메뉴: 지도의 cuisine(없으면 이름)으로 고른다. 모르면 태국 음식 / 커피 */
@@ -181,26 +218,28 @@ export const MENUS: Record<string, { key: string; price: number }[]> = {
   icecream: M(['icecream', 80], ['water', 10]),
   tea: M(['bubbletea', 60], ['thaitea', 45], ['matcha', 90]),
 };
-export function menuFor(kind: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept', cuisine?: string) {
+export function menuFor(kind: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept' | 'antique', cuisine?: string) {
   if (kind === 'food') return MENUS[cuisine ?? ''] ?? MENUS.thai;
   if (kind === 'cafe') return MENUS[cuisine ?? ''] ?? MENUS.coffee;
   return STORES[kind];
 }
 
-export const STORES: Record<'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept', { key: string; price: number }[]> = {
-  mart: [{ key: 'water', price: 10 }, { key: 'cola', price: 17 }, { key: 'noodle', price: 15 }, { key: 'ricebox', price: 39 }, { key: 'chips', price: 30 }, { key: 'choco', price: 35 }, { key: 'plaster', price: 25 }],
+export const STORES: Record<'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept' | 'antique', { key: string; price: number }[]> = {
+  mart: [{ key: 'water', price: 10 }, { key: 'cola', price: 17 }, { key: 'noodle', price: 15 }, { key: 'ricebox', price: 39 }, { key: 'chips', price: 30 }, { key: 'choco', price: 35 }, { key: 'plaster', price: 25 }, { key: 'umbrella', price: 200 }],
   pharmacy: [{ key: 'painkiller', price: 30 }, { key: 'bandage', price: 45 }, { key: 'saline', price: 20 }, { key: 'firstaid', price: 250 }, { key: 'water', price: 10 }],
   food: [{ key: 'padthai', price: 60 }, { key: 'khaoman', price: 50 }, { key: 'noodlesoup', price: 50 }, { key: 'water', price: 10 }],
   cafe: [{ key: 'coffee', price: 65 }, { key: 'thaitea', price: 45 }, { key: 'cake', price: 80 }, { key: 'water', price: 10 }],
   // 17차: 우주새와 다른 무기를 파는 거리 상인
-  tools: [{ key: 'pipe', price: 180 }, { key: 'hammer', price: 290 }, { key: 'shovel', price: 420 }, { key: 'sledge', price: 2600 }, { key: 'water', price: 10 }], // 철물점·수리점: 공구
-  dept: [{ key: 'knife', price: 390 }, { key: 'bat', price: 850 }, { key: 'cola', price: 20 }, { key: 'chips', price: 35 }], // 백화점·쇼핑몰: 주방칼·운동용품
+  // 26차: 현실 값 · 겹치지 않게 (식칼은 우주새)
+  tools: ['pipe', 'hammer', 'sickle', 'crowbar', 'shovel', 'hatchet', 'wrench', 'machete', 'boltcutter', 'sledge', 'fireaxe'].map((key) => ({ key, price: ITEMS.find((x) => x.key === key)!.price })).concat([{ key: 'water', price: 10 }]), // 잡화점·철물점·수리점: 공구와 농기구
+  dept: [{ key: 'bat', price: 800 }, { key: 'metalbat', price: 1500 }, { key: 'cola', price: 20 }, { key: 'chips', price: 35 }], // 백화점·쇼핑몰: 운동용품
+  antique: ['gladius', 'cutlass', 'saber', 'rapier', 'katana', 'shinsakuto', 'nihonto'].map((key) => ({ key, price: ITEMS.find((x) => x.key === key)!.price })), // 기념품·골동품 가게: 진열장의 칼
 };
 
-const EFFECT: Record<Lang, { heal: string[]; atkN: string; defN: string; rope: string; needsAmmo: string; ammo: string; two: string; ranged: string; needsArrows: string; arrows: string; fuel: string; cross: string; steal: string }> = {
-  ko: { heal: ['조금 회복', '회복', '많이 회복', '크게 회복'], atkN: '공격력 {n}', defN: '방어력 {n}', rope: '추락을 한 번 막아 줌', needsAmmo: '탄약 필요', ammo: '권총에 넣는 탄약', two: '양손 · 느리지만 묵직하게 내려찍음', ranged: '원거리 · 민첩이 더해짐', needsArrows: '화살 필요', arrows: '활에 메기는 화살', fuel: '세 칸 앞까지 불길 · 연료는 하루 5분', cross: '현실로도 가져간다', steal: '현실·지옥에서 훔치기 +{n}%' },
-  th: { heal: ['ฟื้นฟูเล็กน้อย', 'ฟื้นฟู', 'ฟื้นฟูมาก', 'ฟื้นฟูมหาศาล'], atkN: 'พลังโจมตี {n}', defN: 'พลังป้องกัน {n}', rope: 'กันตกจากที่สูงได้หนึ่งครั้ง', needsAmmo: 'ต้องใช้กระสุน', ammo: 'กระสุนสำหรับปืนพก', two: 'สองมือ · ช้าแต่ฟาดลงหนักหน่วง', ranged: 'ระยะไกล · ความว่องไวช่วยเพิ่มพลัง', needsArrows: 'ต้องใช้ลูกธนู', arrows: 'ลูกธนูสำหรับธนู', fuel: 'พ่นไฟไกลสามช่อง · เชื้อเพลิงวันละ 5 นาที', cross: 'พากลับไปโลกจริงได้', steal: 'ขโมยในโลกจริง·นรก +{n}%' },
-  en: { heal: ['Heals a little', 'Heals', 'Heals a lot', 'Heals greatly'], atkN: 'Attack {n}', defN: 'Defense {n}', rope: 'Saves you from one fall', needsAmmo: 'Needs ammo', ammo: 'Rounds for the pistol', two: 'Two-handed · slow, crushing overhead blows', ranged: 'Ranged · agility adds power', needsArrows: 'Needs arrows', arrows: 'Arrows for the bow', fuel: 'Flames three tiles out · 5 minutes of fuel a day', cross: 'Comes with you to the real world', steal: 'Stealing +{n}% in reality and hell' },
+const EFFECT: Record<Lang, { heal: string[]; atkN: string; defN: string; rope: string; needsAmmo: string; ammo: string; two: string; ranged: string; needsArrows: string; arrows: string; fuel: string; cross: string; steal: string; needsRifle: string; rifleammo: string }> = {
+  ko: { heal: ['조금 회복', '회복', '많이 회복', '크게 회복'], atkN: '공격력 {n}', defN: '방어력 {n}', rope: '추락을 한 번 막아 줌', needsAmmo: '탄약 필요', ammo: '권총에 넣는 탄약', two: '양손 · 느리지만 묵직하게 내려찍음', ranged: '원거리 · 민첩이 더해짐', needsArrows: '화살 필요', arrows: '활에 메기는 화살', fuel: '세 칸 앞까지 불길 · 연료는 하루 5분', cross: '현실로도 가져간다', steal: '현실·지옥에서 훔치기 +{n}%', needsRifle: '저격총탄 필요 · 8칸 밖에서 천천히', rifleammo: '저격총에 넣는 탄약' },
+  th: { heal: ['ฟื้นฟูเล็กน้อย', 'ฟื้นฟู', 'ฟื้นฟูมาก', 'ฟื้นฟูมหาศาล'], atkN: 'พลังโจมตี {n}', defN: 'พลังป้องกัน {n}', rope: 'กันตกจากที่สูงได้หนึ่งครั้ง', needsAmmo: 'ต้องใช้กระสุน', ammo: 'กระสุนสำหรับปืนพก', two: 'สองมือ · ช้าแต่ฟาดลงหนักหน่วง', ranged: 'ระยะไกล · ความว่องไวช่วยเพิ่มพลัง', needsArrows: 'ต้องใช้ลูกธนู', arrows: 'ลูกธนูสำหรับธนู', fuel: 'พ่นไฟไกลสามช่อง · เชื้อเพลิงวันละ 5 นาที', cross: 'พากลับไปโลกจริงได้', steal: 'ขโมยในโลกจริง·นรก +{n}%', needsRifle: 'ต้องใช้กระสุนไรเฟิล · ยิงช้าจากระยะ 8 ช่อง', rifleammo: 'กระสุนสำหรับปืนไรเฟิล' },
+  en: { heal: ['Heals a little', 'Heals', 'Heals a lot', 'Heals greatly'], atkN: 'Attack {n}', defN: 'Defense {n}', rope: 'Saves you from one fall', needsAmmo: 'Needs ammo', ammo: 'Rounds for the pistol', two: 'Two-handed · slow, crushing overhead blows', ranged: 'Ranged · agility adds power', needsArrows: 'Needs arrows', arrows: 'Arrows for the bow', fuel: 'Flames three tiles out · 5 minutes of fuel a day', cross: 'Comes with you to the real world', steal: 'Stealing +{n}% in reality and hell', needsRifle: 'Needs rifle rounds · slow shots from 8 tiles', rifleammo: 'Rounds for the sniper rifle' },
 };
 
 export function effectText(it: ItemDef, l: Lang, skipStats = false): string {
@@ -210,7 +249,7 @@ export function effectText(it: ItemDef, l: Lang, skipStats = false): string {
   if (it.atk && !skipStats) parts.push(E.atkN.replace('{n}', String(it.atk)));
   if (it.def && !skipStats) parts.push(E.defN.replace('{n}', String(it.def)));
   if (it.two) parts.push(E.two);
-  if (it.ranged && it.key !== 'pistol' && it.note !== 'fuel') parts.push(E.ranged);
+  if (it.ranged && it.key !== 'pistol' && it.note !== 'fuel' && it.note !== 'needsRifle') parts.push(E.ranged);
   if (it.note) parts.push(E[it.note]);
   if (it.steal) parts.push(E.steal.replace('{n}', String(Math.round(it.steal * 100))));
   if (it.cross) parts.push(E.cross);
@@ -308,6 +347,49 @@ export function itemIcon(key: string): HTMLCanvasElement {
     case 'knife':
       P([[4, 27], [19, 12], [22, 15], [8, 28]], '#dfe4ea'); Ln(5, 27, 19, 13, 1, '#f6f9fc'); Ln(9, 28, 21, 16, 1, '#9aa3ad');
       Ln(21, 12, 28, 5, 4, '#3a2418'); R(22, 10, 2, 2, '#c9c4b8'); R(25, 7, 2, 2, '#c9c4b8');
+      break;
+    // ── 26차: 현실 무기 아이콘 ──
+    case 'metalbat':
+      Ln(4, 28, 10, 22, 3, '#2a2a2c'); Ln(10, 22, 26, 6, 6, '#a9b2bb'); Ln(11, 20, 25, 6, 2, '#dfe6ec');
+      R(2, 28, 4, 3, '#1a1a1c'); R(25, 4, 4, 4, '#3a3a3e');
+      break;
+    case 'umbrella':
+      Ln(8, 26, 26, 8, 4, '#1e1e22'); Ln(10, 24, 24, 10, 1, '#4a4a52'); Ln(25, 7, 29, 3, 1, '#a9b2bb');
+      for (let k = 0; k < 7; k++) { const a = Math.PI * (0.5 + k / 6), x = Math.round(7 + Math.cos(a) * 3), y = Math.round(27 + Math.sin(a) * 3); R(x, y, 2, 2, '#8a6238'); }
+      break;
+    case 'sickle':
+      Ln(5, 29, 14, 18, 3, '#8a6238');
+      for (let k = 0; k < 14; k++) { const a = Math.PI * (1.15 + k / 13 * 1.0), x = Math.round(19 + Math.cos(a) * 9), y = Math.round(12 + Math.sin(a) * 9); R(x, y, 2, 2, k > 10 ? '#dfe6ec' : '#a9b2bb'); }
+      break;
+    case 'crowbar':
+      Ln(5, 29, 23, 7, 3, '#b8302a'); Ln(23, 7, 27, 5, 3, '#b8302a'); R(27, 3, 3, 3, '#a9b2bb'); R(3, 28, 3, 3, '#a9b2bb');
+      break;
+    case 'wrench':
+      Ln(5, 29, 18, 14, 4, '#b8302a'); P([[16, 16], [24, 8], [29, 12], [25, 15], [27, 17], [22, 21]], '#a9b2bb'); R(24, 10, 3, 2, '#5a6068');
+      break;
+    case 'machete':
+      Ln(4, 29, 9, 24, 3, '#1e1e22'); P([[9, 23], [26, 4], [30, 6], [29, 10], [12, 26]], '#b8c0c8'); Ln(10, 23, 27, 5, 1, '#eef2f6');
+      break;
+    case 'saber':
+      Ln(5, 28, 9, 24, 3, '#2a1a10'); for (let k = 0; k < 6; k++) R(4 + k, 21 + Math.round(Math.abs(k - 2.5)), 2, 2, '#c9a23e');
+      for (let k = 0; k < 18; k++) { const x = 10 + k, y = Math.round(22 - k * 1.05 + (k * k) / 40); R(x, y, 2, 2, k > 14 ? '#eef2f6' : '#b8c0c8'); }
+      break;
+    case 'rapier':
+      Ln(4, 29, 8, 25, 2, '#2a1a10'); R(6, 21, 6, 6, '#c9a23e'); R(8, 23, 2, 2, '#2a1a10'); Ln(10, 22, 30, 2, 1, '#dfe6ec');
+      break;
+    case 'katana':
+      Ln(3, 29, 9, 23, 3, '#1e1a24'); for (const k of [0, 2, 4]) R(4 + k, 26 - k, 2, 1, '#e8e2d0'); R(9, 21, 4, 4, '#c9a23e');
+      for (let k = 0; k < 18; k++) { const x = 12 + k, y = Math.round(20 - k * 0.98 + (k * k) / 70); R(x, y, 2, 2, k > 15 ? '#ffffff' : '#c8d0d8'); }
+      break;
+    case 'boltcutter':
+      Ln(3, 26, 14, 16, 3, '#b8302a'); Ln(6, 29, 16, 19, 3, '#b8302a'); Ln(14, 16, 24, 8, 2, '#7a828a'); Ln(16, 19, 25, 10, 2, '#7a828a'); P([[23, 7], [29, 3], [27, 10]], '#a9b2bb'); R(15, 16, 3, 3, '#2a2a2c');
+      break;
+    case 'rifle':
+      P([[2, 18], [10, 16], [12, 20], [3, 23]], '#8a6238'); R(10, 15, 10, 4, '#25272b'); R(20, 16, 11, 2, '#1e1e22'); R(11, 11, 9, 3, '#1a1a1e'); R(10, 10, 2, 5, '#3a3a3e'); R(19, 10, 2, 5, '#3a3a3e'); R(14, 19, 3, 5, '#25272b');
+      break;
+    case 'rifleammo':
+      R(4, 14, 24, 14, '#4a5a3a'); R(4, 14, 24, 2, '#6a7a52');
+      for (let k = 0; k < 5; k++) { R(6 + k * 5, 3, 3, 12, '#c9963a'); R(6 + k * 5, 1, 3, 3, '#b0703a'); R(6 + k * 5, 4, 1, 10, '#e8c26a'); }
       break;
     case 'bat':
       Ln(4, 28, 10, 22, 3, '#8a6238'); Ln(10, 22, 26, 6, 6, '#c49a5e'); Ln(11, 20, 25, 6, 2, '#e0bd84');

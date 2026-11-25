@@ -44,9 +44,9 @@ export const MASKGIRL_LOOK: Look = { sex: 'f', build: 0, skin: 0, hair: 2, hairC
 export const TALUS_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'talus', cols: { 1: '#d8ccb0', 3: '#5a4430', 4: '#3a2e22', 5: '#1a1410', 6: '#ffd08a', 10: '#d8ccb0', 12: '#a8281e', 13: '#2e2420', 14: '#c9a23e', 15: '#140e0c' } };
 export const HWANGHON: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'apron', cols: { 1: '#ead2c4', 2: '#3a0e12', 3: '#5a0e18', 4: '#2a0a10', 5: '#0c0808', 6: '#1a1210', 7: '#140a0c', 9: '#5a0e18', 10: '#ead2c4' } };
 
-export const MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle', 'arming'];
+export const MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle', 'arming', 'umbrella', 'sickle', 'crowbar', 'wrench', 'machete', 'metalbat', 'saber', 'rapier', 'katana']; // 26차 현실 무기 더
 /** 양손 무기 (16차): 두 손으로 크게 들어 내려찍는다 (heavy 동작) — 느리지만 묵직하다 */
-export const TWO = new Set(['sledge', 'fireaxe', 'greatsword', 'maul']);
+export const TWO = new Set(['sledge', 'fireaxe', 'greatsword', 'maul', 'boltcutter']);
 /** 16차 괴물 몸: 차림 → [굽기 키, 자세] (무기를 들면 m) */
 const MON16: Record<string, [string, string, Mode]> = { ashgal: ['h', 'ashgal', 'm'], gurma: ['u', 'gurma', 'u'], cinder: ['n', 'cinder', 'm'], bloat: ['l', 'bloat', 'm'], glutton: ['e', 'glutton', 'm'], hawker: ['v', 'hawker', 'm'], debtor: ['d', 'debtor', 'm'], broker: ['k', 'besk', 'm'], forgeknight: ['z', 'forgeknight', 'm'] }; // 24차: 4층 층주 바르칸 · 25차 철갑마
 /** 방어구 겉모습: 그리는 순서와 색 (구역 3 = 본색, 구역 5 = 신발) */
@@ -175,8 +175,9 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
   if (o === 'warden3') return { base: 'b-w-warden3-m', hair: null, weapon: 'w-w-sealstaff', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   if (o === 'yak') return { base: 'b-y-yak-m', hair: null, weapon: weapon === null ? null : `w-y-${weapon ?? 'club'}`, armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   const child = !!look.child;
-  const w = child ? null : weapon && (MELEE.includes(weapon) || TWO.has(weapon) || weapon === 'pistol' || weapon === 'bow' || weapon === 'flamer') ? weapon : null;
-  let mode: Mode = w === 'pistol' || w === 'bow' || w === 'flamer' ? 'g' : w ? 'm' : 'u'; // 권총·활·화염방사기는 쏘는 자세
+  const GUNS = ['pistol', 'bow', 'flamer', 'rifle'];
+  const w = child ? null : weapon && (MELEE.includes(weapon) || TWO.has(weapon) || GUNS.includes(weapon)) ? weapon : null;
+  let mode: Mode = w && GUNS.includes(w) ? 'g' : w ? 'm' : 'u'; // 권총·활·화염방사기·저격총은 쏘는 자세
   const sex = look.sex;
   const build = Math.max(0, Math.min(2, look.build ?? 1));
   // 우비·환자복·앵무새 옷 차림이라도 몸 방어구(재킷·조끼·작업 바지)를 입으면 그 옷 대신 방어구가 보인다

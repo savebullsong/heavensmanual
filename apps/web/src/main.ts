@@ -127,11 +127,13 @@ function seal(w: 'real' | 'hell') {
   for (const k of keys) v.bag[k] = (v.bag[k] ?? 0) + bag[k];
   v.ammo += state.ammo ?? 0;
   if (state.arrows) v.bag.arrows20 = (v.bag.arrows20 ?? 0) + Math.ceil(state.arrows / 20);
+  if (state.rifle) v.bag.rifleammo = (v.bag.rifleammo ?? 0) + Math.ceil(state.rifle / 10);
   state.vault[w] = v;
   state.bag = keepBag;
   state.equip = keepEq;
   state.ammo = 0;
   state.arrows = 0;
+  state.rifle = 0;
   return true;
 }
 function vaultOf(w: 'real' | 'hell'): Stash | null {
@@ -142,7 +144,7 @@ function reclaim(w: 'real' | 'hell') {
   const v = vaultOf(w);
   if (!v) return;
   state.bag ??= {};
-  for (const [k, n] of Object.entries(v.bag)) if (n > 0) { if (k === 'arrows20') state.arrows = (state.arrows ?? 0) + n * 20; else state.bag[k] = (state.bag[k] ?? 0) + n; }
+  for (const [k, n] of Object.entries(v.bag)) if (n > 0) { if (k === 'arrows20') state.arrows = (state.arrows ?? 0) + n * 20; else if (k === 'rifleammo') state.rifle = (state.rifle ?? 0) + n * 10; else state.bag[k] = (state.bag[k] ?? 0) + n; }
   state.ammo = (state.ammo ?? 0) + v.ammo;
   delete state.vault![w];
 }
@@ -183,7 +185,7 @@ async function boot() {
   setInterval(updateHud, 1000);
   setInterval(() => { snapPos(); save(state); }, 4000);
   addEventListener('pagehide', () => { snapPos(); save(state); });
-  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior(), terrace: () => enterTerrace(), officer: () => talkToOfficer(), pasharTalk: () => talkToPashar() }; // 개발용 확인 창구
+  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior(), store: (k: 'tools' | 'antique', n: string) => openStore(k, n), terrace: () => enterTerrace(), officer: () => talkToOfficer(), pasharTalk: () => talkToPashar() }; // 개발용 확인 창구
 }
 
 // ───────────────────────── 장면 전환 ─────────────────────────
@@ -579,6 +581,12 @@ const hooks: WorldHooks = {
       renderAmmo();
       return true;
     }
+    if (wi?.note === 'needsRifle') {
+      if ((state.rifle ?? 0) <= 0) { toast(t().noRifleAmmo); return false; }
+      state.rifle = (state.rifle ?? 0) - 1;
+      renderAmmo();
+      return true;
+    }
     if ((state.ammo ?? 0) <= 0) { toast(t().noAmmo); return false; }
     state.ammo = (state.ammo ?? 0) - 1;
     renderAmmo();
@@ -768,7 +776,7 @@ function clerkTalk() {
   if (info.kind === 'shore') { talkToBulda(); return; }
   if (info.kind === 'home') { talkToYunae(); return; }
   if (info.store === 'bank') { openBank(info.name); return; }
-  if (info.store === 'mart' || info.store === 'pharmacy' || info.store === 'food' || info.store === 'cafe' || info.store === 'tools' || info.store === 'dept') { openStore(info.store, info.name, info.cuisine); return; }
+  if (info.store === 'mart' || info.store === 'pharmacy' || info.store === 'food' || info.store === 'cafe' || info.store === 'tools' || info.store === 'dept' || info.store === 'antique') { openStore(info.store, info.name, info.cuisine); return; }
   const opts: { label: string; danger?: boolean; act: () => void }[] = [];
   const faith = ['temple', 'church', 'mosque', 'gurdwara'].includes(info.kind);
   if (faith) {
@@ -1185,7 +1193,7 @@ async function talkToYunae() {
   if (busy) return;
   const age = world?.zone.interior?.age ?? 1;
   busy = true;
-  dlg.open({ name: L.yunae, portrait: 'yunae' });
+  dlg.open({ name: L.yunae, portrait: (['yunae-child', 'yunae-young', 'yunae-middle'] as const)[age] ?? 'yunae' }); // 27차: 나이마다 다른 그림 (비면 공통 그림)
   for (const line of L.yunaeLines[age]) await dlg.say(line);
   dlg.close();
   busy = false;
@@ -1676,7 +1684,7 @@ function itemRow(it: ItemDef, right: string, onClick: () => void, dim = false) {
   ef.className = 'effect';
   ef.textContent = effectText(it, lang());
   // 23차: 화살·탄약은 가방에 따로 안 보이니 지금 가진 수를 함께
-  if (it.note === 'arrows' || it.note === 'ammo') ef.textContent += ' · ' + (it.note === 'arrows' ? t().haveArrows : t().haveAmmo).replace('{n}', String((it.note === 'arrows' ? state.arrows : state.ammo) ?? 0));
+  if (it.note === 'arrows' || it.note === 'ammo' || it.note === 'rifleammo') ef.textContent += ' · ' + (it.note === 'arrows' ? t().haveArrows : it.note === 'rifleammo' ? t().haveRifle : t().haveAmmo).replace('{n}', String((it.note === 'arrows' ? state.arrows : it.note === 'rifleammo' ? state.rifle : state.ammo) ?? 0));
   const pr = document.createElement('span');
   pr.className = 'price';
   pr.textContent = right;
@@ -1753,7 +1761,7 @@ function chooseBody(title: string, confirm: string, initial: Look, extra: { outf
 const ARMOR_SLOT: Record<string, Slot> = { helmet: 'head', mask: 'head', jacket: 'body', vest: 'body', gloves: 'hands', workpants: 'legs', shinguard: 'shins', boots: 'feet', shield: 'offhand' };
 function slotOf(k: string): Slot | undefined {
   const it = ITEMS.find((x) => x.key === k);
-  if (!it || it.note === 'ammo' || it.note === 'arrows') return undefined;
+  if (!it || it.note === 'ammo' || it.note === 'arrows' || it.note === 'rifleammo') return undefined;
   if (it.cat === 'weapon') return 'weapon';
   if (it.cat === 'armor') return ARMOR_SLOT[it.sprite ?? it.key];
   return undefined;
@@ -1761,7 +1769,8 @@ function slotOf(k: string): Slot | undefined {
 const itemByKey = (k: string) => ITEMS.find((x) => x.key === k)!;
 
 function addToBag(it: ItemDef) {
-  if (it.note === 'ammo' || it.note === 'arrows') delete state.unloaded; // 새로 사면 다시 끼운다
+  if (it.note === 'ammo' || it.note === 'arrows' || it.note === 'rifleammo') delete state.unloaded; // 새로 사면 다시 끼운다
+  if (it.note === 'rifleammo') { state.rifle = (state.rifle ?? 0) + 10; return; }
   if (it.note === 'ammo') { state.ammo = (state.ammo ?? 0) + 12; return; } // 22차: 지옥 유황 탄환·흑요석 화살도 같은 주머니로
   if (it.note === 'arrows') { state.arrows = (state.arrows ?? 0) + 20; state.arrowKey = it.key; return; } // 24차: 마지막에 산 화살이 시위에 걸린다 (화살 종류마다 공격력이 다르다)
   state.bag = state.bag ?? {};
@@ -1775,14 +1784,14 @@ function gear() {
   const eq = eq0.offhand && noShieldWith(eq0.weapon) ? { ...eq0, offhand: undefined } : eq0;
   const w = eq.weapon ? itemByKey(eq.weapon) : null;
   // 쏘는 무기: 권총은 탄약, 활은 화살이 있어야 멀리서 쏜다 (없으면 휘둘러 치는 셈)
-  const shots = w?.note === 'needsAmmo' ? state.ammo ?? 0 : w?.note === 'needsArrows' ? state.arrows ?? 0 : w?.note === 'fuel' ? fuelLeft() : 0; // 22차: 지옥의 뼈활·화승총도 · 25차 화염방사기는 오늘 남은 연료
+  const shots = w?.note === 'needsAmmo' ? state.ammo ?? 0 : w?.note === 'needsArrows' ? state.arrows ?? 0 : w?.note === 'needsRifle' ? state.rifle ?? 0 : w?.note === 'fuel' ? fuelLeft() : 0; // 22차: 지옥의 뼈활·화승총도 · 25차 화염방사기는 오늘 남은 연료
   const ranged = !!w?.ranged && shots > 0 && !(state.unloaded && w.note !== 'fuel'); // 25차: 화살·탄약을 빼 두면 쏘지 않는다
   const def = Object.entries(eq).reduce((s, [slot, k]) => (slot === 'weapon' || !k ? s : s + (itemByKey(k)?.def ?? 0)), 0);
   const dr = Object.entries(eq).reduce((s, [, k]) => (!k ? s : s + (itemByKey(k)?.dr ?? 0)), 0);
   const armor = Object.entries(eq).filter(([slot, k]) => slot !== 'weapon' && k && itemByKey(k)).map(([, k]) => itemByKey(k as string).sprite ?? (k as string));
   // 24차: 활과 화살이 공격력을 반씩 나눈다 (활 < 근접 < 총)
   const arrowAtk = w?.note === 'needsArrows' ? itemByKey(state.arrowKey ?? (inHell() ? 'harrows' : 'arrows'))?.atk ?? 3 : 0;
-  return { atk: w?.ranged ? (ranged ? (w.atk ?? 0) + arrowAtk : 1) : w?.atk ?? 0, def, dr, ranged, flame: w?.note === 'fuel', weapon: w ? w.sprite ?? w.key : null, armor };
+  return { atk: w?.ranged ? (ranged ? (w.atk ?? 0) + arrowAtk : 1) : w?.atk ?? 0, def, dr, ranged, flame: w?.note === 'fuel', range: w?.range, rate: w?.rate, weapon: w ? w.sprite ?? w.key : null, armor };
 }
 /** 실시간으로 남에게 보이는 나 */
 function myInfo(): RemoteInfo {
@@ -1983,7 +1992,7 @@ function renderBag() {
     // 23차: 화살·탄약 칸 — 활이면 화살, 총이면 탄약, 둘 다 아니면 가진 것 · 25차: ✕로 빼 두고 '끼우기'로 다시 (빼 두면 쏘지 않는다)
     const am = pouch();
     const ac = document.createElement('div');
-    const loadable = am.some((x) => x.it.note === 'arrows' || x.it.note === 'ammo');
+    const loadable = am.some((x) => x.it.note === 'arrows' || x.it.note === 'ammo' || x.it.note === 'rifleammo');
     ac.className = 'doll-slot ds-ammo' + (am.length ? ' on' : '') + (am.some((x) => x.need && x.n <= 0) ? ' dry' : '') + (state.unloaded && loadable ? ' unloaded' : '') + (dollSel === 'ammo' && am.length ? ' sel' : '');
     const al = document.createElement('small');
     al.textContent = am[0]?.text ? L.fuelSlot : L.ammoSlot;
@@ -2071,9 +2080,11 @@ function pouch(): { it: ItemDef; n: number; label: string; need: boolean; text?:
   const hell = inHell();
   const arrows = { it: itemByKey(state.arrowKey ?? (hell ? 'harrows' : 'arrows')), n: state.arrows ?? 0, label: L.arrowsLeft.replace('{n}', String(state.arrows ?? 0)), need: w?.note === 'needsArrows' };
   const ammo = { it: itemByKey(hell ? 'hshot' : 'ammo'), n: state.ammo ?? 0, label: L.ammoLeft.replace('{n}', String(state.ammo ?? 0)), need: w?.note === 'needsAmmo' };
+  const rifle = { it: itemByKey('rifleammo'), n: state.rifle ?? 0, label: L.rifleLeft.replace('{n}', String(state.rifle ?? 0)), need: w?.note === 'needsRifle' };
   if (arrows.need) return [arrows];
   if (ammo.need) return [ammo];
-  return [arrows, ammo].filter((x) => x.n > 0);
+  if (rifle.need) return [rifle];
+  return [arrows, ammo, rifle].filter((x) => x.n > 0);
 }
 /** 23차: 공격 버튼 위의 남은 화살·탄약 (쏘는 무기를 들었을 때만). 누르면 장비 칸 */
 const ammoChip = document.createElement('button');
@@ -2674,7 +2685,10 @@ function openHellBank() {
     el.querySelector('.b-bank')!.textContent = L.obolFmt.replace('{n}', Math.floor(h.bank ?? 0).toLocaleString('en-US'));
   };
   for (const n of [100, 1000, 10000]) { const b = document.createElement('button'); b.textContent = n.toLocaleString('en-US'); b.onclick = () => { amt.value = String(n); }; el.querySelector('.bank-quick')!.appendChild(b); }
-  { const b = document.createElement('button'); b.textContent = L.bankAll; b.onclick = () => { amt.value = String(Math.floor(h.notes)); }; el.querySelector('.bank-quick')!.appendChild(b); }
+  // 27차: '전부'는 바로 실행 — 맡기기·찾기 따로 (예전엔 '전부'가 늘 손에 든 양만 적어 찾기가 어려웠다)
+  { const br = document.createElement('span'); br.className = 'flex-break'; el.querySelector('.bank-quick')!.appendChild(br); }
+  { const b = document.createElement('button'); b.className = 'b-all'; b.textContent = L.bankAllIn; b.onclick = () => { amt.value = String(Math.floor(h.notes)); move(1); }; el.querySelector('.bank-quick')!.appendChild(b); }
+  { const b = document.createElement('button'); b.className = 'b-all'; b.textContent = L.bankAllOut; b.onclick = () => { amt.value = String(Math.floor(h.bank ?? 0)); move(-1); }; el.querySelector('.bank-quick')!.appendChild(b); }
   const move = (dir: 1 | -1) => {
     const n = Math.floor(Number(amt.value));
     if (!n || n <= 0) { toast(L.bankAmount); return; }
@@ -3234,7 +3248,7 @@ function addStat(k: StatKey) {
   updateHud();
 }
 // ───────────────────────── 거리 가게 (편의점·약국·식당·카페) ─────────────────────────
-function openStore(kind: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept', name: string, cuisine?: string) {
+function openStore(kind: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept' | 'antique', name: string, cuisine?: string) {
   closeMenus();
   document.querySelector('.store-panel')?.remove();
   const L = t();
@@ -3242,7 +3256,7 @@ function openStore(kind: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept
   el.className = 'store-panel shop-menu';
   el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close">✕</button></div><p class="store-line"></p><div class="menu-list"></div>`;
   el.querySelector('.menu-head b')!.textContent = name;
-  el.querySelector('.store-line')!.textContent = kind === 'tools' ? L.storeTools : kind === 'dept' ? L.storeDept : L.storeLine;
+  el.querySelector('.store-line')!.textContent = kind === 'tools' ? L.storeTools : kind === 'dept' ? L.storeDept : kind === 'antique' ? L.storeAntique : L.storeLine;
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
   const list = el.querySelector('.menu-list')!;
   const draw = () => {
@@ -3329,10 +3343,17 @@ function openBank(name: string) {
     b.onclick = () => { amt.value = String(n); };
     quick.appendChild(b);
   }
-  const all = document.createElement('button');
-  all.textContent = L.bankAll;
-  all.onclick = () => { amt.value = String(Math.floor(state.wallet ?? 0)); };
-  quick.appendChild(all);
+  // 27차: '전부'는 바로 실행 — 지갑 전부 맡기기 · 통장 전부 찾기
+  const allIn = document.createElement('button');
+  allIn.className = 'b-all';
+  allIn.textContent = L.bankAllIn;
+  allIn.onclick = () => { amt.value = String(Math.floor(state.wallet ?? 0)); move(1); };
+  const allOut = document.createElement('button');
+  allOut.className = 'b-all';
+  allOut.textContent = L.bankAllOut;
+  allOut.onclick = () => { amt.value = String(Math.floor(state.bank ?? 0)); move(-1); };
+  const br = document.createElement('span'); br.className = 'flex-break';
+  quick.append(br, allIn, allOut);
   const move = (dir: 1 | -1) => {
     const n = Math.floor(Number(amt.value));
     if (!n || n <= 0) { toast(L.bankAmount); return; }

@@ -7,11 +7,11 @@ REG = {'void': 0, 'skin': 1, 'hair': 2, 'top': 3, 'bottom': 4, 'shoe': 5, 'eye':
        'gown': 9, 'bandage': 10, 'parrot': 11, 'crest': 12, 'wood': 13, 'metal': 14, 'dark': 15}
 HAIRS = ['short', 'swept', 'bob', 'long', 'ponytail', 'buzz']
 OUTFITS = ['casual', 'apron', 'raincoat', 'patient', 'parrot']
-MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle', 'arming']   # 20차: arming = 한손검
-TWO = ['sledge', 'fireaxe', 'greatsword', 'maul']   # 16차 양손 무기 (heavy 동작)
+MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle', 'arming', 'umbrella', 'sickle', 'crowbar', 'wrench', 'machete', 'metalbat', 'saber', 'rapier', 'katana']   # 20차: arming = 한손검 · 26차 현실 무기
+TWO = ['sledge', 'fireaxe', 'greatsword', 'maul', 'boltcutter']   # 16차 양손 무기 (heavy 동작) · 26차 볼트 커터
 ARMOR = ['helmet', 'jacket', 'vest', 'gloves', 'workpants', 'shinguard', 'boots', 'shield', 'mask']   # 25차: 검은 마스크 (헬멧 자리)   # 20차: 왼팔의 둥근 방패
 WEAPONS = MELEE + ['pistol']
-RANGED_G = ['pistol', 'shotgun', 'bow', 'flamer']   # 25차: 화염방사기   # 쏘는 자세(g)로 드는 것
+RANGED_G = ['pistol', 'shotgun', 'bow', 'flamer', 'rifle']   # 25차: 화염방사기   # 쏘는 자세(g)로 드는 것
 
 def id_color(rid):
     v = (rid * 16 + 8) / 255
@@ -1233,6 +1233,77 @@ class Doll:
                 for n in range(9):
                     c = h + Vector((sg * (.06 + n * .008), -.01, -.05 - n * .055))
                     blob(P, c, (.016, .01, .022), metal, None, segs=6, rings=4)
+        # ── 26차: 현실 무기 더 (가게마다 나눠 판다) ──
+        elif name == 'umbrella':   # 접은 장우산: 검은 천이 감긴 긴 대, 뒤로 굽은 손잡이
+            black = rmat('dark', .8, .1)
+            limb(P, grip - d * .05, grip + d * .8, [(0, .008, .008), (1, .006, .006)], metal, None, segs=6)
+            limb(P, grip + d * .12, grip + d * .74, [(0, .012, .012), (.2, .03, .03), (.8, .02, .02), (1, .006, .006)], black, None, segs=8)
+            pts = [grip - d * .05 - d * (.04 * math.sin(a0)) + up * (.04 * (1 - math.cos(a0))) for a0 in [k / 6 * math.pi for k in range(7)]]
+            for p0, p1 in zip(pts, pts[1:]):
+                limb(P, p0, p1, [(0, .011, .011), (1, .011, .011)], wood, None, segs=5)   # 뒤로 굽은 손잡이
+        elif name == 'sickle':   # 낫: 짧은 나무 자루 끝에 초승달처럼 휜 날
+            limb(P, grip - d * .08, grip + d * .2, [(0, .015, .015), (1, .014, .014)], wood, None, segs=8)
+            pts = [grip + d * .2 + up * .0, grip + d * .27 + up * .06, grip + d * .27 + up * .14, grip + d * .2 + up * .2, grip + d * .1 + up * .22]
+            for a, b in zip(pts, pts[1:]):
+                limb(P, a, b, [(0, .004, .016), (1, .003, .013)], metal, None, segs=5)
+        elif name == 'crowbar':   # 쇠지렛대: 붉은 쇠막대, 끝이 갈고리처럼 굽고 납작하다
+            red = rmat('crest', .45, .4)
+            limb(P, grip - d * .12, grip + d * .55, [(0, .013, .013), (1, .013, .013)], red, None, segs=6)
+            limb(P, grip + d * .55, grip + d * .6 + up * .06, [(0, .013, .013), (1, .01, .01)], red, None, segs=6)
+            limb(P, grip + d * .6 + up * .06, grip + d * .56 + up * .1, [(0, .01, .016), (1, .004, .016)], metal, None, segs=5)
+            limb(P, grip - d * .12, grip - d * .16 - up * .02, [(0, .012, .016), (1, .004, .016)], metal, None, segs=5)
+        elif name == 'wrench':   # 파이프 렌치: 붉은 자루, 끝에 톱니 물린 쇠 턱
+            red = rmat('crest', .45, .4)
+            limb(P, grip - d * .08, grip + d * .32, [(0, .017, .022), (1, .017, .022)], red, None, segs=6)
+            h = grip + d * .36
+            limb(P, h - up * .02, h + up * .085, [(0, .026, .03), (1, .022, .028)], metal, None, segs=6)
+            limb(P, h + up * .075, h + up * .085 + d * .07, [(0, .018, .022), (1, .016, .02)], metal, None, segs=5)
+            limb(P, h - up * .015, h - up * .015 + d * .06, [(0, .016, .02), (1, .014, .018)], metal, None, segs=5)
+        elif name == 'machete':   # 마체테: 검은 손잡이, 넓고 긴 외날 (끝이 조금 휘었다)
+            limb(P, grip - d * .08, grip + d * .07, [(0, .018, .018), (1, .018, .018)], dark, None, segs=8)
+            limb(P, grip + d * .07, grip + d * .5, [(0, .004, .035), (.7, .004, .045), (1, .002, .02)], metal, None, segs=6)
+            limb(P, grip + d * .5, grip + d * .58 + up * .02, [(0, .003, .03), (1, .001, .004)], metal, None, segs=5)
+        elif name == 'metalbat':   # 금속 야구방망이: 은빛 쇠, 검은 손잡이 테이프
+            limb(P, grip - d * .07, grip + d * .10, [(0, .021, .021), (1, .017, .017)], dark, None, segs=8)
+            limb(P, grip + d * .10, grip + d * .78, [(0, .017, .017), (.4, .021, .021), (.85, .03, .03), (1, .029, .029)], metal, None, segs=8)
+            blob(P, grip + d * .79, (.029, .029, .01), dark, None, segs=8, rings=4)
+        elif name == 'saber':   # 세이버·해적검: 휜 외날, 손을 감싸는 금빛 손잡이 고리
+            gold = rmat('crest', .3, .7)
+            limb(P, grip - d * .08, grip + d * .06, [(0, .016, .016), (1, .016, .016)], dark, None, segs=8)
+            limb(P, grip + d * .06 - side * .05, grip + d * .06 + side * .05, [(0, .012, .012), (1, .012, .012)], gold, None, segs=6)
+            limb(P, grip + d * .06 - up * .045, grip - d * .09 - up * .03, [(0, .006, .006), (1, .006, .006)], gold, None, segs=5)
+            pts = [grip + d * (.07 + k * .14) + up * (.012 * k * k) for k in range(7)]
+            for k, (a, b) in enumerate(zip(pts, pts[1:])):
+                limb(P, a, b, [(0, .004, .024 - k * .002), (1, .003, .022 - k * .002)], metal, None, segs=5)
+        elif name == 'rapier':   # 레이피어: 가늘고 긴 찌르는 날, 둥근 고리 손잡이
+            gold = rmat('crest', .3, .7)
+            limb(P, grip - d * .09, grip + d * .05, [(0, .014, .014), (1, .014, .014)], dark, None, segs=8)
+            blob(P, grip - d * .1, (.022, .022, .022), gold, None, segs=8, rings=6)
+            blob(P, grip + d * .07, (.05, .05, .012), gold, None, segs=12, rings=4)
+            limb(P, grip + d * .06 - side * .07, grip + d * .06 + side * .07, [(0, .008, .008), (1, .008, .008)], gold, None, segs=6)
+            limb(P, grip + d * .08, grip + d * 1.0, [(0, .003, .012), (.9, .002, .008), (1, .001, .002)], metal, None, segs=5)
+        elif name == 'katana':   # 일본도: 끈 감은 긴 자루, 둥근 코등이, 살짝 휜 외날
+            limb(P, grip - d * .2, grip + d * .07, [(0, .017, .017), (1, .017, .017)], dark, None, segs=8)
+            for t in (-.15, -.08, -.01, .05):
+                blob(P, grip + d * t, (.019, .019, .008), rmat('bandage', .7, .2), None, segs=6, rings=3)
+            blob(P, grip + d * .085, (.045, .045, .01), rmat('crest', .3, .7), None, segs=10, rings=4)
+            pts = [grip + d * (.1 + k * .16) + up * (.008 * k * k) for k in range(7)]
+            for k, (a, b) in enumerate(zip(pts, pts[1:])):
+                limb(P, a, b, [(0, .004, .02), (1, .003, .019 - (k == 5) * .016)], metal, None, segs=5)
+        elif name == 'boltcutter':   # 대형 볼트 커터: 붉은 고무 손잡이 둘이 길게, 끝에 짧은 쇠 턱
+            red = rmat('crest', .45, .4)
+            for sg in (1, -1):
+                limb(P, grip - d * .3 + side * sg * .03, grip + d * .1 + side * sg * .03, [(0, .02, .02), (1, .02, .02)], red, None, segs=6)
+                limb(P, grip + d * .1 + side * sg * .03, grip + d * .62 + side * sg * .012, [(0, .013, .013), (1, .012, .012)], metal, None, segs=6)
+                limb(P, grip + d * .62 + side * sg * .012, grip + d * .76, [(0, .02, .012), (1, .006, .004)], metal, None, segs=5)
+            blob(P, grip + d * .62, (.03, .03, .03), dark, None, segs=8, rings=5)
+        elif name == 'rifle':   # 26차 저격총: 긴 총열, 나무 개머리판, 위에 망원 조준경
+            fwd = Vector((0, -1, 0))
+            limb(P, grip + Vector((0, .025, .035)), grip + Vector((0, .27, -.06)), [(0, .02, .03), (1, .032, .05)], wood, None, segs=6)   # 개머리판
+            limb(P, grip + Vector((0, .02, .05)), grip + Vector((0, -.16, .06)), [(0, .024, .028), (1, .024, .028)], dark, None, segs=6)   # 기관부
+            limb(P, grip + Vector((0, -.16, .065)), grip + Vector((0, -.16, .065)) + fwd * .5, [(0, .011, .011), (1, .009, .009)], dark, None, segs=6)   # 총열
+            limb(P, grip + Vector((0, -.02, .11)), grip + Vector((0, -.2, .11)), [(0, .02, .02), (.15, .016, .016), (.85, .016, .016), (1, .022, .022)], dark, None, segs=8)   # 조준경
+            limb(P, grip + Vector((0, -.1, .06)), grip + Vector((0, -.12, -.01)), [(0, .01, .016), (1, .01, .016)], dark, None, segs=5)   # 탄창
         elif name == 'gatebar':   # 아쉬갈: 불탄 성문에서 뽑은 쇠 빗장 (사슬이 감기고 끝이 달아올랐다)
             glowm = rmat('crest', .3, .75)
             limb(P, grip - d * .2, grip + d * 1.15, [(0, .04, .04), (.5, .045, .045), (1, .05, .05)], metal, None, segs=6)
@@ -1245,7 +1316,7 @@ class Doll:
                 blob(P, grip + d * t + side * (.055 if k % 2 else -.055), (.02, .015, .028), metal, None, segs=6, rings=4)
         ob = finish(P)
         # 16차: 작은 현실 무기는 화면에서 잘 보이게 키운다 (손 쥔 자리를 기준으로)
-        k = {'knife': 1.45, 'dagger': 1.45, 'hammer': 1.45, 'hatchet': 1.45, 'pipe': 1.15, 'bat': 1.15, 'sword': 1.15, 'arming': 1.2}.get(name, 1.0)
+        k = {'knife': 1.45, 'dagger': 1.45, 'hammer': 1.45, 'hatchet': 1.45, 'pipe': 1.15, 'bat': 1.15, 'sword': 1.15, 'arming': 1.2, 'sickle': 1.45, 'wrench': 1.4, 'crowbar': 1.2, 'machete': 1.25, 'metalbat': 1.15, 'umbrella': 1.15, 'saber': 1.15, 'rapier': 1.1, 'katana': 1.1}.get(name, 1.0)
         if k != 1.0:
             for v in ob.data.vertices: v.co = grip + (v.co - grip) * k
         bind(ob, self.arm, rigid('hand.R'), subsurf=0)

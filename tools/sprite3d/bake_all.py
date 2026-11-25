@@ -87,6 +87,10 @@ for sex in 'mf':
     jobs.append({'sex': sex, 'build': 1, 'sets': [{'kind': 'armor', 'piece': 'mask', 'mode': 'm', 'extra': ['idle2', 'walk2']}], 'only': ['idle2', 'walk2'], 'merge': True, 'tag': 'r25'})
 jobs.append({'sex': 'm', 'build': 1, 'monster': 'y', 'occluder': 'yak', 'sets': [{'kind': 'weapon', 'weapon': 'sledge'}], 'tag': 'r25'})
 jobs.append({'sex': 'm', 'build': 1, 'monster': 'z', 'occluder': 'forgeknight', 'sets': [{'kind': 'weapon', 'weapon': 'greatsword'}], 'tag': 'r25'})
+# ── 26차: 현실 무기 더 — 장우산·낫·쇠지렛대·파이프 렌치·마체테·금속 배트·세이버·레이피어·일본도 / 볼트 커터(양손) / 저격총(쏘는 자세)
+for sex in 'mf':
+    jobs.append({'sex': sex, 'build': 1, 'sets': [{'kind': 'weapon', 'weapon': w} for w in ('umbrella', 'sickle', 'crowbar', 'wrench', 'machete', 'metalbat', 'saber', 'rapier', 'katana', 'rifle')] + [{'kind': 'weapon', 'weapon': 'boltcutter', 'extra': ['heavy']}], 'tag': 'r26'})
+    jobs.append({'sex': sex, 'build': 1, 'sets': [{'kind': 'weapon', 'weapon': 'boltcutter', 'extra': ['idle2', 'walk2']}], 'only': ['idle2', 'walk2'], 'merge': True, 'tag': 'r26'})
 # ── 20차: 한손검 · 왼팔 방패 (맨손 u · 무기 m 자세, 보통 체형 하나로 모든 체형에) ──
 for sex in 'mf':
     jobs.append({'sex': sex, 'build': 1, 'sets': [{'kind': 'weapon', 'weapon': 'arming'}] + [{'kind': 'armor', 'piece': 'shield', 'mode': m} for m in ('u', 'm')], 'tag': 'shield20'})

@@ -6,7 +6,7 @@ export type HitKind = 'fist' | 'blunt' | 'blade' | 'gun';
 /** 맞는 쪽의 몸: 같은 무기라도 대상마다 소리가 다르다 */
 export type Body = 'flesh' | 'thug' | 'suturer' | 'monster' | 'player' | 'ash' | 'pret' | 'yak' | 'bones';
 
-const BLADES = new Set(['knife', 'dagger', 'sword', 'arming', 'hatchet', 'needle', 'pickaxe', 'cleaver', 'hook', 'skewer', 'boathook', 'fireaxe', 'greatsword']);
+const BLADES = new Set(['knife', 'dagger', 'sword', 'arming', 'hatchet', 'needle', 'pickaxe', 'cleaver', 'hook', 'skewer', 'boathook', 'fireaxe', 'greatsword', 'sickle', 'machete', 'saber', 'rapier', 'katana', 'boltcutter']);
 export function hitKind(weapon: string | null | undefined, ranged = false): HitKind {
   if (weapon === 'bow') return 'blade'; // 화살은 꽂히는 소리
   if (ranged || weapon === 'pistol') return 'gun';

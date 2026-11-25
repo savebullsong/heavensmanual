@@ -210,11 +210,11 @@ export function dodgeChance(agi: number): number {
 
 /** 회복력: 싸움에서 벗어난 뒤 1분마다 최대 체력의 2% × (1 + 신앙/100) */
 export function regenPerMinute(max: number, fai: number): number {
-  return max * 0.08 * (1 + fai / 100); // 밖에서는 약 12분이면 다 찬다
+  return max * 0.05 * (1 + fai / 100); // 26차: 밖에서는 약 20분이면 다 찬다 (음식·약을 먹게)
 }
-/** 휴식처(지옥 마을·우주새·종교시설·은행·병원·약국 안)에서는 약 50초면 다 찬다 */
+/** 휴식처(지옥 마을·우주새·종교시설·은행·병원·약국 안)에서는 더 빨리 찬다 */
 export function restRegenPerMinute(max: number, fai: number): number {
-  return max * 1.2 * (1 + fai / 100);
+  return max * 0.4 * (1 + fai / 100); // 26차: 휴식처에서도 2분 30초쯤 (예전 50초)
 }
 /** 싸움에서 벗어났다고 보는 시간(초) */
 export const OUT_OF_COMBAT_S = 8;

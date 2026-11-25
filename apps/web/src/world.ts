@@ -151,6 +151,9 @@ interface Walker {
   horns?: Sprite;
   raider?: boolean; // 4층부터의 습격 때 마을로 몰려든 괴물
   kid?: boolean; // 26차: 떼의 곁가지 (재충) — 쓰러지거나 멀어지면 다시 나지 않는다
+  brave?: boolean; // 27차: 맞으면 달아나지 않고 맞선다 (행인·관광객의 절반)
+  hidden?: string | null; // 27차: 품에 숨긴 무기 (단검·권총) — 싸울 때 꺼낸다
+  gunman?: boolean; // 27차: 드물게 권총을 숨긴 센 행인
   pray?: boolean; // 1층 악마상 앞에 엎드려 비는 영혼
   still?: 'sit' | 'lie' | 'lotus'; // 마을의 지친 영혼: 앉아 있거나 누워 있다 · 24차 가부좌 (경계의 완성자·카드 치는 천사)
   vend?: HellVendor | 'street' | 'massage' | 'bar' | 'heaven'; // 마을 장사꾼 · 19차 현실: 손수레 노점 · 마사지 호객 · 바 호객 · 21차 천국: 먹을 것을 파는 천사
@@ -257,7 +260,7 @@ export interface WorldHooks {
   /** 가방에 먹을 것이 있는가 (구르마가 덤비지 않고 조른다) */
   hasFood(): boolean;
 }
-export interface Gear { atk: number; def: number; dr?: number; ranged: boolean; flame?: boolean; weapon: string | null; armor: string[] }
+export interface Gear { atk: number; def: number; dr?: number; ranged: boolean; flame?: boolean; range?: number; rate?: number; weapon: string | null; armor: string[] }
 
 const PED_COUNT = 14;
 const THUG_COUNT = 4;
@@ -1972,6 +1975,38 @@ export class WorldScene {
     return [null, 'bat', 'pipe', 'knife', 'bat', null][Math.floor(r * 6)];
   }
 
+  /**
+   * 27차: 현실의 행인·관광객 절반은 맞으면 맞선다. 큰 것(장우산·야구방망이)은 들고 다니는 게 보이고,
+   * 작은 것(단검)과 아주 드문 권총은 품에 숨겼다가 싸울 때 꺼낸다. 권총 든 행인은 단단하고 세다
+   */
+  private rollPasserArms(noFight: boolean): { brave: boolean; hidden: string | null; gunman: boolean; vis: string | null } {
+    const out = { brave: false, hidden: null as string | null, gunman: false, vis: null as string | null };
+    if (this.realm !== 'real' || noFight) return out;
+    out.brave = Math.random() < 0.5;
+    const r = Math.random();
+    if (out.brave) {
+      if (r < 0.03) { out.hidden = 'pistol'; out.gunman = true; }
+      else if (r < 0.25) out.hidden = 'dagger';
+      else if (r < 0.4) out.vis = 'umbrella';
+      else if (r < 0.5) out.vis = 'bat';
+    } else if (r < 0.1) out.vis = 'umbrella';
+    return out;
+  }
+  private applyPasserArms(w: Walker, a: { brave: boolean; hidden: string | null; gunman: boolean }) {
+    w.brave = a.brave; w.hidden = a.hidden; w.gunman = a.gunman;
+    w.maxHp = w.hp = a.gunman ? 380 : 120;
+  }
+  /** 맞선다: 숨긴 무기가 있으면 꺼낸다 */
+  private standUp(w: Walker, by: Walker) {
+    w.flee = 0; w.path = [];
+    if (!w.target) {
+      w.target = by;
+      const L = t();
+      const one = (a: string[]) => a[Math.floor(Math.random() * a.length)];
+      if (w.hidden) { this.dress(w, w.look, w.hidden); w.hidden = null; this.bubble(w, one(w.gunman ? L.passerGun : L.passerDraw)); }
+      else this.bubble(w, one(L.passerFight));
+    }
+  }
   /** 플레이어 근처 보도(불량배는 골목)에 사람을 세운다. 이미 있던 사람이면 자리만 옮긴다 */
   private spawnNpc(kind: NpcKind, existing?: Walker, weakIn?: Walker['weak'], gangIn?: Walker['gang']) {
     const p = this.player;
@@ -1998,20 +2033,26 @@ export class WorldScene {
       pool.push(l);
       return l;
     };
+    const look = lookOf();
+    // 27차: 행인의 무기는 옷을 입힐 때 한 번에 (두 번 합치지 않게)
+    const arms = kind === 'passer' ? this.rollPasserArms(!!weak || !!look.child) : null;
+    const weapon = weak ? null : arms ? arms.vis : this.npcWeapon(kind, gang);
     if (existing) {
       Object.assign(existing, { x: spot[0] + 0.5, y: spot[1] + 0.5, path: [], hp: existing.maxHp, down: 0, target: null, firstBy: null, flee: 0, home: spot });
       existing.act = null;
       existing.pend = null;
       existing.tour = tour;
-      this.dress(existing, lookOf(), weak ? null : this.npcWeapon(kind, gang));
+      this.dress(existing, look, weapon);
       this.makeWeak(existing, weak);
       this.makeGang(existing, gang);
+      if (arms) this.applyPasserArms(existing, arms);
       return;
     }
-    const w = this.makeWalker(lookOf(), spot[0], spot[1], kind, weak ? null : this.npcWeapon(kind, gang));
+    const w = this.makeWalker(look, spot[0], spot[1], kind, weapon);
     w.tour = tour;
     this.makeWeak(w, weak);
     this.makeGang(w, gang);
+    if (arms) this.applyPasserArms(w, arms);
     if (kind === 'angel') { this.giveWings(w, 0xf8f4ea); w.maxHp = w.hp = 900; w.speed = 1.1; }
     this.walkers.push(w);
   }
@@ -2827,7 +2868,7 @@ export class WorldScene {
     const f = this.zone.hell?.floor ?? 1;
     w.mdef = m;
     w.size = m.scale;
-    w.maxHp = w.hp = Math.round(m.hp * (1 + 0.35 * (f - 1) * (m.boss ? 0 : 1)));
+    w.maxHp = w.hp = Math.round(m.hp * (1 + 0.25 * (f - 1) * (m.boss ? 0 : 1))); // 26차: 무기 공격력 폭을 좁힌 만큼 층마다 덜 단단하게 (0.35 → 0.25)
     w.speed = m.speed;
     w.voice = 0.8 + Math.random() * 0.3;
     if (m.ghost) w.sprite.alpha = 0.72; // 회색 망령: 반쯤 비친다
@@ -3421,7 +3462,8 @@ export class WorldScene {
     const [bx, by] = iso(to.x, to.y);
     for (let n = 0; n < 6; n++) { const a = Math.random() * Math.PI * 2, v = 50 * (0.5 + Math.random()); this.sparks.push({ x: bx, y: by - 22, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.7 - 20, t: 0.18, col: 0xff6a3a }); }
     if (!to.target && to.kind !== 'passer') to.target = this.player;
-    if (to.kind === 'passer') { to.flee = 7; to.path = []; }
+    if (to.kind === 'passer' && to.brave && this.realm === 'real') this.standUp(to, this.player);
+    else if (to.kind === 'passer') { to.flee = 7; to.path = []; }
     if (to.hp <= 0) this.knockDown(to, this.player);
   }
   /** 20차: 훔치다 걸렸다 — 대식자 하나가 나를 잡으러 온다 (방 안이면 문으로 들어온다) */
@@ -4023,7 +4065,8 @@ export class WorldScene {
       if (!to.hitBy) { to.hitBy = true; this.hooks.deed('suturerHit'); }
       if (!to.monster && to.hp < to.maxHp * 0.5) this.transform(to);
     }
-    if (to.kind === 'passer') {
+    if (to.kind === 'passer' && to.brave && this.realm === 'real') this.standUp(to, from);
+    else if (to.kind === 'passer') {
       to.flee = 7;
       to.path = [];
       if (Math.random() < 0.6) this.bubble(to, t().help);
@@ -4133,7 +4176,8 @@ export class WorldScene {
     }
     if (w.weak === 'shade') { w.down = 2.5; return; } // 그림자는 흩어질 뿐 남기는 게 없다
     // 22차: 적대 NPC가 떨어뜨리는 돈은 폭을 넓혀 무작위로 — 취객 1~4 · 불량배 2~6 · 강도 3~9 · 마피아 4~12
-    const amount = w.kind === 'thug' ? (w.gang === 'mafia' ? rand(4, 12) : w.gang === 'robber' ? rand(3, 9) : w.weak === 'drunk' ? rand(1, 4) : rand(2, 6)) : w.tour ? touristCash() : passerCash();
+    // 26차 경제: 싸움 한 번에 드는 끼니값보다 조금 더 (취객 2~6 · 불량배 5~12 · 강도 12~28 · 마피아 25~60)
+    const amount = w.kind === 'thug' ? (w.gang === 'mafia' ? rand(25, 60) : w.gang === 'robber' ? rand(12, 28) : w.weak === 'drunk' ? rand(2, 6) : rand(5, 12)) : w.tour ? touristCash() : passerCash();
     this.dropCoin(w.x, w.y, amount, w.kind === 'passer');
   }
 
@@ -4585,9 +4629,11 @@ export class WorldScene {
     const dist = Math.hypot(tg.x - w.x, tg.y - w.y);
     const flame = this.flames(w);
     const ranged = w.isPlayer ? this.gear.ranged : w.weapon === 'pistol' || flame;
-    const reach = flame ? FLAME : ranged ? RANGED : MELEE;
+    const reach = flame ? FLAME : ranged ? (w.isPlayer ? this.gear.range ?? RANGED : RANGED) : MELEE;
     // 불량배는 자기 골목에서 너무 멀어지면 포기한다
     if (w.kind === 'thug' && Math.hypot(w.x - w.home[0], w.y - w.home[1]) > (this.gangZone() ? 22 : 14)) { w.target = null; w.path = []; return; }
+    // 27차: 맞선 행인도 자리에서 12칸 넘게는 쫓지 않는다
+    if (w.kind === 'passer' && (Math.hypot(w.x - w.home[0], w.y - w.home[1]) > 12 || (tg.isPlayer && this.invisible))) { w.target = null; w.path = []; return; }
     // 괴물: 영혼이 휴식 공간에 들어가면 포기, 층주는 자리에서 10칸 넘게 쫓지 않는다
     if (w.mdef && !w.invader && (this.inRest(tg.x, tg.y) || Math.hypot(w.x - w.home[0], w.y - w.home[1]) > (w.mdef.boss ? 10 : 18))) {
       w.target = null;
@@ -4622,7 +4668,7 @@ export class WorldScene {
     if (w.isPlayer) {
       // 양손 무기: 한 번 내려찍는 데 더 오래 걸리지만 훨씬 묵직하다
       const two = !ranged && TWO.has(this.gear.weapon ?? '');
-      w.atkT = ATK_INTERVAL * (two ? 1.6 : 1);
+      w.atkT = ATK_INTERVAL * (two ? 1.6 : 1) * (ranged ? this.gear.rate ?? 1 : 1); // 저격총은 천천히
       this.quickUsed = false; // 반 박자 당기기는 공격 한 번에 한 번
       if (ranged && !this.hooks.useAmmo()) { this.gear.ranged = false; return; }
       // 근접은 힘, 원거리(권총·활)는 민첩이 공격력에 더해진다
@@ -4633,7 +4679,7 @@ export class WorldScene {
     } else {
       w.atkT = w.kind === 'goat' ? 1.05 : w.gdef ? w.gdef.atk : w.mdef ? w.mdef.atk : w.kind === 'suturer' ? (w.monster ? 0.68 : 0.8) : w.weak ? 1.25 : w.weapon === 'pistol' ? 1.4 : w.gang ? 0.8 : 0.9;
       const f = this.zone.hell?.floor ?? 1;
-      const base = w.kind === 'goat' ? rand(10, 19) : w.kind === 'angel' ? rand(30, 52) : w.gdef ? (tg.isPlayer ? Math.max(rand(w.gdef.dmg[0], w.gdef.dmg[1]) * 0.6, tg.maxHp * 0.12) : rand(w.gdef.dmg[0], w.gdef.dmg[1])) * (tg.sealT && tg.sealT > 0 ? 1.5 : 1) : w.mdef ? rand(w.mdef.dmg[0], w.mdef.dmg[1]) * (w.mdef.boss ? 1 : 1 + 0.25 * (f - 1)) * (w.sealT && w.sealT > 0 ? 0.5 : 1) : w.kind === 'suturer' ? rand(10, 18) * (w.monster ? 1.6 : 1) : w.kind === 'fighter' ? rand(20, 34) * (1 + 0.3 * (f - 1)) : w.weak ? rand(1, 4) : w.gang === 'mafia' ? rand(10, 17) + (w.weapon ? 4 : 0) : w.gang === 'robber' ? rand(6, 12) + (w.weapon ? 3 : 0) : rand(3, 7) + (w.weapon ? 2 : 0);
+      const base = w.kind === 'goat' ? rand(10, 19) : w.kind === 'angel' ? rand(30, 52) : w.gdef ? (tg.isPlayer ? Math.max(rand(w.gdef.dmg[0], w.gdef.dmg[1]) * 0.6, tg.maxHp * 0.12) : rand(w.gdef.dmg[0], w.gdef.dmg[1])) * (tg.sealT && tg.sealT > 0 ? 1.5 : 1) : w.mdef ? rand(w.mdef.dmg[0], w.mdef.dmg[1]) * (w.mdef.boss ? 1 : 1 + 0.25 * (f - 1)) * (w.sealT && w.sealT > 0 ? 0.5 : 1) : w.kind === 'suturer' ? rand(10, 18) * (w.monster ? 1.6 : 1) : w.kind === 'fighter' ? rand(20, 34) * (1 + 0.3 * (f - 1)) : w.weak ? rand(1, 4) : w.kind === 'passer' ? (w.gunman ? rand(14, 22) : rand(3, 7) + (w.weapon ? 3 : 0)) : w.gang === 'mafia' ? rand(10, 17) + (w.weapon ? 4 : 0) : w.gang === 'robber' ? rand(6, 12) + (w.weapon ? 3 : 0) : rand(3, 7) + (w.weapon ? 2 : 0);
       const dmg = Math.max(1, Math.round(base) - (tg.isPlayer ? this.gear.dr ?? 0 : 0));
       this.startAttack(w, tg, dmg);
     }
@@ -4665,7 +4711,7 @@ export class WorldScene {
     const ranged = w.isPlayer ? this.gear.ranged : w.weapon === 'pistol' || flame;
     if (flame) sfx.flame(this.spotOf(w));
     else if (ranged && (w.isPlayer ? this.gear.weapon : w.weapon) !== 'bow') sfx.gunshot(this.spotOf(w));
-    if (Math.hypot(tg.x - w.x, tg.y - w.y) > (flame ? FLAME : ranged ? RANGED : MELEE) + (w.isPlayer && this.kite ? 2 : 0.6)) return;
+    if (Math.hypot(tg.x - w.x, tg.y - w.y) > (flame ? FLAME : ranged ? (w.isPlayer ? this.gear.range ?? RANGED : RANGED) : MELEE) + (w.isPlayer && this.kite ? 2 : 0.6)) return;
     if (w.isPlayer) w.lungeT = ranged ? 0 : 0.1;
     this.swing(w, tg, ranged, flame);
     this.hit(w, tg, pd.dmg, pd.crit, this.kindOf(w));

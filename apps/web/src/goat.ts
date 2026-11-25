@@ -20,7 +20,8 @@ function drawGoat(p: Pose, flip: boolean): HTMLCanvasElement {
       if (dx * dx + dy * dy <= 1) g.fillRect(x, y, 1, 1);
     }
   };
-  const FUR = '#cfc6b4', FUR2 = '#b2a894', FUR3 = '#8a7e6c', DARK = '#3a3028', HORN = '#4a4036', HORN2 = '#6e6252', HOOF = '#1e1a16', EYE = '#e8c23a';
+  // 27차: 검은 염소 — 윤기 도는 검은 털, 잿빛 뿔, 노란 눈만 밝다
+  const FUR = '#2e2a28', FUR2 = '#221f1e', FUR3 = '#161413', DARK = '#0c0a0a', HORN = '#6a645c', HORN2 = '#8e867a', HOOF = '#0a0808', EYE = '#e8c23a';
   g.save();
   if (p.lie) { g.translate(FX, FY); g.rotate(p.lie * 1.35); g.translate(-FX, -FY + p.lie * 10); }
   const lx = p.lunge * 6, bob = p.legs % 2 ? -1 : 0;
@@ -35,7 +36,7 @@ function drawGoat(p: Pose, flip: boolean): HTMLCanvasElement {
   ell(48 + lx * 0.5, 40 + bob, 23, 11, FUR2);
   ell(47 + lx * 0.5, 38 + bob, 22, 10, FUR);
   for (let k = 0; k < 9; k++) px(30 + k * 4 + lx * 0.5, 47 + bob + (k % 2), 3, 4, FUR2);
-  for (let k = 0; k < 14; k++) px(28 + ((k * 7) % 38) + lx * 0.5, 32 + ((k * 5) % 12) + bob, 2, 1, '#e2dacb');
+  for (let k = 0; k < 14; k++) px(28 + ((k * 7) % 38) + lx * 0.5, 32 + ((k * 5) % 12) + bob, 2, 1, '#4a4440');
   // 꼬리 (짧게 치켜든)
   px(24 + lx * 0.4, 30 + bob, 4, 6, FUR); px(23 + lx * 0.4, 28 + bob, 3, 3, FUR2);
   // 목과 머리: 들이받을 때 고개를 숙이고 앞으로
@@ -45,7 +46,7 @@ function drawGoat(p: Pose, flip: boolean): HTMLCanvasElement {
   ell(hx + 7, hy + 4, 6, 4, FUR2); // 주둥이
   px(hx + 11, hy + 3, 2, 2, DARK); // 콧구멍
   // 턱수염
-  for (let k = 0; k < 5; k++) px(hx + 3 + k, hy + 8 + k * 1.4, 2, 2, k > 2 ? '#a89c88' : '#d8d0c2');
+  for (let k = 0; k < 5; k++) px(hx + 3 + k, hy + 8 + k * 1.4, 2, 2, k > 2 ? '#1a1716' : '#2a2624');
   // 눈: 노란 홍채에 가로로 긴 검은 동공 (소름 끼치게)
   px(hx + 1, hy - 3, 5, 3, EYE); px(hx + 2, hy - 2, 4, 1, '#0a0806');
   // 뿔: 뒤로 휘어 감긴 굵은 뿔 (마디)

@@ -125,7 +125,7 @@ def _frames_for(spec):
         return A
     if spec['kind'] == 'armor': return poses.anims(spec['mode'])
     w = spec['weapon']
-    return poses.anims('g' if w in ('pistol', 'shotgun', 'bow', 'flamer') else 'm')
+    return poses.anims('g' if w in ('pistol', 'shotgun', 'bow', 'flamer', 'rifle') else 'm')
 
 def key_for(spec):
     if D.monster: return f"b-{D.mkey}-{spec['outfit']}-{spec.get('mode', 'm')}" if spec['kind'] == 'base' else f"w-{D.mkey}-{spec['weapon']}"

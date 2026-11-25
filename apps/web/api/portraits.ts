@@ -6,7 +6,7 @@
 import { put, del, get } from '@vercel/blob';
 import { createHash, timingSafeEqual } from 'node:crypto';
 
-const SLOTS = ['miss-hwang', 'yellow-wing', 'hwanghon', 'parrot', 'luen', 'pashar', 'goat-king', 'besk', 'talus', 'grandpa', 'bulda', 'yunae', 'maskgirl', 'sprite-miss-hwang', 'sprite-hwanghon', 'sprite-parrot', 'sprite-parrot-up', 'sprite-besk', 'sprite-talus', 'sprite-bulda', 'sprite-maskgirl', 'bld-ujusae', 'bld-ujusae-night', 'bld-ujusae-heaven', 'bld-loan', 'bld-hell-1', 'bld-hell-2', 'bld-hell-3'];
+const SLOTS = ['miss-hwang', 'yellow-wing', 'hwanghon', 'parrot', 'luen', 'pashar', 'goat-king', 'besk', 'talus', 'grandpa', 'bulda', 'yunae', 'yunae-child', 'yunae-young', 'yunae-middle', 'maskgirl', 'sprite-miss-hwang', 'sprite-hwanghon', 'sprite-parrot', 'sprite-parrot-up', 'sprite-besk', 'sprite-talus', 'sprite-bulda', 'sprite-maskgirl', 'bld-ujusae', 'bld-ujusae-night', 'bld-ujusae-heaven', 'bld-loan', 'bld-hell-1', 'bld-hell-2', 'bld-hell-3'];
 const MANIFEST = 'portraits/manifest.json';
 const TYPES: Record<string, string> = { 'image/webp': 'webp', 'image/png': 'png', 'image/jpeg': 'jpg' };
 const MAX_BYTES = 4 * 1024 * 1024;
