@@ -9,6 +9,14 @@ const forced = (() => {
   }
 })();
 
+/** 24차: 서울 시각 (방콕보다 두 시간 빠르다) */
+let fmtS: Intl.DateTimeFormat | null = null;
+export function seoulClock(): { h: number; m: number; label: string } {
+  fmtS ??= new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false });
+  const parts = fmtS.formatToParts(new Date());
+  const h = Number(parts.find((p) => p.type === 'hour')!.value) % 24, m = Number(parts.find((p) => p.type === 'minute')!.value);
+  return { h, m, label: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}` };
+}
 export function bangkokClock(): { h: number; m: number; label: string } {
   if (forced !== null && !Number.isNaN(forced)) {
     const h = Math.floor(forced) % 24, m = Math.round((forced % 1) * 60);

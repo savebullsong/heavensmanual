@@ -208,8 +208,15 @@ export function effectText(it: ItemDef, l: Lang): string {
   return parts.join(' · ');
 }
 
+/** 24차: 서울에서는 원화로 보인다 (속은 바트 그대로, ฿1 ≈ ₩40) */
+let WON = false;
+export function setWon(on: boolean) { WON = on; }
+export const WON_RATE = 40;
+export function moneyText(n: number): string {
+  return WON ? `₩${Math.round(n * WON_RATE).toLocaleString('en-US')}` : `฿${Math.round(n).toLocaleString('en-US')}`;
+}
 export function priceText(n: number, hell = false): string {
-  return hell ? t().obolFmt.replace('{n}', n.toLocaleString('en-US')) : `฿${n.toLocaleString('en-US')}`;
+  return hell ? t().obolFmt.replace('{n}', n.toLocaleString('en-US')) : moneyText(n);
 }
 
 /** 물건 아이콘 — 지옥 물건은 현실 그림을 빌려 그을리고 붉게 물들인다 */

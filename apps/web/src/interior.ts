@@ -14,6 +14,7 @@ const TI = Object.fromEntries(TYPES.map((t, k) => [t, k])) as Record<(typeof TYP
 /** 들어갈 수 있는 건물: 가게·시설이 있고 문(간판 면)이 있는 곳 */
 export function canEnter(b: Building) {
   const p = mainPoi(b);
+  if (b.cat === 'home') return true; // 24차 내 집
   if (!p || b.cat === 'ujusae') return false;
   // 간판이 없어도 들어갈 수 있는 곳: 종교시설·병원·은행
   return !!b.sign || ['place_of_worship', 'hospital', 'clinic', 'bank'].includes(p.t);
@@ -29,7 +30,7 @@ function streetSeller(b: Building): 'tools' | 'dept' | undefined {
 
 export function roomKind(b: Building): string {
   if (b.cat === 'loan') return 'loan'; // 지옥 3층 베스크 대부소
-  if (b.cat === 'hbank' || b.cat === 'atone' || b.cat === 'rebirth' || b.cat === 'terrace') return b.cat; // 지옥 은행 · 속죄의 회당 · 지옥 로비 · 천국 환생의 테라스
+  if (b.cat === 'hbank' || b.cat === 'atone' || b.cat === 'rebirth' || b.cat === 'terrace' || b.cat === 'home') return b.cat; // 지옥 은행 · 속죄의 회당 · 지옥 로비 · 천국 환생의 테라스
   const k = kindOf(b);
   if (k === 'place_of_worship' || b.cat === 'worship') {
     const f = faithOf(b);
@@ -54,12 +55,12 @@ export function roomKind(b: Building): string {
 }
 
 /** 쉬는 곳: 종교시설·은행·병원·약국 (싸움 불가 · 빠른 회복) */
-export const REST_ROOMS = new Set(['temple', 'church', 'mosque', 'gurdwara', 'bank', 'clinic', 'pharmacy', 'hbank', 'atone', 'rebirth', 'terrace']);
+export const REST_ROOMS = new Set(['home', 'temple', 'church', 'mosque', 'gurdwara', 'bank', 'clinic', 'pharmacy', 'hbank', 'atone', 'rebirth', 'terrace']);
 
 const SIZE: Record<string, [number, number]> = {
   temple: [13, 11], church: [13, 11], mosque: [12, 11], gurdwara: [12, 11], bank: [12, 10], clinic: [12, 10], pharmacy: [9, 8],
   mart: [11, 9], food: [12, 10], cafe: [10, 9], bar: [10, 9], salon: [9, 8], massage: [10, 9], laundry: [9, 8], lobby: [11, 9], shop: [9, 8], loan: [10, 8],
-  hbank: [10, 8], atone: [11, 10], rebirth: [31, 17], terrace: [23, 16], gym: [13, 11], dept: [26, 20],
+  hbank: [10, 8], atone: [11, 10], rebirth: [31, 17], terrace: [23, 16], home: [11, 9], gym: [13, 11], dept: [26, 20],
 };
 const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   temple: { floor: 'temple', wall: '#e9dcc0', trim: '#a8322a' }, church: { floor: 'stone', wall: '#e8e2d4', trim: '#6b4a30' },
@@ -74,6 +75,7 @@ const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   hbank: { floor: 'dark', wall: '#34302c', trim: '#8a6a2a' }, atone: { floor: 'stone', wall: '#4a4440', trim: '#6a2a22' },
   rebirth: { floor: 'marble', wall: '#dfe3e6', trim: '#56687a' },
   terrace: { floor: 'cloud', wall: '#f6f2ea', trim: '#c9a23e' },
+  home: { floor: 'jangpan', wall: '#e6dcc6', trim: '#7a5a3e' }, // 24차 내 집: 누런 장판 · 바랜 벽지
   gym: { floor: 'rubber', wall: '#d6d8da', trim: '#c83a2a' },
   dept: { floor: 'marble', wall: '#ece6dc', trim: '#b08a4a' },
 };
@@ -213,6 +215,12 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
       for (const [ii, jj] of [[W - 2, 1], [W - 3, 1], [W - 2, 2], [1, H - 2], [2, H - 2], [1, H - 3], [W - 2, H - 2], [W - 3, H - 2], [W - 2, H - 3], [W - 4, H - 2], [W - 2, H - 4]]) tiles[jj * W + ii] = TI.void;
       break;
     }
+    case 'home': {
+      // 24차 내 집 (서울 달동네): 작은 방 하나 — 앉은뱅이 밥상 · 개어 둔 이불 · 낡은 텔레비전 · 옷장 · 창가 화분. 유내가 밥상 앞에 있다
+      F(2, 1, 2, 1, 40, 'shelf', 2); F(W - 3, 1, 1, 2, 24, 'counter', 6); F(1, 4, 1, 2, 10, 'bench'); F(mid, 4, 2, 1, 8, 'table', 3); F(x1, 5, 1, 1, 26, 'plant');
+      clerk = { i: mid, j: 3 }; counter = { i: mid, j: 5 };
+      break;
+    }
     case 'gym': {
       // 19차 헬스장: 거울 벽 앞 덤벨 걸이 · 러닝머신 줄 · 벤치 프레스 · 스쿼트 랙 · 샌드백 · 요가 매트 · 안내 데스크(트레이너)
       F(W - 5, y1 - 2, 3, 1, 22, 'counter', 4); clerk = { i: W - 4, j: y1 - 3 }; counter = { i: W - 4, j: y1 - 1 };
@@ -256,7 +264,7 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
   tiles[exit.j * W + exit.i] = TI.walk;
   const look = LOOKS[kind];
   const info: InteriorInfo = {
-    kind, rest: REST_ROOMS.has(kind), name, ...look, exit, clerk, counter, furn,
+    kind, rest: REST_ROOMS.has(kind), name, ...look, exit, clerk, counter, furn, age: kind === 'home' ? (Math.floor(Math.random() * 3) as 0 | 1 | 2) : undefined,
     from: { b: k, out, bd: b }, store: kind === 'bank' ? 'bank' : ['mart', 'pharmacy', 'food', 'cafe'].includes(kind) ? kind : streetSeller(b), cuisine: cuisineOf(b), seats: seats.filter(([i, j]) => tiles[j * W + i] === TI.walk),
   };
   return finalize({ id: `in-${k}`, W, H, tiles, buildings: [], props: [], lanes: [], door: exit, spawn: { i: exit.i, j: exit.j - 1 }, interior: info });
@@ -291,6 +299,7 @@ const FLOORS: Record<string, [string, string]> = {
   temple: ['#8a3a2a', '#9a4632'], stone: ['#b8b0a2', '#aaa294'], prayer: ['#2f6a52', '#3a7a5e'], marble: ['#e4e0da', '#d6d2cc'], pale: ['#e2e8e6', '#d4dcda'],
   grey: ['#c8c8c4', '#bcbcb8'], terracotta: ['#b8704a', '#a8643e'], wood: ['#a0764e', '#946a44'], dark: ['#4a3426', '#3e2c20'], checker: ['#ece8e4', '#3a3434'],
   cloud: ['#ebe4d6', '#e2dacb'],
+  jangpan: ['#d8b46a', '#d0ab62'],
   rubber: ['#3a3c40', '#34363a'],
 };
 
@@ -798,6 +807,12 @@ const STAFF: Record<string, [string, string]> = {
 export const PASHAR_LOOK: Look = { sex: 'm', build: 0, skin: 0, hair: 1, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: '#e8d6c8', 10: '#e8d6c8', 2: '#9a9aa2', 3: '#1c1c22', 4: '#22222a', 9: '#1c1c22', 5: '#141418' } };
 /** 천국의 환생관 루엔 (컨셉 아트: 길고 흰 머리, 흰 법의에 옅은 푸른 띠, 흰 날개, 등불) */
 export const LUEN_LOOK: Look = { sex: 'f', build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, cols: { 1: '#f2dccc', 10: '#f2dccc', 2: '#e8e6f2', 3: '#f8f6f2', 4: '#b8c4e2', 9: '#f8f6f2', 5: '#d8ccb0' } };
+/** 24차 유내: 내 집에 있는 동양인 여성. 올 때마다 여자아이 · 어른 · 중년 여성 중 하나 */
+export function yunaeLook(age: 0 | 1 | 2): Look {
+  if (age === 0) return { sex: 'f', child: true, build: 0, skin: 0, hair: 4, hairColor: 0, top: 0, bottom: 0, cols: { 3: '#e8a0a8', 9: '#e8a0a8', 4: '#3a4a6a', 2: '#1a1412' } };
+  if (age === 1) return { sex: 'f', build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, cols: { 3: '#e4dccc', 9: '#e4dccc', 4: '#3a3a40', 2: '#161210' } };
+  return { sex: 'f', build: 1, skin: 0, hair: 2, hairColor: 0, top: 0, bottom: 0, cols: { 3: '#8a5a6a', 9: '#8a5a6a', 4: '#4a3a3a', 2: '#2a2220' } };
+}
 /** 24차: 환생관 할아버지 — 안경 쓴 아주 늙은 사람 (천국은 흰 옷, 지옥은 잿빛 외투). 그림은 관리자 'grandpa' 칸 */
 export function grandpaLook(hell: boolean): Look {
   const skin = '#e6c9ae';

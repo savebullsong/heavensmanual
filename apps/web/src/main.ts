@@ -6,7 +6,7 @@ import { WorldScene, type WorldHooks, type Stance, type RemoteInfo } from './wor
 import { ShopRoom, type ShopTarget } from './shoproom.ts';
 import { Dialog } from './dialog.ts';
 import { openLookPanel, lookPanelInsets } from './lookpanel.ts';
-import { ITEMS, STORES, menuFor, iconFor, itemIcon, effectText, priceText, HELL_FOOD, type ItemDef, type ItemCat } from './items.ts';
+import { ITEMS, STORES, menuFor, iconFor, itemIcon, effectText, priceText, moneyText, setWon, HELL_FOOD, type ItemDef, type ItemCat } from './items.ts';
 import * as net from './net.ts';
 import { preloadPortrait } from './portraits.ts';
 import { sukhumvitTestZone, decodeZone, type Zone, type Building } from './zone.ts';
@@ -20,7 +20,7 @@ import { interiorZone, roomKind as roomKindOf, canEnter } from './interior.ts';
 import { borderZone } from './border.ts';
 import { TWO } from './sprites.ts';
 import { buildingName, hasBank } from './names.ts';
-import { bangkokClock } from './clock.ts';
+import { bangkokClock, seoulClock } from './clock.ts';
 import { unlockAudio, isMuted, setMuted, plunge, chime } from './sfx.ts';
 import * as sfx from './sfx.ts';
 import { bgmMode, setBgmMode, setIndoor, type BgmMode } from './bgm.ts';
@@ -72,10 +72,13 @@ let workLine = '';
 // 19차: 수쿰빗을 대로를 따라 다섯 구역으로 나눴다 (나나 · 소이 8–17 · 아속 · 소이 20–33 · 프롬퐁). 우주새는 아속에만.
 // 구역은 필요할 때 불러 두고(이웃 구역은 미리), 실패하면 시험 구역
 const ZONE_IDS = ['bkk-nana', 'bkk-soi8-17', 'bkk-asok', 'bkk-soi20-33', 'bkk-phromphong'];
-const HOME_ZONE = 'bkk-asok';
+// 24차: 서울 강남 한 구역 (우주새가 있는 곳). 서울에서 태어난 몸은 서울 우주새 문으로 나간다
+const SEOUL_IDS = ['seoul-gangnam'];
+const ALL_ZONES = [...ZONE_IDS, ...SEOUL_IDS];
+const homeZone = () => (state.region === 'seoul' ? 'seoul-gangnam' : 'bkk-asok');
 const zoneCache = new Map<string, Promise<Zone>>();
 function loadZone(id: string): Promise<Zone> {
-  if (!ZONE_IDS.includes(id)) id = HOME_ZONE;
+  if (!ALL_ZONES.includes(id)) id = homeZone();
   let p = zoneCache.get(id);
   if (!p) {
     p = fetch(`zones/${id}.json`)
@@ -86,7 +89,7 @@ function loadZone(id: string): Promise<Zone> {
   }
   return p;
 }
-loadZone(HOME_ZONE);
+loadZone(homeZone());
 
 const shopLabels = () => ({ hwang: state.realm === 'hell' ? t().hwanghon : t().clerk, parrot: t().parrot, door: t().doorLabel, goat: t().goatName });
 const realm = () => state.realm ?? 'real';
@@ -226,8 +229,8 @@ async function enterWorld(at: 'door' | [number, number] = 'door', zoneId?: strin
   restInShop();
   dropInterior();
   // 어느 구역: 우주새 문 = 아속. 자리로 들어가면 주어진 구역 → 지금 서 있던 현실 구역 → 아속 (모르는 구역(옛 저장)이면 우주새 문 앞)
-  if (zoneId !== undefined && !ZONE_IDS.includes(zoneId)) { at = 'door'; zoneId = undefined; }
-  const zid = at === 'door' ? HOME_ZONE : zoneId ?? (world && !world.zone.hell && !world.zone.interior && ZONE_IDS.includes(world.zone.id) ? world.zone.id : HOME_ZONE);
+  if (zoneId !== undefined && !ALL_ZONES.includes(zoneId)) { at = 'door'; zoneId = undefined; }
+  const zid = at === 'door' ? homeZone() : zoneId ?? (world && !world.zone.hell && !world.zone.interior && ALL_ZONES.includes(world.zone.id) && (world.zone.city === 'seoul') === (state.region === 'seoul') ? world.zone.id : homeZone());
   if (inHell()) { enterHell(hellState().floor, 'shop'); return; }
   shop.stop();
   scene = 'world';
@@ -260,7 +263,7 @@ async function enterWorld(at: 'door' | [number, number] = 'door', zoneId?: strin
   showStance(want !== 'ghost');
   for (const nb of [zone.edges?.w, zone.edges?.e]) if (nb) loadZone(nb); // 이웃 구역은 미리
   if (pendingEater && want === 'real') { pendingEater = false; setTimeout(() => world?.sendEater(), 1500); }
-  if (pendingGuide !== null && want === 'real' && zone.id === HOME_ZONE) { world.setGuide(pendingGuide); pendingGuide = null; }
+  if (pendingGuide !== null && want === 'real' && zone.id === homeZone()) { world.setGuide(pendingGuide); pendingGuide = null; }
   if (want === 'heaven') world.setYwFollow(ywShouldFollow());
   if (want === 'ghost') { net.leaveZone(); return; } // 귀신은 산 사람들 사이에 보이지 않는다
   joinNet(world);
@@ -576,6 +579,14 @@ const hooks: WorldHooks = {
   vendor(kind) {
     openHellStore(kind);
   },
+  homeAlley() {
+    // 24차: 서울 달동네 — 집으로 가는 골목 들머리. 처음 한 번은 '내 집이 여기 있다…', 그다음부터는 갈 때마다 망설이는 혼잣말
+    if (busy || dlg.isOpen) return;
+    const L = t();
+    const first = !state.homeSeen;
+    if (first) { state.homeSeen = true; save(state); }
+    (async () => { busy = true; dlg.open({ name: '', monologue: true }); await dlg.say(first ? L.homeFirst : pick(L.homeAgain)); dlg.close(); busy = false; })();
+  },
   feedGurma() {
     const h = hellState();
     const bag = state.bag ?? {};
@@ -715,6 +726,7 @@ function clerkTalk() {
   if (info.kind === 'rebirth') { talkToPashar(); return; }
   if (info.kind === 'terrace') { talkToOfficer(); return; }
   if (info.kind === 'shore') { talkToBulda(); return; }
+  if (info.kind === 'home') { talkToYunae(); return; }
   if (info.store === 'bank') { openBank(info.name); return; }
   if (info.store === 'mart' || info.store === 'pharmacy' || info.store === 'food' || info.store === 'cafe' || info.store === 'tools' || info.store === 'dept') { openStore(info.store, info.name, info.cuisine); return; }
   const opts: { label: string; danger?: boolean; act: () => void }[] = [];
@@ -965,9 +977,8 @@ async function talkToPashar() {
     if (most > 0) { await dlg.say(L.lobbyExchange.replace('{n}', all.toLocaleString('en-US')).replace('{m}', most.toLocaleString('en-US')).replace('{x}', String(OBOL_RATE))); carry = most; }
     else await dlg.say(L.lobbyNoObol);
     await dlg.say(L.lobbyCity);
-    const c = await dlg.choose([L.regions.bkk, `${L.regions.seoul} ${L.lobbySoon}`]);
-    if (c === 1) await dlg.say(L.lobbySoon);
-    region = 'bkk';
+    const c = await dlg.choose([L.regions.bkk, L.regions.seoul]);
+    region = c === 1 ? 'seoul' : 'bkk';
   }
   await dlg.say(L.lobbyAsk);
   const go = await dlg.choose([L.lobbyGo, L.lobbyWait]);
@@ -1083,6 +1094,17 @@ async function talkToBulda(force = false) {
       await dlg.say(L.buldaStay);
     } else break;
   }
+  dlg.close();
+  busy = false;
+}
+/** 24차 유내: 내 집에 있는 사람. 올 때마다 나이가 다르다 (여자아이 · 어른 · 중년). 누구인지는 아무도 말하지 않는다 */
+async function talkToYunae() {
+  const L = t();
+  if (busy) return;
+  const age = world?.zone.interior?.age ?? 1;
+  busy = true;
+  dlg.open({ name: L.yunae, portrait: 'yunae' });
+  for (const line of L.yunaeLines[age]) await dlg.say(line);
   dlg.close();
   busy = false;
 }
@@ -1339,7 +1361,7 @@ let pendingGuide: number | null = null;
 /** 우주새 문에서 가까운 은행 · 종교시설 · 병원·약국 · 마사지 · 편의점 · 헬스장 */
 async function nearbyPlaces() {
   const L = t();
-  const z = await loadZone(HOME_ZONE);
+  const z = await loadZone(homeZone());
   const d = z.door;
   const want: [string, (b: Building) => boolean][] = [
     [L.placeKinds.bank, (b) => hasBank(b)],
@@ -1599,7 +1621,7 @@ async function goOut() {
     outfits,
     regions: [
       { id: 'bkk', label: L.regions.bkk, ready: true },
-      { id: 'seoul', label: L.regions.seoul, ready: false },
+      { id: 'seoul', label: L.regions.seoul, ready: true }, // 24차: 서울 강남 열림
     ],
   });
   state.look = look;
@@ -2207,7 +2229,7 @@ async function talkToYellowWing() {
     } else if (c === 'luen') {
       if (world?.guideStair()) await dlg.say(L.ywLuenHere);
       else {
-        const here = ZONE_IDS.indexOf(world?.zone.id ?? HOME_ZONE), home = ZONE_IDS.indexOf(HOME_ZONE);
+        const here = ZONE_IDS.indexOf(world?.zone.id ?? homeZone()), home = ZONE_IDS.indexOf(homeZone());
         await dlg.say(L.ywLuenFar.replace('{dir}', here < home ? L.dirs.e : L.dirs.w));
       }
     } else if (c === 'rules') {
@@ -2288,7 +2310,7 @@ async function talkToTaxi() {
   busy = true;
   dlg.open({ name: L.taxiAngel });
   await dlg.say(L.taxiGreet);
-  const here = world?.zone.id ?? HOME_ZONE;
+  const here = world?.zone.id ?? homeZone();
   const far = here === ZONE_IDS[0] ? ZONE_IDS[ZONE_IDS.length - 1] : ZONE_IDS[0];
   const T = L.taxiTo;
   const c = await dlg.choose([T.asok, T.far.replace('{zone}', L.zones[far] ?? far), T.seoul, T.pattaya, T.no]);
@@ -2873,12 +2895,15 @@ function updateHud() {
   // 좁은 화면에서는 '방콕'·'지갑' 글자를 빼고 숫자만 (CSS가 .lbl을 숨김)
   const el = hud.querySelector('.clock');
   const border = realm() === 'border'; // 24차: 경계에는 시계도 돈도 없다
-  if (el) el.innerHTML = border ? '' : `${inHell() ? '' : `<span class="lbl">${t().bkk}</span> `}${bangkokClock().label}`;
+  const zNow = world?.zone.interior ? street?.zone : world?.zone;
+  const seoul = (!inHell() && scene === 'world' && zNow?.city === 'seoul') || (scene === 'shop' && state.region === 'seoul' && realm() === 'real');
+  setWon(realm() === 'real' && state.region === 'seoul');
+  if (el) el.innerHTML = border ? '' : `${inHell() ? '' : `<span class="lbl">${seoul ? t().seoulLbl : t().bkk}</span> `}${(seoul ? seoulClock() : bangkokClock()).label}`;
   const w = hud.querySelector('.wallet');
   if (w) (w as HTMLElement).hidden = border;
   if (w && !border) w.innerHTML = inHell()
     ? `<span class="lbl">${t().notesLabel}</span> <i class="obol-ic"></i>${Math.floor(hellState().notes).toLocaleString('en-US')}${(state.debt ?? 0) > 0 ? ` <span class="debt">${t().debtHud.replace('{n}', String(Math.ceil(state.debt ?? 0)))}</span>` : ''}`
-    : `<span class="lbl">${t().wallet}</span> ฿${Math.floor(state.wallet ?? 0).toLocaleString('en-US')}`;
+    : `<span class="lbl">${t().wallet}</span> ${moneyText(Math.floor(state.wallet ?? 0))}`;
   updateHpBar(state.hp ?? maxHp(), maxHp());
 }
 
@@ -3040,8 +3065,8 @@ function openBank(name: string) {
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
   const amt = el.querySelector('.b-amt') as HTMLInputElement;
   const draw = () => {
-    el.querySelector('.b-wallet')!.textContent = `฿${Math.floor(state.wallet ?? 0).toLocaleString('en-US')}`;
-    el.querySelector('.b-bank')!.textContent = `฿${Math.floor(state.bank ?? 0).toLocaleString('en-US')}`;
+    el.querySelector('.b-wallet')!.textContent = moneyText(Math.floor(state.wallet ?? 0));
+    el.querySelector('.b-bank')!.textContent = moneyText(Math.floor(state.bank ?? 0));
     el.querySelector('.b-obol')!.textContent = L.obolFmt.replace('{n}', String(Math.floor(hellState().notes)));
   };
   // 노자돈: 지갑의 바트를 노전으로 바꿔 둔다 (죽어서 지옥에 가면 그대로 들고 간다 · 되돌릴 수 없음)
@@ -3062,7 +3087,7 @@ function openBank(name: string) {
   const quick = el.querySelector('.bank-quick')!;
   for (const n of [100, 500, 1000]) {
     const b = document.createElement('button');
-    b.textContent = `฿${n.toLocaleString('en-US')}`;
+    b.textContent = moneyText(n);
     b.onclick = () => { amt.value = String(n); };
     quick.appendChild(b);
   }

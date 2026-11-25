@@ -3,6 +3,7 @@
 import { Hound } from './hound.ts';
 import { shuttleCanvas, flameCanvas } from './shipgfx.ts';
 import { goatCharSet } from './goat.ts';
+import { drawDalHouse } from './dalgfx.ts';
 import { drownedCanvas, monkLook, shoreF, shoreLine, shoreSkyCanvas } from './border.ts';
 import { wingTexture, cloudTexture, heavenVignette, cloudStairTexture, terraceSkyTexture, hellPortalTexture, bedTexture, BED_ANCHOR, batWingTexture, hornTexture } from './heavengfx.ts';
 import { hellDecor } from './hellprops.ts';
@@ -35,6 +36,7 @@ const SUCCUBUS_LOOK: Record<number, Look> = {
   4: { sex: 'f', build: 0, skin: 0, hair: 4, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: '#a8968a', 10: '#a8968a', 2: '#e8e2d8', 3: '#1a1412', 4: '#2a1a12', 9: '#a8968a', 5: '#ff8a1a' } }, // 24차: 4층 베르카 (쇳빛 머리·그을린 가죽)
   3: { sex: 'f', build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: '#ecc8b8', 10: '#ecc8b8', 2: '#140a0a', 3: '#8a1020', 4: '#5a0a14', 9: '#ecc8b8', 5: '#c9a23e', 6: '#ff3a4a' } },
 };
+const SEOUL_CARS = ['sedan-white', 'sedan-white', 'sedan-black', 'sedan-silver', 'sedan-silver', 'sedan-blue', 'sedan-red', 'pickup', 'moto', 'bus'];
 /** 22차: 거리 사람 모습 묶음 (구역을 옮겨도 이어 쓴다) */
 const LOOK_POOL = new Map<string, Look[]>();
 /** 22차: 스트리밍 작업 시간 기록 (?debug 에서 window.__perf 로 본다) */
@@ -74,7 +76,7 @@ function loadBuildingArt() {
 }
 import { streetProp, type PropPic } from './propgfx.ts';
 import { decorOf } from './decor.ts';
-import { canEnter, drawRoom, drawFurn, clerkLook, grandpaLook, roomKind as roomKindOf } from './interior.ts';
+import { canEnter, drawRoom, drawFurn, clerkLook, grandpaLook, yunaeLook, roomKind as roomKindOf } from './interior.ts';
 import { carHit, isDanger, DANGER_SPEED, critChance, CRIT_MULTIPLIER, regenPerMinute, restRegenPerMinute, OUT_OF_COMBAT_S, armorClass, rollToHit, maxHp as maxHpFor, newStats, type DeedKey, type Stats } from '../../../packages/shared/src/rules.ts';
 
 function tex(c: HTMLCanvasElement): Texture {
@@ -235,6 +237,8 @@ export interface WorldHooks {
   debtEat(n: number): void;
   /** 건물 문 앞에 닿았다: 안으로 (out = 나왔을 때 설 자리, chaser = 쫓아오던 대식자) */
   enterBuilding(k: number, out: { i: number; j: number }, chaser: { monster: boolean; hp: number } | null, work?: boolean): void;
+  /** 24차: 서울 달동네, 내 집으로 가는 골목 들머리에 들어섰다 */
+  homeAlley(): void;
   /** 방의 나가는 매트를 밟았다 */
   leaveBuilding(): void;
   /** 방의 직원에게 말을 걸었다 */
@@ -912,7 +916,9 @@ export class WorldScene {
     if (!bldArtLoad && (b.cat === 'ujusae' || b.cat === 'loan')) loadBuildingArt().then((any) => { if (any && !this.root.destroyed) this.clearBuildings(); }); // 바꾼 건물 그림이 오면 다시 세운다
     const hellTheme = this.zone.hell ? floorDef(this.zone.hell.floor).theme : null;
     const hf = this.zone.hell?.floor ?? 0;
-    let d = b.cat === 'ujusae' ? (hf ? drawYuhwang(b, hf) : this.realm === 'heaven' ? drawCosmicBirdHeaven(b) : drawCosmicBird(b, this.night === 1)) : b.cat === 'hbank' ? drawHellBank(b, hf || 1) : b.cat === 'atone' ? drawAtone(b, hf || 1) : b.cat === 'rebirth' ? drawRebirthGate(b) : b.cat === 'loan' ? drawLoanHouse(b) : hellTheme ? drawHellStructure(b, hellTheme, true) : kitOk ? drawBuildingKit(b, this.nameOf(b), this.night === 1, this.low) : drawBuilding(b, this.nameOf(b), this.night === 1);
+    // 24차 서울 달동네: 낮은 벽돌집과 내 집은 따로 그린다
+    const dal = this.zone.city === 'seoul' && (b.hut || b.cat === 'home');
+    let d = dal ? drawDalHouse(b, this.night === 1, b.cat === 'home') : b.cat === 'ujusae' ? (hf ? drawYuhwang(b, hf) : this.realm === 'heaven' ? drawCosmicBirdHeaven(b) : drawCosmicBird(b, this.night === 1)) : b.cat === 'hbank' ? drawHellBank(b, hf || 1) : b.cat === 'atone' ? drawAtone(b, hf || 1) : b.cat === 'rebirth' ? drawRebirthGate(b) : b.cat === 'loan' ? drawLoanHouse(b) : hellTheme ? drawHellStructure(b, hellTheme, true) : kitOk ? drawBuildingKit(b, this.nameOf(b), this.night === 1, this.low) : drawBuilding(b, this.nameOf(b), this.night === 1);
     // 17차: 지옥 건물마다 층의 흔적 (1층 화산재 · 2층 이끼와 진흙 · 3층 핏빛과 홍등). 유황새는 따로 그린다, 환생 로비는 홀로 멀쩡하다
     if (hf && b.cat !== 'ujusae' && b.cat !== 'rebirth') d = { ...d, canvas: weatherHell(d.canvas, hf, b.i0 * 31 + b.j0 * 17, { lanterns: !['carcass', 'bonepile', 'guts', 'idol'].includes(b.hk ?? '') }) };
     // 관리자가 갈아 끼운 그림 (같은 크기 또는 2배)
@@ -923,7 +929,7 @@ export class WorldScene {
     const base = tex(art && k ? art : d.canvas);
     const W = d.canvas.width, H = d.canvas.height;
     const parts = this.strips(base, d.x, d.y, b.i0, b.j0, b.w, b.d, -0.2, k === 2 ? 2 : 1);
-    const top = b.cat === 'ujusae' ? COSMIC_TOP : b.cat === 'loan' ? LOAN_TOP : b.cat === 'hbank' ? b.h + 6 : b.cat === 'atone' ? b.h + 46 : b.cat === 'rebirth' ? b.h + 4 : hellTheme ? b.h : kitOk ? buildingTop(b, this.low) : buildingHeight(b.h);
+    const top = dal ? 34 + 16 + Math.min(b.w, b.d) * 3 : b.cat === 'ujusae' ? COSMIC_TOP : b.cat === 'loan' ? LOAN_TOP : b.cat === 'hbank' ? b.h + 6 : b.cat === 'atone' ? b.h + 46 : b.cat === 'rebirth' ? b.h + 4 : hellTheme ? b.h : kitOk ? buildingTop(b, this.low) : buildingHeight(b.h);
     const [lx] = iso(b.i0 + b.w / 2, b.j0 + b.d / 2);
     // 22차: 벽이 있는 자리(투명 여백 판정)는 처음 필요할 때 만든다 — 건물을 세울 때마다 픽셀 전체를 읽던 비용을 뺐다
     return { parts, base, x: d.x, y: d.y, w: W, h: H, top, lx, ly: (b.i0 + b.j0) * (TH / 2) - top + 4, cv: d.canvas, b };
@@ -950,7 +956,7 @@ export class WorldScene {
     for (const v of this.bViews.values()) {
       const b = v.b;
       let want = 0;
-      if (on && b.cat !== 'ujusae' && upperFloors(b) > 0) {
+      if (on && b.cat !== 'ujusae' && b.cat !== 'home' && !b.hut && upperFloors(b) > 0) {
         const dx = Math.max(b.i0 - px, 0, px - (b.i0 + b.w)), dy = Math.max(b.j0 - py, 0, py - (b.j0 + b.d));
         const dist = Math.hypot(dx, dy);
         want = dist < 1.5 ? 0.15 : dist < 3.5 ? (0.15 * (3.5 - dist)) / 2 : 0;
@@ -1603,6 +1609,8 @@ export class WorldScene {
   /** 구름과 금빛 기운: 세상을 밝고 따뜻하게, 화면 가장자리에 흘러가는 구름 (테라스: 둘레가 하늘) */
   /** 24차 사나운 염소: 아무 데서나 나타나 사람을 보면 들이받고, 죽기 직전엔 무섭게 빨리 달아난다. 가끔은 죽는다. 그래도 다시 나타난다 */
   private goatT = -1;
+  private inAlley = false;
+  private ambushT = 0;
   private spawnGoat() {
     const p0 = this.player;
     const spot = randomWalkTileNear(this.zone, Math.floor(p0.x), Math.floor(p0.y), 40, ['walk', 'soi', 'park']);
@@ -1976,7 +1984,7 @@ export class WorldScene {
     // 24차: 가끔은 루엔·파샤르 대신 안경 쓴 아주 늙은 할아버지가 앉아 있다 (천국·지옥 같은 사람, 옷차림만 다름)
     this.grandpa = (info.kind === 'terrace' || info.kind === 'rebirth') && (this.forceGrandpa ?? Math.random() < 0.14);
     if (info.clerk) {
-      const w = this.makeWalker(this.grandpa ? grandpaLook(info.kind === 'rebirth') : clerkLook(info.kind, info.from.b), info.clerk.i, info.clerk.j, 'clerk');
+      const w = this.makeWalker(this.grandpa ? grandpaLook(info.kind === 'rebirth') : info.kind === 'home' ? yunaeLook(info.age ?? 1) : clerkLook(info.kind, info.from.b), info.clerk.i, info.clerk.j, 'clerk');
       w.dir = 'sw';
       w.wait = 1e9;
       this.walkers.push(w);
@@ -2766,7 +2774,8 @@ export class WorldScene {
     for (const lane of lanes) {
       const n = Math.max(1, Math.floor((lane.i1 - lane.i0) / 70));
       for (let k = 0; k < n && this.cars.length < MAX_CARS; k++) {
-        const ct = carSprite(CAR_MODELS[Math.floor(Math.random() * CAR_MODELS.length)], lane.dir);
+        const models = this.zone.city === 'seoul' ? SEOUL_CARS : CAR_MODELS; // 24차: 서울엔 툭툭·분홍 택시가 없다
+        const ct = carSprite(models[Math.floor(Math.random() * models.length)], lane.dir);
         if (!ct) continue;
         const sprite = new Sprite(ct.tex);
         sprite.anchor.set(ct.ax, ct.ay);
@@ -3611,6 +3620,7 @@ export class WorldScene {
     const L = t();
     if (w.kind === 'clerk' && this.zone.interior?.kind === 'shore') return L.bulda;
     if (w.kind === 'clerk' && this.grandpa) return L.grandpaName;
+    if (w.kind === 'clerk' && this.zone.interior?.kind === 'home') return L.yunae;
     if (w.cards) return L.angel;
     if (w.kind === 'goat') return L.goatName;
     if (w.kind === 'clerk') return this.zone.interior?.kind === 'loan' ? L.besk : this.zone.interior?.kind === 'rebirth' ? L.pashar : this.zone.interior?.kind === 'terrace' ? L.officer : this.zone.interior?.name ?? '';
@@ -3643,6 +3653,7 @@ export class WorldScene {
     const L = t();
     if (w.kind === 'clerk' && this.zone.interior?.kind === 'shore') return L.buldaSub;
     if (w.kind === 'clerk' && this.grandpa) return L.grandpaSub;
+    if (w.kind === 'clerk' && this.zone.interior?.kind === 'home') return L.yunaeSub[this.zone.interior.age ?? 1];
     if (w.cards) return L.cardSub;
     if (w.kind === 'goat') return L.goatSub;
     if (w.kind === 'clerk') return this.zone.interior?.kind === 'terrace' ? L.officerSub : L.clerkSub[(this.zone.interior?.kind ?? 'shop') as keyof typeof L.clerkSub] ?? '';
@@ -3690,7 +3701,7 @@ export class WorldScene {
     const p = this.player;
     // 19차: 출입 아이콘이 떴다 = 문 앞에 서 있다. 길이 막혀도(울타리·물) 바로 들어간다
     if (!this.walkTo(spot[0], spot[1])) {
-      if (Math.hypot(spot[0] + 0.5 - p.x, spot[1] + 0.5 - p.y) < 2.6) this.hooks.enterBuilding(k, { i: spot[0], j: spot[1] }, this.takeChaser());
+      if (Math.hypot(spot[0] + 0.5 - p.x, spot[1] + 0.5 - p.y) < 2.6) this.hooks.enterBuilding(k, { i: spot[0], j: spot[1] }, this.zone.buildings[k]?.cat === 'home' ? null : this.takeChaser());
       return;
     }
     this.storeWant = { k, kind: 'enter', spot };
@@ -4405,6 +4416,13 @@ export class WorldScene {
     if (this.realm === 'heaven') this.updateHeaven(realDt);
     if (this.shoreFx) this.updateShore(realDt);
     if (this.shipGo) this.updateShip(realDt);
+    if (this.zone.homeAlley && !this.zone.interior && this.realm === 'real') {
+      const a = this.zone.homeAlley, pl = this.player;
+      const inA = pl.x >= a.i0 && pl.x <= a.i1 + 1 && pl.y >= a.j0 && pl.y <= a.j1 + 1;
+      if (inA && !this.inAlley) { this.inAlley = true; this.hooks.homeAlley(); if (Math.random() < 0.22) this.ambushT = 2.2 + Math.random() * 2; } // 가끔 집 가는 길에 대식자
+      else if (!inA && this.inAlley && (pl.x > a.i1 + 6 || pl.y > a.j1 + 6)) this.inAlley = false;
+    }
+    if (this.ambushT > 0 && (this.ambushT -= dt) <= 0 && !this.zone.interior) this.spawnSuturer();
     if (this.goatT > 0 && (this.goatT -= dt) <= 0) { this.goatT = -1; if (!this.walkers.some((x) => x.kind === 'goat')) this.spawnGoat(); }
     if (this.kerb) this.updateKerberos(dt);
     if (this.guide) this.updateGuide(dt);
@@ -4544,7 +4562,7 @@ export class WorldScene {
     if (this.storeWant && !p.path.length && Math.hypot(this.storeWant.spot[0] + 0.5 - p.x, this.storeWant.spot[1] + 0.5 - p.y) < (Math.floor(p.x) === this.storeWant.spot[0] && Math.floor(p.y) === this.storeWant.spot[1] ? 9 : 2.6)) {
       const sw = this.storeWant;
       this.storeWant = null;
-      if (sw.kind === 'enter') this.hooks.enterBuilding(sw.k, { i: sw.spot[0], j: sw.spot[1] }, this.takeChaser());
+      if (sw.kind === 'enter') this.hooks.enterBuilding(sw.k, { i: sw.spot[0], j: sw.spot[1] }, this.zone.buildings[sw.k]?.cat === 'home' ? null : this.takeChaser()); // 24차: 내 집 문은 도망가는 문 — 대식자는 따라 들어오지 못한다
       else if (sw.kind === 'bank') this.hooks.bank(this.nameOf(this.zone.buildings[sw.k]));
       else this.hooks.store(sw.kind, this.nameOf(this.zone.buildings[sw.k]), cuisineOf(this.zone.buildings[sw.k]));
     }

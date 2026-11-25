@@ -66,7 +66,7 @@ export function decorOf(z: Zone): Decor {
     const shop = !!mainPoi(b);
     const r1 = h01(b.i0, b.j0, 7), r2 = h01(b.j0, b.i0, 9), r3 = h01(k, b.i0, 11);
     // 산프라품: 건물 모서리 앞 (태국 건물 대부분이 하나씩 둔다 — 여기서는 열에 하나)
-    if (r1 < 0.12) put(fi + (si ? 0 : 0), fj, 'spirit', 0, 1) || put(fi + si * (len - 1), fj + sj * (len - 1), 'spirit', 0, 1);
+    if (r1 < 0.12 && z.city !== 'seoul') put(fi + (si ? 0 : 0), fj, 'spirit', 0, 1) || put(fi + si * (len - 1), fj + sj * (len - 1), 'spirit', 0, 1);
     if (!shop) return;
     // 오토바이: 가게 앞에 1~3대
     if (r2 < 0.35) {

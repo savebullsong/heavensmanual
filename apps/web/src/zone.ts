@@ -8,7 +8,8 @@ export type Category =
   | 'convenience' | 'pharmacy' | 'clinic' | 'restaurant' | 'bar' | 'cafe' | 'bank' | 'worship' | 'school'
   | 'hotel' | 'laundry' | 'shop' | 'office' | 'condo' | 'ujusae' | 'loan' | 'generic'
   | 'hbank' | 'atone' | 'rebirth' // 지옥: 지옥 은행 · 속죄의 회당 · (1층 불탄 도시 골목 끝) 환생 로비 입구
-  | 'terrace'; // 천국: 구름 계단 위 환생의 테라스 (환생관 루엔)
+  | 'terrace' // 천국: 구름 계단 위 환생의 테라스 (환생관 루엔)
+  | 'home'; // 24차 서울 달동네 골목 끝의 내 집 (유내)
 
 export interface Building {
   i0: number; j0: number; w: number; d: number; // 바닥 사각형 (타일)
@@ -48,6 +49,10 @@ export interface Zone {
   edges?: { w: string | null; e: string | null; c: number; i0: number; i1: number; j0: number; j1: number };
   /** 전체 지도에서 이 구역 (0,0)의 자리 (구역 사이 좌표를 맞춘다) */
   origin?: { i: number; j: number };
+  /** 24차: 도시 (서울이면 간판·차·시계·화폐가 서울식) · 내 집으로 가는 골목 들머리 · 내 집 문 앞 */
+  city?: 'seoul';
+  homeAlley?: { i0: number; j0: number; i1: number; j1: number };
+  home?: { i: number; j: number };
 }
 /** 방의 가구: 바닥 사각형(타일)과 높이(px), 무엇인지 */
 export interface Furn { i: number; j: number; w: number; d: number; h: number; kind: string; v?: number }
@@ -60,6 +65,7 @@ export interface InteriorInfo {
   clerk?: { i: number; j: number }; // 직원이 서는 곳
   counter?: { i: number; j: number }; // 직원에게 말을 거는 자리 (카운터 앞)
   furn: Furn[];
+  age?: 0 | 1 | 2; // 24차 내 집: 오늘 유내의 나이 (여자아이 · 어른 · 중년)
   from: { b: number; out: { i: number; j: number }; bd?: Building }; // 거리의 건물 번호와 나왔을 때 설 자리 (bd = 그 건물, 21차 직종 판단용)
   store?: string; cuisine?: string; // 가게 창 (mart · pharmacy · food · cafe) / bank
   seats: [number, number][]; // 손님이 서 있을 자리
@@ -120,14 +126,14 @@ export function finalize(z: Omit<Zone, 'blocked'>): Zone {
 export function decodeZone(json: {
   id: string; W: number; H: number; codes: string; types: string[]; tiles: string;
   buildings: Building[]; props: Prop[]; lanes: Lane[]; door: { i: number; j: number }; spawn: { i: number; j: number }; attribution?: string;
-  shop?: boolean; edges?: Zone['edges']; origin?: Zone['origin'];
+  shop?: boolean; edges?: Zone['edges']; origin?: Zone['origin']; city?: Zone['city']; homeAlley?: Zone['homeAlley']; home?: Zone['home'];
 }): Zone {
   const map = new Uint8Array(128);
   for (let k = 0; k < json.codes.length; k++) map[json.codes.charCodeAt(k)] = TI[json.types[k] as TileType] ?? 0;
   const tiles = new Uint8Array(json.W * json.H);
   for (let k = 0; k < tiles.length; k++) tiles[k] = map[json.tiles.charCodeAt(k)];
   const lanes = widenMainWalks(tiles, json.W, json.H, json.lanes);
-  return finalize({ id: json.id, W: json.W, H: json.H, tiles, buildings: json.buildings, props: json.props, lanes, door: json.door, spawn: json.spawn, attribution: json.attribution, shop: json.shop ?? true, edges: json.edges, origin: json.origin });
+  return finalize({ id: json.id, W: json.W, H: json.H, tiles, buildings: json.buildings, props: json.props, lanes, door: json.door, spawn: json.spawn, attribution: json.attribution, shop: json.shop ?? true, edges: json.edges, origin: json.origin, city: json.city, homeAlley: json.homeAlley, home: json.home });
 }
 
 /**

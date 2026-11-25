@@ -40,6 +40,7 @@ const TYPES: Record<string, [string, string, string]> = {
   place_of_worship: ['사원', 'ศาสนสถาน', 'Place of worship'], cinema: ['영화관', 'โรงภาพยนตร์', 'Cinema'], theatre: ['극장', 'โรงละคร', 'Theatre'],
   marketplace: ['시장', 'ตลาด', 'Market'], fuel: ['주유소', 'ปั๊มน้ำมัน', 'Gas station'], car_wash: ['세차장', 'คาร์แคร์', 'Car wash'],
   coworking_space: ['공유 오피스', 'โคเวิร์กกิ้งสเปซ', 'Coworking'], post_office: ['우체국', 'ไปรษณีย์', 'Post office'],
+  karaoke: ['노래방', 'คาราโอเกะ', 'Karaoke'], academy: ['학원', 'สถาบันกวดวิชา', 'Cram school'], home: ['집', 'บ้าน', 'Home'],
   hotel: ['호텔', 'โรงแรม', 'Hotel'], hostel: ['호스텔', 'โฮสเทล', 'Hostel'], guest_house: ['게스트하우스', 'เกสต์เฮาส์', 'Guesthouse'],
   apartment_hotel: ['서비스 아파트', 'เซอร์วิสอพาร์ตเมนต์', 'Serviced apartment'], fitness_centre: ['헬스장', 'ฟิตเนส', 'Gym'],
 };
