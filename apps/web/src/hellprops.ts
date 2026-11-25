@@ -133,7 +133,7 @@ export function hellDecor(kind: string, theme: Theme, v: number, o = 0): HPic {
     // 끓는 가마솥: 장작불 위 쇠솥, 넘칠 듯 끓는 것 (1층 녹은 쇠 · 2층 담즙 · 3층 피), 밖으로 뻗은 뼈 손
     const p = pen(64, 60);
     const cx = 64, cy = 74;
-    const fill: Record<Theme, [string, string, string]> = { ash: ['#ff7a1a', '#ffc24a', '#b8320e'], swamp: ['#6a8a2a', '#a8c24a', '#3a4a16'], market: ['#9a0e0a', '#d8261a', '#5a0606'] };
+    const fill: Record<Theme, [string, string, string]> = { ash: ['#ff7a1a', '#ffc24a', '#b8320e'], swamp: ['#6a8a2a', '#a8c24a', '#3a4a16'], market: ['#9a0e0a', '#d8261a', '#5a0606'], forge: ['#ff9a2a', '#fff0a8', '#c8420e'] };
     const [m, mh, md] = fill[theme];
     p.E(cx, 112, 46, 8, '#120a08');
     for (const [a, b] of [[-30, 26], [26, -28]]) p.L(cx + a, 110, cx + b, 100, 5, '#3a2416');
@@ -625,7 +625,7 @@ function thornTree(r: (k: number) => number): HPic {
 /** 바위 무더기: 1층 현무암(틈의 용암 빛) · 2층 이끼 낀 바위 · 3층 붉은 사암과 핏자국 */
 function rock(theme: Theme, r: (k: number) => number): HPic {
   const p = pen(52, 40);
-  const pal: Record<Theme, [string, string, string]> = { ash: ['#2e2a28', '#4a4440', '#161210'], swamp: ['#3a3e30', '#565c46', '#1e2018'], market: ['#5a2a22', '#7e4234', '#2e1410'] };
+  const pal: Record<Theme, [string, string, string]> = { ash: ['#2e2a28', '#4a4440', '#161210'], swamp: ['#3a3e30', '#565c46', '#1e2018'], market: ['#5a2a22', '#7e4234', '#2e1410'], forge: ['#262222', '#3e3836', '#0e0c0c'] };
   const [base, lit, dark] = pal[theme];
   p.E(52, 70, 46, 9, '#0e0a08');
   const n = 2 + Math.floor(r(1) * 2);

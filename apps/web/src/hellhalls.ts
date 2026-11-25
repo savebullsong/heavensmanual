@@ -13,7 +13,7 @@ function shade(hex: string, k: number) {
   const f = (v: number) => Math.max(0, Math.min(255, Math.round(v * k))).toString(16).padStart(2, '0');
   return `#${f(n >> 16)}${f((n >> 8) & 255)}${f(n & 255)}`;
 }
-const STONE: Record<number, string> = { 1: '#5a5652', 2: '#4a5244', 3: '#5a3e36' };
+const STONE: Record<number, string> = { 1: '#5a5652', 2: '#4a5244', 3: '#5a3e36', 4: '#3e3a38' }; // 24차 4층: 그을린 쇳빛 돌
 
 function cv(b: Building, top: number, pad = 12) {
   const { i0, j0, w, d } = b;

@@ -568,8 +568,41 @@ function burnt(b: Building, theme: Theme) {
 }
 
 /** 지옥의 집·덩어리 한 채 */
+/** 24차 4층 조형물: 거대한 모루 — 그 위에 박힌 대장장이 망치, 감긴 쇠사슬, 위에서 쇳물을 붓는 도가니 (분노를 두들겨 펴는 곳) */
+function greatAnvil(b: Building) {
+  const top = b.h + 30;
+  const cv = canvasFor(b, top, 18);
+  const { g, P, R, line, finish } = cv;
+  const { i0, j0, w, d } = b, j1 = j0 + d;
+  const E = (x: number, y: number, rx: number, ry: number, col: string) => { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); g.fill(); };
+  plinth(cv, b, 0, 10, 0.1, '#2e2a28', '#221e1c', '#161312');
+  plinth(cv, b, 10, 18, 0.6, '#3a3634', '#2a2624', '#1a1716');
+  const [cx, cy] = P(i0 + w / 2, j0 + d / 2, 18);
+  const iron = '#3a3634', ironL = '#6a625a', ironD = '#1a1614', hot = '#ff8a1a', white = '#fff2b8';
+  // 모루: 허리가 잘록한 받침 · 넓은 머리 · 앞으로 뾰족한 뿔
+  R(cx - 9, cy - 22, 18, 22, iron); R(cx - 9, cy - 22, 3, 22, ironL); R(cx + 6, cy - 22, 3, 22, ironD);
+  R(cx - 14, cy - 6, 28, 6, ironD);
+  R(cx - 22, cy - 34, 40, 12, iron); R(cx - 22, cy - 34, 40, 2, ironL); R(cx - 22, cy - 24, 40, 2, ironD);
+  for (let k = 0; k < 12; k++) R(cx + 18 + k, cy - 33 + Math.floor(k / 3), 1, 10 - Math.floor(k * 0.8), k < 6 ? iron : ironD); // 뿔
+  // 모루 위에 달아오른 쇳덩이와 박힌 망치
+  E(cx - 4, cy - 36, 8, 3, hot); E(cx - 4, cy - 37, 5, 2, white);
+  line([cx + 4, cy - 36], [cx + 14, cy - 66], 3, '#4a3424');
+  R(cx + 7, cy - 74, 16, 9, iron); R(cx + 7, cy - 74, 16, 2, ironL); R(cx + 20, cy - 74, 3, 9, ironD);
+  // 감긴 쇠사슬
+  for (let k = 0; k < 16; k++) R(cx - 20 + k * 2.6, cy - 30 + Math.sin(k * 0.8) * 3 + k * 1.1, 3, 2, k % 2 ? '#5a5652' : '#8a8078');
+  // 위에서 쇳물을 붓는 도가니 (사슬에 매달림) — 하얗게 떨어지는 쇳물 줄기
+  line([cx - 30, cy - 104], [cx - 12, cy - 84], 1, '#5a5652'); line([cx + 2, cy - 104], [cx - 4, cy - 86], 1, '#5a5652');
+  R(cx - 16, cy - 88, 14, 10, ironD); R(cx - 15, cy - 87, 12, 3, hot);
+  R(cx - 6, cy - 80, 3, 42, hot); R(cx - 5, cy - 80, 1, 42, white);
+  // 받침 둘레로 흘러내린 쇳물과 흩어진 불티
+  for (let k = 0; k < 5; k++) { const [x, y] = P(i0 + 0.3 + k * (w - 0.6) / 4, j1 - 0.1, 18); R(x, y, 1, 8 + (k * 5) % 9, k % 2 ? hot : '#c8420e'); }
+  for (let k = 0; k < 14; k++) { const [x, y] = P(i0 + hash(k, 1, i0) * w, j1 + 0.1 + hash(k, 2, j0) * 0.4, 0); R(x, y - 1, 1, 1, hash(k, 3) < 0.5 ? hot : white); }
+  finish();
+  return { canvas: cv.c, x: cv.minX, y: cv.minY };
+}
+
 export function drawHellBuild(b: Building, kind: HellBuildKind, theme: Theme): { canvas: HTMLCanvasElement; x: number; y: number } {
-  if (kind === 'idol') return theme === 'ash' ? demonIdol(b) : theme === 'swamp' ? hungryMaw(b) : bloodScale(b);
+  if (kind === 'idol') return theme === 'ash' ? demonIdol(b) : theme === 'swamp' ? hungryMaw(b) : theme === 'forge' ? greatAnvil(b) : bloodScale(b);
   if (kind === 'thatch') return thatch(b, theme);
   if (kind === 'prison') return prison(b, theme);
   if (kind === 'bonehouse') return bonehouse(b, theme);

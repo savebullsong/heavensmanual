@@ -88,7 +88,7 @@ function loadZone(id: string): Promise<Zone> {
 }
 loadZone(HOME_ZONE);
 
-const shopLabels = () => ({ hwang: state.realm === 'hell' ? t().hwanghon : t().clerk, parrot: t().parrot, door: t().doorLabel });
+const shopLabels = () => ({ hwang: state.realm === 'hell' ? t().hwanghon : t().clerk, parrot: t().parrot, door: t().doorLabel, goat: t().goatName });
 const realm = () => state.realm ?? 'real';
 /** 관리자 캐릭터의 투명 모드 (관리자로 지정된 계정만) */
 const INVIS_KEY = 'heavensmanual.invisible';
@@ -156,6 +156,7 @@ async function boot() {
   shop = new ShopRoom(app, bodyLook(), false, shopLabels());
   shop.onArrive = onShopArrive;
   shop.onParrot = talkToParrot;
+  shop.onGoat = () => npcSay(t().goatName, pick([t().goatTag, t().goatShop]));
   app.stage.addChild(shop.root);
   preloadPortrait('miss-hwang');
   // 다시 열면 마지막 자리에서 (현실·천국·귀신은 거리의 그 자리, 가게 안에서 일하던 중이면 그 가게 안에서 계속)
@@ -211,6 +212,7 @@ function enterShop(fromStreet: boolean) {
   if (world) world.root.visible = false;
   { const r = realm(); shop.setRealm(r === 'heaven' || r === 'border' ? 'real' : r); }
   shop.setLabels(shopLabels());
+  shop.setGoat(realm() === 'real' && Math.random() < 0.16); // 24차: 가끔 가게 안에 염소 (안에서는 들이받지 않는다)
   if (inHell()) preloadPortrait('hwanghon');
   shop.setLook(bodyLook(), gear()); // 입은 방어구 그대로 (맨몸이면 환자복 같은 처음 옷이 드러난다)
   shop.enter(fromStreet);

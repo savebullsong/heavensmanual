@@ -412,4 +412,79 @@ def debtor(self, g):
             blob(P, el + (wr - el) * .9 + Vector((0, .01, -.03 - n * .03)), (.01, .007, .014), metal, None, segs=6, rings=4)
         ob = finish(P); bind(ob, self.arm, rigid(f'forearm.{k}')); self.add(g, ob)
 
-NEW = {'ashwraith': ashwraith, 'ashgal': ashgal, 'gurma': gurma, 'cinder': cinder, 'bloat': bloat, 'glutton': glutton, 'hawker': hawker}
+
+# ───────── 도르칸 (4층 층주, 24차): 용광로의 집행자 — 사용자 컨셉 그림. 뿔 달린 검은 가시 갑옷, 해골 얼굴에 붉은 눈,
+#            어깨·팔뚝마다 굽은 가시, 갑옷 틈으로 달아오른 금, 해진 검붉은 망토 ─────────
+def forgeknight(self, g):
+    s, V = self.s, self.V
+    iron = rmat('skin', .55, .45, .7); plate = rmat('dark', .5, .5, .6); glow = rmat('crest', .25, .85)
+    spike = rmat('metal', .35, .6, .8); cape = rmat('top', .9, .05); bone = rmat('bandage', .45, .35); horn = rmat('wood', .5, .3)
+    rnd = random.Random(41)
+    def bulk(rings):
+        out = []
+        for c, u, v, rs, rf in rings:
+            z = c.z / s
+            k = 1.3 if 1.15 < z < 1.46 else 1.12
+            out.append((c, u, v, rs * k + .015, rf * k + .015))
+        return out
+    self.torso(g, iron, plate, hem=.98, extra=bulk)
+    self.arms(g, None); self.hands(g); self.legs(g, iron, plate, foot=1.2)
+    P = Part(g + '.armor')
+    # 어깨받이: 겹친 판 위로 뒤로 굽은 가시 셋씩
+    for sx in (1, -1):
+        blob(P, V(sx * .26, .0, 1.43), (.13 * s, .12 * s, .08 * s), plate, None, segs=12, rings=8)
+        for k in range(3):
+            b0 = V(sx * (.22 + k * .05), .02, 1.48 + k * .01)
+            limb(P, b0, b0 + Vector((sx * .05, .04, .16 + k * .03)) * s, [(0, .028, .028), (1, .002, .002)], spike, None, segs=6)
+    # 가슴판: 가운데 능선 + 비늘처럼 겹친 판 + 심장 자리의 달아오른 틈
+    blob(P, V(0, -.15, 1.28), (.19 * s, .06 * s, .14 * s), plate, None, segs=12, rings=8)
+    for k in range(5):
+        limb(P, V(-.15, -.19, 1.36 - k * .07), V(.15, -.19, 1.36 - k * .07), [(0, .012, .01), (1, .012, .01)], spike, None, segs=5)
+    limb(P, V(-.03, -.2, 1.34), V(.02, -.21, 1.18), [(0, .016, .012), (1, .008, .006)], glow, None, segs=5)
+    # 허리의 가시 띠와 쇠사슬 고리, 무릎까지 내려오는 비늘 앞자락
+    limb(P, V(0, 0, 1.0), V(0, 0, .93), [(0, .21 * s, .17 * s), (1, .21 * s, .17 * s)], plate, None, segs=16)
+    for k in range(8):
+        a = k / 8 * math.pi * 2
+        c = V(math.cos(a) * .2, math.sin(a) * .16, .97)
+        limb(P, c, c + Vector((math.cos(a) * .06, math.sin(a) * .05, .0)) * s, [(0, .016, .016), (1, .002, .002)], spike, None, segs=5)
+    limb(P, V(0, -.17, .95), V(0, -.2, .58), [(0, .12, .02), (1, .1, .015)], plate, None, segs=5)
+    # 해진 검붉은 망토: 어깨 뒤에서 땅 가까이까지, 끝이 찢겨 갈라진다
+    for k in range(9):
+        x0 = (k - 4) * .055
+        top = V(x0 * 1.1, .14, 1.44)
+        low = V(x0 * 1.6 + rnd.uniform(-.03, .03), .26 + abs(x0) * .3, .12 + rnd.uniform(0, .18))
+        limb(P, top, low, [(0, .06, .012), (.7, .05, .01), (1, .02, .006)], cape, None, segs=4)
+    # 갑옷 틈의 용암 금
+    for k in range(18):
+        c, a, z = _surf(V, s, rnd, .98, 1.42, .2)
+        d = Vector((rnd.uniform(-.04, .04), 0, rnd.uniform(-.07, -.03)))
+        limb(P, c, c + d * s, [(0, .006, .006), (1, .004, .004)], glow, None, segs=4)
+    ob = finish(P); bind(ob, self.arm, _spine_w(s)); self.add(g, ob)
+    for k in 'LR':   # 팔뚝·정강이의 굽은 가시
+        for bn in (f'forearm.{k}', f'shin.{k}'):
+            a, b = self.bones[bn][0], self.bones[bn][1]
+            P = Part(f'{g}.spk.{bn}')
+            for n in range(2):
+                c = a + (b - a) * (.35 + n * .3) + Vector((0, .05, 0))
+                limb(P, c, c + Vector((0, .08, .05)) * s, [(0, .02, .02), (1, .002, .002)], spike, None, segs=5)
+            ob = finish(P); bind(ob, self.arm, rigid(bn)); self.add(g, ob)
+    # 머리: 해골 얼굴(이빨) · 붉게 빛나는 눈구멍 · 왕관처럼 솟은 가시 · 크게 휜 뿔 둘
+    hc = V(0, -.03, 1.58)
+    P = Part(g + '.head')
+    blob(P, hc, (.1 * s, .105 * s, .11 * s), plate, None, segs=14, rings=10)          # 투구
+    blob(P, hc + Vector((0, -.075 * s, -.01 * s)), (.07 * s, .035 * s, .075 * s), bone, None, segs=10, rings=8)   # 해골 얼굴
+    for sx in (1, -1):
+        blob(P, hc + Vector((sx * .028 * s, -.105 * s, .015 * s)), (.016 * s, .008 * s, .012 * s), glow, None, segs=8, rings=5)
+    for k in range(5):
+        blob(P, hc + Vector(((k - 2) * .014 * s, -.108 * s, -.05 * s)), (.006 * s, .006 * s, .01 * s), bone, None, segs=6, rings=4)
+    for k in range(5):   # 왕관 가시
+        c = hc + Vector(((k - 2) * .03 * s, -.01 * s, .09 * s))
+        limb(P, c, c + Vector((0, .01, .07 + (2 - abs(k - 2)) * .03)) * s, [(0, .016, .016), (1, .002, .002)], spike, None, segs=5)
+    for sx in (1, -1):   # 큰 뿔: 옆머리에서 바깥 위로 솟았다 안으로 휜다
+        pts = [hc + Vector((sx * (.09 + n * .022) * s, .01 * s, (.03 + n * .028 - (n / 9) ** 2 * .05) * s)) for n in range(10)]
+        for n in range(9):
+            w0 = (.04 - n * .004) * s
+            limb(P, pts[n], pts[n + 1], [(0, w0, w0), (1, max(.003, w0 * .9), max(.003, w0 * .9))], horn, None, segs=7)
+    ob = finish(P); bind(ob, self.arm, lambda co: {'head': smooth(co.z, 1.44 * s, 1.5 * s), 'spine': 1 - smooth(co.z, 1.44 * s, 1.5 * s)}); self.add(g, ob)
+
+NEW = {'ashwraith': ashwraith, 'ashgal': ashgal, 'gurma': gurma, 'cinder': cinder, 'bloat': bloat, 'glutton': glutton, 'hawker': hawker, 'forgeknight': forgeknight}

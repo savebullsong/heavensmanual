@@ -68,6 +68,7 @@ BODY = {'x': dict(h=1.28, shoulder=.22, hipw=.105, arm=1.4, leg=1.12),   # 변�
         'r': dict(h=1.25, shoulder=.3, hipw=.16, arm=1.25, leg=.7),
         # 16차: 층마다 다른 괴물과 층주 (hellbodies.py)
         'h': dict(h=1.22, shoulder=.28, hipw=.13, arm=1.7, leg=1.45),           # 1층 층주 아쉬갈: 숯이 된 바위 거인
+        'z': dict(h=1.24, shoulder=.27, hipw=.12, arm=1.5, leg=1.35),           # 24차 4층 층주 도르칸: 가시 갑옷 기사
         'u': dict(h=1.3, shoulder=.15, hipw=.085, arm=1.0, leg=.8, neck=.2),    # 2층 층주 구르마: 산 같은 배, 바늘 목
         'n': dict(h=.97, shoulder=.17, hipw=.088, arm=.9, leg=.88),             # 1층 불씨 망자
         'l': dict(h=1.0, shoulder=.19, hipw=.1, arm=1.15, leg=1.05),            # 2층 늪 망자 (불어 터질 듯한 시체)
@@ -75,9 +76,9 @@ BODY = {'x': dict(h=1.28, shoulder=.22, hipw=.105, arm=1.4, leg=1.12),   # 변�
         'v': dict(h=1.12, shoulder=.17, hipw=.088, arm=1.0, leg=1.05, neck=.05), # 3층 흥정꾼 (가면 상인)
         'd': dict(h=1.0, shoulder=.17, hipw=.09, arm=.9, leg=.9)}               # 3층 빚쟁이 해골 (멍에·족쇄)
 MONSTER_BW = {'x': None, 'a': .8, 'p': .68, 'y': 1.32, 's': .42, 'k': 1.7, 'b': 1.0, 'g': .42, 'o': 1.08, 'w': .95, 't': .5, 'r': 1.0,
-              'h': 1.45, 'u': .62, 'n': .8, 'l': 1.05, 'e': 1.3, 'v': .85, 'd': .42}
+              'h': 1.45, 'u': .62, 'n': .8, 'l': 1.05, 'e': 1.3, 'v': .85, 'd': .42, 'z': 1.25}
 MONSTER_HK = {'x': 1.0, 'a': 1.05, 'p': .86, 'y': 1.12, 's': 1.0, 'k': 1.2, 'b': 1.0, 'g': 1.0, 'o': .9, 'w': 1.0, 't': 1.0, 'r': 1.0,
-              'h': 1.2, 'u': .9, 'n': 1.05, 'l': 1.0, 'e': 1.0, 'v': 1.0, 'd': 1.0}
+              'h': 1.2, 'u': .9, 'n': 1.05, 'l': 1.0, 'e': 1.0, 'v': 1.0, 'd': 1.0, 'z': 1.1}
 BUILD = [.9, 1.0, 1.14]   # 마름 · 보통 · 건장 (뼈 위치는 같고 굵기만 다르다 → 머리·무기 층을 함께 쓴다)
 
 class Doll:
@@ -1197,6 +1198,23 @@ class Doll:
                 a = k * 2.39996; zz = 1 - 2 * (k + .5) / 14; r = math.sqrt(1 - zz * zz)
                 n = side * math.cos(a) * r + up * math.sin(a) * r + d * zz
                 limb(P, c0 + n * .07, c0 + n * .14, [(0, .018, .018), (1, .002, .002)], metal, None, segs=5)
+        elif name == 'chainmace':   # 24차 도르칸: 사람 키를 넘는 쇠 자루, 끝에 가시 왕관과 달아오른 구슬, 늘어진 쇠사슬
+            glowm = rmat('crest', .25, .85)
+            top_dir = Vector((0, -.08, 1)).normalized()
+            limb(P, grip - top_dir * .7, grip + top_dir * 1.0, [(0, .026, .026), (1, .024, .024)], dark, None, segs=8)
+            for t0 in (.2, .55, .85):
+                c = grip + top_dir * t0
+                limb(P, c - top_dir * .025, c + top_dir * .025, [(0, .036, .036), (1, .036, .036)], metal, None, segs=8)
+            h = grip + top_dir * 1.12
+            blob(P, h, (.07, .07, .07), glowm, None, segs=12, rings=8)
+            for k in range(7):
+                a = k / 7 * math.pi * 2
+                b0 = h + Vector((math.cos(a) * .06, math.sin(a) * .06, -.02))
+                limb(P, b0, b0 + Vector((math.cos(a) * .1, math.sin(a) * .1, .12)), [(0, .022, .022), (1, .002, .002)], metal, None, segs=5)
+            for sg in (1, -1):
+                for n in range(9):
+                    c = h + Vector((sg * (.06 + n * .008), -.01, -.05 - n * .055))
+                    blob(P, c, (.016, .01, .022), metal, None, segs=6, rings=4)
         elif name == 'gatebar':   # 아쉬갈: 불탄 성문에서 뽑은 쇠 빗장 (사슬이 감기고 끝이 달아올랐다)
             glowm = rmat('crest', .3, .75)
             limb(P, grip - d * .2, grip + d * 1.15, [(0, .04, .04), (.5, .045, .045), (1, .05, .05)], metal, None, segs=6)

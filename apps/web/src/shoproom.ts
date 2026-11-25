@@ -2,6 +2,7 @@
 import { Application, Assets, ColorMatrixFilter, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import { portraitUrl } from './portraits.ts';
 import { parrotPixels, type Look } from './character.ts';
+import { goatIdleCanvas } from './goat.ts';
 import { toCanvas } from './raster.ts';
 import { iso } from './gfx.ts';
 import { MISS_HWANG, HWANGHON, charSet, frameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, type CharSet, type Dir, type Frame } from './sprites.ts';
@@ -23,6 +24,7 @@ async function loadPixel(u: string): Promise<Texture | null> {
 
 const HWANG = { x: 4.6, y: 1.55 };
 const TALK_TILE: [number, number] = [4, 3];
+const GOAT_SPOT: [number, number] = [4.5, 6.2]; // 24차: 가게 안 염소가 서는 자리 (문 가까운 바닥)
 const DOOR_TILE: [number, number] = [1, 7]; // 남서쪽(앞 왼쪽) 벽의 문 안쪽 매트 — 바깥 우주새의 문과 같은 쪽
 const START_FIRST: [number, number] = [4, 5];
 const START_BACK: [number, number] = [2, 6];
@@ -75,12 +77,13 @@ function roomPath(si: number, sj: number, ti: number, tj: number): [number, numb
   return path;
 }
 
-export type ShopTarget = 'hwang' | 'parrot' | 'door';
+export type ShopTarget = 'hwang' | 'parrot' | 'door' | 'goat';
 
 export interface ShopLabels {
   hwang: string;
   parrot: string;
   door: string;
+  goat: string;
 }
 
 export class ShopRoom {
@@ -141,6 +144,21 @@ export class ShopRoom {
 
   /** 20차: 앵무새를 눌렀다 (대화) */
   onParrot?: () => void;
+  onGoat?: () => void;
+  /** 24차: 가끔 가게 안에 들어와 있는 염소 (안에서는 얌전하다) */
+  private goat: Sprite | null = null;
+  setGoat(on: boolean) {
+    if (!on) { this.goat?.destroy(); this.goat = null; return; }
+    if (this.goat) return;
+    const tx = Texture.from(goatIdleCanvas(true));
+    tx.source.scaleMode = 'nearest';
+    const g = new Sprite(tx);
+    g.anchor.set(50 / 100, 66 / 76); g.scale.set(0.5);
+    const [x, y] = iso(GOAT_SPOT[0], GOAT_SPOT[1]);
+    g.position.set(x, y); g.zIndex = GOAT_SPOT[0] + GOAT_SPOT[1];
+    this.objects.addChild(g);
+    this.goat = g;
+  }
   constructor(private app: Application, look: Look, ghost: boolean, private labels: ShopLabels) {
     this.objects.sortableChildren = true;
     this.bg.zIndex = -1;
@@ -408,6 +426,7 @@ export class ShopRoom {
     if (this.hellOn) {
       if (inSprite(this.bird, 4)) return 'parrot';
     } else if (inSprite(this.parrot, 6)) return 'parrot';
+    if (this.goat && inSprite(this.goat, 4)) return 'goat';
     if (inSprite(this.hwang)) return 'hwang';
     // 남서쪽 앞 벽(j = RD)의 문: 화면 좌표를 그 벽 위의 (i, 높이)로 바꿔 본다
     const di = x / 32 + RD, dz = (di + RD) * 16 - y;
@@ -430,6 +449,7 @@ export class ShopRoom {
     const t = this.hit(gx, gy);
     if (t) {
       this.showLabel(t, 2.2);
+      if (t === 'goat') { this.onGoat?.(); return; }
       if (t === 'parrot') {
         this.crestT = 0.8;
         this.onParrot?.();
@@ -463,6 +483,7 @@ export class ShopRoom {
   }
   private labelAnchor(t: ShopTarget): [number, number] {
     if (t === 'hwang') { const [x, y] = iso(HWANG.x, HWANG.y); return [x, y - 48]; }
+    if (t === 'goat') { const [x, y] = iso(GOAT_SPOT[0], GOAT_SPOT[1]); return [x, y - 34]; }
     if (t === 'parrot' && this.hellOn) { const [x, y] = iso(this.bx, this.by); return [x, y - 64]; }
     if (t === 'parrot') { const [x, y] = iso(PARROT_PERCH.x, PARROT_PERCH.y); return [x + 1, y - PARROT_PERCH.z - 20]; }
     const [x, y] = iso(1.6, RD);

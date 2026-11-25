@@ -73,6 +73,14 @@ export function hellGroundJob(z: Zone, theme: Theme, i0: number, j0: number): Gr
     else if (a3 > 0.6) lerp('#a8100c', '#ff4a2a', (a3 - 0.6) * 4);
     else { lerp('#2a0404', '#5a0808', a1 * 1.4); if (gr < 0.04) set('#7a0e0a'); }
   };
+  // 24차 4층 용광로: 쇳물 — 검게 식은 딱지 사이로 하얗게 달아오른 금, 노랗게 끓는 웅덩이
+  const molten = (a1: number, a2: number, a3: number, gr: number) => {
+    const crack = Math.abs(a2 - 0.5);
+    if (crack < 0.014) set('#fff2b8');
+    else if (crack < 0.034) set('#ffb02a');
+    else if (a3 > 0.55) lerp('#d8520e', '#ffd04a', (a3 - 0.55) * 3.2);
+    else { lerp('#1e0e08', '#4a1e0a', a1 * 1.4); if (gr < 0.05) set('#8a3a10'); }
+  };
   const row = (py: number) => {
     const Y = py + minY;
     // 이 줄에서 마름모 안에 드는 x 범위만 (밖의 점은 건너뛴다)
@@ -110,6 +118,9 @@ export function hellGroundJob(z: Zone, theme: Theme, i0: number, j0: number): Gr
           if (Math.abs(Math.sin(X * 0.09 + Yp * 0.05 + n2 * 9)) < 0.05) set('#3a4a40');
           if (n3 > 0.66 && grain < 0.3) set('#2e3e26'); // 물이끼
           if (edge < 0.05) set('#3a3424');
+        } else if (theme === 'forge') {
+          molten(n1, n2, n3, grain);
+          if (edge < 0.05) set(edge < 0.025 ? '#fff6d0' : '#ffb02a');
         } else {
           // 피의 용암: 검붉게 식은 껍질 사이로 핏빛 금이 달아오른다
           bloodLava(X, Yp, n1, n2, n3, grain);
@@ -126,9 +137,9 @@ export function hellGroundJob(z: Zone, theme: Theme, i0: number, j0: number): Gr
           const cu = Math.floor(u), du = u - cu, dv = v - rowj;
           const id = hash(cu, rowj, 5);
           const e = Math.min(du, 1 - du, dv, 1 - dv);
-          if (e < 0.07 + n3 * 0.03) set(theme === 'market' ? '#1e0c0a' : '#141010');
+          if (e < 0.07 + n3 * 0.03) set(theme === 'market' ? '#1e0c0a' : theme === 'forge' ? '#0a0808' : '#141010');
           else {
-            if (theme === 'market') lerp('#6a2e24', '#4e2018', id * 0.8 + n1 * 0.3); else lerp('#4a4440', '#36302c', id * 0.8 + n1 * 0.3);
+            if (theme === 'market') lerp('#6a2e24', '#4e2018', id * 0.8 + n1 * 0.3); else if (theme === 'forge') { lerp('#3e3836', '#2a2624', id * 0.8 + n1 * 0.3); if (du < 0.12 && dv < 0.18) set('#6a625a'); } else lerp('#4a4440', '#36302c', id * 0.8 + n1 * 0.3);
             if (du < 0.2 || dv < 0.2) shade(1.16); else if (du > 0.82 || dv > 0.8) shade(0.78);
             if (grain < 0.02) shade(0.7);
           }
@@ -138,9 +149,9 @@ export function hellGroundJob(z: Zone, theme: Theme, i0: number, j0: number): Gr
         const u = fj * 5, pu = u - Math.floor(u);
         if (pu < 0.14) set(theme === 'ash' ? '#a8321a' : theme === 'swamp' ? '#101814' : '#3a0404');
         else { lerp('#4a3424', '#34241a', hash(Math.floor(u), 2, 3) + n1 * 0.3); if (pu < 0.26) shade(1.15); if (pu > 0.88) shade(0.75); }
-        if (theme === 'market' && ((fi * 6) % 1 < 0.18)) set('#3a3a3a'); // 쇠 창살 다리
+        if ((theme === 'market' || theme === 'forge') && ((fi * 6) % 1 < 0.18)) set('#3a3a3a'); // 쇠 창살 다리
       } else if (best === 6) {
-        lerp(theme === 'swamp' ? '#20221a' : theme === 'market' ? '#2a1816' : '#221e1c', theme === 'swamp' ? '#16180f' : theme === 'market' ? '#1c100e' : '#161312', n1);
+        lerp(theme === 'swamp' ? '#20221a' : theme === 'market' ? '#2a1816' : theme === 'forge' ? '#161212' : '#221e1c', theme === 'swamp' ? '#16180f' : theme === 'market' ? '#1c100e' : theme === 'forge' ? '#0c0a0a' : '#161312', n1);
       } else if (theme === 'ash') {
         if (best === 1) {
           // 그을린 모래: 바람에 쓸린 물결 무늬 + 검은 재 알갱이
@@ -173,6 +184,18 @@ export function hellGroundJob(z: Zone, theme: Theme, i0: number, j0: number): Gr
           if (n3 > 0.72) { set('#1c2420'); if (grain < 0.06) set('#3a4a40'); }
         }
         if (second === 2 && edge < 0.2) shade(0.65 + edge * 1.6); // 물가는 축축하게 어둡다
+      } else if (theme === 'forge') {
+        if (best === 1) { lerp('#2e2a28', '#1e1b1a', n1); if (hash(X, Y >> 1, 23) < 0.05) set('#6e665e'); } // 쇳가루 깔린 땅
+        else if (best === 4) { lerp('#2a2422', '#1c1816', n1); if (Math.sin(X * 0.4 + Yp * 0.12) > 0.95) set('#3e3632'); }
+        else {
+          // 검은 쇠똥(슬래그) 바닥: 굳은 거품 자국 · 속이 달아오른 금 · 반짝이는 쇳가루 · 가끔 아직 뜨거운 덩어리
+          lerp('#2a2624', '#181514', n1 * 1.2 - 0.1);
+          if (n2 > 0.7) shade(0.8 + (n2 - 0.7));
+          const crack = Math.abs(n3 - 0.5);
+          if (crack < 0.006) set('#ff8a1a'); else if (crack < 0.012) set('#5a2a10');
+          if (grain < 0.006) set('#c8b8a0'); else if (grain < 0.012) set('#ff6a1a');
+        }
+        if (second === 2 && edge < 0.24) { const k = 1 - edge / 0.24; r = r * (1 - k * 0.3) + 90 * k; gg = gg * (1 - k * 0.5) + 30 * k; b *= 1 - k * 0.7; if (edge < 0.08 && grain < 0.3) set('#ffb02a'); } // 쇳물가는 달아오른다
       } else {
         if (best === 1) { lerp('#3e2620', '#2e1c18', n1); if (n2 > 0.66) shade(0.75); }
         else if (best === 4) {
@@ -211,7 +234,8 @@ export function hellGroundJob(z: Zone, theme: Theme, i0: number, j0: number): Gr
 
 /** 지도 밖까지 이어지는 피의 용암 바다 (3층): 이음매 없이 반복되는 256×128 한 장 */
 let SEA: HTMLCanvasElement | null = null;
-export function bloodLavaTile() {
+export function bloodLavaTile(forge = false) {
+  if (forge) return moltenSeaTile();
   if (SEA) return SEA;
   const NZ = noiseTex();
   const nz = (x: number, y: number) => NZ[((y & 255) << 8) | (x & 255)];
@@ -233,6 +257,33 @@ export function bloodLavaTile() {
   }
   g.putImageData(im, 0, 0);
   SEA = c;
+  return c;
+}
+
+/** 24차: 4층 바깥의 끝없는 쇳물 바다 (이음매 없는 256×128) */
+let IRON: HTMLCanvasElement | null = null;
+function moltenSeaTile() {
+  if (IRON) return IRON;
+  const NZ = noiseTex();
+  const nz = (x: number, y: number) => NZ[((y & 255) << 8) | (x & 255)];
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 128;
+  const g = c.getContext('2d')!;
+  const im = g.createImageData(256, 128);
+  const col = (h: string) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  for (let y = 0; y < 128; y++) for (let x = 0; x < 256; x++) {
+    const Yp = y * 2, n1 = nz(x, Yp), n2 = nz(x + 113, Yp + 71), n3 = nz(x + 57, Yp + 191), gr = hash(x, y, 3);
+    const crack = Math.abs(n2 - 0.5);
+    let c3: number[];
+    if (crack < 0.014) c3 = col('#fff2b8');
+    else if (crack < 0.034) c3 = col('#ffb02a');
+    else if (n3 > 0.55) { const a = col('#d8520e'), b = col('#ffd04a'), t = Math.min(1, (n3 - 0.55) * 3.2); c3 = a.map((v, k) => v + (b[k] - v) * t); }
+    else { const a = col('#1e0e08'), b = col('#4a1e0a'), t = Math.min(1, n1 * 1.4); c3 = a.map((v, k) => v + (b[k] - v) * t); if (gr < 0.05) c3 = col('#8a3a10'); }
+    const o = (y * 256 + x) * 4;
+    im.data[o] = c3[0]; im.data[o + 1] = c3[1]; im.data[o + 2] = c3[2]; im.data[o + 3] = 255;
+  }
+  g.putImageData(im, 0, 0);
+  IRON = c;
   return c;
 }
 
@@ -343,7 +394,7 @@ export function drawHellStructure(b: Building, theme: Theme, night: boolean): { 
 
 /** 지옥 화면 위 붉은 어둠의 세기 (깊을수록 짙다) */
 export function hellTint(floor: number) {
-  return { color: [0x2a0a06, 0x12200c, 0x2a0408][Math.min(2, floor - 1)], alpha: 0.32 + floor * 0.04 };
+  return { color: [0x2a0a06, 0x12200c, 0x2a0408, 0x2e1404][Math.min(3, floor - 1)], alpha: 0.32 + Math.min(3, floor) * 0.04 };
 }
 
 // ───────────────────────── 지옥 소품: 마른 나무 · 화로 · 부러진 돌기둥 ─────────────────────────

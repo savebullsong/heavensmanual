@@ -101,6 +101,10 @@ export const ITEMS: ItemDef[] = [
   { key: 'lanternwine', cat: 'goods', price: 20, heal: 400, hell: true, floor: 3, store: 'drop', icon: 'choco', name: { ko: '홍등 술', th: 'สุราโคมแดง', en: 'Red-lantern wine' } },
   { key: 'bloodvest', cat: 'armor', price: 220, def: 8, hell: true, floor: 3, store: 'drop', sprite: 'vest', icon: 'vest', name: { ko: '핏빛 가죽 조끼', th: 'เสื้อกั๊กหนังสีเลือด', en: 'Blood-leather vest' } },
   { key: 'scalecleaver', cat: 'weapon', price: 320, atk: 15, hell: true, floor: 3, store: 'drop', sprite: 'cleaver', icon: 'hatchet', name: { ko: '저울추 고기칼', th: 'มีดสับตุ้มตาชั่ง', en: 'Scale-weight cleaver' } },
+  // 24차 4층 용광로 고유 물건
+  { key: 'slagbread', cat: 'goods', price: 26, heal: 520, hell: true, floor: 4, store: 'drop', icon: 'cake', name: { ko: '모루에 구운 쇠빵', th: 'ขนมปังอบบนทั่ง', en: 'Anvil-baked ironbread' } },
+  { key: 'forgegloves', cat: 'armor', price: 260, def: 9, hell: true, floor: 4, store: 'drop', sprite: 'gloves', icon: 'gloves', name: { ko: '대장장이 쇠장갑', th: 'ถุงมือเหล็กช่างตีเหล็ก', en: "Smith's iron gauntlets" } },
+  { key: 'slagmaul', cat: 'weapon', price: 420, atk: 20, two: true, hell: true, floor: 4, store: 'drop', sprite: 'sledge', icon: 'sledge', name: { ko: '쇳물 오함마', th: 'ค้อนปอนด์น้ำเหล็ก', en: 'Slag sledge' } },
   // 22차 지옥 휴게소: 물장수 · 약장수 · 무기상(원거리)
   { key: 'hmurky', cat: 'goods', price: 2, heal: 40, hell: true, store: 'hwater', icon: 'water', name: { ko: '탁한 물', th: 'น้ำขุ่น', en: 'Murky water' } },
   { key: 'hboiled', cat: 'goods', price: 6, heal: 120, hell: true, store: 'hwater', icon: 'water', name: { ko: '끓인 강물', th: 'น้ำแม่น้ำต้มสุก', en: 'Boiled river water' } },

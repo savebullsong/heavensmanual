@@ -3,14 +3,15 @@
 import { TYPES, finalize, type Zone, type Building, type HellBuildKind, type Prop, type TileType , type HellVendor} from './zone.ts';
 import type { Lang } from './i18n.ts';
 
-export const OPEN_FLOORS = 3; // 지금 열린 층 (4~13층은 하나씩 업데이트)
+export const OPEN_FLOORS = 4; // 지금 열린 층 (4~13층은 하나씩 업데이트)
 
-export type Theme = 'ash' | 'swamp' | 'market';
+export type Theme = 'ash' | 'swamp' | 'market' | 'forge'; // 24차: 4층 용광로
 export interface FloorDef { floor: number; theme: Theme; name: Record<Lang, string>; sin: Record<Lang, string>; monsters: string[]; boss: string; guard?: string; /** 고문 장면의 고문자 (그 층의 큰 괴물이 몽둥이를 든다) */ torturer: string }
 export const FLOORS: FloorDef[] = [
   { floor: 1, theme: 'ash', name: { ko: '재의 문턱', th: 'ธรณีแห่งเถ้าถ่าน', en: 'Threshold of Ash' }, sin: { ko: '경미한 잘못, 책임 회피', th: 'ความผิดเล็กน้อย การหนีความรับผิดชอบ', en: 'Petty wrongs, evading responsibility' }, monsters: ['ashen', 'ember', 'bonewalker', 'gateyak'], boss: 'ashgal', guard: 'ashwarden', torturer: 'gateyak' },
   { floor: 2, theme: 'swamp', name: { ko: '굶주림의 늪', th: 'บึงแห่งความหิวโหย', en: 'Swamp of Hunger' }, sin: { ko: '탐욕', th: 'ความโลภ', en: 'Greed' }, monsters: ['pret', 'bogdead', 'glutton'], boss: 'gurma', guard: 'hollowbowl', torturer: 'glutton' },
   { floor: 3, theme: 'market', name: { ko: '피의 시장', th: 'ตลาดเลือด', en: 'Blood Market' }, sin: { ko: '사기, 기만', th: 'การฉ้อโกง การหลอกลวง', en: 'Fraud and deceit' }, monsters: ['haggler', 'debtbones', 'broker'], boss: 'serane', guard: 'waxseal', torturer: 'broker' },
+  { floor: 4, theme: 'forge', name: { ko: '용광로', th: 'เตาหลอม', en: 'The Furnace' }, sin: { ko: '분노와 폭력', th: 'ความโกรธและความรุนแรง', en: 'Wrath and violence' }, monsters: ['slagdead', 'chainbones', 'bellows'], boss: 'dorkan', guard: 'anvilward', torturer: 'bellows' },
 ];
 export const floorDef = (f: number) => FLOORS[Math.max(1, Math.min(FLOORS.length, f)) - 1];
 
@@ -51,13 +52,22 @@ export const GUARDS: Record<string, GuardDef> = {
     cols: { 1: '#a8281e', 3: '#1e1818', 4: '#141010', 14: '#c9a23e', 13: '#3a2418', 12: '#c8281e', 6: '#ffd08a', 15: '#0e0a0a', 10: '#a8281e' },
     hp: 4200, dmg: [30, 42], atk: 1.0, speed: 0.6, special: 'seal', // 층주 세라네만큼
   },
+  // 24차 4층: 모루지기 — 쇠 두건 아래 그을린 얼굴, 모루를 닮은 쇳덩이 곤봉으로 내려쳐 밀어낸다
+  anvilward: {
+    key: 'anvilward', body: 'warden1', weapon: 'knocker',
+    name: { ko: '모루지기', th: 'ผู้เฝ้าทั่ง', en: 'Anvil Warden' },
+    line: { ko: '여기선 쇠만 두드린다. 사람은 아니다.', th: 'ที่นี่ตีแต่เหล็ก ไม่ตีคน', en: 'Here we strike iron. Not people.' },
+    look: { ko: '쇳물에 그을린 쇠 두건, 가슴에 박힌 모루 모양의 쇳덩이, 손에는 쇠똥이 엉겨 붙은 무거운 곤봉. 두건 틈으로 불티가 샌다.', th: 'ผ้าคลุมหัวเหล็กไหม้เกรียมจากน้ำเหล็ก ก้อนเหล็กรูปทั่งฝังที่อก ในมือคือกระบองหนักมีตะกรันติด ประกายไฟลอดออกจากรอยผ้า', en: 'An iron hood scorched by molten metal, an anvil-shaped lump of iron set in its chest, a heavy club crusted with slag. Sparks leak from the hood.' },
+    cols: { 1: '#3a3634', 3: '#2a2624', 4: '#1a1716', 10: '#5a524c', 14: '#8a7e6e', 15: '#060404', 12: '#ff8a1a', 6: '#ff8a1a' },
+    hp: 5400, dmg: [34, 46], atk: 1.0, speed: 0.6, special: 'push', // 층주 도르칸만큼
+  },
 };
 
 /** 괴물: 몸 + 색. 일반 괴물은 모두 무기를 든다. 16차부터 층마다 몸이 다르다:
  *  1층 잿빛 망자(곡괭이) · 불씨 망자(머리가 타오르는 숯 몸, 낙인 쇠) · 걷는 해골 · 문지기 야크 / 층주 아쉬갈(숯 바위 거인, 성문 빗장)
  *  2층 프렛(국자) · 늪 망자(불어 터진 시체, 쇠갈고리 장대) · 탐식귀(두꺼비 거구, 몽둥이) / 층주 구르마(산 같은 배, 맨손)
  *  3층 흥정꾼(웃는 가면 상인, 고기 칼) · 빚쟁이 해골(멍에·족쇄, 빚 갈고리) · 살점 거간꾼(뚱뚱한 금붙이 상인, 고기 칼) / 층주 세라네 */
-export type MonsterBody = 'ash' | 'pret' | 'yak' | 'bones' | 'serane' | 'ashgal' | 'gurma' | 'cinder' | 'bloat' | 'glutton' | 'hawker' | 'debtor' | 'broker';
+export type MonsterBody = 'ash' | 'pret' | 'yak' | 'bones' | 'serane' | 'ashgal' | 'gurma' | 'cinder' | 'bloat' | 'glutton' | 'hawker' | 'debtor' | 'broker' | 'forgeknight';
 export interface MonsterDef {
   key: string; body: MonsterBody; name: Record<Lang, string>;
   skin: string; cloth: string; glow: string; // 살·옷·빛나는 곳 색
@@ -86,6 +96,12 @@ export const MONSTERS: Record<string, MonsterDef> = Object.fromEntries([
   M('debtbones', 'debtor', '빚쟁이 해골', 'โครงกระดูกลูกหนี้', 'Debtor bones', '#c9b89a', '#6a5a3a', '#f2c84a', 360, [13, 21], 1.2, 7, 0.9, 1, [7, 13], { weapon: 'hook', cols: { 10: '#e8dcc0' } }),
   M('broker', 'broker', '살점 거간꾼', 'นายหน้าเนื้อ', 'Flesh broker', '#8a5a4a', '#2a1a12', '#f2c84a', 800, [19, 29], 0.9, 5, 1.1, 1.1, [15, 26], { weapon: 'cleaver', cols: { 14: '#c9a23e' } }),
   // 세라네: 피의 시장 끝 나루터 앞에 도사린 거대한 살덩이 애벌레. 세로로 찢어진 아가리에 이빨이 세 겹 (맨손 = 발톱 팔)
+  // 4층 용광로 (24차): 쇳물에 반쯤 녹은 망자 · 사슬에 묶인 그을린 해골 · 풀무를 등에 진 거한
+  M('slagdead', 'ash', '쇳물 망자', 'ผีน้ำเหล็ก', 'Slag dead', '#3a3634', '#1e1a18', '#ff8a1a', 420, [15, 23], 1.0, 6, 0.95, 1, [8, 15], { weapon: 'pickaxe', cols: { 12: '#ffb02a', 14: '#6a625a' } }),
+  M('chainbones', 'debtor', '사슬 해골', 'โครงกระดูกโซ่', 'Chained bones', '#4a423c', '#2a2420', '#ff6a1a', 400, [15, 24], 1.25, 7, 0.88, 1, [8, 15], { weapon: 'hook', cols: { 10: '#5e5650', 14: '#8a8078' } }),
+  M('bellows', 'glutton', '풀무 거한', 'ยักษ์สูบลม', 'Bellows brute', '#2e2826', '#5a4a3a', '#ff7a2a', 900, [22, 32], 0.85, 5, 1.15, 1.15, [18, 30], { weapon: 'club', cols: { 4: '#1a1412', 14: '#8a6a3a' } }),
+  // 도르칸: 용광로의 집행자. 뿔 달린 검은 가시 갑옷, 해골 얼굴에 붉은 눈, 쇠사슬 감긴 철퇴 지팡이, 해진 붉은 망토 (사용자 컨셉 그림)
+  M('dorkan', 'forgeknight', '도르칸', 'ดอร์คาน', 'Dorkan', '#2a2422', '#5a0e10', '#ff4a1a', 5400, [34, 48], 0.9, 8, 1.05, 1.6, [520, 640], { boss: true, weapon: 'chainmace', cols: { 13: '#7a1014', 14: '#5a5250', 15: '#0a0606' } }),
   M('serane', 'serane', '세라네', 'เซราเน', 'Serane', '#5e1a20', '#360a0e', '#e0281e', 4200, [30, 42], 0.8, 6, 1.0, 1.85, [380, 460], { boss: true, weapon: null }),
 ].map((m) => [m.key, m]));
 
@@ -108,8 +124,8 @@ function vnoise(x: number, y: number, seed: number) {
 }
 const cache = new Map<number, Zone>();
 /** 위층 통행세와 속죄의 회당 목표 (노전). 층주를 피해 지나가는 값은 아주 비싸다 */
-export const TOLL: Record<number, number> = { 1: 10000, 2: 20000, 3: 30000 };
-export const ATONE_GOAL: Record<number, number> = { 1: 11000, 2: 21000, 3: 31000 };
+export const TOLL: Record<number, number> = { 1: 10000, 2: 20000, 3: 30000, 4: 40000 };
+export const ATONE_GOAL: Record<number, number> = { 1: 11000, 2: 21000, 3: 31000, 4: 41000 };
 /**
  * 4층부터: 마을의 결계(보호)가 주기적으로 걷힌다. 그동안 괴물이 마을로 몰려들고, 경비병은 휴전 협약대로 움직이지 않는다.
  * 모두에게 같은 시각에 일어나도록 실제 시계로 정한다 (층마다 어긋나게). 매 15분 중 2분.
@@ -151,7 +167,8 @@ export function hellZone(floor: number): Zone {
   const disc = (ci: number, cj: number, rad: number, t: TileType) => { for (let j = cj - rad; j <= cj + rad; j++) for (let i = ci - rad; i <= ci + rad; i++) if ((i - ci) ** 2 + (j - cj) ** 2 <= rad * rad + 1) set(i, j, t); };
   // 바깥: 지나갈 수 없는 경계 (네 칸 바위 + 층마다 다른 해자: 1층 용암 두 칸 · 2층 늪 두 칸)
   // 3층(피의 시장)은 바깥이 벽이 아니라 끝없는 피의 용암 바다 (경계 여덟 칸이 모두 피의 용암)
-  const SEA = T === 'market';
+  const MK = T === 'market' || T === 'forge'; // 4층 용광로도 바깥이 끝없는 쇳물 바다 · 나루터
+  const SEA = MK;
   const EDGE = SEA ? 0 : 4, MOAT = SEA ? 8 : 2;
   const edgeD = (i: number, j: number) => Math.min(i, j, W - 1 - i, H - 1 - j);
   const CITY = T === 'ash' ? 14 : 0; // 1층 북쪽 끝: 해자 대신 불탄 도시가 늘어선 띠
@@ -276,7 +293,7 @@ export function hellZone(floor: number): Zone {
   const approach = T === 'ash' ? { i: U.i, j: CITY + 5 } : T === 'swamp' ? { i: B.i, j: B.j + 3 } : U;
   road(gateFor(B), B); road(B, approach); road(gateFor(D), { i: D.i, j: D.j - 1 });
   disc(B.i, B.j, 6, 'walk'); disc(D.i, D.j - 2, 2, 'walk');
-  if (T === 'market') for (let j = 3; j < U.j; j++) set(U.i, j, j < U.j - 1 ? 'cross' : 'walk'); // 나루터 부두 (널빤지)
+  if (MK) for (let j = 3; j < U.j; j++) set(U.i, j, j < U.j - 1 ? 'cross' : 'walk'); // 나루터 부두 (널빤지)
 
   // ── 마을 ──
   const inV = (i: number, j: number, m = 0) => {
@@ -296,7 +313,7 @@ export function hellZone(floor: number): Zone {
   for (let j = C.j - VR - 3; j <= C.j + VR + 3; j++) for (let i = C.i - VR - 3; i <= C.i + VR + 3; i++) {
     if (!inV(i, j, 1)) continue;
     const plaza = Math.hypot(i - C.i, j - C.j) < VR * 0.38 || (i - C.i) * (j - C.j) === 0;
-    set(i, j, T === 'swamp' ? 'walk' : T === 'market' ? (plaza ? 'walk' : 'soi') : plaza ? 'walk' : 'lot');
+    set(i, j, T === 'swamp' ? 'walk' : MK ? (plaza ? 'walk' : 'soi') : plaza ? 'walk' : 'lot');
   }
   // ── 17차: 사각형이 아닌 땅 — 들쭉날쭉한 해안선 ──
   // 땅 = 가운데에서 잡음으로 흔든 반지름 안 + 꼭 필요한 곳(마을·층주·위층 길·아래층 계단·길) 둘레.
@@ -321,7 +338,7 @@ export function hellZone(floor: number): Zone {
     if (landHold(i, j)) continue;
     const cv = coast(i, j);
     if (cv >= 0.03 || (SEA && cv >= 0)) continue;
-    if (cv >= 0) { if (T !== 'market') { set(i, j, 'block'); cliff.add(j * W + i); } continue; } // 해안 절벽
+    if (cv >= 0) { if (!MK) { set(i, j, 'block'); cliff.add(j * W + i); } continue; } // 해안 절벽
     if (T === 'swamp') set(i, j, cv < -0.07 ? 'block' : 'water'); // 늪물 너머는 바위산
     else set(i, j, 'water');
   }
@@ -341,6 +358,9 @@ export function hellZone(floor: number): Zone {
       [-4, 6, 2, 1, 24, 'generic', 'stall'], [6, 0, 1, 2, 24, 'generic', 'stall']],
     market: [[-1, -6, 2, 2, 58, 'ujusae', undefined, 'left'], [3, -6, 3, 2, 62, 'loan', undefined, 'left'], [-7, -6, 2, 2, 48, 'hbank', undefined, 'left'], [-7, 1, 2, 2, 46, 'atone', undefined, 'left'],
       [3, 3, 2, 1, 26, 'generic', 'butcher'], [-3, 5, 2, 1, 22, 'generic', 'stall'], [5, -1, 1, 2, 22, 'generic', 'stall'], [-3, -2, 2, 2, 76, 'generic', 'idol']],
+    // 4층 용광로: 대부소 없이 · 쇠를 두드리는 대장간 노점 · 가운데 큰 모루 조형물
+    forge: [[-1, -6, 2, 2, 58, 'ujusae', undefined, 'left'], [4, -6, 2, 2, 48, 'hbank', undefined, 'left'], [-7, -6, 2, 2, 46, 'atone', undefined, 'left'],
+      [3, 3, 2, 1, 26, 'generic', 'butcher'], [-3, 5, 2, 1, 22, 'generic', 'stall'], [5, -1, 1, 2, 22, 'generic', 'stall'], [-7, 1, 1, 2, 22, 'generic', 'stall'], [-3, -2, 2, 2, 76, 'generic', 'idol']],
   };
   let shop: Building | null = null;
   for (const [di, dj, w, d, h, cat, hk, sign] of LAYOUT[T]) {
@@ -390,6 +410,7 @@ export function hellZone(floor: number): Zone {
     ash: [['prison', 2], ['bonehouse', 2], ['carcass', 4], ['bonepile', 4], ['guts', 2], ['burnt', 3]],
     swamp: [['bonehouse', 1], ['carcass', 3], ['bonepile', 3], ['guts', 3]],
     market: [['bonehouse', 4], ['prison', 3], ['carcass', 3], ['bonepile', 3], ['guts', 2]],
+    forge: [['prison', 4], ['burnt', 4], ['bonepile', 3], ['carcass', 2]], // 4층: 쇠 감옥 · 타 버린 집 · 녹다 만 뼈 무더기
   };
   const sizeOf = (k: HellBuildKind): [number, number, number] => {
     const a = r() < 0.5;

@@ -79,6 +79,8 @@ for sex in 'mf':
         sets += [{'kind': 'armor', 'piece': pc, 'mode': 'm', 'extra': ['idle2', 'walk2']} for pc in (['jacket', 'vest', 'workpants'] + (['helmet', 'gloves', 'shinguard', 'boots'] if b == 1 else []))]
         if b == 1: sets += [{'kind': 'weapon', 'weapon': w, 'extra': ['idle2', 'walk2']} for w in TWO]
         jobs.append({'sex': sex, 'build': b, 'sets': sets, 'only': ['idle2', 'walk2'], 'merge': True, 'tag': 'hold19'})
+# ── 24차: 4층 층주 도르칸 (가시 갑옷 기사 + 사슬 철퇴 지팡이)
+jobs.append({'sex': 'm', 'build': 1, 'monster': 'z', 'occluder': 'forgeknight', 'sets': [{'kind': 'base', 'outfit': 'forgeknight', 'mode': 'm'}, {'kind': 'weapon', 'weapon': 'chainmace'}], 'tag': 'forge24'})
 # ── 20차: 한손검 · 왼팔 방패 (맨손 u · 무기 m 자세, 보통 체형 하나로 모든 체형에) ──
 for sex in 'mf':
     jobs.append({'sex': sex, 'build': 1, 'sets': [{'kind': 'weapon', 'weapon': 'arming'}] + [{'kind': 'armor', 'piece': 'shield', 'mode': m} for m in ('u', 'm')], 'tag': 'shield20'})

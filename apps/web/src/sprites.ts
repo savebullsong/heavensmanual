@@ -46,7 +46,7 @@ export const MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'da
 /** 양손 무기 (16차): 두 손으로 크게 들어 내려찍는다 (heavy 동작) — 느리지만 묵직하다 */
 export const TWO = new Set(['sledge', 'fireaxe', 'greatsword', 'maul']);
 /** 16차 괴물 몸: 차림 → [굽기 키, 자세] (무기를 들면 m) */
-const MON16: Record<string, [string, string, Mode]> = { ashgal: ['h', 'ashgal', 'm'], gurma: ['u', 'gurma', 'u'], cinder: ['n', 'cinder', 'm'], bloat: ['l', 'bloat', 'm'], glutton: ['e', 'glutton', 'm'], hawker: ['v', 'hawker', 'm'], debtor: ['d', 'debtor', 'm'], broker: ['k', 'besk', 'm'] };
+const MON16: Record<string, [string, string, Mode]> = { ashgal: ['h', 'ashgal', 'm'], gurma: ['u', 'gurma', 'u'], cinder: ['n', 'cinder', 'm'], bloat: ['l', 'bloat', 'm'], glutton: ['e', 'glutton', 'm'], hawker: ['v', 'hawker', 'm'], debtor: ['d', 'debtor', 'm'], broker: ['k', 'besk', 'm'], forgeknight: ['z', 'forgeknight', 'm'] }; // 24차: 4층 층주 도르칸
 /** 방어구 겉모습: 그리는 순서와 색 (구역 3 = 본색, 구역 5 = 신발) */
 const ARMOR_ORDER = ['workpants', 'shinguard', 'boots', 'jacket', 'vest', 'gloves', 'shield'];
 const ARMOR_COLOR: Record<string, string> = { helmet: '#b0302a', jacket: '#4a5236', vest: '#3a3f46', gloves: '#d8cfb4', workpants: '#4a4536', shinguard: '#2b2f36', boots: '#3a2a1a', shield: '#7a4a2a' };
@@ -214,7 +214,7 @@ export function charSet(look: Look, weapon: string | null = null, armor: string[
   p = pxReady.then(async () => {
     const cs = await build(look, keys);
     // 괴물 몸을 아직 굽지 않았으면 실밥 터진 대식자 몸에 색만 입혀 쓴다
-    if (!cs.frames.size && ['ash', 'pret', 'yak', 'ashgal', 'gurma', 'cinder', 'bloat', 'glutton', 'hawker', 'debtor', 'broker'].includes(look.outfit ?? '')) return build({ ...look, outfit: 'stitched' }, layerKeys({ ...look, outfit: 'stitched' }, 'needle'));
+    if (!cs.frames.size && ['ash', 'pret', 'yak', 'ashgal', 'gurma', 'cinder', 'bloat', 'glutton', 'hawker', 'debtor', 'broker', 'forgeknight'].includes(look.outfit ?? '')) return build({ ...look, outfit: 'stitched' }, layerKeys({ ...look, outfit: 'stitched' }, 'needle'));
     return cs;
   });
   sets.set(id, p);
