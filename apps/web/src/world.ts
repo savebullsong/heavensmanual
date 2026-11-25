@@ -1349,8 +1349,23 @@ export class WorldScene {
     if (!e) return;
     // 대로 동쪽 끝, 구름과 맞닿은 가장자리
     let at: [number, number] | null = null;
-    // 대로 표지와 겹치지 않게 대로 남쪽 보도·골목 쪽으로
-    for (let di = 4; di < 40 && !at; di++) for (const dj of [12, 14, 16, 10, 18, -12, -14, -16, 20, -20]) { const i = e.i1 - di, j = e.c + dj; if (walkable(this.zone, i, j) && walkable(this.zone, i - 1, j) && walkable(this.zone, i, j + 1) && walkable(this.zone, i - 1, j + 1)) { at = [i, j]; break; } }
+    // 21차: 문(240×330px)이 건물에 가리지 않는 빈 자리 — 문 앞쪽(화면 아래) 띠에 건물이 없는 칸을 고른다.
+    // 대로 가운데의 구역 끝 표지와는 떨어지고(남북 6칸 이상), 구름 가장자리에 가까울수록 좋다
+    const blocked = (i: number, j: number) => !this.heavenOut(i, j) && !walkable(this.zone, i, j) && !['water', 'void'].includes(tileAt(this.zone, i, j));
+    let best = 1e9;
+    for (let di = 4; di < 46; di++)
+      for (let dj = -32; dj <= 32; dj++) {
+        if (Math.abs(dj) < 6) continue;
+        const i = e.i1 - di, j = e.c + dj;
+        if (this.heavenOut(i, j) || !walkable(this.zone, i, j) || !walkable(this.zone, i - 1, j) || !walkable(this.zone, i, j + 1) || !walkable(this.zone, i - 1, j + 1)) continue;
+        let n = 0;
+        const d0 = i - j, s0 = i + j;
+        for (let s = s0 + 1; s <= s0 + 14; s++) for (let d = d0 - 5; d <= d0 + 5; d++) { if ((s + d) & 1) continue; if (blocked((s + d) / 2, (s - d) / 2)) n++; }
+        // 문 뒤(위로 솟은 부분)에 붙은 높은 건물도 조금 덜어 본다
+        for (let s = s0 - 3; s <= s0; s++) for (let d = d0 - 2; d <= d0 + 2; d++) { if ((s + d) & 1) continue; if (blocked((s + d) / 2, (s - d) / 2)) n += 0.3; }
+        const score = n * 100 + di * 0.6 + Math.abs(Math.abs(dj) - 12) * 0.4;
+        if (score < best) { best = score; at = [i, j]; }
+      }
     if (!at) return;
     const spr = new Sprite(hellPortalTexture(0));
     spr.anchor.set(0.5, 0.96);
@@ -1358,6 +1373,7 @@ export class WorldScene {
     spr.position.set(Math.round(x), Math.round(y));
     spr.zIndex = at[0] + at[1] + 0.5;
     this.objects.addChild(spr);
+    this.addTall(spr, x - 120, y - 317, x + 120, y + 13); // 뒤로 들어가면 옅어진다
     this.portal = { i: at[0], j: at[1], spr, f: 0, t: 0 };
     this.invadeT = 45 + Math.random() * 45; // 첫 침공은 금방
   }
