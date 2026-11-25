@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict';
 import { judge, hellFloor, evilRatio, addSoulExp, soulExpToNext, applyDeed, carHit, maxHp, isDanger, resurrectionChance, critChance } from './rules.ts';
 
-assert.deepEqual(judge({ good: 0, evil: 0 }), { world: 'ghost' });
-assert.deepEqual(judge({ good: 5, evil: 5 }), { world: 'ghost' });
+assert.deepEqual(judge({ good: 0, evil: 0 }), { world: 'border' });
+assert.deepEqual(judge({ good: 5, evil: 5 }), { world: 'border' });
 assert.equal(judge({ good: 9, evil: 1 }).world, 'heaven');
 assert.deepEqual(judge({ good: 100, evil: 0 }), { world: 'heaven' });
 assert.equal(hellFloor(51), 1);

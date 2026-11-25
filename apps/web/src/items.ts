@@ -45,11 +45,11 @@ export const ITEMS: ItemDef[] = [
   // 양손 무기 (16차)
   { key: 'sledge', cat: 'weapon', price: 2600, atk: 10, store: 'tools', two: true, name: { ko: '오함마', th: 'ค้อนปอนด์', en: 'Sledgehammer' } },
   { key: 'fireaxe', cat: 'weapon', price: 5200, atk: 13, two: true, name: { ko: '소방 도끼', th: 'ขวานดับเพลิง', en: 'Fire axe' } },
-  { key: 'pistol', cat: 'weapon', price: 45000, atk: 20, ranged: true, note: 'needsAmmo', name: { ko: '권총', th: 'ปืนพก', en: 'Pistol' } },
-  { key: 'ammo', cat: 'weapon', price: 600, note: 'ammo', name: { ko: '권총탄 12발', th: 'กระสุนปืนพก 12 นัด', en: 'Pistol rounds ×12' } },
+  { key: 'pistol', cat: 'weapon', price: 68000, atk: 26, ranged: true, note: 'needsAmmo', name: { ko: '권총', th: 'ปืนพก', en: 'Pistol' } },
+  { key: 'ammo', cat: 'weapon', price: 2400, note: 'ammo', name: { ko: '권총탄 12발', th: 'กระสุนปืนพก 12 นัด', en: 'Pistol rounds ×12' } },
   // 17차 활: 소리 없이 멀리서. 민첩이 높을수록 세다
-  { key: 'bow', cat: 'weapon', price: 3200, atk: 9, ranged: true, note: 'needsArrows', name: { ko: '사냥 활', th: 'ธนูล่าสัตว์', en: 'Hunting bow' } },
-  { key: 'arrows', cat: 'weapon', price: 150, note: 'arrows', name: { ko: '화살 20대', th: 'ลูกธนู 20 ดอก', en: 'Arrows ×20' } },
+  { key: 'bow', cat: 'weapon', price: 2600, atk: 3, ranged: true, note: 'needsArrows', name: { ko: '사냥 활', th: 'ธนูล่าสัตว์', en: 'Hunting bow' } },
+  { key: 'arrows', cat: 'weapon', price: 150, atk: 3, note: 'arrows', name: { ko: '화살 20대', th: 'ลูกธนู 20 ดอก', en: 'Arrows ×20' } },
   // 방어구
   { key: 'helmet', cat: 'armor', price: 690, def: 3, name: { ko: '헬멧', th: 'หมวกกันน็อก', en: 'Helmet' } },
   { key: 'shield', cat: 'armor', price: 3800, def: 4, name: { ko: '원형 방패', th: 'โล่กลม', en: 'Round shield' } }, // 20차: 왼팔에 (권총·활·양손 무기와는 못 든다)
@@ -107,11 +107,11 @@ export const ITEMS: ItemDef[] = [
   { key: 'hsalve', cat: 'goods', price: 12, heal: 180, hell: true, store: 'hmed', icon: 'bandage', name: { ko: '유황 연고', th: 'ขี้ผึ้งกำมะถัน', en: 'Sulfur salve' } },
   { key: 'hstitch', cat: 'goods', price: 28, heal: 360, hell: true, store: 'hmed', icon: 'bandage', name: { ko: '망자의 실 꿰매기', th: 'ด้ายเย็บของผู้ตาย', en: 'Dead man’s stitches' } },
   { key: 'hbitter', cat: 'goods', price: 60, heal: 700, hell: true, store: 'hmed', icon: 'painkiller', name: { ko: '쓴 약 한 병', th: 'ยาขมหนึ่งขวด', en: 'Vial of bitter cure' } },
-  { key: 'hbonebow', cat: 'weapon', price: 180, atk: 12, ranged: true, note: 'needsArrows', hell: true, store: 'harms', sprite: 'bow', icon: 'bow', name: { ko: '뼈활', th: 'ธนูกระดูก', en: 'Bone bow' } },
-  { key: 'hlongbow', cat: 'weapon', price: 420, atk: 17, ranged: true, note: 'needsArrows', hell: true, store: 'harms', sprite: 'bow', icon: 'bow', name: { ko: '힘줄 장궁', th: 'ธนูยาวเอ็น', en: 'Sinew longbow' } },
-  { key: 'hmatchlock', cat: 'weapon', price: 900, atk: 26, ranged: true, note: 'needsAmmo', hell: true, store: 'harms', sprite: 'pistol', icon: 'pistol', name: { ko: '유황 화승총', th: 'ปืนคาบชุดกำมะถัน', en: 'Sulfur matchlock' } },
-  { key: 'harrows', cat: 'weapon', price: 18, note: 'arrows', hell: true, store: 'harms', icon: 'arrows', name: { ko: '흑요석 화살 20대', th: 'ลูกธนูหินออบซิเดียน 20 ดอก', en: 'Obsidian arrows ×20' } },
-  { key: 'hshot', cat: 'weapon', price: 40, note: 'ammo', hell: true, store: 'harms', icon: 'ammo', name: { ko: '유황 탄환 12발', th: 'กระสุนกำมะถัน 12 นัด', en: 'Sulfur shot ×12' } },
+  { key: 'hbonebow', cat: 'weapon', price: 160, atk: 4, ranged: true, note: 'needsArrows', hell: true, store: 'harms', sprite: 'bow', icon: 'bow', name: { ko: '뼈활', th: 'ธนูกระดูก', en: 'Bone bow' } },
+  { key: 'hlongbow', cat: 'weapon', price: 380, atk: 6, ranged: true, note: 'needsArrows', hell: true, store: 'harms', sprite: 'bow', icon: 'bow', name: { ko: '힘줄 장궁', th: 'ธนูยาวเอ็น', en: 'Sinew longbow' } },
+  { key: 'hmatchlock', cat: 'weapon', price: 1600, atk: 32, ranged: true, note: 'needsAmmo', hell: true, store: 'harms', sprite: 'pistol', icon: 'pistol', name: { ko: '유황 화승총', th: 'ปืนคาบชุดกำมะถัน', en: 'Sulfur matchlock' } },
+  { key: 'harrows', cat: 'weapon', price: 18, atk: 4, note: 'arrows', hell: true, store: 'harms', icon: 'arrows', name: { ko: '흑요석 화살 20대', th: 'ลูกธนูหินออบซิเดียน 20 ดอก', en: 'Obsidian arrows ×20' } },
+  { key: 'hshot', cat: 'weapon', price: 150, note: 'ammo', hell: true, store: 'harms', icon: 'ammo', name: { ko: '유황 탄환 12발', th: 'กระสุนกำมะถัน 12 นัด', en: 'Sulfur shot ×12' } },
   { key: 'hjerky', cat: 'goods', price: 3, heal: 50, hell: true, store: 'hmeat', icon: 'chips', name: { ko: '말린 고기', th: 'เนื้อแห้ง', en: 'Dried meat' } },
   { key: 'hskewer', cat: 'goods', price: 5, heal: 100, hell: true, store: 'hmeat', icon: 'ricebox', name: { ko: '고기 꼬치', th: 'เนื้อเสียบไม้', en: 'Meat skewer' } },
   { key: 'hstew', cat: 'goods', price: 10, heal: 220, hell: true, store: 'hmeat', icon: 'noodle', name: { ko: '뼈국', th: 'ซุปกระดูก', en: 'Bone broth' } },

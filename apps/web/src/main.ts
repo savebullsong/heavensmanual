@@ -17,6 +17,7 @@ import { load, save, type Slot, type Stash } from './state.ts';
 import { hellZone, OPEN_FLOORS, floorDef, MONSTERS, GUARDS, TOLL, ATONE_GOAL, GURMA_FULL, setRaidForce, FLOORS } from './hell.ts';
 import type { HellVendor } from './zone.ts';
 import { interiorZone, roomKind as roomKindOf, canEnter } from './interior.ts';
+import { borderZone } from './border.ts';
 import { TWO } from './sprites.ts';
 import { buildingName, hasBank } from './names.ts';
 import { bangkokClock } from './clock.ts';
@@ -26,6 +27,7 @@ import { bgmMode, setBgmMode, setIndoor, type BgmMode } from './bgm.ts';
 import { applyDeed, karmaPoints, fmtKarma, armorClass, addSoulExp, judge, evilRatio, prayerAnswerChance, restRegenPerMinute, isDanger, DEED_TABLE, newStats, soulExpToNext, maxHp as maxHpFor, POINTS_PER_RANK, STAT_KEYS, STAT_MAX, type DeedKey, type StatKey } from '../../../packages/shared/src/rules.ts';
 
 const state = load();
+if (state.realm === 'ghost') { state.realm = 'border'; delete state.pos; } // 24차: 귀신은 없어졌다 — 떠돌던 영혼은 경계의 해변으로
 if (state.lang) setLang(state.lang);
 // 시험용: ?newlife 는 새 영혼으로 다시 시작, ?form=raincoat 처럼 처음 모습을 고정
 const params = new URLSearchParams(location.search);
@@ -159,18 +161,20 @@ async function boot() {
   // 다시 열면 마지막 자리에서 (현실·천국·귀신은 거리의 그 자리, 가게 안에서 일하던 중이면 그 가게 안에서 계속)
   const pos = state.pos && state.pos.w === realm() ? state.pos : null;
   if (realm() === 'hell') enterHell(hellState().floor, 'resume');
+  else if (realm() === 'border') enterBorder('resume');
   else if (pos && (state.look || realm() !== 'real')) resumeAt(pos);
   else if (realm() === 'ghost' || realm() === 'heaven') enterWorld(realm() === 'heaven' ? 'door' : undefined);
   else enterShop(false);
   setInterval(updateHud, 1000);
   setInterval(() => { snapPos(); save(state); }, 4000);
   addEventListener('pagehide', () => { snapPos(); save(state); });
-  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar() }; // 개발용 확인 창구
+  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w) }; // 개발용 확인 창구
 }
 
 // ───────────────────────── 장면 전환 ─────────────────────────
 /** 지금 서 있는 곳을 적어 둔다 (방 안이면 그 건물과, 일하는 중인지) */
 function snapPos() {
+  if (realm() === 'border') { delete state.pos; return; }
   if (scene !== 'world' || !world || world.isDead) { if (scene === 'shop') delete state.pos; return; }
   const inside = world.zone.interior;
   const base = inside && street ? street : world;
@@ -205,7 +209,7 @@ function enterShop(fromStreet: boolean) {
   closeMenus();
   world?.stop();
   if (world) world.root.visible = false;
-  { const r = realm(); shop.setRealm(r === 'heaven' ? 'real' : r); }
+  { const r = realm(); shop.setRealm(r === 'heaven' || r === 'border' ? 'real' : r); }
   shop.setLabels(shopLabels());
   if (inHell()) preloadPortrait('hwanghon');
   shop.setLook(bodyLook(), gear()); // 입은 방어구 그대로 (맨몸이면 환자복 같은 처음 옷이 드러난다)
@@ -705,8 +709,10 @@ function clerkTalk() {
   if (info.kind === 'loan') { talkToBesk(); return; } // 3층 피의 시장: 베스크 대부소
   if (info.kind === 'hbank') { openHellBank(); return; }
   if (info.kind === 'atone') { openAtone(); return; }
+  if ((info.kind === 'rebirth' || info.kind === 'terrace') && world?.clerkIsGrandpa) { talkToGrandpa(info.kind === 'rebirth'); return; }
   if (info.kind === 'rebirth') { talkToPashar(); return; }
   if (info.kind === 'terrace') { talkToOfficer(); return; }
+  if (info.kind === 'shore') { talkToBulda(); return; }
   if (info.store === 'bank') { openBank(info.name); return; }
   if (info.store === 'mart' || info.store === 'pharmacy' || info.store === 'food' || info.store === 'cafe' || info.store === 'tools' || info.store === 'dept') { openStore(info.store, info.name, info.cuisine); return; }
   const opts: { label: string; danger?: boolean; act: () => void }[] = [];
@@ -968,17 +974,21 @@ async function talkToPashar() {
   dlg.close();
   busy = false;
   // 가져가는 노전: 손에 든 것부터, 모자라면 은행에서
-  const fromHand = Math.min(carry, Math.floor(h.notes));
-  h.notes -= fromHand;
-  h.bank = Math.max(0, (h.bank ?? 0) - (carry - fromHand));
   state.region = region;
-  rebirthFrom('hell', carry * OBOL_RATE);
-  if (carry > 0) setTimeout(() => toast(L.lobbyCarry.replace('{n}', carry.toLocaleString('en-US')).replace('{b}', (carry * OBOL_RATE).toLocaleString('en-US')), 'good'), 600);
+  shipThenRebirth(() => {
+    const fromHand = Math.min(carry, Math.floor(h.notes));
+    h.notes -= fromHand;
+    h.bank = Math.max(0, (h.bank ?? 0) - (carry - fromHand));
+    rebirthFrom('hell', carry * OBOL_RATE);
+    if (carry > 0) setTimeout(() => toast(L.lobbyCarry.replace('{n}', carry.toLocaleString('en-US')).replace('{b}', (carry * OBOL_RATE).toLocaleString('en-US')), 'good'), 600);
+  });
 }
 
 /** 현실로 다시 태어난다 (지옥에서 파샤르를 거쳐, 또는 귀신이 앵무새를 만나) */
-function rebirthFrom(from: 'hell' | 'ghost' | 'heaven', carryBaht = 0) {
+const STILLBORN = 0.035; // 24차: 환생할 때 드물게 — 태어나자마자, 또는 배 속에서 숨이 멎어 경계로 간다
+function rebirthFrom(from: 'hell' | 'ghost' | 'heaven' | 'border', carryBaht = 0) {
   if (from === 'heaven') delete state.heaven;
+  if (from === 'border') delete state.border;
   if (from === 'hell') {
     seal('hell');
     const h = hellState();
@@ -992,8 +1002,100 @@ function rebirthFrom(from: 'hell' | 'ghost' | 'heaven', carryBaht = 0) {
   if (street) { street.destroy(); street = null; }
   if (world) { world.destroy(); world = null; }
   net.leaveZone();
+  if (from !== 'border' && Math.random() < STILLBORN) { enterBorder('stillborn'); return; }
   enterShop(false);
 }
+
+// ───────────────────────── 24차: 경계의 해변 ─────────────────────────
+/** 경계로: zero = 카르마 0으로 죽어서 · stillborn = 환생하자마자 죽어서 · resume = 다시 열었을 때 */
+async function enterBorder(why: 'zero' | 'stillborn' | 'resume') {
+  const L = t();
+  closeMenus();
+  dropInterior();
+  if (street) { street.destroy(); street = null; }
+  net.leaveZone();
+  state.realm = 'border';
+  if (why !== 'resume' || !state.border) state.border = { since: Date.now(), met: state.border?.met };
+  state.hp = maxHp();
+  delete state.pos;
+  save(state);
+  if (why === 'stillborn') await bornAndDied();
+  shop.stop();
+  shop.root.visible = false;
+  if (world) { world.destroy(); world = null; }
+  scene = 'world';
+  setIndoor(false);
+  const z = borderZone(L.borderName);
+  world = new WorldScene(app, z, bodyLook(), () => undefined, hooks, maxHp(), { realm: 'border' });
+  app.stage.addChild(world.root);
+  world.setLook(bodyLook());
+  world.setGear(gear());
+  world.setStats(stats());
+  world.placeNear(z.spawn.i, z.spawn.j, maxHp());
+  world.setStance('talk');
+  world.start();
+  hud.hidden = false;
+  renderHud();
+  showStance(false);
+  showPlace(L.borderName, L.borderSub);
+}
+/** "나는 태어났다. 그러나 바로 죽었다." — 검은 화면에 두 줄, 그리고 왜 죽었는지 한 줄 */
+function bornAndDied(): Promise<void> {
+  const L = t();
+  const el = document.createElement('div');
+  el.className = 'born-died';
+  el.innerHTML = '<p class="a"></p><p class="b"></p><p class="c"></p>';
+  el.querySelector('.a')!.textContent = L.bornA;
+  el.querySelector('.b')!.textContent = L.bornB;
+  el.querySelector('.c')!.textContent = pick(L.bornWhy);
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  return new Promise((r) => setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 1600); r(); }, 6200));
+}
+/** 불다: 어부이자 랩퍼. 경계가 어떤 곳인지 말해 주고, 다시 태어나고 싶으면 물 쪽으로 보낸다 */
+async function talkToBulda(force = false) {
+  const L = t();
+  if (busy) return;
+  busy = true;
+  dlg.open({ name: L.bulda, portrait: 'bulda' });
+  if (force) {
+    for (const line of L.buldaTimeUp) await dlg.say(line);
+    dlg.close(); busy = false;
+    leaveBorder();
+    return;
+  }
+  if (!state.border?.met) {
+    state.border = { ...(state.border ?? { since: Date.now() }), met: true };
+    save(state);
+    for (const line of L.buldaFirst) await dlg.say(line);
+  } else await dlg.say(pick(L.buldaAgain));
+  for (;;) {
+    const c = await dlg.choose(L.buldaMenu);
+    if (c === 0) { for (const line of L.buldaWhere) await dlg.say(line); }
+    else if (c === 1) { for (const line of L.buldaWho) await dlg.say(line); }
+    else if (c === 2) { await dlg.say(pick(L.buldaRaps)); }
+    else if (c === 3) {
+      await dlg.say(L.buldaRebirthAsk);
+      const y = await dlg.choose([L.buldaRebirthYes, L.buldaRebirthNo]);
+      if (y === 0) { await dlg.say(L.buldaRebirthGo); dlg.close(); busy = false; leaveBorder(); return; }
+      await dlg.say(L.buldaStay);
+    } else break;
+  }
+  dlg.close();
+  busy = false;
+}
+/** 물속으로 걸어 들어가 다시 태어난다 */
+function leaveBorder() {
+  toast(t().borderWalk);
+  const fx = worldFade('heaven', false);
+  fx.covered.then(() => { rebirthFrom('border'); fx.done(); });
+}
+/** 깨달음 없는 자는 잠깐만: 12분이 지나면 불다가 부른다 */
+const BORDER_STAY = 12 * 60 * 1000;
+setInterval(() => {
+  if (realm() !== 'border' || busy || dlg.isOpen || !state.border) return;
+  if (Date.now() - state.border.since > BORDER_STAY) talkToBulda(true);
+}, 5000);
 
 /** 행위를 기록하고 영혼 경험치를 더한다 */
 function recordDeed(key: DeedKey, opt: { floor?: number; share?: number } = {}) {
@@ -1542,7 +1644,7 @@ const itemByKey = (k: string) => ITEMS.find((x) => x.key === k)!;
 
 function addToBag(it: ItemDef) {
   if (it.note === 'ammo') { state.ammo = (state.ammo ?? 0) + 12; return; } // 22차: 지옥 유황 탄환·흑요석 화살도 같은 주머니로
-  if (it.note === 'arrows') { state.arrows = (state.arrows ?? 0) + 20; return; }
+  if (it.note === 'arrows') { state.arrows = (state.arrows ?? 0) + 20; state.arrowKey = it.key; return; } // 24차: 마지막에 산 화살이 시위에 걸린다 (화살 종류마다 공격력이 다르다)
   state.bag = state.bag ?? {};
   state.bag[it.key] = (state.bag[it.key] ?? 0) + 1;
 }
@@ -1559,7 +1661,9 @@ function gear() {
   const def = Object.entries(eq).reduce((s, [slot, k]) => (slot === 'weapon' || !k ? s : s + (itemByKey(k)?.def ?? 0)), 0);
   const dr = Object.entries(eq).reduce((s, [, k]) => (!k ? s : s + (itemByKey(k)?.dr ?? 0)), 0);
   const armor = Object.entries(eq).filter(([slot, k]) => slot !== 'weapon' && k && itemByKey(k)).map(([, k]) => itemByKey(k as string).sprite ?? (k as string));
-  return { atk: w?.ranged ? (ranged ? w.atk ?? 0 : 1) : w?.atk ?? 0, def, dr, ranged, weapon: w ? w.sprite ?? w.key : null, armor };
+  // 24차: 활과 화살이 공격력을 반씩 나눈다 (활 < 근접 < 총)
+  const arrowAtk = w?.note === 'needsArrows' ? itemByKey(state.arrowKey ?? (inHell() ? 'harrows' : 'arrows'))?.atk ?? 3 : 0;
+  return { atk: w?.ranged ? (ranged ? (w.atk ?? 0) + arrowAtk : 1) : w?.atk ?? 0, def, dr, ranged, weapon: w ? w.sprite ?? w.key : null, armor };
 }
 /** 실시간으로 남에게 보이는 나 */
 function myInfo(): RemoteInfo {
@@ -1794,7 +1898,7 @@ function pouch(): { it: ItemDef; n: number; label: string; need: boolean }[] {
   const L = t();
   const w = state.equip?.weapon ? itemByKey(state.equip.weapon) : null;
   const hell = inHell();
-  const arrows = { it: itemByKey(hell ? 'harrows' : 'arrows'), n: state.arrows ?? 0, label: L.arrowsLeft.replace('{n}', String(state.arrows ?? 0)), need: w?.note === 'needsArrows' };
+  const arrows = { it: itemByKey(state.arrowKey ?? (hell ? 'harrows' : 'arrows')), n: state.arrows ?? 0, label: L.arrowsLeft.replace('{n}', String(state.arrows ?? 0)), need: w?.note === 'needsArrows' };
   const ammo = { it: itemByKey(hell ? 'hshot' : 'ammo'), n: state.ammo ?? 0, label: L.ammoLeft.replace('{n}', String(state.ammo ?? 0)), need: w?.note === 'needsAmmo' };
   if (arrows.need) return [arrows];
   if (ammo.need) return [ammo];
@@ -1936,7 +2040,7 @@ function showDeath(cause: 'car' | 'beaten' | 'hell') {
   document.querySelector('.store-panel')?.remove();
   const d = state.deeds ?? { good: 0, evil: 0 };
   const j = judge(d);
-  const verdict = j.world === 'heaven' ? L.judgeHeaven : j.world === 'hell' ? L.judgeHell.replace('{n}', String(j.floor)) : L.judgeGhost;
+  const verdict = j.world === 'heaven' ? L.judgeHeaven : j.world === 'hell' ? L.judgeHell.replace('{n}', String(j.floor)) : L.judgeBorder;
   const el = document.createElement('div');
   el.className = 'death';
   el.innerHTML = `<div class="death-box"><h1></h1><p class="cause"></p><p class="karma"></p><p class="money"></p><p class="verdict"></p><p class="closed"></p><button class="primary"></button></div>`;
@@ -1960,16 +2064,12 @@ function showDeath(cause: 'car' | 'beaten' | 'hell') {
     closed.textContent = j.floor > OPEN_FLOORS ? L.hellCap.replaceAll('{m}', String(OPEN_FLOORS)) : '';
     btn.textContent = L.toHell;
     btn.onclick = () => { el.remove(); world?.revive(bodyLook()); enterHell(j.floor, 'fall'); };
-  } else if (j.world === 'ghost') {
-    closed.textContent = L.ghostLine;
-    btn.textContent = L.toGhost;
-    btn.onclick = () => {
-      el.remove();
-      state.realm = 'ghost';
-      state.hp = maxHp();
-      save(state);
-      enterWorld(here ? [Math.floor(here.x), Math.floor(here.y)] : 'door');
-    };
+  } else if (j.world === 'border') {
+    // 24차: 선악이 꼭 같은 영혼 — 귀신 대신 경계의 해변으로
+    closed.textContent = L.borderLine;
+    btn.textContent = L.toBorder;
+    btn.onclick = () => { el.remove(); world?.revive(bodyLook()); enterBorder('zero'); };
+    void here;
   } else {
     // 3단계: 천국이 열렸다. 쌓은 선행은 환생할 때 영혼 경험치로 돌려받는다 (환생관에게)
     closed.textContent = '';
@@ -2030,8 +2130,40 @@ async function talkToOfficer() {
   await dlg.say(L.offSigh);
   dlg.close();
   busy = false;
+  shipThenRebirth(() => rebirthFrom('heaven'));
+}
+/** 24차: 환생은 우주왕복선으로 — 걸어가 타고, 떠오르면 아래 세상으로 */
+async function shipThenRebirth(go: () => void) {
+  busy = true;
+  toast(t().shipBoard);
+  await world?.boardShip();
   const fx = worldFade('heaven', false);
-  fx.covered.then(() => { rebirthFrom('heaven'); fx.done(); });
+  fx.covered.then(() => { busy = false; go(); fx.done(); });
+}
+/** 24차: 가끔 루엔·파샤르 대신 앉아 있는 안경 쓴 할아버지. 설득하지 않는다 — 우주선을 가리킬 뿐 */
+async function talkToGrandpa(hell: boolean) {
+  const L = t();
+  if (busy) return;
+  busy = true;
+  dlg.open({ name: L.grandpaName, portrait: 'grandpa' });
+  for (const line of hell ? L.grandpaGreetHell : L.grandpaGreet) await dlg.say(line);
+  await dlg.say(L.grandpaAsk);
+  const c = await dlg.choose([L.grandpaGo, L.grandpaWait]);
+  if (c !== 0) { await dlg.say(L.grandpaStay); dlg.close(); busy = false; return; }
+  await dlg.say(L.grandpaBye);
+  dlg.close();
+  busy = false;
+  if (!hell) { shipThenRebirth(() => rebirthFrom('heaven')); return; }
+  // 지옥: 파샤르와 같은 셈으로 노전을 바꿔 준다 (덤도 설교도 없이)
+  const h = hellState();
+  const ratio = Math.round(evilRatio(state.deeds ?? { good: 0, evil: 0 }) ?? 100);
+  const carry = Math.floor((Math.floor(h.notes + (h.bank ?? 0)) * (100 - ratio)) / 100);
+  shipThenRebirth(() => {
+    const fromHand = Math.min(carry, Math.floor(h.notes));
+    h.notes -= fromHand; h.bank = Math.max(0, (h.bank ?? 0) - (carry - fromHand));
+    rebirthFrom('hell', carry * OBOL_RATE);
+    if (carry > 0) setTimeout(() => toast(L.lobbyCarry.replace('{n}', carry.toLocaleString('en-US')).replace('{b}', (carry * OBOL_RATE).toLocaleString('en-US')), 'good'), 600);
+  });
 }
 /** 21차: 안내천사가 따라다니는가 — 처음 온 영혼이 천국에 익숙해질 때까지 (종교행사에 한 번 다녀오면 끝, 따돌리면 멈춘다) */
 function ywShouldFollow() {
@@ -2484,7 +2616,7 @@ function renderHud() {
   const L = t();
   hud.hidden = false;
   const place = placeName();
-  const live = !net.account() ? `<button class="live">${L.live}</button>` : '';
+  const live = !net.account() && realm() !== 'border' ? `<button class="live">${L.live}</button>` : '';
   const narrow = matchMedia('(max-width: 640px)').matches;
   hudNarrow = narrow;
   hud.innerHTML = `
@@ -2738,9 +2870,11 @@ function updateHpBar(hp: number, max: number) {
 function updateHud() {
   // 좁은 화면에서는 '방콕'·'지갑' 글자를 빼고 숫자만 (CSS가 .lbl을 숨김)
   const el = hud.querySelector('.clock');
-  if (el) el.innerHTML = `${inHell() ? '' : `<span class="lbl">${t().bkk}</span> `}${bangkokClock().label}`;
+  const border = realm() === 'border'; // 24차: 경계에는 시계도 돈도 없다
+  if (el) el.innerHTML = border ? '' : `${inHell() ? '' : `<span class="lbl">${t().bkk}</span> `}${bangkokClock().label}`;
   const w = hud.querySelector('.wallet');
-  if (w) w.innerHTML = inHell()
+  if (w) (w as HTMLElement).hidden = border;
+  if (w && !border) w.innerHTML = inHell()
     ? `<span class="lbl">${t().notesLabel}</span> <i class="obol-ic"></i>${Math.floor(hellState().notes).toLocaleString('en-US')}${(state.debt ?? 0) > 0 ? ` <span class="debt">${t().debtHud.replace('{n}', String(Math.ceil(state.debt ?? 0)))}</span>` : ''}`
     : `<span class="lbl">${t().wallet}</span> ฿${Math.floor(state.wallet ?? 0).toLocaleString('en-US')}`;
   updateHpBar(state.hp ?? maxHp(), maxHp());

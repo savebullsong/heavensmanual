@@ -2,6 +2,7 @@
 import './admin.css';
 import { PORTRAIT_SLOTS, SPRITE_SLOTS, DEFAULT_PORTRAITS, type PortraitSlot } from './portraits.ts';
 import { charSet, frameOf, MISS_HWANG, HWANGHON, BESK_LOOK, TALUS_LOOK, PX } from './sprites.ts';
+import { BULDA_LOOK } from './border.ts';
 import { drawCosmicBird, drawCosmicBirdHeaven } from './ujusae.ts';
 import { drawYuhwang } from './yuhwang.ts';
 import { drawLoanHouse } from './loanhouse.ts';
@@ -17,11 +18,15 @@ const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   'goat-king': { name: '염소대왕', where: '지옥 13층 · 최종 보스' },
   besk: { name: '베스크', where: '지옥 3층 · 베스크 대부소의 대부업자' },
   talus: { name: '탈루스', where: '지옥 2층 들판 · 뼈주사위 노름꾼' },
+  grandpa: { name: '환생관 할아버지', where: '천국 환생의 테라스 · 지옥 로비 — 가끔 루엔·파샤르 대신 나오는 안경 쓴 아주 늙은 할아버지 (천국·지옥 같은 사람, 옷차림만 다름)' },
+  bulda: { name: '불다', where: '경계의 해변 · 콘로 머리의 어부 겸 랩퍼 (붓다 아님)' },
+  yunae: { name: '유내', where: '서울 · 내 집 — 동양인 여성. 올 때마다 여자아이 · 어른 · 중년 여성 중 하나 (한 장이면 셋 모두에 같은 그림)' },
   'sprite-miss-hwang': { name: '미스 황', where: '우주새 카운터 뒤에 서 있는 모습 (왼쪽 아래를 봄)' },
   'sprite-hwanghon': { name: '황혼', where: '유황새(지옥) 카운터 뒤에 서 있는 모습 (왼쪽 아래를 봄)' },
   'sprite-parrot': { name: '앵무새 · 볏 내림', where: '카운터 끝 횃대 · 평소 모습' },
   'sprite-parrot-up': { name: '앵무새 · 볏 세움', where: '가끔 머리깃을 세울 때 (비워 두면 볏 내림 그림을 그대로 씀)' },
   'sprite-besk': { name: '베스크', where: '지옥 3층 · 베스크 대부소 카운터 뒤에 서 있는 모습 (왼쪽 아래를 봄 · 오른쪽 아래를 볼 때는 좌우를 뒤집어 씀)' },
+  'sprite-bulda': { name: '불다', where: '경계의 해변 · 잔교 들머리에 서 있는 모습 (왼쪽 아래를 봄 · 오른쪽 아래는 좌우 뒤집기)' },
   'sprite-talus': { name: '탈루스', where: '지옥 2층 들판 · 산탄총을 든 채 서 있는 모습 (왼쪽 아래를 봄 · 오른쪽 아래는 좌우 뒤집기 · 총을 쏠 때는 구운 그림)' },
   'bld-ujusae': { name: '우주새 건물 · 낮', where: '현실·천국의 우주새 · 바닥 2×2칸' },
   'bld-ujusae-night': { name: '우주새 건물 · 밤', where: '창에 불이 켜진 밤 모습 (비워 두면 낮 그림을 밤에도 씀)' },
@@ -49,8 +54,8 @@ function dotSpec(slot: PortraitSlot): Promise<DotSpec | null> {
         const d = slot === 'bld-loan' ? drawLoanHouse(b) : slot.startsWith('bld-hell-') ? drawYuhwang(b, Number(slot.slice(9))) : slot === 'bld-ujusae-heaven' ? drawCosmicBirdHeaven(b) : drawCosmicBird(b, slot === 'bld-ujusae-night');
         return { canvas: d.canvas, w: d.canvas.width, h: d.canvas.height };
       }
-      if (slot === 'sprite-miss-hwang' || slot === 'sprite-hwanghon' || slot === 'sprite-besk' || slot === 'sprite-talus') {
-        const cs = await (slot === 'sprite-talus' ? charSet(TALUS_LOOK, 'shotgun') : charSet(slot === 'sprite-besk' ? BESK_LOOK : slot === 'sprite-hwanghon' ? HWANGHON : MISS_HWANG));
+      if (slot === 'sprite-miss-hwang' || slot === 'sprite-hwanghon' || slot === 'sprite-besk' || slot === 'sprite-talus' || slot === 'sprite-bulda') {
+        const cs = await (slot === 'sprite-talus' ? charSet(TALUS_LOOK, 'shotgun') : charSet(slot === 'sprite-bulda' ? BULDA_LOOK : slot === 'sprite-besk' ? BESK_LOOK : slot === 'sprite-hwanghon' ? HWANGHON : MISS_HWANG));
         const f = frameOf(cs, 'idle', 'sw', 0);
         if (!f) return null;
         const src = f.tex.source.resource as HTMLCanvasElement;

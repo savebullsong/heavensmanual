@@ -98,12 +98,21 @@ HEAVY = [  # 어깨에 멤 · 머리 위로 · 정점 · 내려찍음(맞힘) ·
 ]
 
 def sit():
-    """땅바닥에 무릎을 세우고 앉아 고개를 떨군 자세 (지친 영혼)"""
-    return {'thigh.L': [('X', -112), ('Y', -8)], 'shin.L': [('X', 122)], 'foot.L': [('X', -20)],
-            'thigh.R': [('X', -106), ('Y', 8)], 'shin.R': [('X', 116)], 'foot.R': [('X', -18)],
-            'hips': [], 'spine': [('X', -20)], 'head': [('X', 16)],
-            'upper_arm.L': [('X', -58), ('Y', 4)], 'forearm.L': [('X', -42)],
-            'upper_arm.R': [('X', -54), ('Y', -4)], 'forearm.R': [('X', -46)]}
+    """24차: 땅바닥에 무릎을 세우고 앉아 두 팔로 무릎을 감싸 안고 고개를 떨군 자세 (모닥불 앞의 지친 영혼).
+    예전에는 두 팔을 앞으로 내밀어 좀비처럼 보였다"""
+    return {'thigh.L': [('X', -108), ('Y', -6)], 'shin.L': [('X', 124)], 'foot.L': [('X', -20)],
+            'thigh.R': [('X', -102), ('Y', 6)], 'shin.R': [('X', 118)], 'foot.R': [('X', -18)],
+            'hips': [], 'spine': [('X', 24)], 'head': [('X', 22)],
+            'upper_arm.L': [('X', -62), ('Y', 16)], 'forearm.L': [('X', -34)], 'hand.L': [('X', 10)],
+            'upper_arm.R': [('X', -60), ('Y', -16)], 'forearm.R': [('X', -36)], 'hand.R': [('X', 10)]}
+
+def lotus():
+    """24차: 가부좌 — 두 무릎을 옆으로 벌려 바닥에 눕히고 정강이를 앞에서 엇걸어, 허리를 곧게 세우고 손을 무릎 위에 (경계의 세계의 완성자들)"""
+    return {'thigh.L': [('X', -84), ('Z', -48)], 'shin.L': [('X', 150), ('Z', 26)], 'foot.L': [('X', -30)],
+            'thigh.R': [('X', -84), ('Z', 48)], 'shin.R': [('X', 150), ('Z', -26)], 'foot.R': [('X', -30)],
+            'hips': [], 'spine': [('X', 2)], 'head': [('X', 6)],
+            'upper_arm.L': [('X', -16), ('Y', 14), ('Z', -10)], 'forearm.L': [('X', -48)], 'hand.L': [('X', 20)],
+            'upper_arm.R': [('X', -16), ('Y', -14), ('Z', 10)], 'forearm.R': [('X', -48)], 'hand.R': [('X', 20)]}
 
 # 19차: 양손 무기를 싸우지 않을 때도 두 손으로 든다 — 오른손이 아래, 왼손이 위를 잡고 칼끝은 앞 위로 비스듬히 (중단 겨눔)
 HOLD2 = {'upper_arm.R': [('X', -28), ('Y', -14)], 'forearm.R': [('X', -62)], 'hand.R': [('X', -26)],
@@ -118,7 +127,7 @@ def walk2(t):
     P['upper_arm.R'] = [('X', -28 - 3 * s), ('Y', -14)]; P['upper_arm.L'] = [('X', -36 - 3 * s), ('Y', 24)]
     return P
 
-EXTRA = {'heavy': HEAVY, 'sit': [sit()], 'idle2': [idle2()], 'walk2': [walk2(f / 8) for f in range(8)]}
+EXTRA = {'heavy': HEAVY, 'sit': [sit()], 'lotus': [lotus()], 'idle2': [idle2()], 'walk2': [walk2(f / 8) for f in range(8)]}
 
 def anims(mode):
     A = {'idle': [idle(mode)], 'walk': [walk(f / 8, mode) for f in range(8)], 'hit': hit(mode), 'fall': fall(mode)}

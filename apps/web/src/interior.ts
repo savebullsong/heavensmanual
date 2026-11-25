@@ -6,6 +6,7 @@ import { kindOf, mainPoi, hasBank, storeOf, cuisineOf } from './names.ts';
 import { faithOf } from './street.ts';
 import { TW, TH } from './gfx.ts';
 import { BESK_LOOK } from './sprites.ts';
+import { drawShore, drawShoreFurn, BULDA_LOOK } from './border.ts';
 export { BESK_LOOK };
 
 const TI = Object.fromEntries(TYPES.map((t, k) => [t, k])) as Record<(typeof TYPES)[number], number>;
@@ -58,7 +59,7 @@ export const REST_ROOMS = new Set(['temple', 'church', 'mosque', 'gurdwara', 'ba
 const SIZE: Record<string, [number, number]> = {
   temple: [13, 11], church: [13, 11], mosque: [12, 11], gurdwara: [12, 11], bank: [12, 10], clinic: [12, 10], pharmacy: [9, 8],
   mart: [11, 9], food: [12, 10], cafe: [10, 9], bar: [10, 9], salon: [9, 8], massage: [10, 9], laundry: [9, 8], lobby: [11, 9], shop: [9, 8], loan: [10, 8],
-  hbank: [10, 8], atone: [11, 10], rebirth: [23, 17], terrace: [17, 14], gym: [13, 11], dept: [26, 20],
+  hbank: [10, 8], atone: [11, 10], rebirth: [31, 17], terrace: [23, 16], gym: [13, 11], dept: [26, 20],
 };
 const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   temple: { floor: 'temple', wall: '#e9dcc0', trim: '#a8322a' }, church: { floor: 'stone', wall: '#e8e2d4', trim: '#6b4a30' },
@@ -194,6 +195,7 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
         F(i0, 4, 1, 4, 12, 'rope'); F(i0 + 2, 4, 1, 4, 12, 'rope');
       }
       clerk = { i: 11, j: 1 }; counter = { i: 11, j: 3 };
+      F(W - 8, 2, 6, 6, 6, 'shuttle', 1); // 24차: 로비 오른쪽 끝의 발사장 — 환생할 영혼은 이 우주선을 탄다
       F(2, 11, 4, 1, 12, 'bench'); F(8, 12, 3, 1, 12, 'bench'); F(14, 12, 3, 1, 12, 'bench'); F(18, 11, 3, 1, 12, 'bench');
       F(1, 1, 1, 1, 30, 'plant'); F(x1, 9, 1, 1, 30, 'plant'); F(1, 13, 1, 1, 30, 'plant');
       break;
@@ -201,9 +203,12 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
     case 'terrace': {
       // 천국 환생의 테라스: 구름 위에 뜬 흰 대리석 단 (벽 없음). 뒤쪽 가운데 환생의 문 — 문 안으로 아래 세상의 빛이 비친다.
       // 문 앞에 환생관 루엔, 네 귀퉁이 등불 기둥, 앞쪽 대리석 의자 둘. 앞 가장자리 가운데에서 구름 계단으로 내려간다
-      F(mid - 2, 1, 5, 1, 104, 'rgate'); clerk = { i: mid, j: 2 }; counter = { i: mid, j: 4 };
-      for (const [ii, jj] of [[2, 2], [W - 3, 2], [2, 8], [W - 3, 8]]) F(ii, jj, 1, 1, 70, 'cpillar', ii + jj);
-      F(3, 10, 2, 1, 12, 'cbench'); F(W - 5, 10, 2, 1, 12, 'cbench');
+      // 24차: 환생의 문 대신 오른쪽 뒤에 우주왕복선 발사대 — 환생하려면 걸어가 탄다. 왼쪽엔 카드 치는 천사 둘
+      clerk = { i: mid - 1, j: 3 }; counter = { i: mid - 1, j: 5 };
+      F(W - 8, 1, 6, 6, 6, 'shuttle', 0);
+      for (const [ii, jj] of [[2, 2], [2, 10], [W - 3, 10], [mid - 4, 1]]) F(ii, jj, 1, 1, 70, 'cpillar', ii + jj);
+      F(4, 6, 1, 1, 10, 'cardtable');
+      F(3, 13, 2, 1, 12, 'cbench'); F(W - 6, 13, 2, 1, 12, 'cbench');
       // 둥글게 깎은 모서리 (구름 위의 단이라 반듯한 네모가 아니게)
       for (const [ii, jj] of [[W - 2, 1], [W - 3, 1], [W - 2, 2], [1, H - 2], [2, H - 2], [1, H - 3], [W - 2, H - 2], [W - 3, H - 2], [W - 2, H - 3], [W - 4, H - 2], [W - 2, H - 4]]) tiles[jj * W + ii] = TI.void;
       break;
@@ -368,6 +373,7 @@ function drawTerrace(z: Zone): { canvas: HTMLCanvasElement; x: number; y: number
 /** 바닥 + 뒤쪽 두 벽 + 벽 장식 (방 전체를 한 장으로) */
 export function drawRoom(z: Zone, night: boolean): { canvas: HTMLCanvasElement; x: number; y: number } {
   if (z.interior!.kind === 'terrace') return drawTerrace(z);
+  if (z.interior!.kind === 'shore') return drawShore(z); // 24차 경계의 해변
   const info = z.interior!;
   const W = z.W, H = z.H;
   const minX = (0 - H) * (TW / 2) - 8, maxX = W * (TW / 2) + 8;
@@ -484,6 +490,21 @@ export function drawRoom(z: Zone, night: boolean): { canvas: HTMLCanvasElement; 
 
 /** 가구 하나 (바닥 사각형 i·j·w·d, 높이 h) */
 export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas: HTMLCanvasElement; x: number; y: number } {
+  if (f.kind === 'boat' || f.kind === 'netpole' || f.kind === 'drift' || f.kind === 'flot') return drawShoreFurn(f);
+  if (f.kind === 'shuttle') { const e = document.createElement('canvas'); e.width = e.height = 1; return { canvas: e, x: 0, y: 0 }; } // 우주선은 장면이 따로 세운다 (떠오를 수 있게)
+  if (f.kind === 'cardtable') {
+    // 구름 대리석 작은 탁자 위에 펼친 카드 (천사 둘의 노름 — 판돈은 없다)
+    const [x, y] = [(f.i - f.j) * (TW / 2), (f.i + f.j + 1) * (TH / 2)];
+    const c = document.createElement('canvas'); c.width = 72; c.height = 44;
+    const g = c.getContext('2d')!;
+    g.fillStyle = 'rgba(120,110,140,0.25)'; g.beginPath(); g.ellipse(36, 36, 26, 8, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#d8cfbe'; g.fillRect(33, 22, 6, 14);
+    g.fillStyle = '#efe8da'; g.beginPath(); g.ellipse(36, 20, 28, 11, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#c9a23e'; g.beginPath(); g.ellipse(36, 22, 28, 11, 0, 0, Math.PI); g.fill(); g.fillStyle = '#efe8da'; g.beginPath(); g.ellipse(36, 20, 28, 10, 0, 0, Math.PI * 2); g.fill();
+    const cards: [number, number, string][] = [[22, 17, '#ffffff'], [27, 15, '#ffffff'], [44, 18, '#ffffff'], [48, 21, '#ffffff'], [34, 19, '#b8282a']];
+    for (const [cx2, cy2, col] of cards) { g.fillStyle = '#4a3a2a'; g.fillRect(cx2, cy2 + 1, 6, 4); g.fillStyle = col; g.fillRect(cx2, cy2, 6, 4); g.fillStyle = col === '#ffffff' ? '#b8282a' : '#ffffff'; g.fillRect(cx2 + 2, cy2 + 1, 2, 2); }
+    return { canvas: c, x: x - 36, y: y - 28 };
+  }
   const { i, j, w, d, h } = f;
   const i1 = i + w, j1 = j + d;
   const extra = f.kind === 'altar' ? 64 : f.kind === 'rgate' ? 46 : f.kind === 'cpillar' ? 30 : f.kind === 'salonchair' || f.kind === 'candle' ? 18 : 14;
@@ -777,8 +798,16 @@ const STAFF: Record<string, [string, string]> = {
 export const PASHAR_LOOK: Look = { sex: 'm', build: 0, skin: 0, hair: 1, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: '#e8d6c8', 10: '#e8d6c8', 2: '#9a9aa2', 3: '#1c1c22', 4: '#22222a', 9: '#1c1c22', 5: '#141418' } };
 /** 천국의 환생관 루엔 (컨셉 아트: 길고 흰 머리, 흰 법의에 옅은 푸른 띠, 흰 날개, 등불) */
 export const LUEN_LOOK: Look = { sex: 'f', build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, cols: { 1: '#f2dccc', 10: '#f2dccc', 2: '#e8e6f2', 3: '#f8f6f2', 4: '#b8c4e2', 9: '#f8f6f2', 5: '#d8ccb0' } };
+/** 24차: 환생관 할아버지 — 안경 쓴 아주 늙은 사람 (천국은 흰 옷, 지옥은 잿빛 외투). 그림은 관리자 'grandpa' 칸 */
+export function grandpaLook(hell: boolean): Look {
+  const skin = '#e6c9ae';
+  return { sex: 'm', build: 0, skin: 0, hair: 1, hairColor: 0, top: 0, bottom: 0, cols: hell
+    ? { 1: skin, 10: skin, 2: '#e8e4dc', 3: '#3a3634', 9: '#3a3634', 4: '#2a2624', 5: '#141210' }
+    : { 1: skin, 10: skin, 2: '#f2efe8', 3: '#f2ede2', 9: '#f2ede2', 4: '#e8e2d4', 5: '#c8c0b0' } };
+}
 export function clerkLook(kind: string, seed: number): Look {
   if (kind === 'terrace') return LUEN_LOOK;
+  if (kind === 'shore') return BULDA_LOOK;
   if (kind === 'loan') return BESK_LOOK;
   if (kind === 'rebirth') return PASHAR_LOOK;
   if (kind === 'hbank') return { sex: 'm', build: 0, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: '#9a948c', 10: '#9a948c', 2: '#2a2622', 3: '#1e1c1c', 4: '#1a1818', 9: '#1e1c1c', 5: '#0e0c0c' } }; // 잿빛 피부의 은행원

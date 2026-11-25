@@ -64,9 +64,9 @@ for sex in 'mf':
 # 맨몸(u) 몸·머리카락에 앉기 동작만 덧붙인다 (지옥 마을의 지친 영혼)
 for sex in 'mf':
     for b in (0, 1, 2):
-        sets = [{'kind': 'base', 'outfit': 'casual', 'mode': 'u', 'extra': ['sit']}]
-        if b == 1: sets += [{'kind': 'base', 'outfit': o, 'mode': 'u', 'extra': ['sit']} for o in ('raincoat', 'patient')] + [{'kind': 'hair', 'style': h, 'extra': ['sit']} for h in HAIRS]
-        jobs.append({'sex': sex, 'build': b, 'sets': sets, 'only': ['sit'], 'merge': True, 'tag': 'sit16'})
+        sets = [{'kind': 'base', 'outfit': 'casual', 'mode': 'u', 'extra': ['sit', 'lotus']}]
+        if b == 1: sets += [{'kind': 'base', 'outfit': o, 'mode': 'u', 'extra': ['sit', 'lotus']} for o in ('raincoat', 'patient')] + [{'kind': 'hair', 'style': h, 'extra': ['sit', 'lotus']} for h in HAIRS]
+        jobs.append({'sex': sex, 'build': b, 'sets': sets, 'only': ['sit', 'lotus'], 'merge': True, 'tag': 'sit16'})  # 24차: 무릎 감싸 앉기 · 가부좌
 # ── 17차: 강도·마피아(남녀) · 활 · 지옥 장사꾼의 무기(고기 칼·넓적다리뼈·곡괭이·빚 갈고리)를 사람 손에 ──
 for sex in 'mf':
     jobs.append({'sex': sex, 'build': 1, 'sets': [{'kind': 'base', 'outfit': 'robber', 'mode': 'm'}, {'kind': 'base', 'outfit': 'mafia', 'mode': 'm'}, {'kind': 'base', 'outfit': 'mafia', 'mode': 'g'}]

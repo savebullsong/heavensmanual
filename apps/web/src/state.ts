@@ -15,12 +15,13 @@ export interface Save {
   bag?: Record<string, number>;
   equip?: Partial<Record<Slot, string>>;
   /** 마지막으로 있던 곳: 다시 열면 그 자리에서 (가게 안에서 일하던 중이면 계속 일한다) */
-  pos?: { w: 'real' | 'ghost' | 'hell' | 'heaven'; z: string; i: number; j: number; f?: number; k?: number; work?: boolean };
+  pos?: { w: 'real' | 'ghost' | 'hell' | 'heaven' | 'border'; z: string; i: number; j: number; f?: number; k?: number; work?: boolean };
   /** 빠른 칸에 끼운 소비품 (누르면 바로 먹기) */
   quick?: string;
   ammo?: number;
   /** 화살 (활) */
   arrows?: number;
+  arrowKey?: string; // 24차: 시위에 건 화살 종류 (마지막에 산 화살)
   hp?: number;
   /** 이번 생의 선행·악행 (천국·지옥 심판은 이번 생으로) */
   deeds?: { good: number; evil: number };
@@ -32,7 +33,9 @@ export interface Save {
   streetSecs?: number;
   called?: boolean;
   // 2단계: 지금 있는 세계와 지옥에서의 걸음
-  realm?: 'real' | 'ghost' | 'hell' | 'heaven';
+  realm?: 'real' | 'ghost' | 'hell' | 'heaven' | 'border'; // ghost = 예전 저장 (24차부터 border로 옮긴다)
+  /** 24차 경계의 해변: 언제 왔는지 (깨달음 없는 자는 잠깐만) · 불다를 만났는지 */
+  border?: { since: number; met?: boolean };
   adminTrip?: 'real' | 'ghost' | 'heaven' | 'hell'; // 관리자가 시찰(지옥 층 이동·천국)을 떠나기 전의 세계 (돌아갈 곳)
   /** 천국: 환생할 때 받을 선행 보너스 (영혼 경험치) */
   heaven?: { met?: boolean; admin?: boolean; adapted?: boolean; ywLost?: boolean; rites?: number }; // 21차: 행사에 다녀와 익숙해졌나 · 안내천사를 따돌렸나 · 다녀온 행사 수

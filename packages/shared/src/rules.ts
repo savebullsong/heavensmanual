@@ -20,7 +20,7 @@ export interface Deeds {
 
 export type Afterlife =
   | { world: 'heaven' }
-  | { world: 'ghost' }
+  | { world: 'border' } // 24차: 경계의 해변 (예전 귀신)
   | { world: 'hell'; floor: number };
 
 /** 악행 비율(%) = 악행 ÷ (선행 + 악행) × 100. 기록이 없으면 null */
@@ -44,7 +44,7 @@ export function hellFloor(ratio: number): number {
 /** 사후 판정: 기록 없음·정확히 50% → 귀신, 50% 미만 → 천국, 50% 초과 → 지옥 */
 export function judge(d: Deeds): Afterlife {
   const r = evilRatio(d);
-  if (r === null || r === 50) return { world: 'ghost' };
+  if (r === null || r === 50) return { world: 'border' };
   if (r < 50) return { world: 'heaven' };
   return { world: 'hell', floor: hellFloor(r) };
 }

@@ -1,12 +1,14 @@
 // 현실 세계 장면 (PixiJS): 실제 지도, 화면 근처만 불러오기, 클릭 이동, 행인·불량배, 차량, 방콕 실시간 낮밤
 // 1단계-B: 대상 메뉴(말 걸기·살펴보기·공격·강제 공격), 싸움과 체력, 쓰러짐과 돈 줍기, 가게 노동, 차 사고
 import { Hound } from './hound.ts';
+import { shuttleCanvas, flameCanvas } from './shipgfx.ts';
+import { drownedCanvas, monkLook, shoreF, shoreLine, shoreSkyCanvas } from './border.ts';
 import { wingTexture, cloudTexture, heavenVignette, cloudStairTexture, terraceSkyTexture, hellPortalTexture, bedTexture, BED_ANCHOR, batWingTexture, hornTexture } from './heavengfx.ts';
 import { hellDecor } from './hellprops.ts';
 import { Application, ColorMatrixFilter, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture, TilingSprite } from 'pixi.js';
 import { type Look } from './character.ts';
 import { MISS_HWANG, TALUS_LOOK, charSet, frameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, ANIM_FPS, IMPACT, TWO, type CharSet, type Dir, type Anim, type Frame } from './sprites.ts';
-import { type Zone, type Building, type Lane, type Prop, type HellVendor, findPath, walkable, randomWalkTileNear, tileAt } from './zone.ts';
+import { type Zone, type Building, type Lane, type Prop, type HellVendor, type Furn, findPath, walkable, randomWalkTileNear, tileAt } from './zone.ts';
 import { iso, TW, TH, drawBuilding, drawGroundChunk, buildingHeight } from './gfx.ts';
 import { drawBuildingKit, drawGroundKit, buildingTop, upperFloors, carSprite, propSprite, CAR_MODELS, CHUNK, kitOk } from './street.ts';
 import { t, lang } from './i18n.ts';
@@ -70,7 +72,7 @@ function loadBuildingArt() {
 }
 import { streetProp, type PropPic } from './propgfx.ts';
 import { decorOf } from './decor.ts';
-import { canEnter, drawRoom, drawFurn, clerkLook, roomKind as roomKindOf } from './interior.ts';
+import { canEnter, drawRoom, drawFurn, clerkLook, grandpaLook, roomKind as roomKindOf } from './interior.ts';
 import { carHit, isDanger, DANGER_SPEED, critChance, CRIT_MULTIPLIER, regenPerMinute, restRegenPerMinute, OUT_OF_COMBAT_S, armorClass, rollToHit, maxHp as maxHpFor, newStats, type DeedKey, type Stats } from '../../../packages/shared/src/rules.ts';
 
 function tex(c: HTMLCanvasElement): Texture {
@@ -80,7 +82,7 @@ function tex(c: HTMLCanvasElement): Texture {
 }
 
 export type NpcKind = 'passer' | 'thug' | 'suturer' | 'monster' | 'pashar' | 'clerk' | 'angel' | 'yellowwing' | 'officer' | 'guard' | 'talus' | 'soul' | 'vendor' | 'fighter' | 'elder' | 'sleeper';
-export type Realm = 'real' | 'ghost' | 'hell' | 'heaven';
+export type Realm = 'real' | 'ghost' | 'hell' | 'heaven' | 'border'; // 24차: border = 경계의 해변 (귀신 대신)
 export type Stance = 'talk' | 'hostile' | 'all';
 /** name = 아이디(프로필·신고에 쓰는 열쇠), nick = 게임 속 이름(보이는 이름) */
 export interface RemoteInfo { name: string; nick?: string; look: Look; weapon: string | null; armor: string[]; member: boolean; hidden?: boolean }
@@ -117,6 +119,11 @@ interface Walker {
   flee: number;
   hurtT: number;
   flashT?: number; // 맞는 순간 하얗게 번쩍
+  monk?: boolean; // 24차: 경계의 가부좌한 완성자
+  cards?: boolean; // 24차: 테라스에서 카드 치는 천사
+  glasses?: Graphics; // 24차: 환생관 할아버지의 안경
+  squashT?: number; // 24차 손맛: 맞는 순간 몸이 찌그러졌다 펴진다
+  lungeT?: number; // 24차 손맛: 때리는 순간 앞으로 반 걸음
   kb?: { dx: number; dy: number; t: number }; // 밀려나기
   voice?: number; // 사람마다 다른 목소리·타격음 높낮이
   stalk?: number; // 불량배: 시비 걸며 다가오는 중 (초)
@@ -139,7 +146,7 @@ interface Walker {
   horns?: Sprite;
   raider?: boolean; // 4층부터의 습격 때 마을로 몰려든 괴물
   pray?: boolean; // 1층 악마상 앞에 엎드려 비는 영혼
-  still?: 'sit' | 'lie'; // 마을의 지친 영혼: 앉아 있거나 누워 있다
+  still?: 'sit' | 'lie' | 'lotus'; // 마을의 지친 영혼: 앉아 있거나 누워 있다 · 24차 가부좌 (경계의 완성자·카드 치는 천사)
   vend?: HellVendor | 'street' | 'massage' | 'bar' | 'heaven'; // 마을 장사꾼 · 19차 현실: 손수레 노점 · 마사지 호객 · 바 호객 · 21차 천국: 먹을 것을 파는 천사
   /** 19차: 호객원이 서 있는 가게 (건물 번호) */
   shopK?: number;
@@ -434,7 +441,7 @@ export class WorldScene {
       }
     }
     if (this.zone.hell) this.setupHell();
-    else if (this.zone.interior) { this.setupInterior(opts.chaser ?? null); if (opts.work) { const ob = this.zone.interior!.from; this.workIn = { name: opts.work, earned: 0, wait: 0.8, job: ob.b >= 0 && ob.bd ? this.jobOf(ob.bd) : { mult: 1, drain: 0.15, hard: 0 } }; } if (this.realm === 'heaven') this.setupHeavenSky(true); }
+    else if (this.zone.interior) { this.setupInterior(opts.chaser ?? null); if (this.zone.interior?.kind === 'shore') this.setupShore(); if (opts.work) { const ob = this.zone.interior!.from; this.workIn = { name: opts.work, earned: 0, wait: 0.8, job: ob.b >= 0 && ob.bd ? this.jobOf(ob.bd) : { mult: 1, drain: 0.15, hard: 0 } }; } if (this.realm === 'heaven') this.setupHeavenSky(true); }
     else if (this.realm === 'heaven') this.setupHeaven();
     else {
       this.setupCityHaze();
@@ -1590,6 +1597,154 @@ export class WorldScene {
     return null;
   }
   /** 구름과 금빛 기운: 세상을 밝고 따뜻하게, 화면 가장자리에 흘러가는 구름 (테라스: 둘레가 하늘) */
+  /** 24차 환생의 우주왕복선 */
+  private grandpa = false;
+  forceGrandpa?: boolean;
+  get clerkIsGrandpa() { return this.grandpa; }
+  private ship: { s: Sprite; f: Furn; door: [number, number]; hell: boolean; y0: number } | null = null;
+  private shipGo: { res: () => void; phase: 'walk' | 'board' | 'lift'; t: number; v: number; flame?: Sprite; smoke: Sprite[] } | null = null;
+  private addShip(f: Furn) {
+    const hell = (f.v ?? 0) === 1;
+    const pic = shuttleCanvas(hell);
+    const [x, y] = iso(f.i + f.w / 2, f.j + f.d / 2);
+    const z0 = f.i + f.w / 2 + f.j + f.d / 2;
+    const put = (cv: HTMLCanvasElement, z: number) => { const sp = new Sprite(Texture.from(cv)); sp.anchor.set(pic.ax, pic.ay); sp.scale.set(0.5); sp.position.set(x, y + 8); sp.zIndex = z; this.objects.addChild(sp); return sp; };
+    put(pic.back, z0 - 3); // 발사대·발사탑은 남는다
+    const s = put(pic.stack, z0 + 0.5);
+    put(pic.front, z0 + 0.6);
+    this.ship = { s, f, door: [f.i + 1, f.j + f.d], hell, y0: s.y };
+  }
+  private wearGlasses(w: Walker) {
+    const g = new Graphics();
+    g.circle(-2.2, 0, 1.6).stroke({ color: 0x1a1410, width: 0.8 }).circle(2.2, 0, 1.6).stroke({ color: 0x1a1410, width: 0.8 }).moveTo(-0.6, 0).lineTo(0.6, 0).stroke({ color: 0x1a1410, width: 0.6 });
+    g.circle(-2.2, 0, 1.2).fill({ color: 0xffffff, alpha: 0.25 }).circle(2.2, 0, 1.2).fill({ color: 0xffffff, alpha: 0.25 });
+    this.objects.addChild(g);
+    w.glasses = g;
+  }
+  /** 우주선까지 걸어가 타고 떠오른다 (다 떠오르면 끝) */
+  boardShip(): Promise<void> {
+    const sh = this.ship;
+    if (!sh) return Promise.resolve();
+    this.cancelActs();
+    const to = this.nearestWalkable(sh.door[0], sh.door[1]);
+    return new Promise((res) => {
+      this.shipGo = { res, phase: 'walk', t: 0, v: 0, smoke: [] };
+      if (!to || !this.walkTo(to[0], to[1])) this.shipGo.phase = 'board';
+    });
+  }
+  private updateShip(dt: number) {
+    const go = this.shipGo, sh = this.ship;
+    if (!go || !sh) return;
+    const p = this.player;
+    go.t += dt;
+    if (go.phase === 'walk') {
+      if ((!p.path.length && go.t > 0.3) || go.t > 14) { go.phase = 'board'; go.t = 0; }
+      return;
+    }
+    if (go.phase === 'board') {
+      p.sprite.alpha = Math.max(0, 1 - go.t * 2);
+      if (go.t > 0.7) {
+        go.phase = 'lift'; go.t = 0;
+        const fl = new Sprite(Texture.from(flameCanvas(sh.hell)));
+        fl.anchor.set(0.5, 0); fl.zIndex = sh.s.zIndex - 0.05; fl.blendMode = 'add'; // 발밑 구름(앞 장)에 불꽃 끝이 가린다
+        this.objects.addChild(fl);
+        go.flame = fl;
+        sfx.thud(this.spotOf(p));
+      }
+      return;
+    }
+    // 떠오르기: 처음엔 느리게, 점점 빠르게. 불꽃이 깜박이고 발밑에 연기가 부푼다
+    go.v += dt * (go.t < 1 ? 18 : 120);
+    sh.s.y -= go.v * dt;
+    const rise = sh.y0 - sh.s.y;
+    if (go.flame) { go.flame.position.set(sh.s.x, sh.s.y - 12); go.flame.scale.set(0.5 + Math.random() * 0.12, 0.45 + Math.min(0.5, rise / 160) + Math.random() * 0.12); go.flame.alpha = 0.85 + Math.random() * 0.15; }
+    this.shakeT = Math.max(this.shakeT, 0.1); this.shakeA = Math.max(this.shakeA, go.t < 2 ? 3 : 1.5);
+    if (Math.random() < dt * 14) {
+      const c = new Sprite(cloudTexture());
+      c.anchor.set(0.5); c.tint = sh.hell ? 0x7a6a50 : 0xffffff; c.alpha = 0.7;
+      c.scale.set(0.15 + Math.random() * 0.1);
+      c.position.set(sh.s.x + (Math.random() - 0.5) * 90, sh.y0 - 6 + (Math.random() - 0.5) * 20);
+      c.zIndex = sh.s.zIndex + 0.02;
+      this.objects.addChild(c);
+      go.smoke.push(c);
+    }
+    for (const c of go.smoke) { c.scale.x += dt * 0.25; c.scale.y += dt * 0.18; c.alpha = Math.max(0, c.alpha - dt * 0.28); }
+    if (go.t > 3.4) {
+      const res = go.res;
+      for (const c of go.smoke) c.destroy();
+      go.flame?.destroy();
+      this.shipGo = null;
+      res();
+    }
+  }
+  /** 24차 경계의 해변: 저녁 하늘 · 어스름 색 · 낮게 깔린 안개 · 가끔 떠오르는 익사체 · 밀려왔다 빠지는 거품 */
+  private shoreFx: { fog: Sprite[]; bodies: { s: Sprite; t: number; T: number; i: number; j: number }[]; foam: Graphics; ft: number } | null = null;
+  private setupShore() {
+    const sky = new Sprite(Texture.from(shoreSkyCanvas()));
+    sky.width = this.app.screen.width; sky.height = this.app.screen.height;
+    this.root.addChildAt(sky, 0);
+    this.terraceSky = sky;
+    this.hazeOn = true;
+    const cm = new ColorMatrixFilter();
+    cm.saturate(-0.28, false);
+    const dusk = new ColorMatrixFilter();
+    dusk.tint(0xe8c8c0, true);
+    this.camera.filters = [cm, dusk];
+    const fog: Sprite[] = [];
+    for (let k = 0; k < 9; k++) {
+      const c = new Sprite(cloudTexture());
+      c.anchor.set(0.5); c.tint = 0xb4aab8; c.alpha = 0.16 + Math.random() * 0.14;
+      c.scale.set(1.6 + Math.random() * 1.4, 0.9 + Math.random() * 0.6);
+      c.position.set(Math.random() * this.app.screen.width, this.app.screen.height * (0.15 + Math.random() * 0.8));
+      this.overlay.addChild(c);
+      fog.push(c);
+    }
+    const tx = [0, 1, 2, 3].map((v) => { const t2 = Texture.from(drownedCanvas(v)); return t2; });
+    const bodies = [0, 1, 2].map((k) => {
+      const s = new Sprite(tx[k % 4]);
+      s.anchor.set(0.5); s.scale.set(0.5); s.alpha = 0; s.zIndex = -50;
+      this.objects.addChild(s);
+      return { s, t: -k * 9 - Math.random() * 6, T: 22 + Math.random() * 14, i: 0, j: 0 };
+    });
+    const foam = new Graphics();
+    foam.zIndex = -60;
+    this.objects.addChild(foam);
+    this.shoreFx = { fog, bodies, foam, ft: 0 };
+  }
+  private updateShore(dt: number) {
+    const fx = this.shoreFx;
+    if (!fx) return;
+    const Wd = this.app.screen.width;
+    for (const [k, c] of fx.fog.entries()) { c.x += dt * (6 + k * 1.5); if (c.x - c.width / 2 > Wd) c.x = -c.width / 2; }
+    // 익사체: 물가에서 몇 칸 떨어진 바다에 천천히 떠올랐다가 가라앉는다
+    for (const b of fx.bodies) {
+      b.t += dt;
+      if (b.t < 0) continue;
+      if (b.t > b.T) { b.t = -8 - Math.random() * 14; b.s.alpha = 0; continue; }
+      if (b.t - dt <= 0) { b.i = 2 + Math.random() * (this.zone.W - 4); b.j = shoreLine(Math.floor(b.i)) - 2.5 - Math.random() * 4; b.s.texture = b.s.texture; }
+      const a = Math.min(1, b.t / 4, (b.T - b.t) / 4);
+      const [x, y] = iso(b.i + b.t * 0.02, b.j + b.t * 0.03);
+      b.s.position.set(x, y + Math.sin(this.time * 1.3 + b.T) * 1.5);
+      b.s.alpha = a * 0.85;
+      b.s.rotation = Math.sin(this.time * 0.4 + b.T) * 0.05;
+    }
+    // 물가 거품: 밀려왔다 빠진다
+    fx.ft += dt;
+    if (fx.ft < 1 / 15) return;
+    fx.ft = 0;
+    const g = fx.foam;
+    g.clear();
+    const reach = (Math.sin(this.time * 0.55) + 1) / 2;
+    for (let pass = 0; pass < 2; pass++) {
+      const off = pass === 0 ? 0.35 * reach : -0.6 + 0.3 * reach;
+      let first = true;
+      for (let i = -6; i <= this.zone.W + 6; i += 0.5) {
+        const [x, y] = iso(i, shoreF(i) + off + Math.sin(i * 1.7 + this.time) * 0.06);
+        if (first) { g.moveTo(x, y); first = false; } else g.lineTo(x, y);
+      }
+      g.stroke({ color: 0xe6e8ea, width: pass === 0 ? 1.5 : 1, alpha: pass === 0 ? 0.55 * (1 - reach * 0.4) : 0.25 });
+    }
+  }
   private setupHeavenSky(terrace: boolean) {
     if (terrace) {
       const sky = new Sprite(terraceSkyTexture());
@@ -1771,17 +1926,32 @@ export class WorldScene {
     rs.position.set(room.x, room.y);
     this.ground.addChild(rs);
     for (const f of info.furn) {
+      if (f.kind === 'shuttle') { this.addShip(f); continue; }
       const d = drawFurn(f, info, nightIn);
       this.strips(tex(d.canvas), d.x, d.y, f.i, f.j, f.w, f.d, f.h <= 2 ? -40 : -0.2);
     }
+    // 24차: 가끔은 루엔·파샤르 대신 안경 쓴 아주 늙은 할아버지가 앉아 있다 (천국·지옥 같은 사람, 옷차림만 다름)
+    this.grandpa = (info.kind === 'terrace' || info.kind === 'rebirth') && (this.forceGrandpa ?? Math.random() < 0.14);
     if (info.clerk) {
-      const w = this.makeWalker(clerkLook(info.kind, info.from.b), info.clerk.i, info.clerk.j, 'clerk');
+      const w = this.makeWalker(this.grandpa ? grandpaLook(info.kind === 'rebirth') : clerkLook(info.kind, info.from.b), info.clerk.i, info.clerk.j, 'clerk');
       w.dir = 'sw';
       w.wait = 1e9;
       this.walkers.push(w);
       this.clerkW = w;
       if (info.kind === 'loan') this.dotArt(w, 'sprite-besk'); // 관리자가 손본 베스크 도트
-      if (info.kind === 'terrace') this.giveWings(w, 0xf4efe4); // 루엔의 흰 날개
+      if (info.kind === 'shore') { this.dotArt(w, 'sprite-bulda'); w.dir = 'se'; }
+      if (info.kind === 'terrace' && !this.grandpa) this.giveWings(w, 0xf4efe4); // 루엔의 흰 날개
+      if (this.grandpa) this.wearGlasses(w);
+    }
+    if (info.kind === 'terrace') {
+      // 24차: 우주선 근처에서 카드 치는 천사 둘 (가부좌로 마주 앉아)
+      const tb = info.furn.find((f) => f.kind === 'cardtable');
+      if (tb) for (const [di, dir] of [[-1, 'se'], [1, 'nw']] as const) {
+        const a = this.makeWalker(this.npcLook('angel'), tb.i + di, tb.j, 'soul');
+        a.still = 'lotus'; a.dir = dir; a.wait = 1e9; a.speed = 0; a.cards = true;
+        this.giveWings(a, 0xf8f4ea);
+        this.walkers.push(a);
+      }
     }
     if (['temple', 'church', 'mosque', 'gurdwara'].includes(info.kind)) {
       // 19차: 종교마다 가장 높은 이 (주지 스님 · 대주교 · 대이맘 · 수석 그란티) — 제단 옆. 신앙을 뺀 능력치를 되돌려 준다
@@ -1827,7 +1997,15 @@ export class WorldScene {
       }
     }
     const seats = info.seats.slice();
-    const n = info.kind === 'rebirth' || info.kind === 'terrace' ? 0 : Math.min(seats.length, info.rest ? 2 : 3, 1 + (info.from.b % 3));
+    if (info.kind === 'shore') {
+      // 24차 경계: 마른 모래 위에 가부좌한 완성자들 — 바다를 본다
+      info.seats.forEach(([i, j], k) => {
+        const m = this.makeWalker(monkLook(k), i, j, 'soul');
+        m.still = 'lotus'; m.dir = k % 2 ? 'ne' : 'nw'; m.wait = 1e9; m.speed = 0; m.monk = true;
+        this.walkers.push(m);
+      });
+    }
+    const n = info.kind === 'rebirth' || info.kind === 'terrace' || info.kind === 'shore' ? 0 : Math.min(seats.length, info.rest ? 2 : 3, 1 + (info.from.b % 3));
     for (let k = 0; k < n; k++) {
       const [i, j] = seats.splice((info.from.b * 7 + k * 3) % seats.length, 1)[0];
       const w = this.makeWalker(this.npcLook('passer'), i, j, 'passer');
@@ -1880,7 +2058,7 @@ export class WorldScene {
         }
       }
     }
-    if (!this.workIn && !this.leaving && !this.dead && !p.path.length && Math.floor(p.x) === info.exit.i && Math.floor(p.y) === info.exit.j && this.time > 0.6) {
+    if (info.kind !== 'shore' && !this.workIn && !this.leaving && !this.dead && !p.path.length && Math.floor(p.x) === info.exit.i && Math.floor(p.y) === info.exit.j && this.time > 0.6) {
       this.cancelActs();
       this.leaving = true;
       setTimeout(() => this.hooks.leaveBuilding(), 0); // 이 장면의 틱이 끝난 뒤에 버린다
@@ -1962,6 +2140,12 @@ export class WorldScene {
       const w = this.makeWalker(soulLook(), so.i, so.j, 'soul');
       w.still = so.pose === 'stand' ? undefined : so.pose;
       w.dir = DIR4[so.d % 4];
+      // 24차: 앉은 영혼은 가까운 모닥불·화톳불을 바라본다 (빌던 이는 악마상 그대로)
+      if (so.pose === 'sit' && !so.pray) {
+        let best: Prop | null = null, bd = 9;
+        for (const q of this.zone.props) if ((q.kind === 'bonfire' || q.kind === 'campfire') && Math.hypot(q.i - so.i, q.j - so.j) < bd) { bd = Math.hypot(q.i - so.i, q.j - so.j); best = q; }
+        if (best) w.dir = dirFromTile(best.i + 0.5 - (so.i + 0.5), best.j + 0.5 - (so.j + 0.5), w.dir);
+      }
       if (so.pray) w.pray = true;
       w.wait = 1e9; w.speed = 0; w.maxHp = w.hp = 400;
       this.walkers.push(w);
@@ -3000,9 +3184,8 @@ export class WorldScene {
       if (door && (!spot || Math.hypot(spot[0] - door[0], spot[1] - door[1]) <= 3)) spot = door;
       if (spot && this.walkTo(spot[0], spot[1])) { this.rippleAt(spot[0], spot[1]); return; }
     }
-    // 5) 땅 (지나가는 길의 사람·건물은 신경 쓰지 않는다)
-    this.cancelActs();
-    this.moveToScreen(gx, gy);
+    // 5) 땅 (지나가는 길의 사람·건물은 신경 쓰지 않는다) — 24차: 활이면 표적을 쥔 채 무빙샷
+    this.groundMove(gx, gy);
   }
 
   /** 화면 좌표의 땅으로 걸어간다 (못 가는 칸이면 가장 가까운 갈 수 있는 칸) */
@@ -3236,6 +3419,7 @@ export class WorldScene {
   private cancelActs() {
     this.hooks.away();
     this.player.target = null;
+    this.kite = false;
     this.pending = null;
     this.stairWant = false;
     this.wantShop = false;
@@ -3299,7 +3483,7 @@ export class WorldScene {
     if (w.kind === 'soul' || w.kind === 'fighter') {
       if (!w.still) w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir);
       const f = this.zone.hell?.floor ?? 0;
-      const lines = w.kind === 'fighter' ? L.fighterLines : this.zone.interior?.kind === 'rebirth' ? L.lobbySoulLines : w.pray ? L.idolPrayLines : f === 2 ? L.soulHungryLines : f === 3 && !w.still ? L.soulHaggleLines : w.still === 'lie' ? L.soulLieLines : L.soulLines;
+      const lines = w.kind === 'fighter' ? L.fighterLines : w.monk ? L.monkLines : w.cards ? L.cardLines : this.zone.interior?.kind === 'rebirth' ? L.lobbySoulLines : w.pray ? L.idolPrayLines : f === 2 ? L.soulHungryLines : f === 3 && !w.still ? L.soulHaggleLines : w.still === 'lie' ? L.soulLieLines : L.soulLines;
       this.hooks.say(this.npcName(w), pd.kind === 'look' ? this.npcSub(w) : lines[Math.floor(Math.random() * lines.length)]);
       return;
     }
@@ -3381,6 +3565,9 @@ export class WorldScene {
   }
   private npcName(w: Walker) {
     const L = t();
+    if (w.kind === 'clerk' && this.zone.interior?.kind === 'shore') return L.bulda;
+    if (w.kind === 'clerk' && this.grandpa) return L.grandpaName;
+    if (w.cards) return L.angel;
     if (w.kind === 'clerk') return this.zone.interior?.kind === 'loan' ? L.besk : this.zone.interior?.kind === 'rebirth' ? L.pashar : this.zone.interior?.kind === 'terrace' ? L.officer : this.zone.interior?.name ?? '';
     if (w.mdef) return w.mdef.name[lang()];
     if (w.gdef) return w.gdef.name[lang()];
@@ -3409,6 +3596,9 @@ export class WorldScene {
   }
   private npcSub(w: Walker) {
     const L = t();
+    if (w.kind === 'clerk' && this.zone.interior?.kind === 'shore') return L.buldaSub;
+    if (w.kind === 'clerk' && this.grandpa) return L.grandpaSub;
+    if (w.cards) return L.cardSub;
     if (w.kind === 'clerk') return this.zone.interior?.kind === 'terrace' ? L.officerSub : L.clerkSub[(this.zone.interior?.kind ?? 'shop') as keyof typeof L.clerkSub] ?? '';
     if (w.mdef) return w.mdef.boss ? L.hellBoss.replace('{n}', String(this.zone.hell?.floor ?? 1)) : L.hellMonster;
     if (w.kind === 'pashar') return L.pasharSub;
@@ -3504,6 +3694,34 @@ export class WorldScene {
   }
   private tapCombo = 0;
   private quickUsed = false;
+  /** 24차 무빙샷: 활을 든 채 땅을 누르면 표적을 놓지 않고 걸으며 쏜다 */
+  private kite = false;
+  private bowOn() { return this.gear.ranged && this.gear.weapon === 'bow'; }
+  private keepKite() {
+    const p = this.player, tg = p.target;
+    const ok = !!tg && this.bowOn() && tg.down <= 0 && Math.hypot(tg.x - p.x, tg.y - p.y) <= RANGED + 4;
+    return ok ? tg : null;
+  }
+  /** 땅을 눌러 걷기 시작: 활이면 표적을 그대로 쥔다 */
+  private groundMove(gx: number, gy: number, fx = true) {
+    const keep = this.keepKite();
+    this.cancelActs();
+    if (keep) { this.player.target = keep; this.kite = true; }
+    this.moveToScreen(gx, gy, fx);
+  }
+  /** 24차 손맛: 땅에 남는 핏방울·뼛가루 (몇 초 뒤 사라진다) */
+  private splats: { x: number; y: number; r: number; col: number; t: number }[] = [];
+  private splat(to: Walker, n: number) {
+    if (this.realm === 'heaven') return;
+    const b = this.bodyOf(to);
+    const col = b === 'bones' ? 0xcfc2a2 : b === 'ash' ? 0x2e2824 : b === 'pret' ? 0x4e5a24 : b === 'monster' ? 0x3a4a1a : 0x7a120e;
+    const [x, y] = iso(to.x, to.y);
+    for (let k = 0; k < n; k++) {
+      const a = Math.random() * Math.PI * 2, d = 3 + Math.random() * 11;
+      this.splats.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.5, r: 1 + Math.random() * 2.2, col, t: 4 + Math.random() * 2 });
+    }
+    if (this.splats.length > 90) this.splats.splice(0, this.splats.length - 90);
+  }
 
   // ───────────────────────── 일하기 ─────────────────────────
   /**
@@ -3651,14 +3869,19 @@ export class WorldScene {
   /** 타격감: 멈칫(히트스톱) · 화면 흔들림 · 번쩍 · 밀려남 · 불꽃 */
   private impactFx(from: Walker, to: Walker, crit: boolean, kind?: sfx.HitKind) {
     const mine = from.isPlayer || to.isPlayer;
+    // 24차 손맛: 무기 무게에 따라 멈칫·흔들림이 다르다 (양손·둔기는 묵직하게, 활은 짧고 가볍게, 총은 쾅)
+    const heavy = from.isPlayer && !this.gear.ranged && (TWO.has(this.gear.weapon ?? '') || kind === 'blunt');
+    const bow = from.isPlayer && this.bowOn(), gun = from.isPlayer && this.gear.ranged && !bow;
     if (mine) {
-      this.hitStop = Math.max(this.hitStop, crit ? 0.11 : 0.065);
-      this.shakeT = Math.max(this.shakeT, crit ? 0.22 : to.isPlayer ? 0.16 : 0.1);
-      this.shakeA = Math.max(this.shakeA, crit ? 5 : to.isPlayer ? 3.5 : 2.5);
+      this.hitStop = Math.max(this.hitStop, crit ? 0.12 : bow ? 0.035 : heavy ? 0.095 : gun ? 0.08 : 0.07);
+      this.shakeT = Math.max(this.shakeT, crit ? 0.24 : to.isPlayer ? 0.16 : heavy || gun ? 0.15 : 0.1);
+      this.shakeA = Math.max(this.shakeA, crit ? 5.5 : to.isPlayer ? 3.5 : heavy ? 4 : gun ? 3.5 : bow ? 1.6 : 2.6);
     }
-    to.flashT = 0.07;
+    to.flashT = 0.08;
+    to.squashT = 0.13;
+    if (from.isPlayer || to.isPlayer) this.splat(to, crit ? 5 : heavy ? 4 : 2);
     const dx = to.x - from.x, dy = to.y - from.y, d = Math.hypot(dx, dy) || 1;
-    const push = (crit ? 0.42 : kind === 'blunt' ? 0.3 : 0.2) * (to.kind === 'suturer' && !to.monster ? 0.5 : 1);
+    const push = (crit ? 0.42 : heavy ? 0.4 : kind === 'blunt' ? 0.3 : bow ? 0.12 : 0.2) * (to.kind === 'suturer' && !to.monster ? 0.5 : 1);
     to.kb = { dx: (dx / d) * push, dy: (dy / d) * push, t: 0.12 };
     const [ax, ay] = iso(from.x, from.y), [bx, by] = iso(to.x, to.y);
     const sx = ax + (bx - ax) * 0.7, sy = ay + (by - ay) * 0.7 - 24;
@@ -3671,6 +3894,16 @@ export class WorldScene {
 
   private knockDown(w: Walker, by: Walker) {
     sfx.thud(this.spotOf(w));
+    if (by.isPlayer) {
+      // 24차 손맛: 마지막 일격 — 길게 멈칫, 크게 흔들리고, 멀리 나가떨어진다
+      this.hitStop = Math.max(this.hitStop, 0.17);
+      this.shakeT = Math.max(this.shakeT, 0.3); this.shakeA = Math.max(this.shakeA, 6);
+      const dx = w.x - by.x, dy = w.y - by.y, d = Math.hypot(dx, dy) || 1;
+      w.kb = { dx: (dx / d) * 0.9, dy: (dy / d) * 0.9, t: 0.22 };
+      this.splat(w, 7);
+      const [sx, sy] = iso(w.x, w.y);
+      for (let k = 0; k < 12; k++) { const a = Math.random() * Math.PI * 2, v = 50 + Math.random() * 60; this.sparks.push({ x: sx, y: sy - 4, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.35 - 10, t: 0.2 + Math.random() * 0.12, col: this.realm === 'heaven' ? 0xfff2b0 : 0xb8a888 }); }
+    }
     w.hp = 0;
     w.down = 30;
     w.path = [];
@@ -3909,6 +4142,16 @@ export class WorldScene {
   /** 맞는 순간의 효과: 근접은 베는 선, 총은 총구 불꽃과 탄도 */
   private swing(from: Walker, to: Walker, ranged = false) {
     const g = new Graphics();
+    if (ranged && (from.isPlayer ? this.bowOn() : false)) {
+      // 24차: 활 — 화살이 날아가 꽂힌다 (총구 불꽃 대신)
+      const [ax, ay] = iso(from.x, from.y), [bx, by] = iso(to.x, to.y);
+      const x0 = ax, y0 = ay - 30, x1 = bx, y1 = by - 26, a = Math.atan2(y1 - y0, x1 - x0);
+      g.moveTo(-9, 0).lineTo(5, 0).stroke({ color: 0xd8c8a0, width: 1.4 }).poly([5, -2, 9, 0, 5, 2]).fill(0xeeeeee).moveTo(-9, -2).lineTo(-6, 0).lineTo(-9, 2).stroke({ color: 0xc0402a, width: 1 });
+      g.rotation = a; g.position.set(x0, y0); g.zIndex = 1e6 - 4;
+      this.objects.addChild(g);
+      this.flyArrows.push({ g, x0, y0, x1, y1, t: 0, T: Math.max(0.04, Math.hypot(x1 - x0, y1 - y0) / 900) });
+      return;
+    }
     if (ranged) {
       const [ax, ay] = iso(from.x, from.y), [bx, by] = iso(to.x, to.y);
       const dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy) || 1;
@@ -3968,7 +4211,7 @@ export class WorldScene {
       else { anim = w.act.anim; i = fi; }
     }
     if (!w.act && downed) { anim = 'fall'; i = (cs.counts.fall ?? 1) - 1; }
-    else if (!w.act && w.still) { if (w.still === 'lie' || !cs.counts.sit) { anim = w.still === 'lie' ? 'fall' : 'idle'; i = w.still === 'lie' ? (cs.counts.fall ?? 1) - 1 : 0; } else { anim = 'sit'; i = 0; } }
+    else if (!w.act && w.still) { const sa: Anim = w.still === 'lotus' && cs.counts.lotus ? 'lotus' : 'sit'; if (w.still === 'lie' || !cs.counts[sa]) { anim = w.still === 'lie' ? 'fall' : 'idle'; i = w.still === 'lie' ? (cs.counts.fall ?? 1) - 1 : 0; } else { anim = sa; i = 0; } }
     if (anim === 'walk') i %= cs.counts.walk ?? 8;
     if (w.art && anim === 'idle' && (w.dir === 'sw' || w.dir === 'se')) { this.poseArt(w, cs, w.art); return; }
     applyFrame(w.sprite, frameOf(cs, anim, w.dir, i), w.size ?? 1);
@@ -4008,7 +4251,11 @@ export class WorldScene {
       if (tg.isPlayer) this.guardHostAt = -99;
       return;
     }
-    if (dist > reach) {
+    // 24차 무빙샷: 내가 누른 길을 걸으면서 사거리 안이면 쏜다 (멀어지면 화살을 아끼고 걷기만)
+    const kiting = w.isPlayer && this.kite && ranged && w.path.length > 0;
+    if (kiting && dist > RANGED + 7) { w.target = null; this.kite = false; return; }
+    if (kiting && dist > reach) { w.atkT = Math.max(0, w.atkT - dt); return; }
+    if (dist > reach && !kiting) {
       w.repathT -= dt;
       if (w.repathT <= 0 || !w.path.length) {
         w.repathT = 0.45;
@@ -4017,7 +4264,7 @@ export class WorldScene {
       }
       return;
     }
-    w.path = [];
+    if (!kiting) w.path = [];
     // 공격 장면이 대각선으로만 있으면 대각선 넷 중에서, 상하좌우까지 있으면(2배 그림) 8방향으로 바라본다
     if (!w.act || w.act.anim !== 'fall') w.dir = dirFromTile(tg.x - w.x, tg.y - w.y, w.dir, !!w.cs?.eight);
     w.atkT -= dt;
@@ -4066,7 +4313,8 @@ export class WorldScene {
     if (tg.down > 0 || (tg.isPlayer && this.dead) || w.down > 0) return;
     const ranged = w.isPlayer ? this.gear.ranged : w.weapon === 'pistol';
     if (ranged && (w.isPlayer ? this.gear.weapon : w.weapon) !== 'bow') sfx.gunshot(this.spotOf(w));
-    if (Math.hypot(tg.x - w.x, tg.y - w.y) > (ranged ? RANGED : MELEE) + 0.6) return;
+    if (Math.hypot(tg.x - w.x, tg.y - w.y) > (ranged ? RANGED : MELEE) + (w.isPlayer && this.kite ? 2 : 0.6)) return;
+    if (w.isPlayer) w.lungeT = ranged ? 0 : 0.1;
     this.swing(w, tg, ranged);
     this.hit(w, tg, pd.dmg, pd.crit, this.kindOf(w));
   }
@@ -4080,8 +4328,9 @@ export class WorldScene {
     let ax = 0, ay = 0;
     const look = Math.min(3, w.path.length);
     for (let k = 0; k < look; k++) { ax += w.path[k][0] + 0.5; ay += w.path[k][1] + 0.5; }
-    w.dir = dirFromTile(ax / look - w.x, ay / look - w.y, w.dir);
+    if (!(w.isPlayer && this.kite && w.act && w.target)) w.dir = dirFromTile(ax / look - w.x, ay / look - w.y, w.dir); // 무빙샷: 쏘는 동안은 표적을 본다
     let speed = w.speed;
+    if (w.isPlayer && this.kite && w.act) speed *= 0.8; // 시위를 당기는 동안 조금 느리게
     if (w.flee > 0) speed = 1.9;
     if (w.isPlayer && isDanger(w.hp, w.maxHp)) speed *= DANGER_SPEED;
     if (w.kind === 'thug' && w.target) speed = w.weak ? 1.05 : w.gang === 'robber' ? 1.95 : w.gang === 'mafia' ? 1.75 : 1.6;
@@ -4102,6 +4351,8 @@ export class WorldScene {
     this.drawSparks(realDt);
     if (this.zone.hell) { this.drawEmbers(realDt); this.updateHound(dt); this.updateTorture(dt); this.drawGuardFx(dt); this.drawLiquid(realDt); }
     if (this.realm === 'heaven') this.updateHeaven(realDt);
+    if (this.shoreFx) this.updateShore(realDt);
+    if (this.shipGo) this.updateShip(realDt);
     if (this.kerb) this.updateKerberos(dt);
     if (this.guide) this.updateGuide(dt);
     this.updateLandmarks(dt);
@@ -4169,8 +4420,15 @@ export class WorldScene {
       const [sx, sy] = iso(w.x, w.y);
       // 취객은 걸을 때 비틀거린다
       const sway = w.weak === 'drunk' && moving ? Math.sin(this.time * 3.1 + w.home[0]) * 2.2 : 0;
-      w.sprite.position.set(sx + sway, sy);
+      let lx = 0, ly = 0;
+      if (w.lungeT && w.lungeT > 0 && w.target) { // 24차: 때리는 순간 반 걸음 앞으로
+        const [tx2, ty2] = iso(w.target.x, w.target.y), q = Math.sin((w.lungeT / 0.1) * Math.PI) * 4, L = Math.hypot(tx2 - sx, ty2 - sy) || 1;
+        lx = ((tx2 - sx) / L) * q; ly = ((ty2 - sy) / L) * q; w.lungeT -= dt;
+      }
+      w.sprite.position.set(sx + sway + lx, sy + ly);
+      if (w.squashT && w.squashT > 0) { const q = w.squashT / 0.13; w.sprite.scale.x *= 1 + 0.16 * q; w.sprite.scale.y *= 1 - 0.13 * q; w.squashT -= dt; }
       w.sprite.zIndex = w.down > 0 ? w.x + w.y - 0.3 : w.x + w.y;
+      if (w.glasses) { const fr = w.dir === 'ne' || w.dir === 'nw' || w.dir === 'n'; w.glasses.visible = !fr && w.down <= 0 && w.sprite.visible; w.glasses.position.set(sx + (w.dir === 'sw' || w.dir === 'w' ? -2 : w.dir === 'se' || w.dir === 'e' ? 2 : 0), sy - 44.5 * (w.size ?? 1)); w.glasses.zIndex = w.x + w.y + 0.004; }
       if (w.horns) { w.horns.visible = w.down <= 0 && w.sprite.visible; w.horns.position.set(sx, sy - 47 * (w.size ?? 1)); w.horns.zIndex = w.x + w.y + 0.003; }
       if (w.wings) {
         const up = w.dir === 'ne' || w.dir === 'nw' || w.dir === 'n';
@@ -4581,8 +4839,7 @@ export class WorldScene {
       pr.hold = true;
       this.skipTap = true;
       if (this.working?.on) { this.stopWork(); }
-      this.cancelActs();
-      this.moveToScreen(pr.x, pr.y);
+      this.groundMove(pr.x, pr.y);
       pr.next = this.time + 0.15;
       return;
     }
@@ -4663,7 +4920,15 @@ export class WorldScene {
   }
 
   /** 타격 불꽃 */
+  private flyArrows: { g: Graphics; x0: number; y0: number; x1: number; y1: number; t: number; T: number }[] = [];
   private drawSparks(dt: number) {
+    for (let k = this.flyArrows.length - 1; k >= 0; k--) {
+      const f = this.flyArrows[k];
+      f.t += dt;
+      const q = Math.min(1, f.t / f.T);
+      f.g.position.set(f.x0 + (f.x1 - f.x0) * q, f.y0 + (f.y1 - f.y0) * q);
+      if (f.t > f.T + 0.12) { f.g.destroy(); this.flyArrows.splice(k, 1); }
+    }
     this.drawRankUp(dt);
     this.drawHands(dt);
     this.cullStatic(dt);
@@ -4683,6 +4948,13 @@ export class WorldScene {
   private drawFx(dt: number) {
     const g = this.fxLayer;
     g.clear();
+    // 24차: 땅에 떨어진 핏방울·뼛가루 — 천천히 스민다
+    for (let k = this.splats.length - 1; k >= 0; k--) {
+      const sp = this.splats[k];
+      sp.t -= dt;
+      if (sp.t <= 0) { this.splats.splice(k, 1); continue; }
+      g.ellipse(sp.x, sp.y, sp.r * 1.4, sp.r * 0.7).fill({ color: sp.col, alpha: Math.min(0.75, sp.t * 0.4) });
+    }
     const rp = this.ripple;
     if (rp) {
       rp.t += dt;
