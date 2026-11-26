@@ -1,7 +1,7 @@
 // 지옥의 바닥과 구조물: 파일 없이 한 칸씩 점을 찍어 그린다 (재 · 용암 · 늪 · 핏물 · 돌 · 판자)
 import { drawHellBuild } from './hellbuild.ts';
 import { TW, TH, iso } from './gfx.ts';
-import { tileAt, type Zone, type Building, type TileType } from './zone.ts';
+import { tileAt, mirror, type Zone, type Building, type TileType } from './zone.ts';
 import type { Theme } from './hell.ts';
 
 const CHUNK = 24;
@@ -51,7 +51,7 @@ const hexc = (h: string): RGB => { let v = HC.get(h); if (!v) { v = hex(h); HC.s
 export function hellGroundJob(z: Zone, theme: Theme, i0: number, j0: number): GroundJob {
   const NZ = noiseTex();
   const nz = (x: number, y: number) => NZ[((y & 255) << 8) | (x & 255)];
-  const i1 = Math.min(z.W, i0 + CHUNK), j1 = Math.min(z.H, j0 + CHUNK);
+  const i1 = z.beyond ? i0 + CHUNK : Math.min(z.W, i0 + CHUNK), j1 = z.beyond ? j0 + CHUNK : Math.min(z.H, j0 + CHUNK); // 32차: 지도 밖까지
   const minX = (i0 - j1) * (TW / 2), minY = (i0 + j0) * (TH / 2);
   const W = (i1 - i0 + j1 - j0) * (TW / 2) + 2, H = (i1 - i0 + j1 - j0) * (TH / 2) + 2;
   const c = document.createElement('canvas');
@@ -60,7 +60,8 @@ export function hellGroundJob(z: Zone, theme: Theme, i0: number, j0: number): Gr
   const im = g.createImageData(W, H);
   const D = im.data;
   const tiles = z.tiles, ZW = z.W, ZH = z.H;
-  const cls = (i: number, j: number) => { const ii = i < 0 ? 0 : i >= ZW ? ZW - 1 : i, jj = j < 0 ? 0 : j >= ZH ? ZH - 1 : j; return CLASS_OF[TYPE_IDX[tiles[jj * ZW + ii]] ?? 'lot']; };
+  const bm = z.beyond?.m;
+  const cls = (i: number, j: number) => { const ii = bm !== undefined ? mirror(ZW, bm, i) : i < 0 ? 0 : i >= ZW ? ZW - 1 : i, jj = bm !== undefined ? mirror(ZH, bm, j) : j < 0 ? 0 : j >= ZH ? ZH - 1 : j; return CLASS_OF[TYPE_IDX[tiles[jj * ZW + ii]] ?? 'lot']; }; // 32차: 지도 밖은 거울
   const sc = new Float32Array(7);
   let r = 0, gg = 0, b = 0;
   const set = (h: string) => { const v = hexc(h); r = v[0]; gg = v[1]; b = v[2]; };

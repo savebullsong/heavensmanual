@@ -2,7 +2,7 @@
 import './canvasfix.ts'; // 29차: 맨 먼저 — 2D 캔버스를 메모리 쪽에
 import './admin.css';
 import { PORTRAIT_SLOTS, SPRITE_SLOTS, DEFAULT_PORTRAITS, type PortraitSlot } from './portraits.ts';
-import { charSet, frameOf, MISS_HWANG, HWANGHON, BESK_LOOK, TALUS_LOOK, MASKGIRL_LOOK, yunaeLook, PX } from './sprites.ts';
+import { charSet, charSet3, frameOf, artDensity, MISS_HWANG, HWANGHON, BESK_LOOK, TALUS_LOOK, MASKGIRL_LOOK, yunaeLook, PX } from './sprites.ts';
 import { BULDA_LOOK } from './border.ts';
 import { drawCosmicBird, drawCosmicBirdHeaven } from './ujusae.ts';
 import { drawYuhwang } from './yuhwang.ts';
@@ -36,7 +36,7 @@ const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   'sprite-yunae-teen': { name: '유내 · 10대', where: '서울 · 내 집 안 · 밥상 앞에 서 있는 모습 (왼쪽 아래를 봄 · 오른쪽 아래는 좌우 뒤집기 · 걷는 모습은 구운 그림)' },
   'sprite-yunae-20s': { name: '유내 · 20대', where: '서울 · 내 집 대문 앞 · 서 있는 모습 (왼쪽 아래를 봄 · 걸어 나가는 모습은 구운 그림)' },
   'sprite-yunae-30s': { name: '유내 · 30대 후반', where: '서울 · 내 집 안 · 밥상 앞에 서 있는 모습 (왼쪽 아래를 봄 · 걷는 모습은 구운 그림)' },
-  'sprite-goat-king': { name: '염소대왕', where: '지옥 142층 · 판관석 뒤에 앉은 윗몸 (아래쪽은 판관석이 가린다 · 기본 그림과 같은 크기 216×236 · 2배 밀도)' },
+  'sprite-goat-king': { name: '염소대왕', where: '지옥 142층 · 뒤 모서리 흑요석 단 위 옥좌에 앉은 온몸 (옥좌째 · 정면 · 기본 그림과 같은 크기 440×626 · 2배 밀도 → 게임 속 220×313)' },
   'sprite-talus': { name: '탈루스', where: '지옥 2층 들판 · 산탄총을 든 채 서 있는 모습 (왼쪽 아래를 봄 · 오른쪽 아래는 좌우 뒤집기 · 총을 쏠 때는 구운 그림)' },
   'bld-ujusae': { name: '우주새 건물 · 낮', where: '현실·천국의 우주새 · 바닥 2×2칸' },
   'bld-ujusae-night': { name: '우주새 건물 · 밤', where: '창에 불이 켜진 밤 모습 (비워 두면 낮 그림을 밤에도 씀)' },
@@ -52,7 +52,7 @@ type Tab = 'portraits' | 'sprites' | 'chars';
 const isSprite = (s: PortraitSlot) => (SPRITE_SLOTS as readonly string[]).includes(s);
 
 /** 도트 칸의 지금 기본 그림 (게임이 구운 그림 그대로) */
-interface DotSpec { canvas: HTMLCanvasElement; w: number; h: number; foot?: [number, number] }
+interface DotSpec { canvas: HTMLCanvasElement; w: number; h: number; foot?: [number, number]; /** 32차: 3배 밑그림을 구울 사람 */ who?: { look: import('./character.ts').Look; weapon: string | null } }
 const dotSpecs = new Map<PortraitSlot, Promise<DotSpec | null>>();
 function dotSpec(slot: PortraitSlot): Promise<DotSpec | null> {
   let p = dotSpecs.get(slot);
@@ -66,7 +66,8 @@ function dotSpec(slot: PortraitSlot): Promise<DotSpec | null> {
         return { canvas: d.canvas, w: d.canvas.width, h: d.canvas.height };
       }
       if (slot === 'sprite-miss-hwang' || slot === 'sprite-hwanghon' || slot === 'sprite-besk' || slot === 'sprite-talus' || slot === 'sprite-bulda' || slot === 'sprite-maskgirl' || slot.startsWith('sprite-yunae-')) {
-        const cs = await (slot === 'sprite-talus' ? charSet(TALUS_LOOK, 'shotgun') : charSet(slot.startsWith('sprite-yunae-') ? yunaeLook(slot === 'sprite-yunae-teen' ? 0 : slot === 'sprite-yunae-20s' ? 1 : 2) : slot === 'sprite-maskgirl' ? MASKGIRL_LOOK : slot === 'sprite-bulda' ? BULDA_LOOK : slot === 'sprite-besk' ? BESK_LOOK : slot === 'sprite-hwanghon' ? HWANGHON : MISS_HWANG));
+        const who = slot === 'sprite-talus' ? { look: TALUS_LOOK, weapon: 'shotgun' } : { look: slot.startsWith('sprite-yunae-') ? yunaeLook(slot === 'sprite-yunae-teen' ? 0 : slot === 'sprite-yunae-20s' ? 1 : 2) : slot === 'sprite-maskgirl' ? MASKGIRL_LOOK : slot === 'sprite-bulda' ? BULDA_LOOK : slot === 'sprite-besk' ? BESK_LOOK : slot === 'sprite-hwanghon' ? HWANGHON : MISS_HWANG, weapon: null };
+        const cs = await charSet(who.look, who.weapon);
         const f = frameOf(cs, 'idle', 'sw', 0);
         if (!f) return null;
         const src = f.tex.source.resource as HTMLCanvasElement;
@@ -74,8 +75,9 @@ function dotSpec(slot: PortraitSlot): Promise<DotSpec | null> {
         const c = document.createElement('canvas');
         c.width = fr.width; c.height = fr.height;
         c.getContext('2d')!.drawImage(src, fr.x, fr.y, fr.width, fr.height, 0, 0, fr.width, fr.height);
-        // 구운 그림이 2배 밀도(PX=2)면 캔버스는 2배, 필요한 크기(w·h)는 게임 속 크기로 적는다
-        return { canvas: c, w: Math.round(c.width / PX), h: Math.round(c.height / PX), foot: [Math.round((f.ax * f.w) / PX), Math.round((f.ay * f.h) / PX)] };
+        // 구운 그림이 2배 밀도(PX=2)면 캔버스는 2배, 필요한 크기(w·h)는 게임 속 크기로 적는다 (32차: 3배 시험 중이면 3으로 나눈다)
+        const P = cs.px ?? PX;
+        return { canvas: c, w: Math.round(c.width / P), h: Math.round(c.height / P), foot: [Math.round((f.ax * f.w) / P), Math.round((f.ay * f.h) / P)], who };
       }
       const name = slot === 'sprite-parrot' ? 'shop-parrot-0' : 'shop-parrot-1';
       const im = await new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = slot === 'sprite-goat-king' ? './npc/goat-king.png' : `./sprites/${name}.png`; });
@@ -252,6 +254,7 @@ function dotCard(slot: PortraitSlot) {
   const pick = h('button', 'primary', 'PNG 올리기');
   const down = h('button', '', '지금 그림 (1배)');
   const down2 = h('button', '', '2배 밑그림');
+  const down3 = h('button', '', '3배 밑그림');
   const reset = h('button', '', '구운 그림으로');
   const save = h('button', 'primary', '저장');
   const cancel = h('button', '', '취소');
@@ -269,7 +272,7 @@ function dotCard(slot: PortraitSlot) {
     g.drawImage(src, 0, 0, w * Z, h0 * Z);
     if (spec?.foot) {
       // 발 기준점 (게임에서 바닥에 닿는 점)
-      const m = w === spec.w * 2 ? 2 : 1;
+      const m = Math.abs(w - spec.w * 3) <= 3 ? 3 : Math.abs(w - spec.w * 2) <= 2 ? 2 : 1;
       const [fx, fy] = [spec.foot[0] * m + (m - 1) * 0.5, spec.foot[1] * m + (m - 1) * 0.5];
       g.strokeStyle = 'rgba(224,70,58,0.9)'; g.lineWidth = 1;
       g.beginPath(); g.moveTo((fx + 0.5) * Z - 6, (fy + 0.5) * Z); g.lineTo((fx + 0.5) * Z + 6, (fy + 0.5) * Z);
@@ -286,13 +289,14 @@ function dotCard(slot: PortraitSlot) {
   const show = async () => {
     spec = await dotSpec(slot);
     if (!spec) { size.textContent = '구운 그림을 읽지 못했습니다.'; return; }
-    size.innerHTML = `필요한 크기 <b>${spec.w}×${spec.h}px</b> 또는 2배 <b>${spec.w * 2}×${spec.h * 2}px</b> · 배경 투명 PNG<br><span class="hint2">2배로 그리면 게임 속 크기는 같고, 휴대폰·고해상도 화면에서 두 배 섬세하게 보입니다</span>${spec.foot ? `<br>발 기준점: 왼쪽에서 ${spec.foot[0]}px, 위에서 ${spec.foot[1]}px (2배면 ${spec.foot[0] * 2}, ${spec.foot[1] * 2}) · 빨간 십자` : '<br>그림의 왼쪽 위가 지금 그림과 같은 자리에 놓입니다'}`;
+    size.innerHTML = `필요한 크기 <b>${spec.w}×${spec.h}px</b> · 2배 <b>${spec.w * 2}×${spec.h * 2}px</b>${spec.who ? ` · 3배 <b>${spec.w * 3}×${spec.h * 3}px</b>` : ''} · 배경 투명 PNG<br><span class="hint2">2배·3배로 그리면 게임 속 크기는 같고, 휴대폰·고해상도 화면에서 그만큼 섬세하게 보입니다${spec.who ? ' (도트 3배 시험을 켜면 3배 그림만 보입니다)' : ''}</span>${spec.foot ? `<br>발 기준점: 왼쪽에서 ${spec.foot[0]}px, 위에서 ${spec.foot[1]}px (2배면 ${spec.foot[0] * 2}, ${spec.foot[1] * 2}${spec.who ? ` · 3배면 ${spec.foot[0] * 3 + 1}, ${spec.foot[1] * 3 + 1}` : ''}) · 빨간 십자` : '<br>그림의 왼쪽 위가 지금 그림과 같은 자리에 놓입니다'}`;
     const u = overrides[slot];
     current = u ? await asCanvas(u).catch(() => spec!.canvas) : spec.canvas;
     paint(current, current.width, current.height);
     status.textContent = u ? '바꾼 그림을 쓰는 중' : '게임이 구운 그림을 쓰는 중';
     actions.innerHTML = '';
     actions.append(pick, down, down2);
+    if (spec.who) actions.append(down3);
     if (u) actions.append(reset);
   };
   const save2 = (c: HTMLCanvasElement) => c.toBlob((b) => {
@@ -323,6 +327,22 @@ function dotCard(slot: PortraitSlot) {
     g.drawImage(spec.canvas, 0, 0, c.width, c.height);
     save2(c);
   };
+  // 32차: 3배 밑그림 — 3배로 구운 층이 있으면 그 그림을, 없으면 지금 그림을 픽셀째 세 배로. 크기·발 기준점은 게임 그림에 맞춰 둔다
+  down3.onclick = async () => {
+    if (!spec?.who) return;
+    const c = document.createElement('canvas');
+    c.width = spec.w * 3; c.height = spec.h * 3;
+    const g = c.getContext('2d')!;
+    g.imageSmoothingEnabled = false;
+    const cs3 = await charSet3(spec.who.look, spec.who.weapon).catch(() => null);
+    const f3 = cs3 ? frameOf(cs3, 'idle', 'sw', 0) : undefined;
+    if (f3 && spec.foot) {
+      const fr = f3.tex.frame;
+      const fx = Math.round(f3.ax * f3.w), fy = Math.round(f3.ay * f3.h);
+      g.drawImage(f3.tex.source.resource as HTMLCanvasElement, fr.x, fr.y, fr.width, fr.height, spec.foot[0] * 3 + 1 - fx, spec.foot[1] * 3 + 1 - fy, fr.width, fr.height);
+    } else g.drawImage(spec.canvas, 0, 0, c.width, c.height);
+    save2(c);
+  };
   pick.onclick = () => file.click();
   file.onchange = async () => {
     const f = file.files?.[0];
@@ -334,14 +354,14 @@ function dotCard(slot: PortraitSlot) {
     if (!isPng) { status.textContent = `PNG 파일만 올릴 수 있습니다 (투명 배경이 필요해서). 이 파일은 ${f.type || '종류를 알 수 없는 파일'}입니다. 사진 앱이 JPEG로 바꿔 보냈다면 '파일'에서 원본 PNG를 골라 주세요.`; return; }
     let c: HTMLCanvasElement;
     try { c = await asCanvas(f); } catch { status.textContent = '이 파일은 열 수 없습니다.'; return; }
-    const k = c.width === spec.w && c.height === spec.h ? 1 : c.width === spec.w * 2 && c.height === spec.h * 2 ? 2 : 0;
-    if (!k) {
-      status.textContent = `크기가 다릅니다: 올린 그림 ${c.width}×${c.height}px, 필요한 크기 ${spec.w}×${spec.h}px 또는 ${spec.w * 2}×${spec.h * 2}px`;
+    const k = artDensity(c, spec.w, spec.h);
+    if (!k || (k === 3 && !spec.who)) {
+      status.textContent = `크기가 다릅니다: 올린 그림 ${c.width}×${c.height}px, 필요한 크기 ${spec.w}×${spec.h}px · ${spec.w * 2}×${spec.h * 2}px${spec.who ? ` · ${spec.w * 3}×${spec.h * 3}px` : ''}`;
       return;
     }
     pending = f.type === "image/png" ? f : new Blob([f], { type: "image/png" });
     paint(c, c.width, c.height);
-    status.textContent = `미리보기 · ${c.width}×${c.height}px · 크기 맞음${k === 2 ? ' (2배)' : ''}`;
+    status.textContent = `미리보기 · ${c.width}×${c.height}px · 크기 맞음${k > 1 ? ` (${k}배)` : ''}`;
     actions.innerHTML = '';
     actions.append(save, cancel);
   };

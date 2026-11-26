@@ -105,7 +105,9 @@ export function hasBank(b: Building) {
 /** 물건을 살 수 있는 가게 */
 export type StoreKind = 'mart' | 'pharmacy' | 'food' | 'cafe';
 export function storeOf(b: Building): StoreKind | null {
-  for (const p of (b as B).pois ?? []) {
+  // 32차: 대표 가게(첫 POI)만 — 미용실 건물 2층 식당 때문에 미용실 문에서 음식을 팔던 문제
+  const main = mainPoi(b);
+  for (const p of main ? [main] : []) {
     if (['convenience', 'supermarket', 'kiosk', 'variety_store'].includes(p.t)) return 'mart';
     if (['pharmacy', 'chemist'].includes(p.t)) return 'pharmacy';
     if (['restaurant', 'fast_food', 'food_court', 'marketplace'].includes(p.t)) return 'food';

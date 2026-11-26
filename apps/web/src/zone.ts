@@ -56,7 +56,10 @@ export interface Zone {
   city?: 'seoul';
   homeAlley?: { i0: number; j0: number; i1: number; j1: number };
   home?: { i: number; j: number };
+  /** 32차: 지도 밖(갈 수 없는 곳)까지 그린다 — 그리기 전용. 가장자리 m칸 안쪽을 거울삼아 바깥을 비춘다 (빈 땅은 지어낸 골목·건물로) */
+  beyond?: Beyond;
 }
+export interface Beyond { m: number; lanes: Lane[] }
 /** 방의 가구: 바닥 사각형(타일)과 높이(px), 무엇인지 */
 export interface Furn { i: number; j: number; w: number; d: number; h: number; kind: string; v?: number }
 export interface InteriorInfo {
@@ -100,6 +103,29 @@ export type HellVendor = 'butcher' | 'water' | 'junk' | 'medic' | 'trader' | 'ar
 export function tileAt(z: Zone, i: number, j: number): TileType {
   if (i < 0 || j < 0 || i >= z.W || j >= z.H) return 'void';
   return TYPES[z.tiles[j * z.W + i]];
+}
+
+/** 32차: 거울 좌표 — [m, n-m) 범위를 벗어나면 그 끝을 거울 삼아 뒤집는다 (멀리 가면 다시 뒤집힌다) */
+export function mirror(n: number, m: number, x: number): number {
+  const lo = m, span = n - 2 * m;
+  if (x >= lo && x < lo + span) return x;
+  let t = (x - lo) % (2 * span);
+  if (t < 0) t += 2 * span;
+  return t < span ? lo + t : lo + 2 * span - 1 - t;
+}
+/** 32차: 지어낸 동네 — 12칸마다 두 칸 골목, 나머지는 건물 자리 */
+export const FILL_CELL = 12;
+export function fillTile(i: number, j: number): TileType {
+  const a = ((i % FILL_CELL) + FILL_CELL) % FILL_CELL, b = ((j % FILL_CELL) + FILL_CELL) % FILL_CELL;
+  return a < 2 || b < 2 ? 'soi' : 'block';
+}
+/** 그리기용 땅: 지도 안은 tileAt 그대로, 밖(과 비어 있는 땅)은 거울에 비친 땅 */
+export function groundAt(z: Zone, i: number, j: number): TileType {
+  const b = z.beyond;
+  if (!b) return tileAt(z, i, j);
+  const mi = mirror(z.W, b.m, i), mj = mirror(z.H, b.m, j);
+  const t = TYPES[z.tiles[mj * z.W + mi]];
+  return t === 'void' ? fillTile(mi, mj) : t;
 }
 
 export function finalize(z: Omit<Zone, 'blocked'>): Zone {

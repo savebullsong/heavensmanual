@@ -17,7 +17,8 @@ export function canEnter(b: Building) {
   if (b.cat === 'home') return true; // 24차 내 집
   if (!p || b.cat === 'ujusae') return false;
   // 간판이 없어도 들어갈 수 있는 곳: 종교시설·병원·은행
-  return !!b.sign || ['place_of_worship', 'hospital', 'clinic', 'bank'].includes(p.t);
+  // 32차: 물건을 파는 곳·은행은 반드시 안으로 들어가서 산다 (문 앞에서 사던 버그)
+  return !!b.sign || ['place_of_worship', 'hospital', 'clinic', 'bank'].includes(p.t) || !!storeOf(b) || hasBank(b);
 }
 
 /** 17차: 우주새와 다른 무기를 파는 거리 상인 — 철물점·수리점(공구) · 백화점·쇼핑몰(주방칼·운동용품) */
@@ -63,7 +64,7 @@ export const REST_ROOMS = new Set(['home', 'temple', 'church', 'mosque', 'gurdwa
 const SIZE: Record<string, [number, number]> = {
   temple: [13, 11], church: [13, 11], mosque: [12, 11], gurdwara: [12, 11], bank: [12, 10], clinic: [12, 10], pharmacy: [9, 8],
   mart: [11, 9], food: [12, 10], cafe: [10, 9], bar: [10, 9], salon: [9, 8], massage: [10, 9], laundry: [9, 8], lobby: [11, 9], shop: [9, 8], loan: [10, 8],
-  hbank: [10, 8], atone: [11, 10], rebirth: [31, 17], terrace: [23, 16], home: [11, 9], gym: [13, 11], dept: [26, 20], goatroom: [13, 12],
+  hbank: [10, 8], atone: [11, 10], rebirth: [31, 17], terrace: [23, 16], home: [11, 9], gym: [13, 11], dept: [26, 20], goatroom: [17, 17],
 };
 const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   temple: { floor: 'temple', wall: '#e9dcc0', trim: '#a8322a' }, church: { floor: 'stone', wall: '#e8e2d4', trim: '#6b4a30' },
@@ -220,13 +221,13 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
       break;
     }
     case 'goatroom': {
-      // 31차 지옥 142층 · 염소대왕의 방: 뒤쪽 가운데 높은 판관석(검은 옻칠 · 금테 · 붉은 휘장) 뒤에 염소대왕이 앉아 있다.
-      // 양옆 청동 화로(붉은 불), 앞쪽 양옆 쇠사슬 감긴 검붉은 기둥, 문에서 판관석까지 붉은 융단
-      clerk = { i: mid, j: 2 }; counter = { i: mid, j: 5 };
-      F(mid - 2, 3, 5, 1, 30, 'gkdesk');
-      F(mid - 4, 3, 1, 1, 24, 'gkbrazier'); F(mid + 4, 3, 1, 1, 24, 'gkbrazier', 1);
-      F(2, 6, 1, 1, 96, 'gkpillar'); F(W - 3, 6, 1, 1, 96, 'gkpillar', 1);
-      F(2, 2, 1, 1, 96, 'gkpillar', 2); F(W - 3, 2, 1, 1, 96, 'gkpillar', 3);
+      // 32차 지옥 142층 · 염소대왕의 방: 뒤 모서리의 흑요석 단 위, 열두 길 거인이 옥좌에 앉아 문 쪽을 내려다본다.
+      // 단 양옆 청동 화로(붉은 불), 쇠사슬 감긴 검붉은 기둥 넷, 문(앞 모서리)에서 단까지 비스듬한 붉은 융단
+      clerk = { i: 3, j: 3 }; counter = { i: 7, j: 7 };
+      F(1, 1, 5, 5, 16, 'gkdais');
+      F(7, 1, 1, 1, 24, 'gkbrazier'); F(1, 7, 1, 1, 24, 'gkbrazier', 1);
+      F(10, 1, 1, 1, 236, 'gkpillar', 2); F(1, 10, 1, 1, 236, 'gkpillar', 3);
+      F(11, 7, 1, 1, 236, 'gkpillar'); F(7, 11, 1, 1, 236, 'gkpillar', 1);
       break;
     }
     case 'home': {
@@ -326,7 +327,7 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
   // 깔개는 맨 아래에 (가구 밑에 깔린다)
   furn.sort((p, q) => (p.h <= 2 ? 0 : 1) - (q.h <= 2 ? 0 : 1));
   for (const f of furn) if (f.h > 2) for (let j = f.j; j < f.j + f.d; j++) for (let i = f.i; i < f.i + f.w; i++) tiles[j * W + i] = TI.block;
-  const exit = { i: mid, j: y1 };
+  const exit = kind === 'goatroom' ? { i: x1, j: y1 } : { i: mid, j: y1 }; // 32차: 염소대왕의 방은 옥좌 맞은편 앞 모서리가 문
   tiles[exit.j * W + exit.i] = TI.walk;
   const look = LOOKS[kind];
   const info: InteriorInfo = {
@@ -339,7 +340,7 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
 
 // ───────────────────────── 그림 ─────────────────────────
 type Pt = [number, number];
-const WALL = 100; // 벽 높이 px
+let WALL = 100; // 벽 높이 px (32차: 염소대왕의 방은 거인이 앉을 만큼 높다)
 
 function mixHex(a: string, b: string, t: number) {
   const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
@@ -452,6 +453,7 @@ export function drawRoom(z: Zone, night: boolean): { canvas: HTMLCanvasElement; 
   if (z.interior!.kind === 'terrace') return drawTerrace(z);
   if (z.interior!.kind === 'shore') return drawShore(z); // 24차 경계의 해변
   const info = z.interior!;
+  WALL = info.kind === 'goatroom' ? 270 : 100; // 32차: 거인의 방은 벽이 높다
   const W = z.W, H = z.H;
   const minX = (0 - H) * (TW / 2) - 8, maxX = W * (TW / 2) + 8;
   const minY = -WALL - 20, maxY = (W + H) * (TH / 2) + 8;
@@ -472,12 +474,13 @@ export function drawRoom(z: Zone, night: boolean): { canvas: HTMLCanvasElement; 
     poly([P(a + 0.12, 3.12, 0), P(b2 - 0.12, 3.12, 0), P(b2 - 0.12, H - 2.12, 0), P(a + 0.12, H - 2.12, 0)], '#a8282a');
   }
   if (info.kind === 'goatroom') {
-    // 문에서 판관석 앞까지 붉은 융단 (금빛 테) · 흑요석 바닥의 붉은 실금
-    const a = Math.floor(W / 2) - 1, b2 = Math.floor(W / 2) + 2;
-    poly([P(a, 4, 0), P(b2, 4, 0), P(b2, H - 1, 0), P(a, H - 1, 0)], '#c9a23e');
-    poly([P(a + 0.1, 4.1, 0), P(b2 - 0.1, 4.1, 0), P(b2 - 0.1, H - 1, 0), P(a + 0.1, H - 1, 0)], '#7a1014');
-    poly([P(a + 0.3, 4.3, 0), P(b2 - 0.3, 4.3, 0), P(b2 - 0.3, H - 1, 0), P(a + 0.3, H - 1, 0)], '#8e1418');
-    for (let j = 1; j < H - 1; j++) for (let i = 1; i < W - 1; i++) if ((i * 7 + j * 13) % 9 === 0 && (i < a || i >= b2)) poly([P(i + 0.2, j + 0.4, 0), P(i + 0.8, j + 0.6, 0), P(i + 0.82, j + 0.63, 0), P(i + 0.22, j + 0.43, 0)], '#5a1a14');
+    // 32차: 문(앞 모서리)에서 옥좌의 단까지 비스듬히 곧게 깔린 붉은 융단 (금빛 테) · 흑요석 바닥의 붉은 실금
+    const band = (a0: number, a1: number, wd: number, col: string) => poly([P(a0 + wd, a0 - wd, 0), P(a1 + wd, a1 - wd, 0), P(a1 - wd, a1 + wd, 0), P(a0 - wd, a0 + wd, 0)], col);
+    band(5.6, H - 1.4, 1.25, '#c9a23e');
+    band(5.7, H - 1.45, 1.1, '#7a1014');
+    band(5.8, H - 1.5, 0.85, '#8e1418');
+    for (let t = 7; t < H - 2; t += 2) { const [cx, cy] = P(t + 0.5, t + 0.5, 0); g.fillStyle = '#c9a23e'; g.beginPath(); g.moveTo(cx, cy - 5); g.lineTo(cx + 9, cy); g.lineTo(cx, cy + 5); g.lineTo(cx - 9, cy); g.closePath(); g.fill(); g.fillStyle = '#7a1014'; g.fillRect(Math.round(cx) - 2, Math.round(cy) - 1, 4, 2); }
+    for (let j = 1; j < H - 1; j++) for (let i = 1; i < W - 1; i++) if ((i * 7 + j * 13) % 9 === 0 && Math.abs(i - j) > 2) poly([P(i + 0.2, j + 0.4, 0), P(i + 0.8, j + 0.6, 0), P(i + 0.82, j + 0.63, 0), P(i + 0.22, j + 0.43, 0)], '#5a1a14');
   }
   // 앞 가장자리 걸레받이 (잘린 벽 단면)
   poly([P(W - 1, 1, 0), P(W - 1, H - 1, 0), P(W - 1, H - 1, 6), P(W - 1, 1, 6)], mixHex(info.wall, '#000000', 0.45));
@@ -565,37 +568,27 @@ export function drawRoom(z: Zone, night: boolean): { canvas: HTMLCanvasElement; 
     { const [hx, hy] = P(mid + 0.12, 1, 78); g.strokeStyle = '#c9a23e'; g.lineWidth = 2; g.beginPath(); g.ellipse(hx, hy, 12, 8, 0, 0.4, Math.PI * 2 - 0.3); g.stroke(); }
     for (let x = 2; x < W - 2; x += 3) for (let z = 20; z < 90; z += 4) onR(x, x + 0.06, z, z + 2, '#5a5650');
   } else if (k === 'goatroom') {
-    // 31차 염소대왕의 방: 금빛 글자를 수놓은 붉은 깃발 · 벽을 타고 내려오는 쇠사슬 · 판관석 위 숫양 해골 문장
+    // 32차 염소대왕의 방 (높은 벽): 금빛 글자를 수놓은 긴 붉은 깃발 · 벽을 타고 내려오는 쇠사슬
+    const hz = 2.3; // 깃발 길이 (벽이 높다)
     const banner = (x0: number, z0: number, onLeft: boolean) => {
       const quad = (a: number, b: number, z1: number, z2: number, col: string) => onLeft ? poly([P(1, a, z1), P(1, b, z1), P(1, b, z2), P(1, a, z2)], col) : onR(a, b, z1, z2, col);
-      quad(x0 - 0.05, x0 + 0.85, z0 - 2, z0 + 62, '#3a0a0c');
-      quad(x0, x0 + 0.8, z0, z0 + 60, '#8a1418');
-      quad(x0 + 0.06, x0 + 0.74, z0 + 3, z0 + 57, '#a8181c');
-      quad(x0, x0 + 0.8, z0 + 58, z0 + 62, '#c9a23e');
-      // 금빛 글자 (세로로 세 자) · 아래 술
-      for (let n = 0; n < 3; n++) {
-        const zc = z0 + 44 - n * 14;
-        quad(x0 + 0.3, x0 + 0.5, zc - 5, zc + 5, '#d9b44a');
-        quad(x0 + 0.18, x0 + 0.62, zc - 1, zc + 1, '#d9b44a');
-        quad(x0 + 0.24, x0 + 0.3, zc - 4, zc - 2, '#e8c86a');
+      const L = 62 * hz;
+      quad(x0 - 0.05, x0 + 0.85, z0 - 2, z0 + L, '#3a0a0c');
+      quad(x0, x0 + 0.8, z0, z0 + L - 2, '#8a1418');
+      quad(x0 + 0.06, x0 + 0.74, z0 + 3, z0 + L - 5, '#a8181c');
+      quad(x0, x0 + 0.8, z0 + L - 4, z0 + L, '#c9a23e');
+      for (let n = 0; n < 4; n++) {
+        const zc = z0 + L - 26 - n * 28;
+        quad(x0 + 0.3, x0 + 0.5, zc - 8, zc + 8, '#d9b44a');
+        quad(x0 + 0.16, x0 + 0.64, zc - 1.5, zc + 1.5, '#d9b44a');
+        quad(x0 + 0.24, x0 + 0.3, zc - 6, zc - 3, '#e8c86a');
       }
-      for (let n = 0; n < 4; n++) quad(x0 + 0.1 + n * 0.18, x0 + 0.16 + n * 0.18, z0 - 8, z0, n % 2 ? '#c9a23e' : '#8a1418');
+      for (let n = 0; n < 4; n++) quad(x0 + 0.1 + n * 0.18, x0 + 0.16 + n * 0.18, z0 - 12, z0, n % 2 ? '#c9a23e' : '#8a1418');
     };
-    for (const x0 of [1.6, 3.2, W - 4, W - 2.4]) banner(x0, 22, false);
-    for (const y0 of [2.6, 5.2, 7.8]) banner(y0, 22, true);
-    // 쇠사슬 (오른쪽 뒤 벽 · 왼쪽 벽)
-    const chain = (x0: number, onLeft: boolean) => { for (let z = 96; z > 30; z -= 5) { const q = (z / 5) % 2; if (onLeft) poly([P(1, x0, z), P(1, x0 + 0.12, z), P(1, x0 + 0.12, z - 4), P(1, x0, z - 4)], q ? '#3a3638' : '#5a5458'); else onR(x0 + (q ? 0.02 : 0), x0 + 0.1 + (q ? 0 : 0.02), z - 4, z, q ? '#3a3638' : '#5a5458'); } };
-    for (const x0 of [2.6, W - 2.9]) chain(x0, false);
-    for (const y0 of [4.2, 6.8, 9.4]) chain(y0, true);
-    // 숫양 해골 문장 (판관석 위, 염소대왕 머리 위로 높이)
-    { const [cx, cy] = P(mid + 0.5, 1, 96);
-      g.fillStyle = '#8a6a2a'; g.beginPath(); g.ellipse(cx, cy, 13, 9, 0, 0, Math.PI * 2); g.fill();
-      g.fillStyle = '#c9a23e'; g.beginPath(); g.ellipse(cx, cy, 11, 7.5, 0, 0, Math.PI * 2); g.fill();
-      g.fillStyle = '#e8dcc0'; g.fillRect(Math.round(cx) - 4, Math.round(cy) - 4, 8, 7); g.fillRect(Math.round(cx) - 2, Math.round(cy) + 3, 4, 3);
-      g.fillStyle = '#2a0a0a'; g.fillRect(Math.round(cx) - 3, Math.round(cy) - 2, 2, 2); g.fillRect(Math.round(cx) + 1, Math.round(cy) - 2, 2, 2);
-      g.strokeStyle = '#d9b44a'; g.lineWidth = 2;
-      g.beginPath(); g.arc(cx - 8, cy - 1, 4, Math.PI * 0.2, Math.PI * 1.7); g.stroke();
-      g.beginPath(); g.arc(cx + 8, cy - 1, 4, Math.PI * 1.3, Math.PI * 0.8, true); g.stroke(); }
+    for (const x0 of [7.3, 12.4, W - 3.2]) banner(x0, 70, false);
+    for (const y0 of [7.3, 12.4, H - 3.2]) banner(y0, 70, true);
+    const chain = (x0: number, onLeft: boolean) => { for (let z = WALL - 8; z > 40; z -= 5) { const q = (z / 5) % 2; if (onLeft) poly([P(1, x0, z), P(1, x0 + 0.12, z), P(1, x0 + 0.12, z - 4), P(1, x0, z - 4)], q ? '#3a3638' : '#5a5458'); else onR(x0 + (q ? 0.02 : 0), x0 + 0.1 + (q ? 0 : 0.02), z - 4, z, q ? '#3a3638' : '#5a5458'); } };
+    for (const x0 of [9.2, 14.0]) { chain(x0, false); chain(x0, true); }
   } else if (k === 'lobby') {
     winL(2, 3, 0, 64, '#8a8a84'); winL(4, 5, 0, 64, '#8a8a84'); // 승강기 문
     onR(3, W - 3, 60, 66, '#c9a23e');
@@ -861,6 +854,17 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       for (let n = 0; n < 5; n++) poly([P(i + 1.7, j + 0.32 + n * 0.08, h + 2.2), P(i + 2.3, j + 0.32 + n * 0.08, h + 2.2), P(i + 2.3, j + 0.34 + n * 0.08, h + 2.2), P(i + 1.7, j + 0.34 + n * 0.08, h + 2.2)], '#3a3028');
       B3(i + 3.6, j + 0.35, i + 3.85, j + 0.6, h, h + 5, '#8a1418'); // 인장
       poly([P(i + 0.7, j + 0.4, h + 1), P(i + 1.3, j + 0.6, h + 1), P(i + 1.3, j + 0.64, h + 1), P(i + 0.7, j + 0.44, h + 1)], '#2a1a12'); // 붓
+      break;
+    }
+    case 'gkdais': {
+      // 32차 옥좌의 단: 흑요석 두 단 · 금빛 모서리 · 위에 붉은 깔개
+      B3(i, j, i1, j1, 0, h / 2, '#1e1a24');
+      faceL(i, i1, h / 2 - 2, h / 2, '#c9a23e'); faceR(j, j1, h / 2 - 2, h / 2, '#8a6a22');
+      box(i, j, i1 - 0.35, j1 - 0.35, h / 2, h, '#2e2838', '#221d2a', '#18141e');
+      poly([P(i, j1 - 0.35, h - 2), P(i1 - 0.35, j1 - 0.35, h - 2), P(i1 - 0.35, j1 - 0.35, h), P(i, j1 - 0.35, h)], '#d9b44a');
+      poly([P(i1 - 0.35, j, h - 2), P(i1 - 0.35, j1 - 0.35, h - 2), P(i1 - 0.35, j1 - 0.35, h), P(i1 - 0.35, j, h)], '#a8822e');
+      poly([P(i + 0.4, j + 0.4, h + 0.2), P(i1 - 0.8, j + 0.4, h + 0.2), P(i1 - 0.8, j1 - 0.8, h + 0.2), P(i + 0.4, j1 - 0.8, h + 0.2)], '#5a0e14');
+      poly([P(i + 0.55, j + 0.55, h + 0.3), P(i1 - 0.95, j + 0.55, h + 0.3), P(i1 - 0.95, j1 - 0.95, h + 0.3), P(i + 0.55, j1 - 0.95, h + 0.3)], '#7a1418');
       break;
     }
     case 'gkbrazier': {

@@ -214,6 +214,14 @@ export const ITEMS: ItemDef[] = [
     ['friedchicken', 120, 160, '프라이드치킨', 'ไก่ทอด', 'Fried chicken'], ['tomyum', 150, 170, '똠얌꿍', 'ต้มยำกุ้ง', 'Tom yum goong'],
     ['grilledfish', 250, 200, '생선구이', 'ปลาเผา', 'Grilled fish'], ['somtam', 50, 100, '쏨땀', 'ส้มตำ', 'Papaya salad'], ['bamee', 50, 120, '바미 (달걀국수)', 'บะหมี่', 'Egg noodles'],
   ] as [string, number, number, string, string, string][]).map(([key, price, heal, ko, th, en]): ItemDef => ({ key, cat: 'goods', price, heal, store: 'food', now: true, name: { ko, th, en } })),
+  // 32차: 서울(강남) 가게 — 분식집 · 밥집 · 중국집 · 고깃집 · 치킨집 · 편의점 (값은 원화를 바트로: ₩40 = ฿1)
+  ...([
+    ['gimbap', 88, '김밥', 'คิมบับ', 'Gimbap', 'sushi'], ['ramyeon', 113, '라면', 'รามยอน', 'Ramyeon', 'ramen'], ['jjajang', 175, '짜장면', 'จาจังมยอน', 'Jjajangmyeon', 'pasta'],
+    ['gukbap', 250, '돼지국밥', 'ข้าวต้มซุปหมู', 'Pork rice soup', 'kimchistew'], ['samgyeop', 400, '삼겹살', 'ซัมกยอบซัล', 'Samgyeopsal', 'steak'], ['naengmyeon', 275, '냉면', 'บะหมี่เย็น', 'Cold noodles', 'pho'],
+    ['jjamppong', 200, '짬뽕', 'จัมปง', 'Jjamppong', 'tomyum'], ['sundae', 125, '순대', 'ซุนแด', 'Sundae', 'friedchicken'],
+  ] as [string, number, string, string, string, string][]).map(([key, price, ko, th, en, icon]): ItemDef => ({ key, cat: 'goods', price, heal: 1, store: 'food', now: true, icon, name: { ko, th, en } })),
+  { key: 'samgak', cat: 'goods', price: 38, heal: 1, store: 'mart', icon: 'sushi', name: { ko: '삼각김밥', th: 'ข้าวปั้นสามเหลี่ยม', en: 'Triangle gimbap' } },
+  { key: 'bananamilk', cat: 'goods', price: 43, heal: 1, store: 'mart', icon: 'thaitea', name: { ko: '바나나우유', th: 'นมกล้วย', en: 'Banana milk' } },
   ...([
     ['croissant', 90, 60, '크루아상', 'ครัวซองต์', 'Croissant'], ['donut', 45, 45, '도넛', 'โดนัท', 'Donut'],
     ['icecream', 80, 50, '아이스크림', 'ไอศกรีม', 'Ice cream'], ['bubbletea', 60, 40, '버블티', 'ชานมไข่มุก', 'Bubble tea'],
@@ -260,7 +268,27 @@ export const MENUS: Record<string, { key: string; price: number }[]> = {
   icecream: M(['icecream', 80], ['water', 10]),
   tea: M(['bubbletea', 60], ['thaitea', 45], ['matcha', 90]),
 };
-export function menuFor(kind: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept' | 'antique', cuisine?: string) {
+/** 32차: 서울 가게 메뉴 (태국 음식 대신). 업종(cuisine)이 없으면 가게 이름으로 분식 · 밥집 · 중국집 · 고깃집 · 치킨집 중 하나 */
+const KR_MENUS: Record<string, { key: string; price: number }[]> = {
+  bunsik: M(['gimbap', 88], ['tteok', 113], ['ramyeon', 113], ['sundae', 125], ['water', 25]),
+  rice: M(['kimchistew', 225], ['bibimbap', 225], ['gukbap', 250], ['water', 25]),
+  chinese: M(['jjajang', 175], ['jjamppong', 200], ['friedrice', 200], ['dimsum', 175], ['water', 25]),
+  bbq: M(['samgyeop', 400], ['naengmyeon', 275], ['kimchistew', 200], ['cola', 50]),
+  chicken: M(['friedchicken', 500], ['fries', 100], ['cola', 50]),
+  cafe: M(['coffee', 113], ['cake', 163], ['croissant', 100], ['water', 25]),
+  mart: M(['water', 25], ['cola', 50], ['noodle', 38], ['samgak', 38], ['bananamilk', 43], ['ricebox', 125], ['chips', 50], ['choco', 50], ['plaster', 75], ['umbrella', 250]),
+  pharmacy: M(['painkiller', 75], ['bandage', 113], ['saline', 50], ['firstaid', 625], ['water', 25]),
+};
+const KR_PICK: Record<string, string> = { korean: '', chinese: 'chinese', chicken: 'chicken', barbecue: 'bbq', bbq: 'bbq', noodle: 'bunsik', fast_food: 'bunsik' };
+export function menuFor(kind: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept' | 'antique', cuisine?: string, seoul = false, seed = '') {
+  if (seoul && (kind === 'mart' || kind === 'pharmacy' || kind === 'cafe')) return KR_MENUS[kind];
+  if (seoul && kind === 'food') {
+    const k = KR_PICK[cuisine ?? ''];
+    if (k) return KR_MENUS[k];
+    if (cuisine && MENUS[cuisine] && cuisine !== 'thai' && cuisine !== 'korean' && !['noodle', 'seafood'].includes(cuisine)) return MENUS[cuisine];
+    let h = 0; for (const ch of seed) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return KR_MENUS[['bunsik', 'rice', 'chinese', 'bbq', 'chicken'][h % 5]];
+  }
   if (kind === 'food') return MENUS[cuisine ?? ''] ?? MENUS.thai;
   if (kind === 'cafe') return MENUS[cuisine ?? ''] ?? MENUS.coffee;
   return STORES[kind];
@@ -302,7 +330,14 @@ export function effectText(it: ItemDef, l: Lang, skipStats = false): string {
 /** 24차: 서울에서는 원화로 보인다 (속은 바트 그대로, ฿1 ≈ ₩40) */
 let WON = false;
 export function setWon(on: boolean) { WON = on; }
+/** 32차: 지금 원화로 보이는가 (입력칸도 원 단위) */
+export function wonRate() { return WON ? WON_RATE : 1; }
 export const WON_RATE = 40;
+/** 32차: 서울에서는 글 속의 바트 금액(฿1,234)을 원화로 (알림 · 대화 · 은행 · 메뉴 글이 모두 이것을 거친다) */
+export function wonify(text: string): string {
+  if (!WON || !text.includes('฿')) return text;
+  return text.replace(/฿([\d,]+(?:\.\d+)?)/g, (_, num: string) => `₩${Math.round(parseFloat(num.replace(/,/g, '')) * WON_RATE).toLocaleString('en-US')}`);
+}
 export function moneyText(n: number): string {
   return WON ? `₩${Math.round(n * WON_RATE).toLocaleString('en-US')}` : `฿${Math.round(n).toLocaleString('en-US')}`;
 }

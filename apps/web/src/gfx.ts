@@ -1,5 +1,5 @@
 // 지형 · 건물 · 소품 · 차량 그래픽 (도트 느낌의 캔버스 그리기)
-import { type Zone, type Building, type Prop, tileAt } from './zone.ts';
+import { type Zone, type Building, type Prop, tileAt, groundAt } from './zone.ts';
 import { ramp } from './raster.ts';
 
 export const TW = 64, TH = 32;
@@ -24,9 +24,9 @@ export const CHUNK = 24;
 
 /** 바닥을 CHUNK×CHUNK 타일 조각으로 그린다 (화면에 보이는 조각만 만든다) */
 export function drawGroundChunk(z: Zone, i0: number, j0: number): { canvas: HTMLCanvasElement; x: number; y: number } | null {
-  const i1 = Math.min(z.W, i0 + CHUNK), j1 = Math.min(z.H, j0 + CHUNK);
+  const i1 = z.beyond ? i0 + CHUNK : Math.min(z.W, i0 + CHUNK), j1 = z.beyond ? j0 + CHUNK : Math.min(z.H, j0 + CHUNK);
   let any = false;
-  for (let j = j0; j < j1 && !any; j++) for (let i = i0; i < i1; i++) if (tileAt(z, i, j) !== 'void') { any = true; break; }
+  for (let j = j0; j < j1 && !any; j++) for (let i = i0; i < i1; i++) if (groundAt(z, i, j) !== 'void') { any = true; break; }
   if (!any) return null;
   const minX = (i0 - j1) * (TW / 2), minY = (i0 + j0) * (TH / 2);
   const c = document.createElement('canvas');
@@ -45,11 +45,11 @@ export function drawGroundChunk(z: Zone, i0: number, j0: number): { canvas: HTML
     return top * (1 - fj) + bot * fj;
   };
   const SOFT: Record<string, number> = { water: 0, lot: 1, block: 1, park: 2, walk: 3, soi: 3 };
-  const bridge = (i: number, j: number) => tileAt(z, i, j) === 'walk' && [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([a, b]) => tileAt(z, i + a, j + b) === 'water').length >= 2;
+  const bridge = (i: number, j: number) => groundAt(z, i, j) === 'walk' && [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([a, b]) => groundAt(z, i + a, j + b) === 'water').length >= 2;
   const diamond = (x: number, y: number) => { g.beginPath(); g.moveTo(x, y); g.lineTo(x + TW / 2, y + TH / 2); g.lineTo(x, y + TH); g.lineTo(x - TW / 2, y + TH / 2); g.closePath(); };
   for (let j = j0; j < j1; j++)
     for (let i = i0; i < i1; i++) {
-      const t = tileAt(z, i, j);
+      const t = groundAt(z, i, j);
       if (t === 'void') continue;
       const base = RAMPS[t];
       const [x, y] = S(i, j);
@@ -68,7 +68,7 @@ export function drawGroundChunk(z: Zone, i0: number, j0: number): { canvas: HTML
       // 모서리 깎기: 맞닿은 두 이웃이 같은 다른 땅(그리고 대각선도)이면 그 모서리 반쪽을 이웃 땅으로 칠한다
       const pt = SOFT[t];
       if (pt !== undefined) {
-        const N = (a: number, b: number) => tileAt(z, i + a, j + b);
+        const N = (a: number, b: number) => groundAt(z, i + a, j + b);
         // [이웃1, 이웃2, 대각선, 반대쪽1, 반대쪽2, 깎을 삼각형의 세 꼭짓점]
         const corners: [[number, number], [number, number], [number, number], [number, number], [number, number], [number, number][]][] = [
           [[-1, 0], [0, -1], [-1, -1], [1, 0], [0, 1], [[i, j], [i + 1, j], [i, j + 1]]],
@@ -113,10 +113,10 @@ export function drawGroundChunk(z: Zone, i0: number, j0: number): { canvas: HTML
     g.strokeStyle = color; g.lineWidth = 2; g.setLineDash(dashed ? [12, 14] : []);
     g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
   };
-  for (const l of z.lanes) {
+  for (const l of z.beyond ? z.lanes.concat(z.beyond.lanes) : z.lanes) {
     if (l.j < j0 - 1 || l.j > j1 || l.i1 < i0 || l.i0 >= i1) continue;
     const mid = Math.floor((Math.max(l.i0, i0) + Math.min(l.i1, i1 - 1)) / 2);
-    const up = tileAt(z, mid, l.j - 1), down = tileAt(z, mid, l.j + 1);
+    const up = groundAt(z, mid, l.j - 1), down = groundAt(z, mid, l.j + 1);
     if (up === 'road' || up === 'cross') line(l.j, l.i0, l.i1, '#d9d6cc', true);
     else if (up === 'median') line(l.j, l.i0, l.i1, '#d8b63c', false);
     else if (up === 'walk') line(l.j, l.i0, l.i1, '#6e665b', false);

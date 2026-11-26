@@ -7,7 +7,8 @@ import { TYPES, finalize, type Zone, type Furn, type InteriorInfo } from './zone
 import type { Look } from './character.ts';
 
 const TI = Object.fromEntries(TYPES.map((t, k) => [t, k])) as Record<(typeof TYPES)[number], number>;
-export const SHORE_W = 30, SHORE_H = 26;
+// 32차: 긴 해변 — 물가를 따라 96칸 (걸을 수 있는 곳 너머로도 바다와 모래가 화면 끝까지 이어진다)
+export const SHORE_W = 96, SHORE_H = 26;
 /** 물가 선: 이 줄(j)보다 위(작은 j)는 바다 */
 export function shoreF(i: number) {
   return 8 + Math.sin(i * 0.37) * 0.9 + Math.sin(i * 0.11 + 1.3) * 0.8;
@@ -15,8 +16,8 @@ export function shoreF(i: number) {
 export function shoreLine(i: number) {
   return Math.round(shoreF(i));
 }
-/** 잔교: 물가에서 바다로 6칸 뻗은 나무 다리 (두 칸 너비) */
-export const PIER = { i0: 9, i1: 11, j0: 1 };
+/** 잔교: 물가에서 바다로 6칸 뻗은 나무 다리 (두 칸 너비) — 32차: 긴 해변의 가운데 */
+export const PIER = { i0: 46, i1: 48, j0: 1 };
 
 /** 불다: 노란 고무 작업복(어부 기름옷)과 장화, 바짝 땋아 붙인 검은 콘로 머리 */
 export const BULDA_LOOK: Look = { sex: 'm', build: 2, skin: 2, hair: 5, hairColor: 0, top: 0, bottom: 0, cols: { 1: '#6a4228', 10: '#6a4228', 2: '#141010', 3: '#d8a41e', 9: '#d8a41e', 4: '#2a3430', 5: '#1a1e1c', 6: '#141010' } };
@@ -39,22 +40,35 @@ export function borderZone(name: string): Zone {
   for (let j = PIER.j0; j < shoreLine(PIER.i0) + 1; j++) for (let i = PIER.i0; i < PIER.i1; i++) tiles[j * W + i] = TI.walk;
   const furn: Furn[] = [];
   const F = (i: number, j: number, w: number, d: number, h: number, kind: string, v = 0) => furn.push({ i, j, w, d, h, kind, v });
-  const s0 = shoreLine(13);
-  F(13, s0 + 1, 3, 1, 14, 'boat');                 // 엎어 놓은 고깃배 (불다의 배)
-  F(17, s0 + 1, 1, 1, 34, 'netpole', 0); F(19, s0 + 2, 1, 1, 34, 'netpole', 1); // 그물 너는 장대
-  // 떠밀려 온 잡동사니: 물가 젖은 모래를 따라
-  for (const [i, v] of [[3, 0], [6, 1], [22, 2], [25, 3], [27, 4], [15, 5], [20, 6]] as const) F(i, shoreLine(i) + (i % 3 === 0 ? 1 : 0), 1, 1, 10, 'flot', v);
-  F(4, shoreLine(4) + 3, 2, 1, 6, 'drift', 0); F(23, shoreLine(23) + 4, 2, 1, 6, 'drift', 1); // 떠밀려 온 통나무
+  const P0 = PIER.i0;
+  const s0 = shoreLine(P0 + 4);
+  F(P0 + 4, s0 + 1, 3, 1, 14, 'boat');                 // 엎어 놓은 고깃배 (불다의 배)
+  F(P0 + 8, shoreLine(P0 + 8) + 1, 1, 1, 34, 'netpole', 0); F(P0 + 10, shoreLine(P0 + 10) + 2, 1, 1, 34, 'netpole', 1); // 그물 너는 장대
+  // 32차: 긴 해변 저쪽에도 버려진 배 한 척 · 그물 장대 한 쌍
+  F(14, shoreLine(14) + 2, 3, 1, 14, 'boat'); F(80, shoreLine(80) + 1, 1, 1, 34, 'netpole', 0); F(82, shoreLine(82) + 2, 1, 1, 34, 'netpole', 1);
+  // 떠밀려 온 잡동사니: 물가 젖은 모래를 따라 (해변 전체에 흩어져)
+  for (let i = 3; i < W - 3; i += 4) {
+    if (i >= P0 - 1 && i <= PIER.i1 + 1) continue;
+    const r = hsh(i, 7);
+    if (r < 0.35) continue;
+    F(i, shoreLine(i) + (i % 3 === 0 ? 1 : 0), 1, 1, 10, 'flot', Math.floor(hsh(i, 9) * 7));
+  }
+  for (const i of [6, 27, P0 + 13, 70, 88]) F(i, shoreLine(i) + 3 + (i % 2), 2, 1, 6, 'drift', i % 2); // 떠밀려 온 통나무
   for (const f of furn) if (f.h > 6) for (let j = f.j; j < f.j + f.d; j++) for (let i = f.i; i < f.i + f.w; i++) tiles[j * W + i] = TI.block;
   const clerk = { i: PIER.i0 + 1, j: shoreLine(PIER.i0) + 1 };
   const counter = { i: PIER.i0 + 1, j: clerk.j + 2 };
-  // 가부좌한 완성자들의 자리: 마른 모래 위, 바다를 바라보고
-  const seats: [number, number][] = [[5, 15], [8, 19], [14, 17], [20, 14], [24, 19], [17, 22]];
+  // 가부좌한 완성자들의 자리: 마른 모래 위, 바다를 바라보고 (긴 해변을 따라 띄엄띄엄)
+  const seats: [number, number][] = [];
+  for (let i = 5; i < W - 4; i += 7) {
+    if (Math.abs(i - P0) < 4) continue;
+    const j = shoreLine(i) + 5 + Math.floor(hsh(i, 3) * 9);
+    if (j < H - 2 && tiles[j * W + i] === TI.walk) seats.push([i, j]);
+  }
   const info: InteriorInfo = {
     kind: 'shore', rest: true, name, floor: 'sand', wall: '#8a8296', trim: '#c8b89a',
     exit: { i: -9, j: -9 }, clerk, counter, furn, from: { b: -9, out: { i: 0, j: 0 } }, seats,
   };
-  return finalize({ id: 'border-shore', W, H, tiles, buildings: [], props: [], lanes: [], door: { i: 15, j: H - 4 }, spawn: { i: 15, j: H - 4 }, interior: info });
+  return finalize({ id: 'border-shore', W, H, tiles, buildings: [], props: [], lanes: [], door: { i: P0 + 4, j: H - 6 }, spawn: { i: P0 + 4, j: H - 6 }, interior: info });
 }
 
 type Pt = [number, number];
@@ -85,75 +99,112 @@ export function shoreSkyCanvas(): HTMLCanvasElement {
   return c;
 }
 
-/** 해변 전체 (방 한 장): 수평선까지 이어진 바다 · 물가의 흰 거품과 젖은 모래 · 마른 모래 · 잔교 */
-export function drawShore(z: Zone): { canvas: HTMLCanvasElement; x: number; y: number } {
-  const W = z.W, H = z.H;
-  const I0 = -14, I1 = W + 12, J0 = -14, J1 = H + 12;
-  const minX = (I0 - J1) * (TW / 2), maxX = (I1 - J0) * (TW / 2);
-  const minY = (I0 + J0) * (TH / 2) - 40, maxY = (I1 + J1) * (TH / 2);
-  const { c, g, P, poly } = painter(minX, minY, maxX - minX, maxY - minY);
+/** 32차: 해변 한 덩어리 (CHUNK×CHUNK 칸) — 바다·모래·거품·잔교. 지도 밖도 똑같이 이어진다 (칸마다 같은 무늬라 이음매가 없다) */
+export const SHORE_CHUNK = 24;
+export function drawShoreChunk(i0: number, j0: number): { canvas: HTMLCanvasElement; x: number; y: number } {
+  const i1 = i0 + SHORE_CHUNK, j1 = j0 + SHORE_CHUNK;
+  const minX = (i0 - j1) * (TW / 2), maxX = (i1 - j0) * (TW / 2);
+  const minY = (i0 + j0) * (TH / 2), maxY = (i1 + j1) * (TH / 2);
+  const { c, g, P: P0, poly } = painter(minX - 6, minY - 3, maxX - minX + 14, maxY - minY + 8);
+  const P = P0;
   const sl = (i: number) => shoreF(i);
+  // 이 덩어리의 마름모 안만 칠한다 (옆 덩어리와 겹치지 않게)
+  g.save();
+  // (마름모 밖은 맨 끝에 지운다 — 처음부터 잘라 그리면 가장자리 반투명 점에 바다빛이 섞여 덩어리 사이에 실금이 생긴다)
+  g.save();
+  const A = i0 - 4, B = i1 + 4; // 이웃 칸의 큰 얼룩·선까지 그려야 이음매가 맞는다
   // 1) 바다: 한 빛깔로 깔고, 물가와 나란한 잔물결을 짧게 끊어서
   g.fillStyle = '#4a5a60'; g.fillRect(0, 0, c.width, c.height);
   g.lineWidth = 1;
-  for (let k = 1; k < 18; k++) for (let i = I0; i < I1; i += 1.2) {
-    if (hsh(i * 3, k) < 0.45) continue;
-    const L = 0.4 + hsh(k, i) * 0.9;
-    const jj = sl(i) - k * 1.1 + Math.sin(i + k) * 0.2;
-    const [x0, y0] = P(i, jj, 0), [x1, y1] = P(i + L, jj, 0);
-    g.strokeStyle = `rgba(196,204,210,${Math.max(0.03, 0.2 - k * 0.01)})`;
-    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+  for (let i = Math.floor(A / 1.2) * 1.2; i < B; i += 1.2) {
+    const base = sl(i);
+    for (let k = 1; k < 60; k++) {
+      const jj = base - k * 1.1 + Math.sin(i + k) * 0.2;
+      if (jj < j0 - 2) break;
+      if (jj > j1 + 1 || hsh(i * 3, k) < 0.45) continue;
+      const L = 0.4 + hsh(k, i) * 0.9;
+      const [x0, y0] = P(i, jj, 0), [x1, y1] = P(i + L, jj, 0);
+      g.strokeStyle = `rgba(196,204,210,${Math.max(0.03, 0.2 - k * 0.01)})`;
+      g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+    }
   }
-  // 2) 모래: 물가를 따라 한 덩어리로 (칸 무늬 없이) → 큰 얼룩 · 고운 모래알 · 젖은 띠
+  // 2) 모래: 물가를 따라 한 덩어리로 → 큰 얼룩 · 고운 모래알 · 젖은 띠
   const shore: Pt[] = [];
-  for (let i = I0; i <= I1; i += 0.25) shore.push(P(i, sl(i), 0));
-  const beach = () => { g.beginPath(); g.moveTo(shore[0][0], shore[0][1]); for (const q of shore) g.lineTo(q[0], q[1]); const e = P(I1, J1, 0), f = P(I0, J1, 0); g.lineTo(e[0], e[1]); g.lineTo(f[0], f[1]); g.closePath(); };
-  beach(); g.fillStyle = '#8c8272'; g.fill();
-  g.save(); beach(); g.clip();
-  for (let k = 0; k < 520; k++) {
-    const i = I0 + hsh(k, 1) * (I1 - I0), j = sl(i) + 1 + hsh(k, 2) * (J1 - sl(i));
-    const [x, y] = P(i, j, 0);
-    g.globalAlpha = 0.05 + hsh(k, 3) * 0.05; g.fillStyle = hsh(k, 4) < 0.5 ? '#a89a84' : '#6e6658';
-    g.beginPath(); g.ellipse(x, y, 18 + hsh(k, 5) * 50, 8 + hsh(k, 6) * 20, 0, 0, Math.PI * 2); g.fill();
+  for (let i = A; i <= B; i += 0.25) shore.push(P(i, sl(i), 0));
+  const beach = () => { g.beginPath(); g.moveTo(shore[0][0], shore[0][1]); for (const q of shore) g.lineTo(q[0], q[1]); const e = P(B, j1 + 40, 0), f = P(A, j1 + 40, 0); g.lineTo(e[0], e[1]); g.lineTo(f[0], f[1]); g.closePath(); };
+  if (j1 > 5) {
+    beach(); g.fillStyle = '#8c8272'; g.fill();
+    g.save(); beach(); g.clip();
+    for (let j = Math.max(j0 - 3, 4); j < j1 + 3; j++) for (let i = A; i < B; i++) {
+      if (hsh(i, j * 7 + 1) > 0.3) continue; // 칸마다 얼룩 하나쯤 (이웃 덩어리도 같은 자리)
+      const [x, y] = P(i + hsh(i, j), j + hsh(j, i), 0);
+      g.globalAlpha = 0.05 + hsh(i, j + 3) * 0.05; g.fillStyle = hsh(i, j + 4) < 0.5 ? '#a89a84' : '#6e6658';
+      g.beginPath(); g.ellipse(x, y, 18 + hsh(i, j + 5) * 50, 8 + hsh(i, j + 6) * 20, 0, 0, Math.PI * 2); g.fill();
+    }
+    g.globalAlpha = 1;
+    for (let j = j0; j < j1; j++) for (let i = i0; i < i1; i++) for (let k = 0; k < 6; k++) { const [x, y] = P(i + hsh(i * 7 + k, j), j + hsh(j * 5 + k, i), 0); g.fillStyle = hsh(i + k, j * 3) < 0.5 ? 'rgba(60,52,44,0.35)' : 'rgba(200,190,170,0.3)'; g.fillRect(Math.round(x), Math.round(y), 1, 1); }
+    // 젖은 띠: 물가에서 모래 쪽으로 번진다
+    for (const [off, wdt, col] of [[0.9, 26, 'rgba(84,76,68,0.45)'], [0.45, 14, 'rgba(70,64,58,0.55)']] as const) {
+      g.strokeStyle = col; g.lineWidth = wdt; g.lineJoin = 'round';
+      g.beginPath(); for (let i = A; i <= B; i += 0.25) { const [x, y] = P(i, sl(i) + off, 0); if (i === A) g.moveTo(x, y); else g.lineTo(x, y); } g.stroke();
+    }
+    for (let j = j0; j < j1; j++) for (let i = i0; i < i1; i++) {
+      const d = j - sl(i);
+      if (d < 0) continue;
+      const n = hsh(i, j);
+      if (d > 2 && n > 0.72) poly([P(i + 0.2, j + 0.4, 0), P(i + 0.8, j + 0.3, 0), P(i + 0.82, j + 0.35, 0), P(i + 0.22, j + 0.45, 0)], '#776c5c', 0.35); // 바람 자국
+      if (d > 2 && n < 0.05) { const [x, y] = P(i + 0.5, j + 0.5, 0); g.fillStyle = '#d8ccb8'; g.fillRect(Math.round(x), Math.round(y), 2, 1); } // 조개
+      if (d < 1.6 && n > 0.82) { const [x, y] = P(i + 0.4, j + 0.3, 0); g.fillStyle = '#2e3a26'; g.fillRect(Math.round(x) - 3, Math.round(y), 6, 2); g.fillRect(Math.round(x) - 1, Math.round(y) - 1, 3, 1); } // 해초
+    }
+    g.restore();
+    // 물가의 흰 거품 (두 겹)
+    for (const [off, a] of [[0.05, 0.85], [-0.45, 0.35]] as const) {
+      g.strokeStyle = `rgba(226,228,230,${a})`; g.lineWidth = off === 0.05 ? 2 : 1;
+      g.beginPath();
+      for (let i = A; i <= B; i += 0.25) { const [x, y] = P(i, sl(i) + off + Math.sin(i * 2.3) * 0.08, 0); if (i === A) g.moveTo(x, y); else g.lineTo(x, y); }
+      g.stroke();
+    }
+    // 마른 모래 위 발자국 한 줄 (누군가 바다로 걸어 들어간)
+    for (let k = 0; k < 9; k++) { const [x, y] = P(PIER.i0 + 12 + k * 0.15 + (k % 2) * 0.3, 21 - k * 1.3, 0); g.fillStyle = 'rgba(80,70,60,0.55)'; g.fillRect(Math.round(x), Math.round(y), 3, 2); }
   }
-  g.globalAlpha = 1;
-  for (let k = 0; k < 9000; k++) { const x = hsh(k, 7) * c.width, y = hsh(k, 8) * c.height; g.fillStyle = hsh(k, 9) < 0.5 ? 'rgba(60,52,44,0.35)' : 'rgba(200,190,170,0.3)'; g.fillRect(Math.round(x), Math.round(y), 1, 1); }
-  // 젖은 띠: 물가에서 모래 쪽으로 번진다
-  for (const [off, wdt, col] of [[0.9, 26, 'rgba(84,76,68,0.45)'], [0.45, 14, 'rgba(70,64,58,0.55)']] as const) {
-    g.strokeStyle = col; g.lineWidth = wdt; g.lineJoin = 'round';
-    g.beginPath(); for (let i = I0; i <= I1; i += 0.25) { const [x, y] = P(i, sl(i) + off, 0); if (i === I0) g.moveTo(x, y); else g.lineTo(x, y); } g.stroke();
-  }
-  for (let j = J0; j < J1; j++) for (let i = I0; i < I1; i++) {
-    const d = j - sl(i);
-    if (d < 0) continue;
-    const n = hsh(i, j);
-    if (d > 2 && n > 0.72) poly([P(i + 0.2, j + 0.4, 0), P(i + 0.8, j + 0.3, 0), P(i + 0.82, j + 0.35, 0), P(i + 0.22, j + 0.45, 0)], '#776c5c', 0.35); // 바람 자국
-    if (d > 2 && n < 0.05) { const [x, y] = P(i + 0.5, j + 0.5, 0); g.fillStyle = '#d8ccb8'; g.fillRect(Math.round(x), Math.round(y), 2, 1); } // 조개
-    if (d < 1.6 && n > 0.82) { const [x, y] = P(i + 0.4, j + 0.3, 0); g.fillStyle = '#2e3a26'; g.fillRect(Math.round(x) - 3, Math.round(y), 6, 2); g.fillRect(Math.round(x) - 1, Math.round(y) - 1, 3, 1); } // 해초
-  }
-  g.restore();
-  // 물가의 흰 거품 (두 겹)
-  for (const [off, a] of [[0.05, 0.85], [-0.45, 0.35]] as const) {
-    g.strokeStyle = `rgba(226,228,230,${a})`; g.lineWidth = off === 0.05 ? 2 : 1;
-    g.beginPath();
-    for (let i = I0; i <= I1; i += 0.25) { const [x, y] = P(i, sl(i) + off + Math.sin(i * 2.3) * 0.08, 0); if (i === I0) g.moveTo(x, y); else g.lineTo(x, y); }
-    g.stroke();
-  }
-  // 마른 모래 위 발자국 한 줄 (누군가 바다로 걸어 들어간)
-  for (let k = 0; k < 9; k++) { const [x, y] = P(21 + k * 0.15 + (k % 2) * 0.3, 21 - k * 1.3, 0); g.fillStyle = 'rgba(80,70,60,0.55)'; g.fillRect(Math.round(x), Math.round(y), 3, 2); }
   // 3) 잔교: 바다 위 나무 널빤지와 말뚝
   const pj1 = shoreLine(PIER.i0) + 1;
-  for (let j = PIER.j0; j < pj1; j++) for (let i = PIER.i0; i < PIER.i1; i++) {
-    for (let s = 0; s < 3; s++) poly([P(i, j + s / 3, 4), P(i + 1, j + s / 3, 4), P(i + 1, j + (s + 0.9) / 3, 4), P(i, j + (s + 0.9) / 3, 4)], hsh(i * 3 + s, j) < 0.5 ? '#6a5442' : '#5e4a3a');
+  if (i0 < PIER.i1 + 1 && i1 > PIER.i0 - 1 && j0 < pj1 + 1 && j1 > PIER.j0 - 1) {
+    for (let j = PIER.j0; j < pj1; j++) for (let i = PIER.i0; i < PIER.i1; i++) {
+      for (let s2 = 0; s2 < 3; s2++) poly([P(i, j + s2 / 3, 4), P(i + 1, j + s2 / 3, 4), P(i + 1, j + (s2 + 0.9) / 3, 4), P(i, j + (s2 + 0.9) / 3, 4)], hsh(i * 3 + s2, j) < 0.5 ? '#6a5442' : '#5e4a3a');
+    }
+    for (let j = PIER.j0; j < pj1; j += 2) for (const i of [PIER.i0, PIER.i1]) { const [x, y] = P(i, j, 4); g.fillStyle = '#3a2e24'; g.fillRect(Math.round(x) - 1, Math.round(y), 3, 12); }
+    poly([P(PIER.i0, pj1, 4), P(PIER.i1, pj1, 4), P(PIER.i1, pj1, 0), P(PIER.i0, pj1, 0)], '#4a3a2e');
   }
-  for (let j = PIER.j0; j < pj1; j += 2) for (const i of [PIER.i0, PIER.i1]) { const [x, y] = P(i, j, 4); g.fillStyle = '#3a2e24'; g.fillRect(Math.round(x) - 1, Math.round(y), 3, 12); }
-  poly([P(PIER.i0, pj1, 4), P(PIER.i1, pj1, 4), P(PIER.i1, pj1, 0), P(PIER.i0, pj1, 0)], '#4a3a2e');
-  // 4) 수평선 안개 (위로 갈수록 하늘에 녹는다)
-  const fy = P(I0, J0, 0)[1];
-  const gr = g.createLinearGradient(0, 0, 0, fy + 260);
-  gr.addColorStop(0, 'rgba(110,98,112,1)'); gr.addColorStop(0.6, 'rgba(110,98,112,0.55)'); gr.addColorStop(1, 'rgba(110,98,112,0)');
-  g.fillStyle = gr; g.fillRect(0, 0, c.width, fy + 260);
-  return { canvas: c, x: minX, y: minY };
+  // 4) 수평선 안개: 물가에서 멀어질수록(j가 작을수록) 하늘빛 안개에 녹는다 — 칸 좌표로 칠해 이음매가 없다
+  if (j0 < 2) {
+    g.save();
+    g.setTransform(TW / 2, TH / 2, -TW / 2, TH / 2, -minX + 6, -minY + 3);
+    const gr = g.createLinearGradient(0, -22, 0, 2);
+    gr.addColorStop(0, 'rgba(110,98,112,1)'); gr.addColorStop(0.55, 'rgba(110,98,112,0.6)'); gr.addColorStop(1, 'rgba(110,98,112,0)');
+    g.fillStyle = gr; g.fillRect(i0 - 1, j0 - 1, SHORE_CHUNK + 2, Math.min(j1, 2) - j0 + 1);
+    g.restore();
+  }
+  g.restore();
+  // 이 덩어리의 마름모(2~3px 넉넉히)만 남긴다 — 옆 덩어리와 겹치는 띠는 같은 그림이라 이음매가 없다
+  g.globalCompositeOperation = 'destination-in';
+  g.beginPath(); { const a = P(i0, j0, 0), b = P(i1, j0, 0), d = P(i1, j1, 0), e = P(i0, j1, 0); g.moveTo(a[0], a[1] - 3); g.lineTo(b[0] + 6, b[1]); g.lineTo(d[0], d[1] + 3); g.lineTo(e[0] - 6, e[1]); } g.closePath();
+  g.fillStyle = '#000'; g.fill();
+  g.globalCompositeOperation = 'source-over';
+  return { canvas: c, x: minX - 6, y: minY - 3 };
+}
+
+/** (예전 한 장짜리) 해변 전체 — 관리자 미리보기 등에서 걸을 수 있는 곳만 한 장으로 */
+export function drawShore(z: Zone): { canvas: HTMLCanvasElement; x: number; y: number } {
+  const parts: { canvas: HTMLCanvasElement; x: number; y: number }[] = [];
+  for (let cj = Math.floor(-6 / SHORE_CHUNK); cj * SHORE_CHUNK < z.H + 6; cj++) for (let ci = Math.floor(-6 / SHORE_CHUNK); ci * SHORE_CHUNK < z.W + 6; ci++) parts.push(drawShoreChunk(ci * SHORE_CHUNK, cj * SHORE_CHUNK));
+  const x0 = Math.min(...parts.map((p) => p.x)), y0 = Math.min(...parts.map((p) => p.y));
+  const x1 = Math.max(...parts.map((p) => p.x + p.canvas.width)), y1 = Math.max(...parts.map((p) => p.y + p.canvas.height));
+  const c = document.createElement('canvas');
+  c.width = Math.ceil(x1 - x0); c.height = Math.ceil(y1 - y0);
+  const g = c.getContext('2d')!;
+  for (const p of parts) g.drawImage(p.canvas, p.x - x0, p.y - y0);
+  return { canvas: c, x: x0, y: y0 };
 }
 
 /** 해변의 물건: 엎은 고깃배 · 그물 장대 · 떠밀려 온 잡동사니 · 통나무 */

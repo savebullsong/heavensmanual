@@ -5,7 +5,7 @@ import { parrotPixels, type Look } from './character.ts';
 import { goatIdleCanvas } from './goat.ts';
 import { toCanvas } from './raster.ts';
 import { iso } from './gfx.ts';
-import { MISS_HWANG, HWANGHON, charSet, frameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, type CharSet, type Dir, type Frame } from './sprites.ts';
+import { MISS_HWANG, HWANGHON, charSet, frameOf, applyFrame, artDensity, dirFromTile, turnedDir, auraFor, makeAuraSprite, type CharSet, type Dir, type Frame } from './sprites.ts';
 import { RW, RD, COUNTER, ROOM_BOUNDS, PARROT_PERCH, CAGE, drawCage, drawRoomBackground, drawCounterPieces, drawLamp, nightFactor } from './shopgfx.ts';
 import { bangkokClock } from './clock.ts';
 import { shopKitReady, counterStrips, type ShopKit } from './shopkit.ts';
@@ -319,14 +319,15 @@ export class ShopRoom {
       if (id !== this.keeperId) return;
       const f = frameOf(cs, 'idle', 'sw', 0);
       applyFrame(this.hwang, f);
-      if (!u || !f || cs.px === 3) return; // 31차: 도트 3배 시험 중에는 관리자 도트 대신 3배로 구운 그림을 보여 준다
+      if (!u || !f) return;
       const tx = await loadPixel(u);
-      if (!tx) return;
-      this.hwang.texture = tx;
-      // 같은 크기 또는 2배(더 섬세한 그림)면 그 배율 그대로, 크기가 조금이라도 다르면(구운 그림이 바뀌어 한두 점 달라졌을 때)
-      // 게임 속 키에 맞춰 줄인다 — 거인이 되지 않게 (발 기준점은 아래 가운데)
+      if (!tx || id !== this.keeperId) return;
+      // 같은 크기 또는 2배·3배(더 섬세한 그림)면 그 배율 그대로, 맞는 배수가 없으면 게임 속 키에 맞춰 줄인다 — 거인이 되지 않게 (발 기준점은 아래 가운데)
       const lw = Math.round(f.w * f.k), lh = Math.round(f.h * f.k); // 게임 속 크기
-      const k = tx.width === lw * 2 && tx.height === lh * 2 ? 2 : tx.width === lw && tx.height === lh ? 1 : 0;
+      const k = artDensity(tx, lw, lh);
+      // 32차: 도트 3배 시험 중에는 관리자가 3배로 그려 올린 그림만 쓴다 (1·2배 그림이면 3배로 구운 그림)
+      if (cs.px === 3 && k !== 3) return;
+      this.hwang.texture = tx;
       if (k) { this.hwang.scale.set(1 / k); this.hwang.anchor.set(f.ax, f.ay); }
       else { this.hwang.scale.set(lh / tx.height); this.hwang.anchor.set(0.5, 1); }
     });

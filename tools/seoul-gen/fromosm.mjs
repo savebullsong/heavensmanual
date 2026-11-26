@@ -99,6 +99,18 @@ for (const k of pathTiles) {
 for (const k of pathTiles) { const i = k % W, j = Math.floor(k / W); if (r() < 0.07) props.push({ i, j, kind: r() < 0.5 ? 'pole' : 'plant' }); }
 // 가장 바깥 둘레: 걸을 수 없다 (달동네 쪽은 수풀 벼랑)
 for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) if (i < 2 || j < 2 || i >= W - 2 || j >= H - 2) set(i, j, inDal(i, j) ? 'park' : 'block');
+// 32차: 한국스탠다드차타드은행 — 원래 건물의 문이 뒤쪽 좁은 골목에 나서 들어가기 힘들다.
+//   같은 건물 단지의 큰길 쪽 동(남쪽 건물)으로 은행을 옮겨 문이 큰길 보도를 보게 한다.
+{
+  const bank = buildings.find((b) => b.pois?.some((p) => p.t === 'bank' && /스탠다드/.test(p.n ?? '')));
+  const front = bank && buildings.find((b) => b !== bank && b.h === bank.h && b.j0 === bank.j0 + bank.d && b.i0 < bank.i0 + bank.w && b.i0 + b.w > bank.i0);
+  if (bank && front) {
+    const poi = bank.pois.find((p) => p.t === 'bank');
+    bank.pois = bank.pois.filter((p) => p !== poi);
+    front.pois = [poi, ...(front.pois ?? []).filter((p) => p.t === 'convenience'), ...(front.pois ?? []).filter((p) => p.t !== 'convenience')];
+    front.sign = 'left';
+  }
+}
 const sa = start;
 const json = {
   v: 2, id: 'seoul-gangnam', W, H, tileMeters: full.tileMeters, codes, types,

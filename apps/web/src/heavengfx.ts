@@ -47,7 +47,7 @@ let cloud: Texture | null = null;
 /** 부드러운 구름 덩어리 (여러 원을 겹친 흰 빛) */
 export function cloudTexture(): Texture {
   if (cloud) return cloud;
-  const W = 360, H = 150;
+  const W = 360, H = 172; // 32차: 아래 구름 덩이(110+55)가 잘려 가로 금이 보이던 것 — 아래를 넉넉히
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   const g = c.getContext('2d')!;

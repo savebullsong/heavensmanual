@@ -7,7 +7,7 @@ import { WorldScene, type WorldHooks, type Stance, type RemoteInfo } from './wor
 import { ShopRoom, type ShopTarget } from './shoproom.ts';
 import { Dialog } from './dialog.ts';
 import { openLookPanel, lookPanelInsets } from './lookpanel.ts';
-import { ITEMS, STORES, menuFor, itemByKey, iconFor, itemIcon, effectText, priceText, moneyText, setWon, HELL_FOOD, type ItemDef, type ItemCat } from './items.ts';
+import { ITEMS, STORES, menuFor, itemByKey, iconFor, itemIcon, effectText, priceText, moneyText, setWon, wonify, wonRate, HELL_FOOD, type ItemDef, type ItemCat } from './items.ts';
 import * as net from './net.ts';
 import { preloadPortrait, type PortraitSlot } from './portraits.ts';
 import { sukhumvitTestZone, decodeZone, type Zone, type Building } from './zone.ts';
@@ -219,25 +219,53 @@ function openCage() {
     if (!v) { empty(L.cageEmpty); return; }
     const rows: { key: string; it: ItemDef; n: number; ammo?: boolean }[] = Object.entries(v.bag).filter(([k, n]) => n > 0 && stashItem(k)).map(([k, n]) => ({ key: k, it: stashItem(k), n }));
     if (v.ammo > 0) rows.push({ key: 'ammo', it: itemByKey('ammo'), n: Math.ceil(v.ammo / 12), ammo: true });
+    // 32차: 꺼낼 물건을 눌러 여러 개 고른 뒤 한 번에 꺼낸다 (수수료도 한 번에)
+    for (const k of [...picked.keys()]) if (!rows.some((r) => r.key === k)) picked.delete(k);
+    if (here && rows.length) { const p = document.createElement('p'); p.className = 'cage-note'; p.textContent = L.cagePickHint; list.appendChild(p); }
     for (const r of rows) {
       const fee = stashFee(r.it, tw === 'hell');
-      const row = itemRow(r.it, here ? `×${r.n} · ${L.cageFeeEach.replace('{p}', priceText(fee, hell))}` : `×${r.n}`, async () => {
+      const k0 = picked.get(r.key);
+      const row = itemRow(r.it, here ? (k0 ? `${L.cagePicked.replace('{n}', String(k0))} · ${priceText(fee * k0, hell)}` : `×${r.n} · ${L.cageFeeEach.replace('{p}', priceText(fee, hell))}`) : `×${r.n}`, async () => {
         if (!here) return;
+        if (picked.has(r.key)) { picked.delete(r.key); draw(); return; }
         const n = r.n > 1 ? await askQty(r.it, fee, r.n, 'take') : 1;
-        if (n <= 0) return;
-        el.remove();
-        await parrotFee(r, n, fee * n, hell);
-        if (document.body.contains(el)) return;
-        openCage();
+        if (n <= 0 || !document.body.contains(el)) return;
+        picked.set(r.key, n);
+        draw();
       }, !here);
+      if (k0) row.classList.add('picked');
       list.appendChild(row);
     }
+    if (!here || !rows.length) return;
+    const foot = document.createElement('div');
+    foot.className = 'cage-foot';
+    const all = document.createElement('button');
+    const everyOn = rows.every((r) => picked.get(r.key) === r.n);
+    all.textContent = everyOn ? L.cagePickNone : L.cagePickAll;
+    all.onclick = () => { if (everyOn) picked.clear(); else for (const r of rows) picked.set(r.key, r.n); draw(); };
+    const go = document.createElement('button');
+    go.className = 'primary';
+    const sel = rows.filter((r) => picked.has(r.key)).map((r) => ({ r, n: picked.get(r.key)! }));
+    const total = sel.reduce((a, x) => a + stashFee(x.r.it, tw === 'hell') * x.n, 0);
+    go.textContent = L.cageTakeSel.replace('{k}', String(sel.length)).replace('{p}', priceText(total, hell));
+    go.disabled = !sel.length;
+    go.onclick = async () => {
+      if (!sel.length) return;
+      el.remove();
+      picked.clear();
+      await parrotFee(sel, total, hell);
+      if (document.body.contains(el)) return;
+      openCage();
+    };
+    foot.append(all, go);
+    list.appendChild(foot);
   };
+  const picked = new Map<string, number>();
   draw();
   panelAt(el);
 }
 /** 꺼낼 때 — 앵무새가 여자 목소리로 수수료를 받는다 */
-async function parrotFee(r: { key: string; it: ItemDef; n: number; ammo?: boolean }, n: number, fee: number, hell: boolean) {
+async function parrotFee(sel: { r: { key: string; it: ItemDef; n: number; ammo?: boolean }; n: number }[], fee: number, hell: boolean) {
   const L = t();
   const w = cageW();
   busy = true;
@@ -252,16 +280,18 @@ async function parrotFee(r: { key: string; it: ItemDef; n: number; ammo?: boolea
     else {
       if (hell) hellState().notes -= fee; else state.wallet = (state.wallet ?? 0) - fee;
       const v = state.vault![w]!;
-      if (r.ammo) { const k = Math.min(v.ammo, n * 12); state.ammo = (state.ammo ?? 0) + k; v.ammo -= k; ammoGear(); }
-      else {
-        v.bag[r.key] = Math.max(0, (v.bag[r.key] ?? 0) - n);
-        if (r.key === 'arrows20') { state.arrows = (state.arrows ?? 0) + n * 20; ammoGear(); }
-        else if (r.key === 'rifleammo') { state.rifle = (state.rifle ?? 0) + n * 10; ammoGear(); }
-        else { state.bag ??= {}; state.bag[r.key] = (state.bag[r.key] ?? 0) + n; }
+      for (const { r, n } of sel) {
+        if (r.ammo) { const k = Math.min(v.ammo, n * 12); state.ammo = (state.ammo ?? 0) + k; v.ammo -= k; ammoGear(); }
+        else {
+          v.bag[r.key] = Math.max(0, (v.bag[r.key] ?? 0) - n);
+          if (r.key === 'arrows20') { state.arrows = (state.arrows ?? 0) + n * 20; ammoGear(); }
+          else if (r.key === 'rifleammo') { state.rifle = (state.rifle ?? 0) + n * 10; ammoGear(); }
+          else { state.bag ??= {}; state.bag[r.key] = (state.bag[r.key] ?? 0) + n; }
+        }
       }
       if (!vaultOf(w)) delete state.vault![w];
       save(state); renderHud(); renderQuick(); refreshCage();
-      await dlg.say(L.cageOpened.replace('{item}', r.it.name[lang()]).replace('{n}', String(n)));
+      await dlg.say(sel.length === 1 ? L.cageOpened.replace('{item}', sel[0].r.it.name[lang()]).replace('{n}', String(sel[0].n)) : L.cageOpenedMany.replace('{list}', sel.map(({ r, n }) => L.cageListItem.replace('{item}', r.it.name[lang()]).replace('{n}', String(n))).join(', ')));
     }
   } else await dlg.say(L.cageLeave);
   endTalk();
@@ -559,7 +589,7 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
  * 관리자: 지옥 n층 휴식 마을로 바로 옮겨 간다 (지도 확인용). 지옥 밖(현실·천국·귀신)에서 왔으면 그 세계를 적어 두고
  * '원래 세계로' 단추로 돌아간다 — 환생이 아니라 시찰에서 돌아오는 것이라 몸·돈·업은 그대로다
  */
-function adminTeleport(to: number | 'back' | 'heaven' | 'bkk' | 'seoul' | 'goat' | 'border') {
+function adminTeleport(to: number | 'back' | 'heaven' | 'bkk' | 'seoul' | 'goat' | 'border' | 'terrace' | 'hlobby') {
   if (!net.account()?.admin || busy || dlg.isOpen) return;
   document.querySelector('.set-panel')?.remove();
   closeMenus();
@@ -593,6 +623,26 @@ function adminTeleport(to: number | 'back' | 'heaven' | 'bkk' | 'seoul' | 'goat'
     if (state.adminTrip === 'hell') delete state.adminTrip;
     if (inHell() && world) { openGoatRoom(null); return; }
     void enterHell(hellState().floor || HELL_START, 'teleport').then(() => openGoatRoom(null));
+    return;
+  }
+  // 32차: 지옥 1층 환생 로비 (파샤르) — 지옥 밖이면 1층으로 내려가서 바로 로비 안
+  if (to === 'hlobby') {
+    if (state.adminTrip === 'hell') delete state.adminTrip;
+    const lobby = () => { if (!world || world.zone.interior || !world.zone.hell) return; const k = world.zone.buildings.findIndex((b) => b.cat === 'rebirth'); const u = world.zone.hell.up; if (k >= 0) enterInterior(k, { i: u.i, j: u.j + 1 }, null, false); };
+    if (inHell() && world && hellState().floor === 1) { lobby(); return; }
+    void enterHell(1, 'teleport').then(lobby);
+    return;
+  }
+  // 32차: 천국 환생의 테라스 (루엔) — 천국 밖이면 천국으로 건너가서 바로 테라스
+  if (to === 'terrace') {
+    const open = () => { if (!world || world.zone.interior || realm() !== 'heaven') return; const st = world.heavenStair ?? world.zone.door; /* 계단이 없는 구역이면 우주새 문 앞에서 바로 */ const b: Building = { i0: st.i, j0: st.j, w: 1, d: 1, h: 0, cat: 'terrace', color: '#ffffff' }; openRoom(interiorZone(b, -4, { i: st.i, j: st.j + 1 }, t().terraceName), null, false); };
+    if (realm() === 'heaven' && world) { open(); return; }
+    state.heaven ??= { admin: true };
+    state.realm = 'heaven';
+    save(state);
+    if (world) { world.destroy(); world = null; net.leaveZone(); }
+    const fx = worldFade('heaven', true);
+    fx.covered.then(async () => { await enterWorld('door'); open(); fx.done(); });
     return;
   }
   // 31차: 경계의 해변 (시찰 중에는 불다가 환생을 재촉하지 않는다)
@@ -732,7 +782,7 @@ const hooks: WorldHooks = {
     crossEdge(dir, x, y);
   },
   menu(title, sub, options, x, y) {
-    openTargetMenu(title, sub, options, x, y);
+    openTargetMenu(title, sub, options.map((o) => ({ ...o, label: wonify(o.label) })), x, y);
   },
   say(name, text) {
     npcSay(name, text);
@@ -776,10 +826,8 @@ const hooks: WorldHooks = {
     void talkToMaskGirl();
   },
   beginnerBat() {
-    if (state.batGiven || realm() !== 'real') return false;
-    const broke = (state.wallet ?? 0) + (state.bank ?? 0) < 50;
-    const bare = !Object.values(state.equip ?? {}).some(Boolean) && !Object.keys(state.bag ?? {}).some((k) => (state.bag![k] ?? 0) > 0 && isGearItem(itemByKey(k)));
-    return broke && bare;
+    // 32차: 처음 한 번은 누구에게나 반드시 (주워 들면 끝) — 그 뒤로는 보통 확률 (world)
+    return !state.batGiven && realm() === 'real';
   },
   useAmmo() {
     const wi = state.equip?.weapon ? itemByKey(state.equip.weapon) : null;
@@ -909,6 +957,7 @@ function enterTerrace() {
 function openRoom(z: Zone, chaser: { monster: boolean; hp: number } | null, work: boolean) {
   if (!world || world.zone.interior) return;
   const outer = world;
+  if (!z.city && outer.zone.city) z.city = outer.zone.city; // 32차: 강남 안의 방은 강남 (₩·한국 시급·한국 메뉴)
   closeMenus();
   document.querySelector('.store-panel')?.remove();
   outer.stop();
@@ -2758,6 +2807,7 @@ function rankUpShow(rank: number) {
 }
 
 function toast(text: string, kind: '' | 'good' | 'evil' = '') {
+  text = wonify(text); // 32차: 서울이면 원화로
   let area = document.querySelector('.toasts');
   if (!area) { area = document.createElement('div'); area.className = 'toasts'; document.body.appendChild(area); }
   const el = document.createElement('div');
@@ -2789,7 +2839,7 @@ function showDeath(cause: 'car' | 'beaten' | 'hell') {
   const here = inside ? { x: inside.from.out.i + 0.5, y: inside.from.out.j + 0.5 } : world?.netPos();
   dropInterior(); // 방에서 죽었으면 방은 버리고 거리로 돌아간다
   save(state);
-  el.querySelector('.money')!.textContent = [lost > 0 ? L.deathLost.replace('{n}', lost.toLocaleString('en-US')) : '', kept > 0 ? L.deathKept.replace('{n}', kept.toLocaleString('en-US')) : lost > 0 ? L.deathNoBank : '', sealed ? L.deathVault : ''].filter(Boolean).join(' ');
+  el.querySelector('.money')!.textContent = wonify([lost > 0 ? L.deathLost.replace('{n}', lost.toLocaleString('en-US')) : '', kept > 0 ? L.deathKept.replace('{n}', kept.toLocaleString('en-US')) : lost > 0 ? L.deathNoBank : '', sealed ? L.deathVault : ''].filter(Boolean).join(' '));
   el.querySelector('h1')!.textContent = L.deathTitle;
   el.querySelector('.cause')!.textContent = cause === 'car' ? L.deathCar : L.deathBeaten;
   el.querySelector('.karma')!.textContent = L.karma.replace('{g}', fmtKarma(d.good)).replace('{e}', fmtKarma(d.evil));
@@ -3244,7 +3294,7 @@ function openHellBank() {
   { const b = document.createElement('button'); b.className = 'b-all'; b.textContent = L.bankAllIn; b.onclick = () => { amt.value = String(Math.floor(h.notes)); move(1); }; el.querySelector('.bank-quick')!.appendChild(b); }
   { const b = document.createElement('button'); b.className = 'b-all'; b.textContent = L.bankAllOut; b.onclick = () => { amt.value = String(Math.floor(h.bank ?? 0)); move(-1); }; el.querySelector('.bank-quick')!.appendChild(b); }
   const move = (dir: 1 | -1) => {
-    const n = Math.floor(Number(amt.value));
+    const n = Math.floor(Number(amt.value) / wonRate());
     if (!n || n <= 0) { toast(L.bankAmount); return; }
     if (dir === 1 && n > Math.floor(h.notes)) { toast(L.hwNoMoney); return; }
     if (dir === -1 && n > Math.floor(h.bank ?? 0)) { toast(L.bankShort); return; }
@@ -3467,7 +3517,7 @@ function renderHud() {
   const narrow = matchMedia('(max-width: 640px)').matches;
   hudNarrow = narrow;
   hud.innerHTML = `
-    <div class="hud-left${workLine ? ' working' : ''}"><div class="where" data-zone="${escHtml(place)}"><b>${escHtml(place)}</b></div>${scene === 'shop' && realm() === 'ghost' ? `<span class="hint">${L.hintGhost}</span>` : ''}<span class="work">${workLine}</span>${workLine && world?.isWorkingInside ? `<button class="work-stop">${L.workStop}</button>` : ''}</div>
+    <div class="hud-left${workLine ? ' working' : ''}"><div class="where" data-zone="${escHtml(place)}"><b>${escHtml(place)}</b></div>${scene === 'shop' && realm() === 'ghost' ? `<span class="hint">${L.hintGhost}</span>` : ''}<span class="work">${wonify(workLine)}</span>${workLine && world?.isWorkingInside ? `<button class="work-stop">${L.workStop}</button>` : ''}</div>
     <div class="hud-tools">${live}<div class="hud-right">
       <span class="hpbox" title="${L.hpLabel}"><span class="clock"></span><i class="hpbar"><i></i></i><b class="hp-over" hidden></b></span>
       <span class="wallet"></span>
@@ -3520,7 +3570,7 @@ function renderSettings() {
     <section class="set-sec"><h4 class="h-fight"></h4><div class="set-row"><span class="lbl l-counter"></span><div class="seg s-counter"></div></div><p class="note n-counter"></p></section>
     <section class="set-sec"><h4 class="h-lang"></h4><div class="seg s-lang wide"></div></section>
     <section class="set-sec set-acc"><h4 class="h-acc"></h4><div class="acc"></div></section>
-    ${net.account()?.admin ? `<section class="set-sec set-admin"><h4 class="h-admin"></h4><div class="set-row"><span class="lbl l-inv"></span><div class="seg s-inv"></div></div><div class="set-row"><span class="lbl l-tp"></span><div class="seg s-tp"></div></div><div class="set-row"><span class="lbl l-city"></span><div class="seg s-city"></div></div><div class="set-row"><span class="lbl l-dot3"></span><div class="seg s-dot3"></div></div><div class="set-row"><span class="lbl"></span><button class="tp-heaven"></button></div><div class="set-row"><span class="lbl l-worlds"></span><div class="tp-more"><button class="tp-goat"></button><button class="tp-border"></button></div></div>${state.adminTrip && state.adminTrip !== realm() ? '<div class="set-row"><span class="lbl"></span><button class="tp-back"></button></div>' : ''}<p class="note n-admin"></p></section>` : ''}`;
+    ${net.account()?.admin ? `<section class="set-sec set-admin"><h4 class="h-admin"></h4><div class="set-row"><span class="lbl l-inv"></span><div class="seg s-inv"></div></div><div class="set-row"><span class="lbl l-tp"></span><div class="seg s-tp"></div></div><div class="set-row"><span class="lbl l-city"></span><div class="seg s-city"></div></div><div class="set-row"><span class="lbl l-dot3"></span><div class="seg s-dot3"></div></div><div class="set-row"><span class="lbl"></span><button class="tp-heaven"></button></div><div class="set-row"><span class="lbl l-worlds"></span><div class="tp-more"><button class="tp-terrace"></button><button class="tp-hlobby"></button><button class="tp-goat"></button><button class="tp-border"></button></div></div>${state.adminTrip && state.adminTrip !== realm() ? '<div class="set-row"><span class="lbl"></span><button class="tp-back"></button></div>' : ''}<p class="note n-admin"></p></section>` : ''}`;
   el.querySelector('.menu-head b')!.textContent = L.settings;
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
   el.querySelector('.set-sec h4')!.textContent = L.setSound;
@@ -3581,6 +3631,9 @@ function renderSettings() {
     const tg = el.querySelector('.tp-goat') as HTMLButtonElement, tb = el.querySelector('.tp-border') as HTMLButtonElement;
     tg.textContent = L.adminGoat; tg.onclick = () => adminTeleport('goat');
     tb.textContent = L.adminBorder; tb.onclick = () => adminTeleport('border');
+    const tt = el.querySelector('.tp-terrace') as HTMLButtonElement, tl = el.querySelector('.tp-hlobby') as HTMLButtonElement;
+    tt.textContent = L.adminTerrace; tt.onclick = () => adminTeleport('terrace');
+    tl.textContent = L.adminHellLobby; tl.onclick = () => adminTeleport('hlobby');
   }
   document.body.appendChild(el);
   const hudBottom = document.getElementById('hud')?.getBoundingClientRect().bottom ?? 56;
@@ -3865,7 +3918,9 @@ function openStore(kind: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept
     tabsOn();
     if (mode === 'sell') { sellList(list, false, draw); return; }
     if (mode === 'repair') { repairList(list, false, draw); return; }
-    const menu = menuFor(kind, cuisine);
+    // 32차: 강남이면 한국 메뉴 (분식·국밥·중식·고깃집…) — 같은 가게는 늘 같은 메뉴
+    const seoul = (world?.zone.city ?? street?.zone.city) === 'seoul';
+    const menu = menuFor(kind, cuisine, seoul, name);
     const shelf = menu.map((m) => ({ it: itemByKey(m.key), price: m.price }));
     for (const { key, price } of menu) {
       const it = itemByKey(key);
@@ -3915,7 +3970,7 @@ function openBank(name: string) {
       <div class="bank-quick"></div>
       <div class="bank-act"><button class="primary b-in">${L.bankIn}</button><button class="primary b-out">${L.bankOut}</button></div>
       <p class="bank-note">${L.bankNote}</p>
-      <div class="obol-ex"><div class="bank-row"><span>${L.obolEx}</span><b class="b-obol"></b></div><p class="bank-note">${L.obolExSub.replace('{r}', String(OBOL_RATE))}</p><div class="bank-quick obol-quick"></div></div>
+      <div class="obol-ex"><div class="bank-row"><span>${L.obolEx}</span><b class="b-obol"></b></div><p class="bank-note">${wonify(L.obolExSub.replace('{r}', String(OBOL_RATE)))}</p><div class="bank-quick obol-quick"></div></div>
     </div>`;
   el.querySelector('.menu-head b')!.textContent = name;
   el.querySelector('.store-line')!.textContent = L.bankLine;
@@ -3929,7 +3984,7 @@ function openBank(name: string) {
   // 노자돈: 지갑의 바트를 노전으로 바꿔 둔다 (죽어서 지옥에 가면 그대로 들고 간다 · 되돌릴 수 없음)
   for (const b of [100, 500, 1000]) {
     const btn = document.createElement('button');
-    btn.textContent = L.obolExBtn.replace('{b}', b.toLocaleString('en-US')).replace('{n}', String(b / OBOL_RATE));
+    btn.textContent = wonify(L.obolExBtn.replace('{b}', b.toLocaleString('en-US')).replace('{n}', String(b / OBOL_RATE)));
     btn.onclick = () => {
       if ((state.wallet ?? 0) < b) { toast(L.noMoney); return; }
       state.wallet = (state.wallet ?? 0) - b;
@@ -3945,18 +4000,18 @@ function openBank(name: string) {
   for (const n of [100, 500, 1000]) {
     const b = document.createElement('button');
     b.textContent = moneyText(n);
-    b.onclick = () => { amt.value = String(n); };
+    b.onclick = () => { amt.value = String(n * wonRate()); }; // 32차: 서울이면 원 단위로 적힌다
     quick.appendChild(b);
   }
   // 27차: '전부'는 바로 실행 — 지갑 전부 맡기기 · 통장 전부 찾기
   const allIn = document.createElement('button');
   allIn.className = 'b-all';
   allIn.textContent = L.bankAllIn;
-  allIn.onclick = () => { amt.value = String(Math.floor(state.wallet ?? 0)); move(1); };
+  allIn.onclick = () => { amt.value = String(Math.floor(state.wallet ?? 0) * wonRate()); move(1); };
   const allOut = document.createElement('button');
   allOut.className = 'b-all';
   allOut.textContent = L.bankAllOut;
-  allOut.onclick = () => { amt.value = String(Math.floor(state.bank ?? 0)); move(-1); };
+  allOut.onclick = () => { amt.value = String(Math.floor(state.bank ?? 0) * wonRate()); move(-1); };
   const br = document.createElement('span'); br.className = 'flex-break';
   quick.append(br, allIn, allOut);
   const move = (dir: 1 | -1) => {

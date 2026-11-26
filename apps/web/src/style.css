@@ -68,6 +68,12 @@ button.primary:hover { background: #e0b437; }
 .confirm-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
 .confirm-row button { padding: 8px 14px; }
 .cage-note { margin: 4px 2px 8px; color: #c9a86a; font-size: 13px; }
+/* 32차: 우리에서 여러 개 골라 꺼내기 */
+.cage-panel .menu-item.picked { outline: 2px solid #e0b437; outline-offset: -2px; background: rgba(224, 180, 55, 0.14); }
+.cage-panel .menu-item.picked .price { color: #f2cf6a; }
+.cage-foot { position: sticky; bottom: 0; display: flex; gap: 8px; padding: 8px 2px 2px; background: linear-gradient(rgba(20, 16, 12, 0), #1a1510 30%); }
+.cage-foot button { flex: 1; padding: 9px 8px; font-size: 14px; }
+.cage-foot button:disabled { opacity: 0.45; }
 .menu-list { overflow: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
 .menu-item { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; column-gap: 12px; align-items: center; text-align: left; padding: 6px 10px; background: rgba(42, 31, 24, 0.75); border-color: #4f3a28; }
 .menu-item .icon { grid-row: 1 / span 2; width: 32px; height: 32px; image-rendering: pixelated; }

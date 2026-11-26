@@ -28,6 +28,21 @@ export const pxReady: Promise<number> = fetch('./sprites/scale.json').then((r) =
 export const DOT3: boolean = (() => { try { return localStorage.getItem('hm.dot3') === '1' || location.search.includes('dot3'); } catch { return false; } })();
 let set3: Set<string> = new Set();
 const set3Ready: Promise<unknown> = DOT3 ? fetch('./sprites3x/index.json').then((r) => (r.ok ? r.json() : [])).then((a: string[]) => (set3 = new Set(a))).catch(() => null) : Promise.resolve();
+/** 32차: 관리자 도트가 게임 속 크기(lw×lh)의 몇 배 밀도인가 — 1·2·3배 (구운 그림이 바뀌어 한두 점 달라져도 맞춘다). 0 = 맞는 배수 없음 */
+export function artDensity(tx: { width: number; height: number }, lw: number, lh: number): 0 | 1 | 2 | 3 {
+  for (const k of [1, 2, 3] as const) if (Math.abs(tx.width - lw * k) <= k && Math.abs(tx.height - lh * k) <= k) return k;
+  return 0;
+}
+/** 32차: 관리자 페이지의 '3배 밑그림' — 3배로 구운 층이 다 있으면 그 사람을 3배로 합친다 (없으면 null) */
+export async function charSet3(look: Look, weapon: string | null = null): Promise<CharSet | null> {
+  await pxReady;
+  const have: string[] = await fetch('./sprites3x/index.json').then((r) => (r.ok ? r.json() : [])).catch(() => []);
+  const keys = layerKeys(look, weapon, []);
+  const all = [keys.base, keys.hair, keys.weapon].filter((k): k is string => !!k);
+  if (!all.every((k) => have.includes(k))) return null;
+  const cs = await build(look, keys, 3, true);
+  return cs.frames.size ? cs : null;
+}
 export function setDot3(on: boolean) { try { if (on) localStorage.setItem('hm.dot3', '1'); else localStorage.removeItem('hm.dot3'); } catch { /* 무시 */ } }
 export interface CharSet {
   /** 31차: 이 묶음의 픽셀 밀도 (3배 시험이면 3) */

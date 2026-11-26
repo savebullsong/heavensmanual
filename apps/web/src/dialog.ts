@@ -1,3 +1,4 @@
+import { wonify } from './items.ts';
 // 대화창: 주요 인물은 일본 RPG처럼 인물 그림을 크게 세우고, 일반 NPC는 글상자만 쓴다
 import { portraitUrl, type PortraitSlot } from './portraits.ts';
 
@@ -87,6 +88,7 @@ export class Dialog {
 
   /** 한 줄을 타자 치듯 보여 준다. 누르면 끝까지, 한 번 더 누르면 다음으로 */
   say(text: string): Promise<void> {
+    text = wonify(text); // 32차: 서울이면 원화로
     this.stopLine();
     this.choicesEl.innerHTML = '';
     this.nextEl.hidden = true;
@@ -128,6 +130,7 @@ export class Dialog {
 
   /** 마지막 줄 아래에 선택지를 띄운다 */
   choose(options: string[]): Promise<number> {
+    options = options.map(wonify);
     this.nextEl.hidden = true;
     if (this.typing) { clearInterval(this.typing); this.typing = undefined; }
     this.advance = null;

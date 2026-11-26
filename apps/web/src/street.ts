@@ -1,7 +1,7 @@
 // 미리 구운 거리 조각: 건물 면(1층·위층·난간), 지붕 타일, 바닥 타일, 차, 소품 (tools/sprite3d/street.py)
 // 건물 조각은 '구역 번호 × 16 + 음영'이라 건물마다 벽색·차양색·밤 창문 불빛을 따로 입힌다.
 import { Rectangle, Texture } from 'pixi.js';
-import { type Building, type Zone, tileAt } from './zone.ts';
+import { type Building, type Zone, tileAt, groundAt } from './zone.ts';
 import { TW, TH, iso } from './gfx.ts';
 import { kindOf, mainPoi } from './names.ts';
 
@@ -419,7 +419,7 @@ function paintGrain(g: CanvasRenderingContext2D, z: Zone, minX: number, minY: nu
     for (let px = 0; px < lw; px++) {
       const X = (px + 0.5) * R + minX, Y = (py + 0.5) * R + minY;
       const ti = (X / (TW / 2) + Y / (TH / 2)) / 2, tj = (Y / (TH / 2) - X / (TW / 2)) / 2;
-      const t = tileAt(z, Math.floor(ti), Math.floor(tj));
+      const t = groundAt(z, Math.floor(ti), Math.floor(tj));
       const spec = GRAIN[t];
       if (!spec) continue;
       const n = groundGrain(ti + o.i, tj + o.j);
@@ -484,9 +484,9 @@ function paintDecal(g: CanvasRenderingContext2D, t: string, gi: number, gj: numb
 }
 
 export function drawGroundKit(z: Zone, i0: number, j0: number, clip?: { i0: number; i1: number; j0: number; j1: number } | null, heaven = false): { canvas: HTMLCanvasElement; x: number; y: number } | null {
-  const i1 = Math.min(z.W, i0 + CHUNK), j1 = Math.min(z.H, j0 + CHUNK);
+  const i1 = z.beyond ? i0 + CHUNK : Math.min(z.W, i0 + CHUNK), j1 = z.beyond ? j0 + CHUNK : Math.min(z.H, j0 + CHUNK); // 32차: 지도 밖까지
   let any = false;
-  for (let j = j0; j < j1 && !any; j++) for (let i = i0; i < i1; i++) if (tileAt(z, i, j) !== 'void') { any = true; break; }
+  for (let j = j0; j < j1 && !any; j++) for (let i = i0; i < i1; i++) if (groundAt(z, i, j) !== 'void') { any = true; break; }
   if (!any) return null;
   const minX = (i0 - j1) * (TW / 2), minY = (i0 + j0) * (TH / 2);
   const c = document.createElement('canvas');
@@ -497,10 +497,10 @@ export function drawGroundKit(z: Zone, i0: number, j0: number, clip?: { i0: numb
   const S = (x: number, y: number): [number, number] => { const [a, b] = iso(x, y); return [a - minX, b - minY]; };
   // 19차: 계단처럼 꺾이는 경계(풀밭·물·공터·보도·골목)는 모서리 반쪽을 이웃 땅 그림으로 덮어 비스듬한 선으로 · 연못 위 보도는 나무 다리
   const SOFT: Record<string, number> = { water: 0, lot: 1, block: 1, park: 2, walk: 3, soi: 3 };
-  const bridge = (i: number, j: number) => tileAt(z, i, j) === 'walk' && [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([a, b]) => tileAt(z, i + a, j + b) === 'water').length >= 2;
+  const bridge = (i: number, j: number) => groundAt(z, i, j) === 'walk' && [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([a, b]) => groundAt(z, i + a, j + b) === 'water').length >= 2;
   for (let j = j0; j < j1; j++)
     for (let i = i0; i < i1; i++) {
-      const t = tileAt(z, i, j);
+      const t = groundAt(z, i, j);
       if (t === 'void') continue;
       if (clip && (i < clip.i0 - 1 || i > clip.i1 || j < clip.j0 - 1 || j > clip.j1)) continue; // 20차 천국: 구름 아래는 하늘
       const m = ground.meta[`${GROUND_KEY[t] ?? 'lot'}-${hash(i, j) % 4}`];
@@ -516,7 +516,7 @@ export function drawGroundKit(z: Zone, i0: number, j0: number, clip?: { i0: numb
       }
       const pt = SOFT[t];
       if (pt !== undefined) {
-        const N = (a: number, b: number) => tileAt(z, i + a, j + b);
+        const N = (a: number, b: number) => groundAt(z, i + a, j + b);
         const corners: [[number, number], [number, number], [number, number], [number, number], [number, number], [number, number][]][] = [
           [[-1, 0], [0, -1], [-1, -1], [1, 0], [0, 1], [[i, j], [i + 1, j], [i, j + 1]]],
           [[1, 0], [0, -1], [1, -1], [-1, 0], [0, 1], [[i + 1, j], [i + 1, j + 1], [i, j]]],
@@ -541,8 +541,8 @@ export function drawGroundKit(z: Zone, i0: number, j0: number, clip?: { i0: numb
       }
       if (t === 'cross') {
         // 22차: 얼룩말 무늬 — 줄무늬는 차가 달리는 방향과 나란히, 건너는 방향으로 촘촘히. 군데군데 닳았다
-        const runI = (tileAt(z, i - 1, j) === 'cross' ? 1 : 0) + (tileAt(z, i + 1, j) === 'cross' ? 1 : 0);
-        const runJ = (tileAt(z, i, j - 1) === 'cross' ? 1 : 0) + (tileAt(z, i, j + 1) === 'cross' ? 1 : 0);
+        const runI = (groundAt(z, i - 1, j) === 'cross' ? 1 : 0) + (groundAt(z, i + 1, j) === 'cross' ? 1 : 0);
+        const runJ = (groundAt(z, i, j - 1) === 'cross' ? 1 : 0) + (groundAt(z, i, j + 1) === 'cross' ? 1 : 0);
         const alongI = runJ >= runI; // 건널목 띠가 j로 길면 차는 i로 달린다 → 줄무늬는 i 방향
         const quad = (a0: number, a1: number, b0: number, b1: number) => {
           const p = alongI ? [S(i + a0, j + b0), S(i + a1, j + b0), S(i + a1, j + b1), S(i + a0, j + b1)] : [S(i + b0, j + a0), S(i + b0, j + a1), S(i + b1, j + a1), S(i + b1, j + a0)];
@@ -563,7 +563,7 @@ export function drawGroundKit(z: Zone, i0: number, j0: number, clip?: { i0: numb
   const og = z.origin ?? { i: 0, j: 0 };
   for (let j = j0; j < j1; j++)
     for (let i = i0; i < i1; i++) {
-      const t = tileAt(z, i, j);
+      const t = groundAt(z, i, j);
       if (t === 'void' || t === 'cross' || t === 'median' || (t === 'walk' && bridge(i, j))) continue;
       if (clip && (i < clip.i0 || i >= clip.i1 || j < clip.j0 || j >= clip.j1)) continue;
       paintDecal(g, t, i + og.i, j + og.j, S, i, j, heaven);
@@ -577,10 +577,10 @@ export function drawGroundKit(z: Zone, i0: number, j0: number, clip?: { i0: numb
     g.strokeStyle = color; g.lineWidth = width; g.setLineDash(dashed ? [12, 14] : []);
     g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
   };
-  for (const l of z.lanes) {
+  for (const l of z.beyond ? z.lanes.concat(z.beyond.lanes) : z.lanes) {
     if (l.j < j0 - 1 || l.j > j1 || l.i1 < i0 || l.i0 >= i1) continue;
     const mid = Math.floor((Math.max(l.i0, i0) + Math.min(l.i1, i1 - 1)) / 2);
-    const up = tileAt(z, mid, l.j - 1), down = tileAt(z, mid, l.j + 1);
+    const up = groundAt(z, mid, l.j - 1), down = groundAt(z, mid, l.j + 1);
     if (up === 'road' || up === 'cross') line(l.j, l.i0, l.i1, 'rgba(225,222,212,0.85)', true);
     else if (up === 'median') line(l.j, l.i0, l.i1, '#d8b63c', false);
     else if (up === 'walk') { line(l.j, l.i0, l.i1, '#8e877b', false, 3); line(l.j, l.i0, l.i1, '#c9c2b4', false, 1); }
