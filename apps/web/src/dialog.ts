@@ -163,6 +163,7 @@ export class Dialog {
     this.advance = null;
     this.release = null;
     this.choicesEl.innerHTML = '';
+    const shownAt = performance.now();
     return new Promise((resolve) => {
       this.chooseRes = resolve;
       options.forEach((label, k) => {
@@ -171,6 +172,8 @@ export class Dialog {
         if (k === 0) b.className = 'primary';
         if (disabled.includes(k)) { b.disabled = true; b.className = 'off'; } // 34차: 고를 수 없는 선택지도 보여 준다 (조건이 모자람)
         b.onclick = () => {
+          // 36차: 선택지가 막 떴을 때의 누르기는 대사를 넘기던 손가락 — 0.35초 동안은 고른 것으로 치지 않는다
+          if (performance.now() - shownAt < 350) return;
           this.choicesEl.innerHTML = '';
           this.chooseRes = null;
           resolve(k);

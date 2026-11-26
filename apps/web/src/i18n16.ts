@@ -717,6 +717,8 @@ export const more16 = {
     accTruthLines: ["…모르겠어. 정말로.", "네가 원하는 걸 느끼면 나도 그걸 원하게 돼. 그게 내 마음인지, 그렇게 생겨 먹은 건지.", "천사들도 대답해 주지 않아. 그래서 그냥 이렇게 말할게. 지금 너를 보는 게 좋아."],
     accLines: [["저기… 잠깐만.", "너, 여기 처음이지?", "웃는 얼굴 보고 싶어서."], ["오늘따라 더 좋다.", "손 잡아도 돼?", "어디 가? 나도 갈래.", "♥"], ["저기 수영장 가 볼래?", "롤러코스터 탈 사람!", "배고프지 않아?"], ["천천히 걸어. 다친다.", "물은 마셨어?", "추우면 말해."]],
     accBye: ["…또 올게.", "멀리 안 가. 불러.", "지금은 놓아줄게."],
+    ctlHintTouch: "✋ 사람을 누르면 곁으로 걸어갑니다. 머리 위 말풍선을 눌러야 말을 겁니다 · ⚔ 칼일 땐 적만 공격하고 중립은 걷기만 · 길게 누르면 무엇이 있든 그쪽으로 걷습니다",
+    ctlHintPc: "W·A·S·D(방향키)로 걷습니다 · ✋ 사람을 누르면 곁으로 가고, 머리 위 말풍선을 눌러 말을 겁니다 · ⚔ 칼일 땐 적만 공격하고 중립은 걷기만",
   },
   th: {
     rankUpTitle: 'ระดับวิญญาณเพิ่มขึ้น',
@@ -1435,6 +1437,8 @@ export const more16 = {
     accTruthLines: ["…ไม่รู้สิ จริง ๆ", "พอรู้สึกว่าเธอต้องการอะไร ฉันก็อยากได้สิ่งนั้นด้วย ไม่รู้ว่าเป็นใจฉันเอง หรือเพราะฉันเกิดมาแบบนี้", "นางฟ้าก็ไม่ตอบ เลยขอพูดแค่นี้ ตอนนี้ชอบที่ได้มองเธอ"],
     accLines: [["นี่… เดี๋ยวก่อน", "เธอเพิ่งมาที่นี่ใช่ไหม", "อยากเห็นเธอยิ้ม"], ["วันนี้ยิ่งชอบเลย", "จับมือได้ไหม", "จะไปไหน ไปด้วย", "♥"], ["ไปสระว่ายน้ำกันไหม", "ใครจะขึ้นรถไฟเหาะ!", "หิวไหม"], ["เดินช้า ๆ เดี๋ยวเจ็บ", "ดื่มน้ำหรือยัง", "หนาวก็บอกนะ"]],
     accBye: ["…เดี๋ยวมาอีก", "ไม่ไปไกลหรอก เรียกนะ", "ตอนนี้ขอปล่อยไปก่อน"],
+    ctlHintTouch: "✋ แตะคนแล้วจะเดินไปข้าง ๆ แตะบอลลูนคำพูดเหนือหัวเพื่อคุย · ⚔ โหมดดาบ โจมตีเฉพาะศัตรู คนกลาง ๆ แค่เดินไป · กดค้างเพื่อเดินไปทางนั้นเสมอ",
+    ctlHintPc: "เดินด้วย W·A·S·D (ปุ่มลูกศร) · ✋ คลิกคนเพื่อเดินไปข้าง ๆ คลิกบอลลูนคำพูดเพื่อคุย · ⚔ โหมดดาบ โจมตีเฉพาะศัตรู คนกลาง ๆ แค่เดินไป",
   },
   en: {
     rankUpTitle: 'SOUL RANK UP',
@@ -2153,5 +2157,7 @@ export const more16 = {
     accTruthLines: ["…I don't know. Honestly.", "When I feel what you want, I start wanting it too. Whether that's my heart or just how I'm made.", "The angels won't answer either. So I'll just say this: I like looking at you right now."],
     accLines: [["Hey… wait a sec.", "You're new here, aren't you?", "I wanted to see you smile."], ["I like you even more today.", "Can I hold your hand?", "Where are you going? Me too.", "♥"], ["Want to try the pool?", "Who's up for the coaster!", "Aren't you hungry?"], ["Walk slowly. You'll get hurt.", "Did you drink water?", "Tell me if you're cold."]],
     accBye: ["…I'll come again.", "I won't go far. Call me.", "I'll let you go, for now."],
+    ctlHintTouch: "✋ Tap a person to walk up to them; tap the speech bubble above their head to talk · ⚔ In sword mode only enemies are attacked, others are just walked to · Press and hold to always walk that way",
+    ctlHintPc: "Walk with W·A·S·D (arrow keys) · ✋ Click a person to walk up to them, click the speech bubble to talk · ⚔ In sword mode only enemies are attacked, others are just walked to",
   },
 };

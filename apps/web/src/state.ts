@@ -95,6 +95,8 @@ export interface Save {
   dura?: Record<string, number>;
   /** 35차: 내구도 셈이 바뀐 판 (2 = 더 오래 가는 셈, 무기는 바닥나면 박살) */
   duraV?: number;
+  /** 36차: 바뀐 조작 안내를 보였다 */
+  ctlHint?: number;
   /** 35차 내 집 (방콕 콘도 · 서울 아파트) — 통장처럼 다음 생에도 남는다 */
   homes?: { bkk?: boolean; seoul?: boolean };
   /** 35차 가구점에서 산 가구 (가진 집에 저절로 놓인다) */

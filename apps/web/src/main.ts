@@ -30,6 +30,23 @@ import { bgmMode, setBgmMode, setIndoor, type BgmMode } from './bgm.ts';
 import { applyDeed, karmaPoints, fmtKarma, armorClass, addSoulExp, judge, evilRatio, HELL_START, prayerAnswerChance, restRegenPerMinute, isDanger, DEED_TABLE, newStats, soulExpToNext, maxHp as maxHpFor, POINTS_PER_RANK, STAT_KEYS, STAT_MAX, type DeedKey, type StatKey } from '../../../packages/shared/src/rules.ts';
 
 const state = load();
+
+/**
+ * 36차 유령 누르기 막기: 휴대폰은 손가락을 뗀 뒤 같은 자리에 '클릭'을 한 번 더 보낸다. 그 사이 대사가 넘어가며 선택지·메뉴가
+ * 손가락 밑에 새로 뜨면, 누르지도 않은 단추가 눌린다 (베스크 '1000닢 빌리기'가 저절로 눌리던 것).
+ * 단추는 손가락이 그 단추 위에서 눌렸을 때만 눌린 것으로 친다 (키보드로 누른 것은 그대로)
+ */
+{
+  let downEl: Element | null = null;
+  document.addEventListener('pointerdown', (e) => { downEl = e.target as Element; }, true);
+  document.addEventListener('click', (e) => {
+    if (!e.isTrusted || e.detail === 0) return;
+    const b = (e.target as Element | null)?.closest?.('button, .menu-item, [role="button"]');
+    if (!b || (downEl && b.contains(downEl))) return;
+    e.stopPropagation();
+    e.preventDefault();
+  }, true);
+}
 if (state.realm === 'ghost') { state.realm = 'border'; delete state.pos; } // 24차: 귀신은 없어졌다 — 떠돌던 영혼은 경계의 해변으로
 if (state.lang) setLang(state.lang);
 // 시험용: ?newlife 는 새 영혼으로 다시 시작, ?form=raincoat 처럼 처음 모습을 고정
@@ -1947,7 +1964,7 @@ async function talkToHwang() {
       // 주요 가게 자리: 아속 구역 지도에서 우주새 문에서 가장 가까운 곳을 찾아 방향·거리로 말해 주고, 나가면 그곳 위에 표시
       const places = await nearbyPlaces();
       const c = await dlg.choose([...places.map((p) => `${p.label} · ${p.name}`), L.askNever]);
-      if (c < places.length) {
+      if (c >= 0 && c < places.length) {
         const p = places[c];
         await dlg.say(L.hwangDir.replace('{name}', p.name).replace('{dir}', p.dir).replace('{m}', String(p.m)));
         pendingGuide = p.k;
@@ -2012,7 +2029,7 @@ async function talkToBesk() {
   const L = t();
   const h = hellState();
   const debt = () => state.debt ?? 0;
-  dlg.open({ name: L.besk, portrait: 'besk' });
+  dlg.open({ name: L.besk, portrait: 'besk', exit: true });
   if (debt() > 0) await dlg.say(L.beskOwe.replace('{n}', String(debt())));
   else { await dlg.say(L.beskGreet); await dlg.say(L.beskTerms); }
   const room = Math.floor((DEBT_MAX * 2 - debt()) / 2); // 더 빌릴 수 있는 원금
@@ -2021,7 +2038,7 @@ async function talkToBesk() {
   if (debt() > 0) opts.push(L.beskRepay.replace('{n}', String(debt())));
   opts.push(L.beskNo);
   const c = await dlg.choose(opts);
-  if (c < amounts.length) {
+  if (c >= 0 && c < amounts.length) { // 36차: ✕로 그만두면 −1 — 빌린 것도 갚은 것도 없다
     const n = amounts[c];
     h.notes += n;
     ecoLog('earn', 'loan', n, true);
@@ -3752,7 +3769,7 @@ async function heavenFood(from: string) {
   await dlg.say(pick(L.heavenFoodOffer));
   const dishes = pickN(L.heavenDishes, 3);
   const c = await dlg.choose([...dishes, L.heavenFoodNo]);
-  if (c < dishes.length) {
+  if (c >= 0 && c < dishes.length) {
     chime();
     await dlg.say(L.heavenAte.replace('{food}', dishes[c]));
   }
@@ -4746,9 +4763,37 @@ function setStance(s: Stance) {
 }
 function showStance(on: boolean) {
   stanceBox.hidden = !on;
+  // 36차: 바뀐 조작을 한 번만 알려 준다 (손가락이면 길게 누르기, PC면 W·A·S·D)
+  if (on && !state.ctlHint) {
+    state.ctlHint = 1;
+    save(state);
+    setTimeout(() => toast(matchMedia('(pointer: coarse)').matches ? t().ctlHintTouch : t().ctlHintPc), 1800);
+  }
   stanceBox.classList.toggle('low', !!world?.low);
   (stanceBox.querySelector('.st-low') as HTMLElement).title = t().lowLabel;
   setStance(stance);
+}
+
+// ───────────────────────── 36차 PC 키보드 이동 (W·A·S·D · 방향키) ─────────────────────────
+{
+  const held = new Set<string>();
+  const DIR: Record<string, [number, number]> = { KeyW: [0, -1], ArrowUp: [0, -1], KeyS: [0, 1], ArrowDown: [0, 1], KeyA: [-1, 0], ArrowLeft: [-1, 0], KeyD: [1, 0], ArrowRight: [1, 0] };
+  const typing = (e: KeyboardEvent) => { const el = e.target as HTMLElement | null; return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable); };
+  const push = () => {
+    let x = 0, y = 0;
+    for (const c of held) { const d = DIR[c]; if (d) { x += d[0]; y += d[1]; } }
+    world?.setKeyDir(Math.sign(x), Math.sign(y));
+  };
+  window.addEventListener('keydown', (e) => {
+    if (!DIR[e.code] || typing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (scene !== 'world' || busy || dlg.isOpen) { if (held.size) { held.clear(); push(); } return; }
+    if (e.code.startsWith('Arrow')) e.preventDefault();
+    if (held.has(e.code)) return;
+    held.add(e.code);
+    push();
+  });
+  window.addEventListener('keyup', (e) => { if (held.delete(e.code)) push(); });
+  window.addEventListener('blur', () => { if (held.size) { held.clear(); push(); } });
 }
 
 // ───────────────────────── 다른 사람 (실시간) ─────────────────────────

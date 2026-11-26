@@ -4021,9 +4021,9 @@ export class WorldScene {
 
   /** 21차: 손가락으로 눌렀다 (모바일) — 사람을 누르는 범위를 넓히고, 빗나가도 가까운 상대를 잡아 준다 */
   private touchTap = false;
-  private walkerAt(gx: number, gy: number): Walker | null {
+  private walkerAt(gx: number, gy: number, foeFallback = false): Walker | null {
     const { wx, wy } = this.toWorld(gx, gy);
-    const k = this.touchTap ? 1.9 : 1.25; // 손가락은 거의 두 배, 마우스도 조금 넉넉히
+    const k = this.touchTap ? (foeFallback ? 1.9 : 1.35) : 1.15; // 36차: 손 태세에선 몸을 정확히 눌러야 (붐비는 곳에서 걷기가 사람에게 막히지 않게)
     let best: Walker | null = null, bz = -1e9;
     for (const w of this.walkers) {
       if (w.isPlayer) continue;
@@ -4032,11 +4032,11 @@ export class WorldScene {
       const box = w.down > 0 ? { x0: sx - 22 * k, x1: sx + 22 * k, y0: sy - 14 * k, y1: sy + 8 * k } : { x0: sx - 11 * k * sz, x1: sx + 11 * k * sz, y0: sy - 44 * sz - 6 * k, y1: sy + 6 * k };
       if (wx >= box.x0 && wx <= box.x1 && wy >= box.y0 && wy <= box.y1 && w.x + w.y > bz) { best = w; bz = w.x + w.y; }
     }
-    if (best || !this.touchTap) return best;
-    // 그래도 빗나갔다면: 누른 곳 둘레(손가락 하나 반쯤)에서 가장 가까운 사람 — 적이 먼저
+    if (best || !this.touchTap || !foeFallback) return best;
+    // 칼 태세에서 빗나갔다면: 누른 곳 둘레(손가락 하나 반쯤)에서 가장 가까운 적만 (중립은 고르지 않는다)
     let bd = 46;
     for (const w of this.walkers) {
-      if (w.isPlayer || w.down > 0) continue;
+      if (w.isPlayer || w.down > 0 || !this.isFoe(w)) continue;
       const [sx, sy] = iso(w.x, w.y);
       const d = Math.hypot(wx - sx, wy - (sy - 20)) - (this.isFoe(w) ? 14 : 0);
       if (d < bd) { bd = d; best = w; }
@@ -4085,7 +4085,7 @@ export class WorldScene {
     // 싸울 상대(괴물·불량배·대식자·고문하는 괴물·나를 노리는 누구든) 위에서는 칼 모양.
     // 경비병은 나를 공격했을 때만 적 ('모두 공격' 태세면 누구든 칼)
     const foe = this.realm !== 'ghost' && ((w && w.down <= 0 && (this.isFoe(w) || (this.stance === 'all' && w.kind !== 'clerk'))) || (!w && this.torturerAt(gx, gy, true)));
-    document.body.style.cursor = foe ? SWORD_CURSOR : this.hoverFor || this.coinAt(gx, gy) || this.onDoorIcon(gx, gy) ? 'pointer' : '';
+    document.body.style.cursor = foe ? SWORD_CURSOR : this.hoverFor || this.coinAt(gx, gy) || this.onDoorIcon(gx, gy) || this.onTalkIcon(gx, gy) ? 'pointer' : '';
   }
 
   /** 출입 아이콘을 눌렀나 (손가락 크기를 생각해 넉넉하게) */
@@ -4093,6 +4093,55 @@ export class WorldScene {
     if (!this.door.visible || this.doorFor === null) return false;
     const { wx, wy } = this.toWorld(gx, gy);
     return Math.hypot(wx - this.doorAt.x, wy - this.doorAt.y) < 20;
+  }
+
+  /** 36차: 곁에 선 사람에게 하는 일 메뉴 (살펴보기 · 말 걸기 · 강제 공격) — 같은 사람을 곁에서 한 번 더 눌렀을 때 */
+  private openPersonMenu(w: Walker) {
+    const L = t();
+    const [sx, sy] = iso(w.x, w.y);
+    const opts: { label: string; danger?: boolean; act: () => void }[] = [];
+    if (w.kind === 'thug' || w.kind === 'goat' || w.kind === 'suturer' || (w.mdef && !w.asleep) || w.gdef) opts.push({ label: L.act.attack, act: () => this.attack(w) });
+    if (w.mdef?.key === 'gurma') opts.push({ label: w.asleep ? L.act.look : L.gurmaFeedBtn, act: () => this.approach(w, 'talk') });
+    if (!w.mdef) opts.push({ label: L.act.talk, act: () => this.approach(w, 'talk') });
+    opts.push({ label: L.act.look, act: () => this.approach(w, 'look') });
+    if (w.kind === 'passer' || w.kind === 'angel' || w.kind === 'yellowwing' || w.kind === 'officer' || w.kind === 'soul' || w.kind === 'vendor' || w.kind === 'fighter') opts.push({ label: L.act.force, danger: true, act: () => (this.realm === 'heaven' ? this.hooks.heavenAct('assault') : this.attack(w)) });
+    this.hooks.menu(this.npcName(w), this.npcSub(w), opts, sx + this.camera.x, sy - 44 + this.camera.y);
+  }
+  /** 36차: 말을 걸 수 있는 사람 (적·쓰러진 이·다른 유저·차는 아니다) */
+  private talkable(w: Walker) {
+    if (w.isPlayer || w.down > 0 || w.kind === 'remote' || w.invader) return false;
+    if (w.kind === 'clerk') return true;
+    if (w.mdef && w.mdef.key !== 'gurma') return false;
+    if (w.kind === 'thug' || w.kind === 'goat' || w.kind === 'suturer') return false;
+    return !this.isFoe(w);
+  }
+  /** 36차: 손 태세에서 내 곁(1.9칸)의 말을 걸 수 있는 사람 하나 — 머리 위에 말풍선. 마지막으로 누른 사람이 먼저 */
+  private focusW: Walker | null = null;
+  nearFor: Walker | null = null;
+  private findNear() {
+    if (this.stance !== 'talk' || this.dead || this.realm === 'ghost' || this.pending || this.working?.on) return null;
+    const p = this.player;
+    const f = this.focusW;
+    if (f && this.walkers.includes(f) && this.talkable(f) && Math.hypot(f.x - p.x, f.y - p.y) < 1.9) return f;
+    let best: Walker | null = null, bd = 1.9;
+    for (const w of this.walkers) {
+      const d = Math.hypot(w.x - p.x, w.y - p.y);
+      if (d < bd && this.talkable(w)) { bd = d; best = w; }
+    }
+    return best;
+  }
+  /** 말풍선을 눌렀나 (손가락 크기를 생각해 넉넉하게) */
+  private onTalkIcon(gx: number, gy: number) {
+    if (!this.talkIcon.visible || !this.nearFor) return false;
+    const { wx, wy } = this.toWorld(gx, gy);
+    return Math.hypot(wx - this.talkIcon.x, wy - this.talkIcon.y) < (this.touchTap ? 24 : 16);
+  }
+  /** 말풍선: 점원이면 계산대로, 그 밖엔 말 걸기 */
+  private interactNear(w: Walker) {
+    this.focusW = w;
+    if (w.kind === 'clerk') { this.showLabel({ kind: 'w', w }, 2); this.approachClerk(); return; }
+    this.showLabel({ kind: 'w', w }, 2);
+    this.approach(w, 'talk');
   }
 
   private onTap(gx: number, gy: number, force: boolean) {
@@ -4115,8 +4164,14 @@ export class WorldScene {
       this.moveToScreen(gx, gy);
       return;
     }
-    // 1) 사람: 메뉴 (컨트롤·시프트를 누르고 누르면 바로 공격 = 강제 공격). 고문하던 야크도 누르면 고문을 멈추고 덤빈다
-    const w = this.walkerAt(gx, gy) ?? this.torturerAt(gx, gy);
+    // 36차 조작: ✋ 손 태세 — 사람을 누르면 이름이 뜨고 곁으로 걸어간다. 가까이 가면 머리 위에 말풍선이 뜨고, 그걸 눌러야 말을 건다
+    //   (곁에 선 채 같은 사람을 한 번 더 누르면 살펴보기·강제 공격 메뉴). ⚔ 칼 태세 — 적은 누르면 공격, 중립은 누르면 그 곁으로 걷기만.
+    //   고문하던 괴물은 칼 태세에서 몸을 정확히 눌렀을 때만 고문을 멈추고 덤빈다
+    const sword = this.stance !== 'talk';
+    // 출입 아이콘(가게 문 앞에 서 있을 때만 뜬다)과 말풍선은 사람보다 먼저 — 일부러 누른 것이니까
+    if (this.onDoorIcon(gx, gy)) { this.interact(this.doorFor!); return; }
+    if (!sword && this.nearFor && this.onTalkIcon(gx, gy)) { this.interactNear(this.nearFor); return; }
+    const w = this.walkerAt(gx, gy, sword) ?? (sword || force ? this.torturerAt(gx, gy) : null);
     // 21차: 천국의 구름 계단을 누르면 그 앞까지 걸어가 테라스로 올라간다
     if (!w && this.stairBox && this.heavenStair && this.realm === 'heaven' && !this.zone.interior) {
       const wx = gx - this.camera.x, wy = gy - this.camera.y, b = this.stairBox;
@@ -4131,6 +4186,7 @@ export class WorldScene {
     if (w && w.kind === 'remote' && w.rid && w.rinfo) {
       const hostile = this.recentAttacker(w.rid) || !!w.rpos?.c;
       if (w.down <= 0 && (force || this.stance === 'all' || (this.stance === 'hostile' && hostile))) { this.attack(w); return; }
+      if (sword) { this.groundMove(gx, gy); return; }
       const [sx, sy] = iso(w.x, w.y);
       this.hooks.person(w.rid, w.rinfo, sx + this.camera.x, sy - 44 + this.camera.y, () => this.attack(w));
       return;
@@ -4142,19 +4198,19 @@ export class WorldScene {
       // 천국: 그림자 말고 누구에게든 손을 들면 천국의 법을 어긴 것 (현실로 강제 환생)
       if (this.realm === 'heaven' && !w.weak && !w.invader && (force || this.stance === 'all')) { this.hooks.heavenAct('assault'); return; }
       if (force || this.stance === 'all' || (this.stance === 'hostile' && hostile)) { this.attack(w); return; }
-      this.showLabel({ kind: 'w', w }, 2);
-      const [sx, sy] = iso(w.x, w.y);
-      const opts: { label: string; danger?: boolean; act: () => void }[] = [];
-      if (w.kind === 'thug' || w.kind === 'goat' || w.kind === 'suturer' || (w.mdef && !w.asleep) || w.gdef) opts.push({ label: L.act.attack, act: () => this.attack(w) });
-      if (w.mdef?.key === 'gurma') opts.push({ label: w.asleep ? L.act.look : L.gurmaFeedBtn, act: () => this.approach(w, 'talk') });
-      if (!w.mdef) opts.push({ label: L.act.talk, act: () => this.approach(w, 'talk') });
-      opts.push({ label: L.act.look, act: () => this.approach(w, 'look') });
-      if (w.kind === 'passer' || w.kind === 'angel' || w.kind === 'yellowwing' || w.kind === 'officer' || w.kind === 'soul' || w.kind === 'vendor' || w.kind === 'fighter') opts.push({ label: L.act.force, danger: true, act: () => (this.realm === 'heaven' ? this.hooks.heavenAct('assault') : this.attack(w)) });
-      this.hooks.menu(this.npcName(w), this.npcSub(w), opts, sx + this.camera.x, sy - 44 + this.camera.y);
+      if (sword) { this.showLabel({ kind: 'w', w }, 1.2); this.groundMove(gx, gy); return; } // 칼 태세의 중립: 그 곁으로 걷기만
+      this.showLabel({ kind: 'w', w }, 2.5);
+      const near = Math.hypot(w.x - this.player.x, w.y - this.player.y) < 1.9;
+      if (!(near && this.focusW === w)) {
+        // 처음 누른 사람: 곁으로 걸어가기만 (메뉴 없음)
+        this.focusW = w;
+        this.cancelActs();
+        if (!near && this.walkTo(Math.floor(w.x), Math.floor(w.y))) this.rippleAt(Math.floor(w.x), Math.floor(w.y));
+        return;
+      }
+      this.openPersonMenu(w);
       return;
     }
-    // 2) 출입 아이콘 (가게 문 앞에 서 있을 때만 뜬다) = 상호작용
-    if (this.onDoorIcon(gx, gy)) { this.interact(this.doorFor!); return; }
     // 3) 떨어진 돈
     const c = this.coinAt(gx, gy);
     if (c) { this.cancelActs(); this.walkTo(Math.floor(c.x), Math.floor(c.y)); this.rippleAt(Math.floor(c.x), Math.floor(c.y)); return; }
@@ -6030,6 +6086,7 @@ export class WorldScene {
     if (this.labelT > 0) this.labelT -= dt;
     this.drawLabel(this.labelT > 0 ? this.labelFor : this.hoverFor);
     this.updatePress();
+    this.updateKeys();
     this.drawFx(dt);
     this.updateDoor(p);
     if (this.loots.length) this.updateLoot(dt); // 26차: 현실에서도 줍는다 (지옥에서만 돌던 탓에 야구 배트가 주워지지 않았다)
@@ -6302,6 +6359,33 @@ export class WorldScene {
     c.bubbleT = text.length > 6 ? 2.4 : 1.2;
   }
 
+  /** 36차 PC 키보드 이동 (W·A·S·D, 방향키): 누르고 있는 동안 화면 방향으로 걷는다 — 사람·건물 위를 눌러 생기는 일 없이 */
+  private keyDir = { x: 0, y: 0, next: 0, on: false };
+  setKeyDir(x: number, y: number) {
+    const k = this.keyDir;
+    const was = k.on;
+    k.x = x; k.y = y; k.on = !!(x || y);
+    if (k.on && !was) {
+      if (this.working?.on) this.stopWork();
+      this.cancelActs();
+      this.focusW = null;
+      k.next = 0;
+    }
+    if (!k.on && was) this.player.path = this.player.path.slice(0, 1); // 손을 떼면 지금 걸음에서 멈춘다
+  }
+  private updateKeys() {
+    const k = this.keyDir;
+    if (!k.on || this.dead || this.workIn || this.time < k.next) return;
+    k.next = this.time + 0.12;
+    const p = this.player;
+    const [sx, sy] = iso(p.x, p.y);
+    const n = Math.hypot(k.x, k.y) || 1;
+    const tx = sx + this.camera.x + (k.x / n) * 110, ty = sy + this.camera.y + (k.y / n) * 62;
+    const keep = this.keepKite();
+    p.path = p.path.slice(0, 1);
+    if (keep) { p.target = keep; this.kite = true; } else p.target = null;
+    this.moveToScreen(tx, ty, false);
+  }
   /** 길게 누르기: 0.25초가 지나면 무조건 이동, 누른 채 움직이면 목적지를 다시 잡는다 */
   private updatePress() {
     const pr = this.press;
@@ -6524,13 +6608,19 @@ export class WorldScene {
       this.door.position.set(Math.round(x), Math.round(y + bob));
     }
     const pd = this.pending;
-    this.talkIcon.visible = !!pd && pd.kind === 'talk';
-    if (pd && pd.kind === 'talk') {
-      const [x, y] = iso(pd.w.x, pd.w.y);
+    // 36차: 걸어가던 사람 곁에 닿으면 멈춘다 (몸에 부딪히며 걷지 않게)
+    const fw = this.focusW, pl = this.player;
+    if (fw && !pd && pl.path.length && Math.hypot(fw.x - pl.x, fw.y - pl.y) < 1.25 && !pl.target) pl.path = pl.path.slice(0, 1);
+    this.nearFor = pd ? null : this.findNear();
+    const who = pd && pd.kind === 'talk' ? pd.w : this.nearFor;
+    this.talkIcon.visible = !!who;
+    if (who) {
+      const [x, y] = iso(who.x, who.y);
       this.talkIcon.clear().roundRect(-8, -7, 16, 11, 4).fill({ color: 0xfff6d8, alpha: 0.95 }).stroke({ color: 0x140e0a, width: 1 })
         .poly([-2, 4, 3, 4, -3, 8]).fill(0xfff6d8)
         .circle(-4, -1.5, 1).circle(0, -1.5, 1).circle(4, -1.5, 1).fill(0x140e0a);
-      this.talkIcon.position.set(Math.round(x), Math.round(y - (pd.w.kind === 'goatking' ? GK_FACE + 30 : 58) + Math.sin(this.time * 4)));
+      this.talkIcon.scale.set(this.touchTap ? 1.35 : 1.1);
+      this.talkIcon.position.set(Math.round(x), Math.round(y - (who.kind === 'goatking' ? GK_FACE + 30 : (who.size ?? 1) > 1 ? 44 * (who.size ?? 1) + 14 : 58) + Math.sin(this.time * 4)));
     }
   }
 
