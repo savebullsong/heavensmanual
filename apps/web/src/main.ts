@@ -125,6 +125,19 @@ const INVIS_KEY = 'heavensmanual.invisible';
 /** 19차: 자동 반격 (영혼 설정) — 기본은 켬 */
 const COUNTER_KEY = 'heavensmanual.counter';
 const autoCounter = () => { try { return localStorage.getItem(COUNTER_KEY) !== '0'; } catch { return true; } };
+/** 38차 영혼 설정: 자동 회복(빠른 칸의 회복품을 체력이 몇 % 아래로 떨어지면) · 상점 알림 화살표 · PC 키 */
+const HEAL_KEY = 'heavensmanual.autoheal', HEALPCT_KEY = 'heavensmanual.autohealpct', PING_KEY = 'heavensmanual.shopping', KEYS_KEY = 'heavensmanual.keys';
+const lsGet = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
+const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* 그만 */ } };
+const autoHealOn = () => lsGet(HEAL_KEY) === '1';
+const autoHealPct = () => Math.max(10, Math.min(80, Number(lsGet(HEALPCT_KEY) ?? 30) || 30));
+type KeyAct = 'interact' | 'attack' | 'heal' | 'pick';
+const KEY_ACTS: KeyAct[] = ['interact', 'attack', 'heal', 'pick'];
+const KEY_DEFAULT: Record<KeyAct, string> = { interact: 'F1', attack: 'F2', heal: 'F3', pick: 'F4' };
+const keyMap = (): Record<KeyAct, string> => { try { return { ...KEY_DEFAULT, ...(JSON.parse(lsGet(KEYS_KEY) ?? '{}') as Partial<Record<KeyAct, string>>) }; } catch { return { ...KEY_DEFAULT }; } };
+const keyName = (code: string) => code.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Numpad/, 'Num ');
+const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+let keyCapture: ((code: string) => void) | null = null;
 const invisible = () => !!net.account()?.admin && localStorage.getItem(INVIS_KEY) === '1';
 /** 노자돈 환율: ฿10 = 노전 1닢 */
 // 33차 노자돈 환전: 업(묵을 층 ÷ 13)만큼만, 값은 양쪽 다 형편없이 — 이승 돈은 저승에선 종이, 노전은 이승에선 쇳조각
@@ -167,7 +180,12 @@ function seal(w: 'real' | 'hell') {
   if (!keys.length && !(state.ammo ?? 0)) { state.bag = keepBag; state.equip = keepEq; return false; }
   state.vault ??= {};
   const v: Stash = state.vault[w] ?? { bag: {}, ammo: 0 };
-  for (const k of keys) v.bag[k] = (v.bag[k] ?? 0) + bag[k];
+  // 38차: 물건은 제 세계의 우리로 — 지옥 물건은 유황새, 현실 물건은 우주새 (다른 세계의 우리에 들어가 못 쓰게 되지 않게)
+  for (const k of keys) {
+    const home: 'real' | 'hell' = itemByKey(k)?.hell ? 'hell' : 'real';
+    const dv: Stash = home === w ? v : (state.vault[home] ??= { bag: {}, ammo: 0 });
+    dv.bag[k] = (dv.bag[k] ?? 0) + bag[k];
+  }
   v.ammo += state.ammo ?? 0;
   if (state.arrows) v.bag.arrows20 = (v.bag.arrows20 ?? 0) + Math.ceil(state.arrows / 20);
   if (state.rifle) v.bag.rifleammo = (v.bag.rifleammo ?? 0) + Math.ceil(state.rifle / 10);
@@ -178,6 +196,12 @@ function seal(w: 'real' | 'hell') {
   state.arrows = 0;
   state.rifle = 0;
   return true;
+}
+/** 38차: 현실 물건은 지옥에서, 지옥 물건은 현실·천국에서 쓰지 못한다 (세계를 건너는 검은 마스크 · 일기장 · 관리자는 예외) */
+function worldOk(it: ItemDef | null | undefined): boolean {
+  if (!it) return false;
+  if (it.cross || it.use === 'diary' || net.account()?.admin) return true;
+  return inHell() ? !!it.hell : !it.hell;
 }
 function vaultOf(w: 'real' | 'hell'): Stash | null {
   const v = state.vault?.[w];
@@ -201,8 +225,11 @@ const stashItem = (k: string) => itemByKey(k === 'arrows20' ? 'arrows' : k);
  * 꺼낼 때 수수료: 꺼내는 물건 값을 모두 더한 것의 1할. 한 번 꺼낼 때 적어도 ฿20 (지옥 2닢).
  * 37차: 전엔 한 개마다 '적어도 ฿20'이라 콜라 열 개를 꺼내면 콜라 값만큼 수수료가 붙었다
  */
-const stashFee = (it: ItemDef) => it.price * 0.1;
-const stashTotal = (sel: { it: ItemDef; n: number }[], hell: boolean) => Math.max(hell ? 2 : 20, Math.round(sel.reduce((a, x) => a + stashFee(x.it) * x.n, 0)));
+/** 38차: 싼 물건은 낮은 비율, 비싼 무기는 높은 비율 — ฿100 이하 2% · ฿1,000 4% · ฿10,000 6% · ฿100,000 8% · ฿1,000,000부터 10%.
+ *  지옥 물건은 값의 단위가 열의 하나라 기준도 그만큼 (10닢 이하 2%). 최소는 ฿1 (지옥 1닢) — 물 한 병 꺼내는데 최소 수수료 ₩800이 붙던 것 */
+const stashRate = (it: ItemDef) => Math.max(0.02, Math.min(0.1, 0.02 + 0.02 * Math.log10(Math.max(1, it.price) / (it.hell ? 10 : 100))));
+const stashFee = (it: ItemDef) => it.price * stashRate(it);
+const stashTotal = (sel: { it: ItemDef; n: number }[], hell: boolean) => Math.max(1, Math.round(sel.reduce((a, x) => a + stashFee(x.it) * x.n, 0)));
 /** 가게 안 우리 그림에 맡긴 물건 몇 개를 보인다 */
 function refreshCage() {
   const v = state.vault?.[cageW()];
@@ -299,7 +326,7 @@ function openCage() {
     for (const r of rows) {
       const fee = stashFee(r.it);
       const k0 = picked.get(r.key);
-      const row = itemRow(r.it, here ? (k0 ? `${L.cagePicked.replace('{n}', String(k0))} · ${priceText(Math.round(fee * k0), hell)}` : `×${r.n} · ${L.cageFeeRate}`) : `×${r.n}`, async () => {
+      const row = itemRow(r.it, here ? (k0 ? `${L.cagePicked.replace('{n}', String(k0))} · ${priceText(Math.round(fee * k0), hell)}` : `×${r.n} · ${L.cageFeeEach.replace('{p}', priceText(Math.max(1, Math.round(fee)), hell))}`) : `×${r.n}`, async () => {
         if (!here) return;
         if (picked.has(r.key)) { picked.delete(r.key); draw(); return; }
         const n = r.n > 1 ? await askQty(r.it, Math.max(1, Math.round(fee)), r.n, 'take') : 1;
@@ -828,6 +855,7 @@ const hooks: WorldHooks = {
   hp(hp, max) {
     state.hp = Math.max(0, hp);
     updateHpBar(hp, max);
+    autoHealCheck(hp, max);
   },
   nav(label) {
     navChip(label);
@@ -1985,6 +2013,8 @@ async function talkToHwang() {
     // 이 세계의 우주새에 봉인해 둔 물건
     // 29차: 맡긴 물건(죽거나 다시 태어날 때 봉인된 것 포함)은 데스크 앞 보관 우리에 — 꺼낼 때는 앵무새가 수수료를 받는다
     if (vaultOf(hell ? 'hell' : 'real')) await dlg.say(hell ? L.cageHintHw : L.cageHintHwang);
+    // 38차: 끼고 있는 무기·방어구가 많이 닳았으면 철물점을 일러 준다 (현실만)
+    if (!hell && Object.values(state.equip ?? {}).some((k) => { const it = k ? itemByKey(k) : null; return !!it && !it.hell && duraOf(k!) < duraMax(it) * 0.4; })) await dlg.say(L.hwangRepairHint);
   }
   talkedThisVisit = true;
   // 물건 고르기 → (소비품은 수량) → 사고 나면 한마디 뒤 다시 목록. '나가기'나 빈 곳을 누르면 말없이 끝
@@ -2001,6 +2031,7 @@ async function talkToHwang() {
       if (c >= 0 && c < places.length) {
         const p = places[c];
         await dlg.say(L.hwangDir.replace('{name}', p.name).replace('{dir}', p.dir).replace('{m}', String(p.m)));
+        if (p.label === L.placeTools) await dlg.say(L.hwangToolsTip);
         pendingGuide = p.k;
         await dlg.say(L.hwangDirMark);
       }
@@ -2237,6 +2268,7 @@ async function nearbyPlaces() {
   const z = await loadZone(homeZone());
   const d = z.door;
   const want: [string, (b: Building) => boolean][] = [
+    [L.placeTools, (b) => roomKindOf(b) === 'hardware'], // 38차: 무기 수리 — 큰길가 철물점
     [L.placeKinds.bank, (b) => hasBank(b)],
     [L.placeKinds.worship, (b) => ['temple', 'church', 'mosque', 'gurdwara'].includes(roomKindOf(b))],
     [L.placeKinds.clinic, (b) => ['clinic', 'pharmacy'].includes(roomKindOf(b))],
@@ -2606,10 +2638,15 @@ function askQty(it: ItemDef, unit: number, max: number, verb: 'buy' | 'sell' | '
       go.textContent = (verb === 'buy' ? L.qtyBuy : verb === 'sell' ? L.qtySell : verb === 'store' ? L.qtyStore : L.qtyTake).replace('{n}', String(n)).replace('{p}', priceText(unit * n, hell));
     };
     const set = (v: number) => { n = Math.max(1, Math.min(max, v)); draw(); };
-    (el.querySelector('.q-m') as HTMLButtonElement).onclick = () => set(n - 1);
-    (el.querySelector('.q-p') as HTMLButtonElement).onclick = () => set(n + 1);
-    for (const q of [1, 5, 10]) if (q <= max) { const b = document.createElement('button'); b.textContent = `×${q}`; b.onclick = () => set(q); el.querySelector('.qty-quick')!.appendChild(b); }
-    if (max > 1) { const b = document.createElement('button'); b.textContent = L.qtyMax.replace('{n}', String(max)); b.onclick = () => set(max); el.querySelector('.qty-quick')!.appendChild(b); }
+    // 38차: 빠른 단추는 처음엔 그 수로, 다음부터는 더한다 (×10을 한 번 더 누르면 20) — 한 번 누른 뒤엔 '+10'으로 보인다
+    let touched = false;
+    const quickBtns: [HTMLButtonElement, number][] = [];
+    const relabel = () => { for (const [b, q] of quickBtns) b.textContent = touched ? `+${q}` : `×${q}`; };
+    (el.querySelector('.q-m') as HTMLButtonElement).onclick = () => { touched = true; set(n - 1); relabel(); };
+    (el.querySelector('.q-p') as HTMLButtonElement).onclick = () => { touched = true; set(n + 1); relabel(); };
+    for (const q of [1, 5, 10]) if (q <= max) { const b = document.createElement('button'); b.onclick = () => { set(touched ? n + q : q); touched = true; relabel(); }; quickBtns.push([b, q]); el.querySelector('.qty-quick')!.appendChild(b); }
+    relabel();
+    if (max > 1) { const b = document.createElement('button'); b.textContent = L.qtyMax.replace('{n}', String(max)); b.onclick = () => { set(max); touched = true; relabel(); }; el.querySelector('.qty-quick')!.appendChild(b); }
     // 29차: 대화창이 없을 때(거리 가게·지옥 장사꾼 창)는 화면 가운데 작은 창으로 — 한 번 더 확인하고 산다/판다
     const inDlg = dlg.isOpen;
     const wrap = inDlg ? null : document.createElement('div');
@@ -3042,7 +3079,8 @@ function confirmBox(text: string, ok: string): Promise<boolean> {
 }
 
 function gear() {
-  const eq0 = state.equip ?? {};
+  const eqAll = state.equip ?? {};
+  const eq0 = Object.fromEntries(Object.entries(eqAll).filter(([, k]) => k && worldOk(itemByKey(k)))) as typeof eqAll; // 38차: 다른 세계의 장비는 힘을 쓰지 못한다
   const eq = eq0.offhand && noShieldWith(eq0.weapon) ? { ...eq0, offhand: undefined } : eq0;
   const w = eq.weapon ? itemByKey(eq.weapon) : null;
   const wBroken = !!w && broken(w.key); // 30차: 내구도가 바닥난 무기는 맨손 셈 (몸에는 그대로 든다)
@@ -3077,10 +3115,18 @@ type DollSel = Slot | 'ammo';
 let dollSel: DollSel | null = null;
 const isGearItem = (it: ItemDef) => it.cat === 'weapon' || it.cat === 'armor' || !!it.wreck; // 35차: 박살난 무기도 장비 칸에 (낄 수는 없다)
 /** 하나를 먹거나 감는다 (가방 · 빠른 칸 공통) */
-function useItem(k: string) {
+/** 38차: 먹고 쓰는 것은 한 번 쓰면 잠깐(1초) 뒤에 다시 — 마구 삼켜 버티지 못하게, 비싼 회복약이 값을 하게 */
+const USE_CD_MS = 1000;
+let useReadyAt = 0;
+const itemCooling = () => performance.now() < useReadyAt;
+function useItem(k: string): boolean | 'wait' {
   const bag = state.bag ?? {};
   const it = itemByKey(k);
   if (!it?.heal || !(bag[k] > 0)) return false;
+  if (!worldOk(it)) { toast(t().otherWorldItem); return false; }
+  if (itemCooling()) return 'wait';
+  useReadyAt = performance.now() + USE_CD_MS;
+  quickBtn.classList.remove('cd'); void quickBtn.offsetWidth; quickBtn.classList.add('cd');
   bag[k] -= 1;
   if (world && scene === 'world') world.heal(it.heal);
   else state.hp = Math.min(maxHp(), (state.hp ?? maxHp()) + it.heal);
@@ -3164,10 +3210,12 @@ function renderBag() {
     const on = bagTab !== 'gear' && !!slot && state.equip?.[slot] === k; // 장비 탭의 목록은 끼지 않은 여분뿐
     const quick = state.quick === k;
     const label = it.use ? L.readBook : it.heal ? (it.key === 'bandage' || it.key === 'hbandage' ? L.use : L.eat) : slot ? (on ? L.unequip : L.equip) : '';
-    const row = itemRow(it, `${slot ? L.slotNames[slot] + ' · ' : it.wreck ? L.wreckTag + ' · ' : ''}×${bag[k] - (bagTab === 'gear' ? worn(k) : 0)}${on ? ' · ' + L.equipped : ''}`, () => {
+    const foreign = !worldOk(it);
+    const row = itemRow(it, `${foreign ? L.otherWorldTag + ' · ' : ''}${slot ? L.slotNames[slot] + ' · ' : it.wreck ? L.wreckTag + ' · ' : ''}×${bag[k] - (bagTab === 'gear' ? worn(k) : 0)}${on ? ' · ' + L.equipped : ''}`, () => {
       if (bagDrop) { bagDrop = null; renderBag(); return; }
       if (it.use === 'diary') { el.remove(); void readDiary(k); return; }
-      if (it.heal) useItem(k);
+      if (!on && !worldOk(it)) { toast(L.otherWorldItem); return; } // 38차
+      if (it.heal) { if (useItem(k) === 'wait') { toast(L.useWait); return; } }
       else if (slot) {
         state.equip = state.equip ?? {};
         if (!on && slot === 'offhand' && noShieldWith(state.equip.weapon)) { toast(L.shieldNo); return; }
@@ -3410,7 +3458,9 @@ document.body.appendChild(quickBtn);
 quickBtn.onclick = () => {
   const k = state.quick;
   if (!k || busy || dlg.isOpen) return;
-  if (!useItem(k)) { toast(t().quickEmpty); return; }
+  const r = useItem(k);
+  if (r === 'wait') return;
+  if (!r) { toast(t().quickEmpty); return; }
   quickBtn.classList.remove('pop'); void quickBtn.offsetWidth; quickBtn.classList.add('pop');
   renderQuick();
   if (document.querySelector('.bag-panel')) renderBag();
@@ -3881,6 +3931,9 @@ function showHellDeath() {
     if (lost) { state.bag![lost] = Math.max(0, (state.bag![lost] ?? 1) - 1); world?.setGear(gear()); net.nudge(); }
   }
   if (world && !world.zone.interior) world.dropOnDeath(dropped, lost);
+  // 38차: 떨구지 않은 물건은 모두 유황새 보관 우리로 (꺼낼 때 수수료) — 현실 물건이 섞여 있으면 그것은 우주새 우리로
+  const sealedH = seal('hell');
+  if (sealedH) { world?.setGear(gear()); net.nudge(); renderQuick(); }
   state.hp = maxHp();
   save(state);
   const el = document.createElement('div');
@@ -3891,6 +3944,7 @@ function showHellDeath() {
   el.querySelector('.money')!.textContent = [
     dropped > 0 ? L.hellDeathDrop.replace('{n}', dropped.toLocaleString('en-US')) : '',
     lost ? L.hellDeathItem.replace('{item}', itemByKey(lost).name[lang()]) : '',
+    sealedH ? L.hellDeathVault : '',
     (h.bank ?? 0) > 0 ? L.hellDeathBank.replace('{n}', Math.floor(h.bank ?? 0).toLocaleString('en-US')) : '',
   ].filter(Boolean).join(' ');
   const btn = el.querySelector('button')!;
@@ -4266,7 +4320,10 @@ function renderSettings() {
       <div class="set-row"><span class="lbl l-bgm"></span><div class="seg s-bgm"></div></div>
       <div class="set-row"><span class="lbl l-sfx"></span><div class="seg s-sfx"></div></div>
     </section>
-    <section class="set-sec"><h4 class="h-fight"></h4><div class="set-row"><span class="lbl l-counter"></span><div class="seg s-counter"></div></div><p class="note n-counter"></p></section>
+    <section class="set-sec"><h4 class="h-fight"></h4><div class="set-row"><span class="lbl l-counter"></span><div class="seg s-counter"></div></div><p class="note n-counter"></p>
+      <div class="set-row"><span class="lbl l-heal"></span><div class="seg s-heal"></div></div><div class="set-row"><span class="lbl l-healpct"></span><div class="seg s-healpct"></div></div><p class="note n-heal"></p></section>
+    <section class="set-sec"><h4 class="h-screen"></h4><div class="set-row"><span class="lbl l-ping"></span><div class="seg s-ping"></div></div><div class="set-row"><span class="lbl l-low"></span><div class="seg s-low"></div></div></section>
+    ${matchMedia('(pointer: coarse)').matches ? '' : '<section class="set-sec set-keys"><h4 class="h-keys"></h4><div class="keys"></div><p class="note n-keys"></p></section>'}
     <section class="set-sec"><h4 class="h-lang"></h4><div class="seg s-lang wide"></div></section>
     <section class="set-sec set-acc"><h4 class="h-acc"></h4><div class="acc"></div></section>
     ${net.account()?.admin ? `<section class="set-sec set-admin"><h4 class="h-admin"></h4><div class="set-row"><span class="lbl l-inv"></span><div class="seg s-inv"></div></div><div class="set-row"><span class="lbl l-tp"></span><div class="seg s-tp"></div></div><div class="set-row"><span class="lbl l-city"></span><div class="seg s-city"></div></div><div class="set-row"><span class="lbl l-dot3"></span><div class="seg s-dot3"></div></div><div class="set-row"><span class="lbl"></span><button class="tp-heaven"></button></div><div class="set-row"><span class="lbl l-worlds"></span><div class="tp-more"><button class="tp-home"></button><button class="tp-terrace"></button><button class="tp-hlobby"></button><button class="tp-goat"></button><button class="tp-border"></button></div></div><div class="set-row"><span class="lbl l-tools"></span><div class="tp-more"><button class="ad-eco"></button><button class="ad-perf"></button></div></div>${state.adminTrip && state.adminTrip !== realm() ? '<div class="set-row"><span class="lbl"></span><button class="tp-back"></button></div>' : ''}<p class="note n-admin"></p></section>` : ''}`;
@@ -4298,6 +4355,55 @@ function renderSettings() {
   el.querySelector('.l-counter')!.textContent = L.setCounter;
   el.querySelector('.n-counter')!.textContent = L.setCounterNote;
   seg(el.querySelector('.s-counter')!, ['on', 'off'], L.onOff, () => (autoCounter() ? 'on' : 'off'), (v) => { try { localStorage.setItem(COUNTER_KEY, v === 'on' ? '1' : '0'); } catch { /* 그만 */ } world?.setAutoCounter(v === 'on'); });
+  // 38차: 자동 회복 — 체력이 정한 %까지 떨어지면 빠른 칸의 회복품을 먹는다
+  el.querySelector('.l-heal')!.textContent = L.setAutoHeal;
+  el.querySelector('.l-healpct')!.textContent = L.setAutoHealPct;
+  el.querySelector('.n-heal')!.textContent = L.setAutoHealNote;
+  seg(el.querySelector('.s-heal')!, ['on', 'off'], L.onOff, () => (autoHealOn() ? 'on' : 'off'), (v) => { lsSet(HEAL_KEY, v === 'on' ? '1' : '0'); (el.querySelector('.s-healpct') as HTMLElement).classList.toggle('off', v !== 'on'); });
+  const pcts = ['20', '30', '40', '50', '60'];
+  seg(el.querySelector('.s-healpct')!, pcts, pcts.map((x) => `${x}%`), () => String(autoHealPct()), (v) => lsSet(HEALPCT_KEY, v));
+  (el.querySelector('.s-healpct') as HTMLElement).classList.toggle('off', !autoHealOn());
+  // 38차: 화면 — 상점 알림 화살표 · 건물 1층으로 줄이기 (오른쪽 아래 단추에서 옮겨 왔다)
+  el.querySelector('.h-screen')!.textContent = L.setScreen;
+  el.querySelector('.l-ping')!.textContent = L.setShopPing;
+  el.querySelector('.l-low')!.textContent = L.lowLabel;
+  seg(el.querySelector('.s-ping')!, ['on', 'off'], L.onOff, () => (lsGet(PING_KEY) === '0' ? 'off' : 'on'), (v) => { lsSet(PING_KEY, v === 'on' ? '1' : '0'); world?.setShopPing(v === 'on'); });
+  seg(el.querySelector('.s-low')!, ['on', 'off'], L.onOff, () => (world?.low ? 'on' : 'off'), (v) => { if (!world) return; world.setLowBuildings(v === 'on'); street?.setLowBuildings(v === 'on'); });
+  // 38차: PC 키 지정 (손가락 기기에서는 보이지 않는다)
+  const keysBox = el.querySelector('.set-keys .keys');
+  if (keysBox) {
+    el.querySelector('.h-keys')!.textContent = L.setKeys;
+    el.querySelector('.n-keys')!.textContent = L.setKeysNote;
+    const drawKeys = () => {
+      keysBox.innerHTML = '';
+      const km = keyMap();
+      for (const a of KEY_ACTS) {
+        const row = document.createElement('div'); row.className = 'set-row';
+        const lb = document.createElement('span'); lb.className = 'lbl'; lb.textContent = L.keyActs[a];
+        const b = document.createElement('button'); b.className = 'keycap'; b.textContent = keyName(km[a]);
+        b.onclick = () => {
+          b.textContent = L.keyPress; b.classList.add('wait');
+          keyCapture = (code) => {
+            keyCapture = null;
+            if (code === 'Escape') { drawKeys(); return; }
+            if (MOVE_KEYS.has(code)) { toast(L.keyTaken); drawKeys(); return; }
+            const m = keyMap();
+            const other = KEY_ACTS.find((x) => x !== a && m[x] === code);
+            if (other) m[other] = m[a]; // 이미 쓰는 키면 서로 바꾼다
+            m[a] = code;
+            lsSet(KEYS_KEY, JSON.stringify(m));
+            drawKeys();
+          };
+        };
+        row.append(lb, b);
+        keysBox.appendChild(row);
+      }
+      const rs = document.createElement('button'); rs.className = 'keys-reset'; rs.textContent = L.keyReset;
+      rs.onclick = () => { lsSet(KEYS_KEY, '{}'); drawKeys(); };
+      keysBox.appendChild(rs);
+    };
+    drawKeys();
+  }
   seg(el.querySelector('.s-lang')!, LANGS, LANGS.map((l) => (l === 'ko' ? '한국어' : l === 'th' ? 'ไทย' : 'English')), lang, (v) => { changeLang(v); renderSettings(); });
   renderAccountSettings(el.querySelector('.acc')!);
   if (el.querySelector('.set-admin')) {
@@ -4737,23 +4843,45 @@ let stance: Stance = 'talk';
 const LOW_SVG = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><g class="tall"><rect x="4" y="3" width="8" height="18" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="9" width="7" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 7h2M7 11h2M7 15h2M16 13h1M16 17h1" stroke="currentColor" stroke-width="1.6"/></g><g class="short"><rect x="3" y="14" width="18" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 17.5h2M11 17.5h2M15 17.5h2" stroke="currentColor" stroke-width="1.6"/><path d="M12 3v7M9 7.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></g></svg>';
 const stanceBox = document.createElement('div');
 stanceBox.className = 'stance';
-stanceBox.innerHTML = `<button class="st-low" aria-label="lower buildings">${LOW_SVG}</button><button class="st-hand" aria-label="interact">✋</button><button class="st-sword" aria-label="attack stance"><span class="sw">⚔</span><small></small></button>`;
+// 38차: '1층으로 줄이기'는 영혼 설정으로 옮기고 그 자리는 줍기 단추. 손 단추는 돋보기 + '상호작용'
+const PICK_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 2.5v9m-3.5-3.5L12 11.5 15.5 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 12.5h16l-1.6 8H5.6z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="12" cy="16.3" r="1.6" fill="currentColor"/></svg>';
+const LENS_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M14.5 14.5 20 20" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>';
+stanceBox.innerHTML = `<button class="st-pick" aria-label="pick up">${PICK_SVG}<small></small></button><button class="st-hand" aria-label="interact">${LENS_SVG}<small></small></button><button class="st-sword" aria-label="attack stance"><span class="sw">⚔</span><small></small></button>`;
 document.body.appendChild(stanceBox);
 stanceBox.hidden = true;
 (stanceBox.querySelector('.st-hand') as HTMLButtonElement).onclick = () => setStance('talk');
 // 건물 낮추기 (1층만 보이게) — 도심에서 길이 가려 움직이기 힘들 때
-(stanceBox.querySelector('.st-low') as HTMLButtonElement).onclick = () => {
-  if (!world) return;
-  world.setLowBuildings(!world.low);
-  stanceBox.classList.toggle('low', world.low);
-  toast(world.low ? t().lowOn : t().lowOff);
-};
+(stanceBox.querySelector('.st-pick') as HTMLButtonElement).onclick = () => pickAct();
+/** 38차 줍기: 가까운 돈·물건만 (멀면 그쪽으로 걸어가 줍는다) */
+function pickAct() {
+  if (!world || scene !== 'world' || busy || dlg.isOpen) return;
+  if (world.pickNearby() === 'none') toast(t().pickNone);
+}
+/** 38차 회복 키(F3): 빠른 칸의 회복품, 없으면 가방에서 가장 싼 회복품 */
+function healAct() {
+  if (!world || scene !== 'world' || world.isDead) return;
+  const bag = state.bag ?? {};
+  const ok = (k: string | undefined) => !!k && (bag[k] ?? 0) > 0 && !!itemByKey(k)?.heal && !itemByKey(k)?.use && worldOk(itemByKey(k));
+  const k = ok(state.quick) ? state.quick! : Object.keys(bag).filter(ok).sort((a, b) => itemByKey(a).price - itemByKey(b).price)[0];
+  if (!k) { toast(t().healNone); return; }
+  const r = useItem(k);
+  if (r === true) { renderQuick(); if (document.querySelector('.bag-panel')) renderBag(); }
+}
+/** 38차 자동 회복: 체력이 정한 % 아래면 빠른 칸의 회복품을 먹는다 (대기 시간 지키기 · 빠른 칸이 비면 하지 않는다) */
+function autoHealCheck(hp: number, max: number) {
+  if (!autoHealOn() || hp <= 0 || !world || scene !== 'world' || world.isDead || itemCooling()) return;
+  if ((hp / max) * 100 > autoHealPct()) return;
+  const k = state.quick, it = k ? itemByKey(k) : null;
+  if (!k || !it?.heal || it.use || !((state.bag?.[k] ?? 0) > 0) || !worldOk(it)) return;
+  if (useItem(k) === true) { renderQuick(); if (document.querySelector('.bag-panel')) renderBag(); }
+}
+setInterval(() => { if (state.hp !== undefined) autoHealCheck(state.hp, maxHp()); }, 400);
 (stanceBox.querySelector('.st-sword') as HTMLButtonElement).onclick = () => setStance(stance === 'hostile' ? 'all' : 'hostile');
 function setStance(s: Stance) {
   stance = s;
   world?.setStance(s);
   stanceBox.dataset.mode = s;
-  stanceBox.querySelector('small')!.textContent = s === 'talk' ? '' : t().stance[s];
+  stanceBox.querySelector('.st-sword small')!.textContent = s === 'talk' ? '' : t().stance[s];
   (stanceBox.querySelector('.st-sword') as HTMLElement).title = t().stance[s === 'talk' ? 'hostile' : s];
   (stanceBox.querySelector('.st-hand') as HTMLElement).title = t().stance.talk;
 }
@@ -4765,8 +4893,9 @@ function showStance(on: boolean) {
     save(state);
     setTimeout(() => toast(matchMedia('(pointer: coarse)').matches ? t().ctlHintTouch : t().ctlHintPc), 1800);
   }
-  stanceBox.classList.toggle('low', !!world?.low);
-  (stanceBox.querySelector('.st-low') as HTMLElement).title = t().lowLabel;
+  (stanceBox.querySelector('.st-pick') as HTMLElement).title = t().pickLabel;
+  (stanceBox.querySelector('.st-pick small') as HTMLElement).textContent = t().pickLabel;
+  (stanceBox.querySelector('.st-hand small') as HTMLElement).textContent = t().stance.talk;
   setStance(stance);
 }
 
@@ -4790,6 +4919,22 @@ function showStance(on: boolean) {
   });
   window.addEventListener('keyup', (e) => { if (held.delete(e.code)) push(); });
   window.addEventListener('blur', () => { if (held.size) { held.clear(); push(); } });
+  // 38차 PC 키 (영혼 설정에서 바꾼다): F1 상호작용 · F2 공격 태세 · F3 회복품 · F4 줍기
+  window.addEventListener('keydown', (e) => {
+    if (keyCapture) { e.preventDefault(); e.stopPropagation(); keyCapture(e.code); return; }
+    if (typing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+    const km = keyMap();
+    const act = KEY_ACTS.find((a) => km[a] === e.code);
+    if (!act) return;
+    e.preventDefault(); // F1 도움말 · F3 찾기 같은 브라우저 기본 동작을 막는다
+    if (scene !== 'world' || !world || stanceBox.hidden) return;
+    if (act === 'heal') { healAct(); return; }
+    if (busy || dlg.isOpen) return;
+    if (act === 'pick') { pickAct(); return; }
+    if (act === 'attack') { setStance(stance === 'talk' ? 'hostile' : 'talk'); return; }
+    if (stance !== 'talk') { setStance('talk'); return; }
+    world.interactKey();
+  }, true);
 }
 
 // ───────────────────────── 다른 사람 (실시간) ─────────────────────────

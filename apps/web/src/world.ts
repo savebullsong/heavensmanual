@@ -583,7 +583,6 @@ export class WorldScene {
     else if (this.realm === 'heaven') this.setupHeaven();
     else {
       this.setupCityHaze();
-      this.setupBankSigns(); // 33차
       for (let n = 0; n < PED_COUNT; n++) this.spawnNpc('passer');
       // 21차: 거리의 적은 구역 위험도대로 뽑는다 (rollThug). 수는 그대로(14)
       for (let n = 0; n < (this.realm === 'real' ? THUG_COUNT + DRUNK_COUNT + ROBBER_COUNT + MAFIA_COUNT : THUG_COUNT); n++) this.spawnNpc('thug');
@@ -4175,6 +4174,33 @@ export class WorldScene {
     const { wx, wy } = this.toWorld(gx, gy);
     return Math.hypot(wx - this.talkIcon.x, wy - this.talkIcon.y) < (this.touchTap ? 24 : 16);
   }
+  /** 38차 키(F1 상호작용): 문 아이콘이 떠 있으면 들어가고, 말풍선이 떠 있으면 말을 건다. 할 것이 없으면 false */
+  interactKey(): boolean {
+    if (this.dead) return false;
+    if (this.door.visible && this.doorFor !== null) { this.interact(this.doorFor); return true; }
+    if (this.nearFor) { this.interactNear(this.nearFor); return true; }
+    return false;
+  }
+  /**
+   * 38차 줍기 단추(F4): 가까운 돈과 물건만 — 팔 닿는 곳(1.4칸)은 곧바로 줍고, 3.5칸 안에 있으면 가장 가까운 것까지 걸어가 줍는다.
+   * 남이 노리는 돈(소매치기가 집으려는 것)은 건드리지 않는다
+   */
+  pickNearby(): 'got' | 'walk' | 'none' {
+    const p = this.player;
+    if (this.dead || this.realm === 'ghost') return 'none';
+    let got = 0, best: { x: number; y: number } | null = null, bd = 3.5;
+    const take = (o: { x: number; y: number }) => {
+      const d = Math.hypot(o.x - p.x, o.y - p.y);
+      if (d < 1.4) { o.x = p.x; o.y = p.y; got++; } // 다음 장면에서 발밑의 것처럼 주워진다
+      else if (d < bd) { bd = d; best = o; }
+    };
+    for (const c of this.coins) if (!c.claimed) take(c);
+    for (const l of this.loots) take(l);
+    if (got) return 'got';
+    const b = best as { x: number; y: number } | null;
+    if (b) { this.cancelActs(); if (this.walkTo(Math.floor(b.x), Math.floor(b.y))) { this.rippleAt(Math.floor(b.x), Math.floor(b.y)); return 'walk'; } }
+    return 'none';
+  }
   /** 말풍선: 점원이면 계산대로, 그 밖엔 말 걸기 */
   private interactNear(w: Walker) {
     this.focusW = w;
@@ -4375,32 +4401,78 @@ export class WorldScene {
     this.setGuide(best);
     return true;
   }
-  /** 33차: 은행 건물 지붕 위 금빛 간판 — 멀리서도 보이게 (현실 거리만) */
-  private bankSigns: { o: Container; y: number; k: number }[] = [];
-  private setupBankSigns() {
-    if (this.realm !== 'real' || this.zone.interior || this.zone.hell) return;
-    this.zone.buildings.forEach((b, k) => {
-      if (roomKindOf(b) !== 'bank') return;
-      const o = new Container();
-      o.eventMode = 'none';
-      const g = new Graphics();
-      // 금테 두른 검푸른 판 + 기둥 넷 박공 지붕 그림
-      g.roundRect(-30, -24, 60, 34, 5).fill({ color: 0x14233a }).stroke({ color: 0xf2d27a, width: 2 });
-      g.poly([-12, -12, 0, -19, 12, -12]).fill({ color: 0xf2d27a });
-      for (const x of [-10, -4, 2, 8]) g.rect(x, -11, 2.5, 8).fill({ color: 0xf2d27a });
-      g.rect(-12, -3, 24, 2).fill({ color: 0xf2d27a });
-      g.poly([-5, 10, 5, 10, 0, 17]).fill({ color: 0xf2d27a }).stroke({ color: 0x14233a, width: 1 });
-      const tx = new Text({ text: t().bankSign, style: { fontFamily: 'system-ui, sans-serif', fontSize: 10, fontWeight: '800', fill: '#ffe9a8', letterSpacing: 1 } });
-      tx.anchor.set(0.5, 0.5); tx.position.set(0, 4);
-      o.addChild(g, tx);
-      const [x, y0] = iso(b.i0 + b.w / 2, b.j0 + b.d / 2);
-      const y = y0 - Math.min(b.h, 160) - 30;
-      o.position.set(x, y);
-      o.zIndex = 9e5 - 1;
-      this.objects.addChild(o);
-      this.cullAdd(o, x - 34, y - 30, x + 34, y + 22);
-      this.bankSigns.push({ o, y, k });
-    });
+  // ───────── 38차 상점 알림 화살표 (33차 은행 지붕 간판을 대신한다) ─────────
+  // 가게 문 가까이(6칸) 오면 그 문 위에 이름과 아래 화살표가 잠깐(3초 남짓) 떴다 사라진다. 멀리(10칸) 갔다 다시 오면 또.
+  // 문 앞에 서서 출입 아이콘이 뜨면 그 가게의 화살표는 감춘다 (같은 것을 두 번 보이지 않게). 영혼 설정에서 끈다
+  private shopPing = (() => { try { return localStorage.getItem('heavensmanual.shopping') !== '0'; } catch { return true; } })();
+  setShopPing(v: boolean) { this.shopPing = v; if (!v) { for (const pg of this.pings.values()) pg.o.destroy({ children: true }); this.pings.clear(); } }
+  private pings = new Map<number, { o: Container; t: number; y: number }>();
+  private pingSeen = new Map<number, number>();
+  private pingScanT = 0;
+  private pingDoor(k: number): [number, number] | null {
+    if (k === -1) return [this.zone.door.i + 0.5, this.zone.door.j];
+    const b = this.zone.buildings[k];
+    const f = this.frontCached(k);
+    if (!b || !f) return null;
+    return b.sign === 'right' ? [b.i0 + b.w, f[1] + 0.5] : [f[0] + 0.5, b.j0 + b.d];
+  }
+  private pingable(k: number) {
+    const b = this.zone.buildings[k];
+    if (!b) return false;
+    const hellDoor = b.cat === 'loan' || b.cat === 'hbank' || b.cat === 'atone' || b.cat === 'rebirth';
+    return hellDoor || !(this.zone.hell || b.cat === 'ujusae' || !interactive(b) || (!canEnter(b) && !storeOf(b) && !canWork(b) && !hasBank(b)));
+  }
+  private makePing(k: number, at: [number, number]) {
+    const L = t();
+    const b = k >= 0 ? this.zone.buildings[k] : null;
+    const bank = !!b && (roomKindOf(b) === 'bank' || hasBank(b));
+    let name = k === -1 ? (this.zone.hell ? L.hellShop : L.shopLabel) : this.nameOf(b!);
+    if (!name) return;
+    if (name.length > 16) name = name.slice(0, 15) + '…';
+    const o = new Container();
+    o.eventMode = 'none';
+    const tx = new Text({ text: name, style: { fontFamily: 'system-ui, sans-serif', fontSize: 10, fontWeight: '800', fill: bank ? '#ffe9a8' : '#fff3d0' } });
+    tx.anchor.set(0.5, 0.5);
+    const w = Math.ceil(tx.width) + 14;
+    const g = new Graphics();
+    g.roundRect(-w / 2, -9, w, 18, 5).fill({ color: bank ? 0x14233a : 0x18120c, alpha: 0.92 }).stroke({ color: bank ? 0xf2d27a : 0xe0b437, width: 1.5 });
+    g.poly([-5, 9, 5, 9, 0, 16]).fill({ color: bank ? 0xf2d27a : 0xe0b437 });
+    g.poly([-3, 18, 3, 18, 0, 22]).fill({ color: bank ? 0xf2d27a : 0xe0b437, alpha: 0.7 });
+    o.addChild(g, tx);
+    const [x, y0] = iso(at[0], at[1]);
+    const y = y0 - 66;
+    o.position.set(Math.round(x), y);
+    o.zIndex = 9e5 - 1;
+    o.alpha = 0;
+    this.objects.addChild(o);
+    this.pings.set(k, { o, t: 0, y });
+  }
+  private updatePings(dt: number, p: Walker) {
+    const LIFE = 3.4;
+    for (const [k, pg] of this.pings) {
+      pg.t += dt;
+      const a = pg.t < 0.25 ? pg.t / 0.25 : pg.t > LIFE - 0.6 ? Math.max(0, (LIFE - pg.t) / 0.6) : 1;
+      pg.o.alpha = a;
+      pg.o.visible = a > 0 && this.doorFor !== k;
+      pg.o.y = pg.y + Math.sin(this.time * 4 + k) * 1.5 - (1 - Math.min(1, pg.t / 0.25)) * 6;
+      if (pg.t > LIFE) { pg.o.destroy({ children: true }); this.pings.delete(k); }
+    }
+    if (!this.shopPing || this.dead || this.zone.interior || this.realm === 'ghost') return;
+    this.pingScanT -= dt;
+    if (this.pingScanT > 0) return;
+    this.pingScanT = 0.3;
+    const cands = [...this.bViews.keys()].filter((k) => k >= 0 && this.pingable(k));
+    if (this.zone.shop !== false) cands.push(-1);
+    for (const k of cands) {
+      const dp = this.pingDoor(k);
+      if (!dp) continue;
+      const d = Math.hypot(dp[0] - p.x, dp[1] - p.y);
+      const last = this.pingSeen.get(k);
+      if (d > 10) { if (last !== undefined && this.time - last > 20) this.pingSeen.delete(k); continue; }
+      if (d > 6.5 || last !== undefined || this.pings.has(k)) continue;
+      this.pingSeen.set(k, this.time);
+      this.makePing(k, dp);
+    }
   }
   setGuide(k: number) {
     const b = this.zone.buildings[k];
@@ -5714,6 +5786,8 @@ export class WorldScene {
         const path = findPath(this.zone, Math.floor(w.x), Math.floor(w.y), Math.floor(tg.x), Math.floor(tg.y));
         if (path) w.path = path.length > 1 ? path.slice(0, -1) : path;
       }
+      // 38차: 같은 칸(길이 비어 나온다)이나 막힌 칸에 선 상대에게는 곧장 다가간다 — 둘 다 사거리 밖에서 멈춰 서던 것
+      if (!w.path.length) this.closeIn(w, tg, dt, reach);
       return;
     }
     if (!kiting) w.path = [];
@@ -5739,6 +5813,19 @@ export class WorldScene {
       const dmg = Math.max(1, Math.round(base) - (tg.isPlayer ? this.gear.dr ?? 0 : 0));
       this.startAttack(w, tg, dmg);
     }
+  }
+
+  /** 38차: 길 찾기로 닿지 않는 거리(같은 칸의 반대쪽 귀퉁이 등)에서는 상대 쪽으로 곧장 몇 걸음 */
+  private closeIn(w: Walker, tg: Walker, dt: number, reach: number) {
+    const sp = w.speed;
+    if (!sp || w.down > 0 || (w.act && w.act.anim === 'fall')) return;
+    const dx = tg.x - w.x, dy = tg.y - w.y, d = Math.hypot(dx, dy);
+    const step = Math.min(d - reach * 0.8, sp * dt);
+    if (step <= 0) return;
+    const nx = w.x + (dx / d) * step, ny = w.y + (dy / d) * step;
+    if (!walkable(this.zone, Math.floor(nx), Math.floor(ny))) return;
+    w.x = nx; w.y = ny;
+    w.dir = dirFromTile(dx, dy, w.dir, !!w.cs?.eight);
   }
 
   /** 공격 동작을 시작하고, 무기가 닿는 장면에서 피해를 준다 */
@@ -6130,6 +6217,7 @@ export class WorldScene {
     this.updateKeys();
     this.drawFx(dt);
     this.updateDoor(p);
+    this.updatePings(dt, p); // 38차 상점 알림 화살표
     if (this.loots.length) this.updateLoot(dt); // 26차: 현실에서도 줍는다 (지옥에서만 돌던 탓에 야구 배트가 주워지지 않았다)
     if (this.zone.hell) this.edgeWalk(p, dt);
     // 위험 상태: 화면 가장자리가 붉게 뛴다
@@ -6148,7 +6236,6 @@ export class WorldScene {
     this.updateGoatFx(dt); // 33차
     this.updateChimney(dt); // 34차
     this.updateBeyondLife(dt);
-    for (const bs of this.bankSigns) if (bs.o.visible) bs.o.y = bs.y + Math.sin(this.time * 2.2 + bs.k) * 2.5; // 33차: 은행 간판이 살짝 떠 있다
     if (this.gjob) {
       const { key, job } = this.gjob;
       if (job.step(this.gjob.vis ? 14 : 5)) {

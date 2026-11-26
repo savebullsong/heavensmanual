@@ -166,7 +166,7 @@ export function decodeZone(json: {
   for (let k = 0; k < json.codes.length; k++) map[json.codes.charCodeAt(k)] = TI[json.types[k] as TileType] ?? 0;
   const tiles = new Uint8Array(json.W * json.H);
   for (let k = 0; k < tiles.length; k++) tiles[k] = map[json.tiles.charCodeAt(k)];
-  const lanes = widenMainWalks(tiles, json.W, json.H, json.lanes);
+  const lanes = widenMainWalks(tiles, json.W, json.H, json.lanes, json.buildings);
   return finalize({ id: json.id, W: json.W, H: json.H, tiles, buildings: json.buildings, props: json.props, lanes, door: json.door, spawn: json.spawn, attribution: json.attribution, shop: json.shop ?? true, edges: json.edges, origin: json.origin, city: json.city, homeAlley: json.homeAlley, home: json.home });
 }
 
@@ -175,9 +175,29 @@ export function decodeZone(json: {
  * 칸마다(세로 줄) 보도↔보도 사이의 찻길 띠(8~26칸)를 찾아 가장 바깥 차로 한 줄씩을 보도로 바꾸고,
  * 그 줄을 달리던 차로는 지운다 (남은 찻길 위로만 차가 다닌다)
  */
-function widenMainWalks(tiles: Uint8Array, W: number, H: number, lanes: Lane[]): Lane[] {
-  const R = TI.road, M = TI.median, C = TI.cross, WK = TI.walk;
+function widenMainWalks(tiles: Uint8Array, W: number, H: number, lanes: Lane[], buildings: Building[] = []): Lane[] {
+  const R = TI.road, M = TI.median, C = TI.cross, WK = TI.walk, LOT = TI.lot;
   const isRoad = (v: number) => v === R || v === M || v === C;
+  // 38차: 찻길 한가운데 섬처럼 떠 있는 작은 보도 조각(지도의 건널목 선이 계단처럼 남은 것)은 찻길로 — 서울 대로의 '깨진 그림'
+  {
+    const seen = new Uint8Array(W * H);
+    for (let s0 = 0; s0 < W * H; s0++) {
+      if (tiles[s0] !== WK || seen[s0]) continue;
+      const comp: number[] = [s0]; seen[s0] = 1;
+      let closed = true;
+      for (let q = 0; q < comp.length; q++) {
+        const k = comp[q], i = k % W, j = (k - i) / W;
+        for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+          const ni = i + a, nj = j + b;
+          if (ni < 0 || nj < 0 || ni >= W || nj >= H) { closed = false; continue; }
+          const nk = nj * W + ni, v = tiles[nk];
+          if (v === WK) { if (!seen[nk]) { seen[nk] = 1; comp.push(nk); } }
+          else if (!isRoad(v)) closed = false;
+        }
+      }
+      if (closed && comp.length <= 40) for (const k of comp) tiles[k] = R;
+    }
+  }
   for (let i = 0; i < W; i++) {
     let j = 0;
     while (j < H) {
@@ -189,6 +209,43 @@ function widenMainWalks(tiles: Uint8Array, W: number, H: number, lanes: Lane[]):
       if (tiles[(a - 1) * W + i] !== WK || tiles[(b + 1) * W + i] !== WK) continue;
       for (const r of [a, b]) if (tiles[r * W + i] === R || tiles[r * W + i] === C) tiles[r * W + i] = WK;
     }
+  }
+  // 38차: 세로·비스듬한 대로(아속 몬뜨리 · 강남대로)도 — 줄마다(가로) 찻길 띠의 가장 바깥 한 칸씩을 보도로
+  for (let j = 0; j < H; j++) {
+    let i = 0;
+    while (i < W) {
+      if (!isRoad(tiles[j * W + i])) { i++; continue; }
+      const a = i;
+      while (i < W && isRoad(tiles[j * W + i])) i++;
+      const b = i - 1, len = b - a + 1;
+      if (len < 8 || len > 26 || a < 1 || b >= W - 1) continue;
+      if (tiles[j * W + a - 1] !== WK || tiles[j * W + b + 1] !== WK) continue;
+      for (const c of [a, b]) if (tiles[j * W + c] === R || tiles[j * W + c] === C) tiles[j * W + c] = WK;
+    }
+  }
+  // 38차: 연석 보도에서 건물 쪽 빈터(공터)로 두 칸까지 보도를 넓힌다 — 건물이 서 있는 칸은 건드리지 않는다
+  const foot = new Uint8Array(W * H);
+  for (const b of buildings) for (let j = Math.max(0, b.j0); j < Math.min(H, b.j0 + b.d); j++) for (let i = Math.max(0, b.i0); i < Math.min(W, b.i0 + b.w); i++) foot[j * W + i] = 1;
+  const N4: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  let front: number[] = [];
+  for (let j = 1; j < H - 1; j++) for (let i = 1; i < W - 1; i++) {
+    const k = j * W + i;
+    if (tiles[k] === WK && N4.some(([a, b]) => isRoad(tiles[(j + b) * W + i + a]))) front.push(k);
+  }
+  for (let pass = 0; pass < 2; pass++) {
+    const next: number[] = [];
+    for (const k of front) {
+      const i = k % W, j = (k - i) / W;
+      for (const [a, b] of N4) {
+        const ni = i + a, nj = j + b;
+        if (ni < 1 || nj < 1 || ni >= W - 1 || nj >= H - 1) continue;
+        const nk = nj * W + ni;
+        if (tiles[nk] !== LOT || foot[nk]) continue;
+        tiles[nk] = WK;
+        next.push(nk);
+      }
+    }
+    front = next;
   }
   // 차로: 아직 찻길인 구간만 남긴다 (6칸 이상)
   const out: Lane[] = [];

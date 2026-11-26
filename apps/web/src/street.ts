@@ -496,7 +496,7 @@ export function drawGroundKit(z: Zone, i0: number, j0: number, clip?: { i0: numb
   g.imageSmoothingEnabled = false;
   const S = (x: number, y: number): [number, number] => { const [a, b] = iso(x, y); return [a - minX, b - minY]; };
   // 19차: 계단처럼 꺾이는 경계(풀밭·물·공터·보도·골목)는 모서리 반쪽을 이웃 땅 그림으로 덮어 비스듬한 선으로 · 연못 위 보도는 나무 다리
-  const SOFT: Record<string, number> = { water: 0, lot: 1, block: 1, park: 2, walk: 3, soi: 3 };
+  const SOFT: Record<string, number> = { water: 0, lot: 1, block: 1, park: 2, walk: 3, soi: 3, road: 4, median: 5 }; // 38차: 비스듬한 대로의 가장자리도 (강남대로 · 아속 몬뜨리)
   const bridge = (i: number, j: number) => groundAt(z, i, j) === 'walk' && [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([a, b]) => groundAt(z, i + a, j + b) === 'water').length >= 2;
   for (let j = j0; j < j1; j++)
     for (let i = i0; i < i1; i++) {
@@ -581,7 +581,17 @@ export function drawGroundKit(z: Zone, i0: number, j0: number, clip?: { i0: numb
     if (l.j < j0 - 1 || l.j > j1 || l.i1 < i0 || l.i0 >= i1) continue;
     const mid = Math.floor((Math.max(l.i0, i0) + Math.min(l.i1, i1 - 1)) / 2);
     const up = groundAt(z, mid, l.j - 1), down = groundAt(z, mid, l.j + 1);
-    if (up === 'road' || up === 'cross') line(l.j, l.i0, l.i1, 'rgba(225,222,212,0.85)', true);
+    if ((up === 'road' || up === 'cross') && (l.j & 1) === 0) { // 38차: 차선 점선은 두 줄에 하나 (한 칸마다 점선이 깔려 어지럽던 것 — 차는 모든 줄을 그대로 달린다)
+      // 38차: 큰 네거리(세로로 찻길이 길게 이어지는 칸)에서는 차선 점선을 끊는다 — 네거리 한가운데에 점선이 어지럽게 깔리던 것
+      const rd = (i: number, j: number) => { const g = groundAt(z, i, j); return g === 'road' || g === 'cross' || g === 'median'; };
+      const inter = (i: number) => { let n = 0; for (let d = 1; d <= 18 && rd(i, l.j - d); d++) n++; for (let d = 1; d <= 18 && rd(i, l.j + d); d++) n++; return n >= 30; };
+      let s = -1;
+      for (let i = Math.max(l.i0, i0 - 1); i <= Math.min(l.i1, i1) + 1; i++) {
+        const ok = i <= Math.min(l.i1, i1) && !inter(i);
+        if (ok && s < 0) s = i;
+        if (!ok && s >= 0) { line(l.j, s, i - 1, 'rgba(225,222,212,0.85)', true); s = -1; }
+      }
+    }
     else if (up === 'median') line(l.j, l.i0, l.i1, '#d8b63c', false);
     else if (up === 'walk') { line(l.j, l.i0, l.i1, '#8e877b', false, 3); line(l.j, l.i0, l.i1, '#c9c2b4', false, 1); }
     if (down === 'median') line(l.j + 1, l.i0, l.i1, '#d8b63c', false);

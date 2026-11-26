@@ -2,7 +2,7 @@
 // 가구점에서 산 가구는 따로 들고 다니지 않고, 가지고 있는 집에 저절로 놓인다 (같은 자리의 가구는 가장 좋은 것 하나만).
 // 통장과 같이, 집과 가구는 다음 생에도 남는다 (영혼 앞으로 된 등기).
 import type { Zone, Building, Furn } from './zone.ts';
-import { walkable } from './zone.ts';
+import { walkable, tileAt } from './zone.ts';
 import type { Lang } from './i18n.ts';
 
 export type EstateCity = 'bkk' | 'seoul';
@@ -79,9 +79,10 @@ export function furnishShowroom(W: number, H: number, put: (i: number, j: number
 }
 
 // ───────────────────────── 거리에 집과 가구점을 정한다 ─────────────────────────
-const NAMES: Record<EstateCity, { home: { n: string; nko: string; nth: string; nen: string }; furn: { n: string; nko: string; nth: string; nen: string } }> = {
-  bkk: { home: { n: 'The Asok Residence', nko: '더 아속 레지던스', nth: 'ดิ อโศก เรสซิเดนซ์', nen: 'The Asok Residence' }, furn: { n: 'Baan Living', nko: '반 리빙 가구', nth: 'บ้านลิฟวิ่ง', nen: 'Baan Living Furniture' } },
-  seoul: { home: { n: 'Yeoksam Central Heights', nko: '역삼 센트럴 하이츠', nth: 'ยอกซัม เซ็นทรัล ไฮทส์', nen: 'Yeoksam Central Heights' }, furn: { n: 'Nonhyeon Living', nko: '논현 리빙 가구', nth: 'นนฮยอน ลิฟวิ่ง', nen: 'Nonhyeon Living Furniture' } },
+type Nm = { n: string; nko: string; nth: string; nen: string };
+const NAMES: Record<EstateCity, { home: Nm; furn: Nm; tools: Nm }> = {
+  bkk: { home: { n: 'The Asok Residence', nko: '더 아속 레지던스', nth: 'ดิ อโศก เรสซิเดนซ์', nen: 'The Asok Residence' }, furn: { n: 'Baan Living', nko: '반 리빙 가구', nth: 'บ้านลิฟวิ่ง', nen: 'Baan Living Furniture' }, tools: { n: 'Sin Thai Hardware', nko: '신타이 철물점', nth: 'สินไทย ฮาร์ดแวร์', nen: 'Sin Thai Hardware' } },
+  seoul: { home: { n: 'Yeoksam Central Heights', nko: '역삼 센트럴 하이츠', nth: 'ยอกซัม เซ็นทรัล ไฮทส์', nen: 'Yeoksam Central Heights' }, furn: { n: 'Nonhyeon Living', nko: '논현 리빙 가구', nth: 'นนฮยอน ลิฟวิ่ง', nen: 'Nonhyeon Living Furniture' }, tools: { n: 'Yeoksam Hardware', nko: '역삼 철물점', nth: 'ร้านฮาร์ดแวร์ยอกซัม', nen: 'Yeoksam Hardware' } },
 };
 /** 건물 앞(간판 면)에 걸어 설 수 있는 칸이 있으면 그 면 */
 function openFace(z: Zone, b: Building): 'left' | 'right' | null {
@@ -112,5 +113,18 @@ export function designateHomes(z: Zone) {
     shop.b.cat = 'shop';
     shop.b.sign = shop.face!;
     shop.b.pois = [{ t: 'furniture', ...NAMES[city].furn }];
+  }
+  // 38차: 우주새에서 멀지 않은 큰길가에 철물점 하나 (무기 수리 — 미스 황이 길을 알려 준다)
+  const roadside = (x: (typeof free)[number]) => {
+    const b = x.b;
+    const [fi, fj, di, dj] = x.face === 'left' ? [b.i0 + Math.floor(b.w / 2), b.j0 + b.d, 0, 1] : [b.i0 + b.w, b.j0 + Math.floor(b.d / 2), 1, 0];
+    for (let k = 0; k <= 6; k++) { const t = tileAt(z, fi + di * k, fj + dj * k); if (t === 'road' || t === 'cross' || t === 'median') return true; }
+    return false;
+  };
+  const tools = free.filter((x) => x !== home && x !== shop && x.b.w * x.b.d >= 10 && x.b.w * x.b.d <= 110 && x.dist >= 5 && x.dist <= 50 && roadside(x)).sort((a, b) => Math.abs(a.dist - 14) - Math.abs(b.dist - 14) || a.k - b.k)[0];
+  if (tools) {
+    tools.b.cat = 'shop';
+    tools.b.sign = tools.face!;
+    tools.b.pois = [{ t: 'hardware', ...NAMES[city].tools }];
   }
 }

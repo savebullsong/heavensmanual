@@ -58,6 +58,7 @@ export function roomKind(b: Building): string {
   if (k === 'laundry' || b.cat === 'laundry') return 'laundry';
   if (['hotel', 'hostel', 'guest_house', 'apartment_hotel'].includes(k) || b.cat === 'hotel') return 'lobby';
   if (k === 'furniture') return 'furnshop'; // 35차 가구점
+  if (k === 'hardware' || k === 'doityourself') return 'hardware'; // 38차 철물점 (수리)
   if (k === 'amusement_arcade') return 'arcade'; // 35차 천국 오락실
   if (hasBank(b)) return 'bank';
   return 'shop';
@@ -69,7 +70,7 @@ export const REST_ROOMS = new Set(['home', 'myhome', 'temple', 'church', 'mosque
 const SIZE: Record<string, [number, number]> = {
   temple: [13, 11], church: [13, 11], mosque: [12, 11], gurdwara: [12, 11], bank: [12, 10], clinic: [12, 10], pharmacy: [9, 8],
   mart: [11, 9], food: [12, 10], cafe: [10, 9], bar: [10, 9], salon: [9, 8], massage: [10, 9], laundry: [9, 8], lobby: [11, 9], shop: [9, 8], loan: [10, 8],
-  hbank: [10, 8], atone: [11, 10], myhome: [14, 11], furnshop: [12, 10], arcade: [13, 10], rebirth: [31, 17], terrace: [23, 16], home: [11, 9], gym: [13, 11], dept: [26, 20], goatroom: [17, 17],
+  hbank: [10, 8], atone: [11, 10], myhome: [14, 11], furnshop: [12, 10], hardware: [12, 10], arcade: [13, 10], rebirth: [31, 17], terrace: [23, 16], home: [11, 9], gym: [13, 11], dept: [26, 20], goatroom: [17, 17],
 };
 const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   temple: { floor: 'temple', wall: '#e9dcc0', trim: '#a8322a' }, church: { floor: 'stone', wall: '#e8e2d4', trim: '#6b4a30' },
@@ -87,6 +88,7 @@ const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   home: { floor: 'jangpan', wall: '#e6dcc6', trim: '#7a5a3e' },
   myhome: { floor: 'wood', wall: '#ece4d6', trim: '#7a6450' }, // 35차 방콕 콘도 (서울 아파트는 아래에서 대리석)
   furnshop: { floor: 'wood', wall: '#e6ddd0', trim: '#5a4636' },
+  hardware: { floor: 'grey', wall: '#dcd6c8', trim: '#d8641e' }, // 38차 철물점: 시멘트 바닥 · 주황 띠
   arcade: { floor: 'dark', wall: '#241e3a', trim: '#c83ac8' }, // 24차 내 집: 누런 장판 · 바랜 벽지
   gym: { floor: 'rubber', wall: '#d6d8da', trim: '#c83a2a' },
   dept: { floor: 'marble', wall: '#ece6dc', trim: '#b08a4a' },
@@ -304,6 +306,16 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
       seats.push([mid - 1, 8], [mid, 8], [6, 7], [W - 9, 8], [10, 14], [W - 12, 14], [mid - 3, 12], [mid + 3, 12]);
       break;
     }
+    case 'hardware':
+      // 38차 철물점: 뒤 벽 구멍판에 걸린 공구 · 페인트 깡통 선반 · 계산대(주인) / 왼쪽 벽 목재·파이프 거치대와 사다리 /
+      // 가운데 수리 작업대(바이스 · 그라인더 · 고치던 칼)와 나사통 진열대 / 오른쪽 벽 밧줄·사슬·호스 감개, 빗자루 통 / 빨간 공구함
+      F(1, 1, 5, 1, 54, 'pegboard'); F(6, 1, 2, 1, 50, 'paintshelf');
+      F(8, 2, 3, 1, 22, 'counter', 8); clerk = { i: 9, j: 1 }; counter = { i: 9, j: 3 };
+      F(1, 3, 1, 3, 46, 'lumber'); F(1, 6, 1, 1, 52, 'ladder');
+      F(3, 4, 3, 1, 20, 'workbench'); F(3, 6, 3, 1, 30, 'binshelf');
+      F(x1, 4, 1, 2, 50, 'ropespool'); F(x1, y1 - 1, 1, 1, 30, 'brooms'); F(7, 5, 1, 1, 24, 'toolchest');
+      F(mid - 1, y1, 1, 1, 8, 'baskets');
+      break;
     default:
       // 19차 손질: 뒤 벽·왼쪽 벽 진열장, 가운데 진열 탁자 둘과 옷걸이, 거울, 입구 매트 앞 장바구니, 계산대(금전등록기)
       F(W - 5, 2, 3, 1, 22, 'counter', 8); clerk = { i: W - 4, j: 1 }; counter = { i: W - 4, j: 3 };
@@ -1333,6 +1345,114 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       break;
     }
     case 'mirror': B3(i + 0.7, j + 0.1, i1 - 0.05, j1 - 0.1, 0, h, '#6a5a4a'); faceL(i + 0.72, i1 - 0.07, 4, h - 4, night ? '#7a8aa0' : '#c8dce8'); poly([P(i + 0.8, j1, 10), P(i + 0.86, j1, 10), P(i + 0.95, j1, h - 8), P(i + 0.89, j1, h - 8)], '#f2f8ff', 0.6); break;
+    // ── 38차 철물점 ──
+    case 'pegboard': {
+      // 뒤 벽의 구멍판: 촘촘한 구멍, 걸린 공구(망치 · 스패너 · 톱 · 드라이버 · 펜치 · 줄자), 위의 주황 띠
+      const y = j + 0.16;
+      B3(i, j, i1, y, 4, h, '#b8946a');
+      const fl = (x0: number, x2: number, z0: number, z1: number, col: string) => poly([P(x0, y, z0), P(x2, y, z0), P(x2, y, z1), P(x0, y, z1)], col);
+      for (let z = 8; z < h - 7; z += 5) for (let x = i + 0.08; x < i1 - 0.05; x += 0.16) fl(x, x + 0.035, z, z + 1, '#6a5034');
+      fl(i, i1, h - 5, h, '#d8641e');
+      const kinds = ['hammer', 'wrench', 'saw', 'driver', 'pliers', 'tape'];
+      let k = 0;
+      for (let x = i + 0.14; x < i1 - 0.24; x += 0.34, k++) {
+        const z = k % 2 ? 10 : 25;
+        switch (kinds[k % kinds.length]) {
+          case 'hammer': fl(x + 0.08, x + 0.12, z, z + 13, '#8a5a2a'); fl(x, x + 0.22, z + 11, z + 15, '#4a4e56'); break;
+          case 'wrench': fl(x + 0.07, x + 0.11, z, z + 14, '#a8acb4'); fl(x + 0.03, x + 0.15, z + 12, z + 16, '#a8acb4'); fl(x + 0.07, x + 0.11, z + 14, z + 16, '#b8946a'); break;
+          case 'saw': poly([P(x, y, z + 14), P(x + 0.26, y, z + 4), P(x + 0.26, y, z + 2), P(x, y, z + 7)], '#c8ccd2'); fl(x - 0.03, x + 0.05, z + 5, z + 15, '#c83a2a'); break;
+          case 'driver': fl(x + 0.08, x + 0.11, z, z + 8, '#9aa0a8'); fl(x + 0.06, x + 0.13, z + 8, z + 15, k % 4 ? '#e8c02a' : '#c83a2a'); break;
+          case 'pliers': fl(x + 0.05, x + 0.08, z, z + 12, '#3a6ac8'); fl(x + 0.12, x + 0.15, z, z + 12, '#3a6ac8'); fl(x + 0.06, x + 0.14, z + 11, z + 15, '#8a8e96'); break;
+          case 'tape': fl(x + 0.02, x + 0.18, z + 3, z + 12, '#f2c42a'); fl(x + 0.07, x + 0.13, z + 6, z + 9, '#3a3a3a'); break;
+        }
+      }
+      break;
+    }
+    case 'paintshelf': {
+      // 페인트 깡통 선반: 철제 칸 셋 · 칸마다 색이 다른 깡통(흰 상표)
+      const y = j + 0.75;
+      B3(i, j, i1, j + 0.08, 0, h, '#6a6e74');
+      B3(i, j, i + 0.05, y, 0, h, '#7a7e84');
+      for (let z = 4; z < h - 8; z += 14) {
+        box(i + 0.05, j + 0.08, i1 - 0.05, y, z, z + 1.5, '#9a9ea4', '#5a5e64', '#4a4e54');
+        for (let x = i + 0.08, n = 0; x < i1 - 0.24; x += 0.24, n++) {
+          const col = ['#ece8dc', '#c83a2a', '#2a6aa8', '#3a9a5a', '#e8c02a', '#e87a2a'][(n + z) % 6];
+          box(x, y - 0.24, x + 0.2, y - 0.04, z + 1.5, z + 10, '#cfd2d6', col, mixHex(col, '#000000', 0.25));
+          poly([P(x + 0.03, y - 0.04, z + 4), P(x + 0.17, y - 0.04, z + 4), P(x + 0.17, y - 0.04, z + 7), P(x + 0.03, y - 0.04, z + 7)], '#f4f2ea');
+        }
+      }
+      B3(i1 - 0.05, j, i1, y, 0, h, '#7a7e84');
+      break;
+    }
+    case 'lumber': {
+      // 목재·파이프 거치대: 벽에 기대 선 각목과 합판 · 가로로 걸친 쇠파이프
+      B3(i, j, i + 0.12, j1, 0, h, '#5a4a3a');
+      for (let y = j + 0.08, n = 0; y < j1 - 0.12; y += 0.14, n++) {
+        const col = ['#c8a070', '#b88a58', '#d8b888', '#a87a48'][n % 4];
+        const top = h - 4 - ((n * 7) % 14);
+        box(i + 0.14, y, i + 0.34, y + 0.11, 0, top, mixHex(col, '#ffffff', 0.15), col, mixHex(col, '#000000', 0.2));
+      }
+      for (const z of [12, 28]) box(i + 0.36, j + 0.05, i + 0.46, j1 - 0.05, z, z + 3, '#d0d4da', '#9aa0a8', '#7a8088');
+      break;
+    }
+    case 'ladder': {
+      // 알루미늄 A자 사다리 (꼭대기 주황 발판)
+      const x0 = i + 0.25, x2 = i + 0.75;
+      for (const yy of [j + 0.22, j1 - 0.22]) { B3(x0, yy - 0.03, x0 + 0.05, yy + 0.03, 0, h, '#c8ccd2'); B3(x2 - 0.05, yy - 0.03, x2, yy + 0.03, 0, h - 2, '#b0b4ba'); }
+      for (let z = 9; z < h - 4; z += 9) box(x0, j + 0.2, x0 + 0.05, j1 - 0.2, z, z + 1.5, '#eef0f2', '#c8ccd2', '#a8acb2');
+      B3(x0 - 0.02, j + 0.16, x2 + 0.02, j1 - 0.16, h, h + 2, '#e8642a');
+      break;
+    }
+    case 'workbench': {
+      // 수리 작업대: 두꺼운 나무 상판 · 쇠 다리 · 아래 칸의 빨간 공구함 · 바이스 · 그라인더 · 고치던 칼과 줄
+      for (const [x, y] of [[i + 0.08, j + 0.1], [i1 - 0.14, j + 0.1], [i + 0.08, j1 - 0.16], [i1 - 0.14, j1 - 0.16]] as const) B3(x, y, x + 0.06, y + 0.06, 0, h - 3, '#4a4e56');
+      box(i + 0.1, j + 0.12, i1 - 0.1, j1 - 0.12, 5, 7, '#8a7a5a', '#6a5a40', '#5a4a34');
+      B3(i + 0.3, j + 0.25, i + 0.9, j1 - 0.25, 7, 14, '#c83a2a');
+      box(i, j, i1, j1, h - 3, h, '#c8a070', '#a87a48', '#8a6238');
+      B3(i1 - 0.42, j + 0.3, i1 - 0.1, j1 - 0.3, h, h + 6, '#3a5a8a'); B3(i1 - 0.47, j + 0.42, i1 - 0.42, j1 - 0.42, h + 1, h + 5, '#5a7aaa');
+      B3(i + 0.1, j + 0.3, i + 0.45, j1 - 0.3, h, h + 6, '#5a5e66'); box(i + 0.15, j + 0.24, i + 0.4, j + 0.32, h + 2, h + 10, '#9aa0a8', '#7a8088', '#6a7078');
+      poly([P(i + 0.85, j + 0.48, h + 0.5), P(i + 1.95, j + 0.4, h + 0.5), P(i + 2.0, j + 0.47, h + 0.5), P(i + 0.85, j + 0.6, h + 0.5)], '#dce0e6');
+      poly([P(i + 0.58, j + 0.46, h + 0.5), P(i + 0.85, j + 0.48, h + 0.5), P(i + 0.85, j + 0.6, h + 0.5), P(i + 0.58, j + 0.58, h + 0.5)], '#3a2a1a');
+      poly([P(i + 1.2, j + 0.72, h + 0.5), P(i + 1.7, j + 0.76, h + 0.5), P(i + 1.7, j + 0.81, h + 0.5), P(i + 1.2, j + 0.77, h + 0.5)], '#6a6e76');
+      break;
+    }
+    case 'binshelf': {
+      // 가운데 진열대: 나사·못·경첩을 담은 작은 플라스틱 통이 칸칸이 (위에 주황 가격표 띠)
+      B3(i + 0.05, j + 0.35, i1 - 0.05, j1 - 0.35, 0, h, '#8a8e94');
+      for (let z = 3; z < h - 4; z += 7) for (let x = i + 0.1, n = 0; x < i1 - 0.2; x += 0.2, n++) {
+        const col = ['#2a6aa8', '#c83a2a', '#e8c02a', '#3a9a5a'][(n + z) % 4];
+        box(x, j1 - 0.38, x + 0.17, j1 - 0.3, z, z + 5, mixHex(col, '#ffffff', 0.2), col, mixHex(col, '#000000', 0.25));
+      }
+      B3(i + 0.02, j + 0.33, i1 - 0.02, j1 - 0.33, h, h + 2, '#d8641e');
+      break;
+    }
+    case 'ropespool': {
+      // 밧줄·쇠사슬·호스 감개: 오른쪽 벽의 쇠막대에 큰 감개 셋
+      B3(i + 0.42, j + 0.05, i + 0.5, j1 - 0.05, 0, h, '#5a5e66');
+      const cols = ['#d8c08a', '#9aa0a8', '#2a8a4a'];
+      for (let n = 0; n < 3; n++) {
+        const y0 = j + 0.12 + (n * (d - 0.24)) / 3, y2 = y0 + (d - 0.24) / 3 - 0.06;
+        box(i + 0.15, y0, i + 0.75, y2, h - 30, h - 8, mixHex(cols[n], '#ffffff', 0.2), cols[n], mixHex(cols[n], '#000000', 0.2));
+        for (let z = h - 28; z < h - 9; z += 3) poly([P(i + 0.75, y0, z), P(i + 0.75, y2, z), P(i + 0.75, y2, z + 1), P(i + 0.75, y0, z + 1)], mixHex(cols[n], '#000000', 0.35));
+      }
+      break;
+    }
+    case 'brooms': {
+      // 빗자루·대걸레를 꽂은 파란 통
+      B3(i + 0.25, j + 0.25, i1 - 0.25, j1 - 0.25, 0, 10, '#2a6aa8');
+      for (const [dx, dy, c2] of [[0.35, 0.4, '#c8a070'], [0.55, 0.35, '#e8c02a'], [0.45, 0.6, '#c83a2a']] as const) {
+        B3(i + dx, j + dy, i + dx + 0.04, j + dy + 0.04, 8, h, '#8a6a4a');
+        B3(i + dx - 0.07, j + dy - 0.07, i + dx + 0.11, j + dy + 0.11, h - 5, h + 3, c2);
+      }
+      break;
+    }
+    case 'toolchest': {
+      // 바퀴 달린 빨간 공구함 (서랍 줄 · 은빛 손잡이)
+      B3(i + 0.1, j + 0.15, i1 - 0.1, j1 - 0.15, 2, h, '#c8282a');
+      for (let z = 6; z < h - 2; z += 5) { poly([P(i + 0.12, j1 - 0.15, z), P(i1 - 0.12, j1 - 0.15, z), P(i1 - 0.12, j1 - 0.15, z + 0.8), P(i + 0.12, j1 - 0.15, z + 0.8)], '#7a1418'); poly([P(i + 0.4, j1 - 0.15, z + 2), P(i1 - 0.4, j1 - 0.15, z + 2), P(i1 - 0.4, j1 - 0.15, z + 3), P(i + 0.4, j1 - 0.15, z + 3)], '#dce0e6'); }
+      for (const x of [i + 0.15, i1 - 0.2]) B3(x, j1 - 0.22, x + 0.05, j1 - 0.16, 0, 2, '#2a2a2a');
+      break;
+    }
     case 'baskets': for (let n = 0; n < 3; n++) B3(i + 0.2, j + 0.2, i1 - 0.2, j1 - 0.2, n * 2.5, n * 2.5 + 3, n % 2 ? '#c83a2a' : '#d84a3a'); break;
     case 'snackrack': B3(i + 0.3, j + 0.3, i1 - 0.3, j1 - 0.3, 0, h, '#5a5a5a'); for (let z = 6; z < h - 2; z += 6) for (let x = i + 0.32; x < i1 - 0.35; x += 0.12) faceL(x, x + 0.09, z, z + 4, pick(Math.floor(x * 17 + z))); break;
     case 'freezer': { B3(i + 0.05, j + 0.15, i1 - 0.05, j1 - 0.15, 0, h, '#e8ecee'); box(i + 0.1, j + 0.2, i1 - 0.1, j1 - 0.2, h, h + 1, night ? '#b8d8e8' : '#d2eef8', '#a8c8d8', '#98b8c8'); for (let x = i + 0.25; x < i1 - 0.2; x += 0.3) B3(x, j + 0.35, x + 0.2, j + 0.65, h - 6, h - 2, pick(Math.floor(x * 5))); break; }
