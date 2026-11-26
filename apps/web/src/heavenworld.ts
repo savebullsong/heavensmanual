@@ -142,27 +142,80 @@ export function drawHeavenGround(z: Zone, i0: number, j0: number, chunk: number)
     const a = S(i, j), b = S(i + 1, j), cc = S(i + 1, j + 1), d = S(i, j + 1);
     g.fillStyle = col; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(cc[0], cc[1]); g.lineTo(d[0], d[1]); g.closePath(); g.fill();
   };
+  // 37차: 네모 칸이 보이지 않게 — 종류마다 한 장의 바닥(경로)으로 칠하고, 세상 좌표에 묶인 부드러운 얼룩(몇 칸에 걸친 원형 번짐)으로
+  // 결을 낸다. 얼룩은 덩어리 경계 밖 몇 칸까지 그려 이웃 덩어리와 이어지게 한다
+  const h2 = (i: number, j: number, s2 = 0) => { const v = Math.sin(i * 127.1 + j * 311.7 + s2 * 74.7) * 43758.5453; return v - Math.floor(v); };
+  const paths: Record<string, Path2D> = { park: new Path2D(), walk: new Path2D(), lot: new Path2D(), water: new Path2D() };
+  const grow = 0.012; // 칸 사이 머리카락 틈이 생기지 않게 살짝 키운다
   for (let j = j0; j < j1; j++) for (let i = i0; i < i1; i++) {
     const t = at(i, j);
-    if (t === 'void') continue;
-    const n = ((i * 7 + j * 13) % 5) / 5;
-    if (t === 'park') quad(i, j, ['#dfeccc', '#d8e8c4', '#e4efd2', '#dbe9c8', '#e2eed0'][Math.floor(n * 5)]);
-    else if (t === 'walk') { quad(i, j, (i + j) % 2 ? '#fbfaf7' : '#ece8de'); }
-    else if (t === 'lot') quad(i, j, (i + j) % 2 ? '#f6ecd4' : '#eedfbc');
-    else if (t === 'water') quad(i, j, ((i * 3 + j) % 4) ? '#7ad4e8' : '#8adcee');
+    const pth = paths[t];
+    if (!pth) continue;
+    const a = S(i - grow, j - grow), b = S(i + 1 + grow, j - grow), cc = S(i + 1 + grow, j + 1 + grow), d = S(i - grow, j + 1 + grow);
+    pth.moveTo(a[0], a[1]); pth.lineTo(b[0], b[1]); pth.lineTo(cc[0], cc[1]); pth.lineTo(d[0], d[1]); pth.closePath();
   }
-  // 무늬: 잔디의 솜털 · 길의 금줄 · 물결 · 물가 타일 테두리
+  const SKIN: Record<string, { base: string; lite: string; dark: string; amt: number }> = {
+    park: { base: '#dcebc8', lite: '#f2f8e6', dark: '#bcd6a2', amt: 0.55 },
+    walk: { base: '#f5f2ea', lite: '#ffffff', dark: '#e2dccf', amt: 0.6 },
+    lot: { base: '#f1e3c2', lite: '#faf1dc', dark: '#e0cc9e', amt: 0.55 },
+    water: { base: '#7fd6ea', lite: '#b4ecf6', dark: '#62c2dc', amt: 0.5 },
+  };
+  const M = 4, STEP = 3;
+  for (const t of ['park', 'walk', 'lot', 'water'] as const) {
+    const sk = SKIN[t];
+    g.save();
+    g.clip(paths[t]);
+    g.fillStyle = sk.base;
+    g.fill(paths[t]);
+    for (let j = Math.floor((j0 - M) / STEP) * STEP; j < j1 + M; j += STEP) for (let i = Math.floor((i0 - M) / STEP) * STEP; i < i1 + M; i += STEP) {
+      const k = h2(i, j, t.length);
+      const [x, y] = S(i + h2(i, j, 3) * STEP, j + h2(i, j, 4) * STEP);
+      const rad = 46 + h2(i, j, 5) * 70;
+      const gr = g.createRadialGradient(x, y, 0, x, y, rad);
+      const col = k < 0.5 ? sk.lite : sk.dark;
+      gr.addColorStop(0, col);
+      gr.addColorStop(1, col + '00');
+      g.globalAlpha = sk.amt * (0.35 + Math.abs(k - 0.5));
+      g.fillStyle = gr;
+      g.beginPath(); g.ellipse(x, y, rad, rad * 0.5, 0, 0, Math.PI * 2); g.fill();
+    }
+    g.globalAlpha = 1;
+    // 잔 무늬 (칸 자리와 상관없이 흩뿌린다)
+    for (let j = j0; j < j1; j++) for (let i = i0; i < i1; i++) {
+      if (at(i, j) !== t) continue;
+      if (t === 'park') {
+        // 솜털 같은 풀 · 드문드문 작은 꽃
+        for (let q = 0; q < 4; q++) { const [x, y] = S(i + r(), j + r()); g.fillStyle = r() < 0.5 ? '#f8fcf0' : '#b2cc96'; g.fillRect(Math.round(x), Math.round(y), 1, 2); }
+        if (h2(i, j, 9) < 0.12) { const [x, y] = S(i + r(), j + r()); g.fillStyle = ['#ffffff', '#f6c8d8', '#f2e28a', '#d8c8f2'][Math.floor(h2(i, j, 10) * 4)]; g.fillRect(Math.round(x), Math.round(y), 2, 2); g.fillRect(Math.round(x) - 3, Math.round(y) + 1, 2, 2); }
+      } else if (t === 'walk') {
+        // 대리석 결: 가늘고 길게 휘는 잿빛 금
+        if (h2(i, j, 11) < 0.22) {
+          const [x, y] = S(i + r(), j + r());
+          g.strokeStyle = 'rgba(150,140,130,0.28)'; g.lineWidth = 0.7;
+          g.beginPath(); g.moveTo(x, y); g.bezierCurveTo(x + 14 * (r() - 0.3), y + 6 * r(), x + 30 * r(), y - 4 + 8 * r(), x + 44 * (r() - 0.1), y + 10 * (r() - 0.5)); g.stroke();
+        }
+      } else if (t === 'lot') {
+        for (let q = 0; q < 3; q++) { const [x, y] = S(i + r(), j + r()); g.fillStyle = r() < 0.5 ? 'rgba(255,250,236,0.8)' : 'rgba(196,168,112,0.35)'; g.fillRect(Math.round(x), Math.round(y), 1, 1); }
+      } else if (t === 'water') {
+        for (let q = 0; q < 2; q++) { const [x, y] = S(i + r(), j + r()); g.fillStyle = 'rgba(255,255,255,0.7)'; g.fillRect(Math.round(x), Math.round(y), 5, 1); }
+      }
+    }
+    g.restore();
+  }
+  // 경계: 흰 대리석 길 가장자리의 금줄 · 수영장 흰 타일 테두리 (네 면 모두)
+  const edge = (i: number, j: number, side: 0 | 1 | 2 | 3, col: string, w: number) => {
+    const pts = side === 0 ? [S(i, j), S(i + 1, j)] : side === 1 ? [S(i, j), S(i, j + 1)] : side === 2 ? [S(i, j + 1), S(i + 1, j + 1)] : [S(i + 1, j), S(i + 1, j + 1)];
+    g.strokeStyle = col; g.lineWidth = w; g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); g.lineTo(pts[1][0], pts[1][1]); g.stroke();
+  };
   for (let j = j0; j < j1; j++) for (let i = i0; i < i1; i++) {
     const t = at(i, j);
-    if (t === 'park') for (let k = 0; k < 3; k++) { const [x, y] = S(i + r(), j + r()); g.fillStyle = r() < 0.5 ? '#f6fbee' : '#c6dbb0'; g.fillRect(Math.round(x), Math.round(y), 2, 1); }
-    if (t === 'walk') {
-      if (at(i, j - 1) !== 'walk') { const a = S(i, j), b = S(i + 1, j); g.strokeStyle = '#d8b860'; g.lineWidth = 1; g.beginPath(); g.moveTo(a[0], a[1] + 0.5); g.lineTo(b[0], b[1] + 0.5); g.stroke(); }
-      if (at(i - 1, j) !== 'walk') { const a = S(i, j), b = S(i, j + 1); g.strokeStyle = '#d8b860'; g.lineWidth = 1; g.beginPath(); g.moveTo(a[0] + 0.5, a[1]); g.lineTo(b[0] + 0.5, b[1]); g.stroke(); }
-    }
-    if (t === 'water') {
-      for (let k = 0; k < 2; k++) { const [x, y] = S(i + r(), j + r()); g.fillStyle = 'rgba(255,255,255,0.7)'; g.fillRect(Math.round(x), Math.round(y), 5, 1); }
-      if (at(i, j - 1) !== 'water') { const a = S(i, j), b = S(i + 1, j); g.strokeStyle = '#ffffff'; g.lineWidth = 2; g.beginPath(); g.moveTo(a[0], a[1] + 1); g.lineTo(b[0], b[1] + 1); g.stroke(); }
-      if (at(i - 1, j) !== 'water') { const a = S(i, j), b = S(i, j + 1); g.strokeStyle = '#ffffff'; g.lineWidth = 2; g.beginPath(); g.moveTo(a[0] + 1, a[1]); g.lineTo(b[0] + 1, b[1]); g.stroke(); }
+    if (t !== 'walk' && t !== 'water') continue;
+    const nb: [number, number, 0 | 1 | 2 | 3][] = [[i, j - 1, 0], [i - 1, j, 1], [i, j + 1, 2], [i + 1, j, 3]];
+    for (const [a2, b2, sd] of nb) {
+      const o = at(a2, b2);
+      if (o === t || o === 'void') continue;
+      if (t === 'walk') edge(i, j, sd, 'rgba(216,184,96,0.85)', 1);
+      else edge(i, j, sd, '#ffffff', 2);
     }
   }
   // 섬 가장자리: 아래로 흘러내리는 구름 덩이 (앞쪽 두 면)

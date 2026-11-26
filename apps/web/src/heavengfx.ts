@@ -289,6 +289,110 @@ export function batWingTexture(color: number): Texture {
   batTex.set(color, Texture.from(c));
   return batTex.get(color)!;
 }
+/** 점 그림처럼: 반투명 가장자리를 자르고 한 점짜리 어두운 외곽선을 두른다 (2배 밀도 그림) */
+function crispen(g: CanvasRenderingContext2D, W: number, H: number, edge: [number, number, number]) {
+  const im = g.getImageData(0, 0, W, H), D = im.data;
+  for (let k = 3; k < D.length; k += 4) D[k] = D[k] < 110 ? 0 : 255;
+  const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && D[(y * W + x) * 4 + 3] > 0;
+  const out: number[] = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!solid(x, y) && (solid(x - 1, y) || solid(x + 1, y) || solid(x, y - 1) || solid(x, y + 1))) out.push(x, y);
+  for (let k = 0; k < out.length; k += 2) { const o = (out[k + 1] * W + out[k]) * 4; D[o] = edge[0]; D[o + 1] = edge[1]; D[o + 2] = edge[2]; D[o + 3] = 255; }
+  g.putImageData(im, 0, 0);
+}
+/**
+ * 37차 서큐버스의 박쥐 날개 (컨셉 그림): 어깨에서 솟은 팔뼈 끝(손목)에 작은 갈고리 발톱, 손가락뼈 넷이 부채처럼 펴지고
+ * 그 사이 막은 가장자리로 갈수록 어둡고 뼈 곁은 핏빛이 비친다. 막 끝은 뼈 사이마다 안으로 패였다.
+ * giveWings와 같은 기준점(가운데 · 높이의 62%) · 2배 밀도
+ */
+const succWingTex = new Map<string, Texture>();
+export function succWingTexture(membrane: number, bone: number): Texture {
+  const key = membrane + ':' + bone;
+  const hit = succWingTex.get(key);
+  if (hit) return hit;
+  const W = 150, H = 100, cx = W / 2, ay = Math.round(H * 0.62);
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d')!;
+  const rgb = (v: number) => [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+  const col = (v: number, k: number) => { const a = rgb(v); return `rgb(${a.map((x) => Math.min(255, Math.round(x * k))).join(',')})`; };
+  for (const sd of [-1, 1]) {
+    const S: [number, number] = [cx + sd * 6, ay - 6];
+    const Wr: [number, number] = [cx + sd * 30, ay - 46];
+    const F: [number, number][] = [[cx + sd * 66, ay - 54], [cx + sd * 72, ay - 26], [cx + sd * 62, ay - 2], [cx + sd * 40, ay + 14]];
+    const B: [number, number] = [cx + sd * 9, ay + 8];
+    // 막: 손목 → 손가락 끝마다 안으로 패인 물결 → 몸 쪽 아래
+    g.beginPath(); g.moveTo(...S); g.quadraticCurveTo(cx + sd * 12, ay - 40, ...Wr); g.lineTo(...F[0]);
+    const pts = [...F, B];
+    for (let k = 1; k < pts.length; k++) {
+      const a = pts[k - 1], b = pts[k];
+      const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+      g.quadraticCurveTo(mx + (Wr[0] - mx) * 0.32, my + (Wr[1] - my) * 0.32, b[0], b[1]);
+    }
+    g.closePath();
+    const gr = g.createRadialGradient(Wr[0], Wr[1], 4, Wr[0], Wr[1], 70);
+    gr.addColorStop(0, col(membrane, 1.35)); gr.addColorStop(0.45, col(membrane, 1.0)); gr.addColorStop(1, col(membrane, 0.62));
+    g.fillStyle = gr; g.fill();
+    // 뼈 곁으로 비치는 핏줄 (가는 밝은 줄)
+    g.lineCap = 'round';
+    for (const f of F) {
+      g.strokeStyle = col(membrane, 1.6); g.lineWidth = 1;
+      g.beginPath(); g.moveTo(Wr[0] + (f[0] - Wr[0]) * 0.15, Wr[1] + (f[1] - Wr[1]) * 0.15 + 3); g.lineTo(Wr[0] + (f[0] - Wr[0]) * 0.8, Wr[1] + (f[1] - Wr[1]) * 0.8 + 3); g.stroke();
+    }
+    // 손가락뼈 넷 (밑동이 굵고 끝이 가늘다)
+    for (const f of F) {
+      g.strokeStyle = col(bone, 1); g.lineWidth = 3.2;
+      g.beginPath(); g.moveTo(...Wr); g.lineTo(Wr[0] + (f[0] - Wr[0]) * 0.55, Wr[1] + (f[1] - Wr[1]) * 0.55); g.stroke();
+      g.lineWidth = 2; g.beginPath(); g.moveTo(Wr[0] + (f[0] - Wr[0]) * 0.5, Wr[1] + (f[1] - Wr[1]) * 0.5); g.lineTo(...f); g.stroke();
+      g.strokeStyle = col(bone, 1.9); g.lineWidth = 0.9;
+      g.beginPath(); g.moveTo(Wr[0], Wr[1] - 1); g.lineTo(Wr[0] + (f[0] - Wr[0]) * 0.5, Wr[1] + (f[1] - Wr[1]) * 0.5 - 1); g.stroke();
+    }
+    // 팔뼈 (어깨 → 손목) + 손목 마디 + 갈고리 발톱
+    g.strokeStyle = col(bone, 1); g.lineWidth = 5.5;
+    g.beginPath(); g.moveTo(...S); g.quadraticCurveTo(cx + sd * 12, ay - 40, ...Wr); g.stroke();
+    g.strokeStyle = col(bone, 1.8); g.lineWidth = 1.4;
+    g.beginPath(); g.moveTo(S[0], S[1] - 2); g.quadraticCurveTo(cx + sd * 11, ay - 42, Wr[0], Wr[1] - 2); g.stroke();
+    g.fillStyle = col(bone, 1.25); g.beginPath(); g.arc(Wr[0], Wr[1], 3.6, 0, Math.PI * 2); g.fill();
+    g.fillStyle = col(bone, 2.2); // 손목의 작은 갈고리 발톱 (뿔로 보이지 않게 작고 어둡게)
+    g.beginPath(); g.moveTo(Wr[0] - sd * 1.5, Wr[1] - 2); g.quadraticCurveTo(Wr[0] + sd * 1, Wr[1] - 6, Wr[0] + sd * 5, Wr[1] - 6.5); g.lineTo(Wr[0] + sd * 2, Wr[1] - 1); g.closePath(); g.fill();
+  }
+  const e = rgb(bone);
+  crispen(g, W, H, [Math.round(e[0] * 0.35), Math.round(e[1] * 0.3), Math.round(e[2] * 0.3)]);
+  const t = Texture.from(c);
+  t.source.scaleMode = 'nearest';
+  succWingTex.set(key, t);
+  return t;
+}
+/** 37차 서큐버스의 꼬리: 허리 뒤에서 나와 옆으로 늘어지며 S자로 휘고, 무릎께에서 끝이 살짝 들린 스페이드 (기준점 = 왼쪽 위 밑동 (0.08, 0.14)) */
+const spadeTex = new Map<string, Texture>();
+export const SPADE_ANCHOR: [number, number] = [0.08, 0.14];
+export function spadeTailTexture(color: number, tip: number): Texture {
+  const key = color + ':' + tip;
+  const hit = spadeTex.get(key);
+  if (hit) return hit;
+  const W = 76, H = 60;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d')!;
+  const hx = (v: number, k = 1) => `rgb(${[(v >> 16) & 255, (v >> 8) & 255, v & 255].map((x) => Math.min(255, Math.round(x * k))).join(',')})`;
+  const curve = () => { g.beginPath(); g.moveTo(6, 8); g.bezierCurveTo(20, 6, 22, 30, 34, 38); g.bezierCurveTo(44, 45, 52, 46, 58, 40); };
+  g.lineCap = 'round';
+  curve(); g.strokeStyle = hx(color); g.lineWidth = 4.4; g.stroke();
+  g.beginPath(); g.moveTo(8, 6.5); g.bezierCurveTo(20, 5, 22, 28, 34, 35.5); g.strokeStyle = hx(color, 1.8); g.lineWidth = 1.1; g.stroke();
+  // 스페이드: 끝이 오른쪽 위를 본다
+  g.save(); g.translate(61, 36); g.rotate(-0.75);
+  g.fillStyle = hx(tip);
+  g.beginPath(); g.arc(-1, -4.2, 4.6, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.arc(-1, 4.2, 4.6, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.moveTo(-3, -8); g.lineTo(12, 0); g.lineTo(-3, 8); g.closePath(); g.fill();
+  g.beginPath(); g.moveTo(-8, -1.5); g.lineTo(-2, -1.5); g.lineTo(-2, 1.5); g.lineTo(-8, 1.5); g.closePath(); g.fill();
+  g.fillStyle = hx(tip, 1.7); g.beginPath(); g.arc(-2, -5, 1.7, 0, Math.PI * 2); g.fill();
+  g.restore();
+  crispen(g, W, H, [16, 6, 8]);
+  const t = Texture.from(c);
+  t.source.scaleMode = 'nearest';
+  spadeTex.set(key, t);
+  return t;
+}
 /** 22차: 머리 위의 작은 뿔 한 쌍 */
 const hornTex = new Map<number, Texture>();
 /** 33차: 악마 꼬리 — 허리에서 나와 S자로 휘다가 끝이 세모(스페이드) (2배 크기, 반으로 줄여 쓴다 · 기준점 = 왼쪽 밑동) */

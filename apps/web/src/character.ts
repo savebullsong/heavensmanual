@@ -9,7 +9,7 @@ export const FOOT_Y = 46;
 
 export type Sex = 'f' | 'm';
 export type Facing = 'front' | 'back';
-export type Outfit = 'casual' | 'apron' | 'raincoat' | 'patient' | 'parrot' | 'suturer' | 'stitched' | 'ash' | 'pret' | 'yak' | 'bones' | 'besk' | 'cockatoo' | 'warden1' | 'warden2' | 'warden3' | 'talus' | 'serane' | 'robber' | 'mafia' | 'ashgal' | 'gurma' | 'cinder' | 'bloat' | 'glutton' | 'hawker' | 'debtor' | 'broker' | 'forgeknight';
+export type Outfit = 'casual' | 'apron' | 'raincoat' | 'patient' | 'parrot' | 'suturer' | 'stitched' | 'ash' | 'pret' | 'yak' | 'bones' | 'besk' | 'cockatoo' | 'warden1' | 'warden2' | 'warden3' | 'talus' | 'serane' | 'robber' | 'mafia' | 'ashgal' | 'gurma' | 'cinder' | 'bloat' | 'glutton' | 'hawker' | 'debtor' | 'broker' | 'forgeknight' | 'succubus' | 'accubus'; // 37차: 서큐버스 · 아큐버스 (드레스 · 머리 · 뿔/고리를 몸에 함께 구운 3D 몸)
 export interface Look {
   sex: Sex;
   build: number; // 0 마름 · 1 보통 · 2 건장

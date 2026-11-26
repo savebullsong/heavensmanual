@@ -8,7 +8,7 @@ import { vendorGear, hasVendorGear, VGEAR_FOOT } from './vendorgear.ts';
 import { drawDalHouse } from './dalgfx.ts';
 import { drownedCanvas, monkLook, shoreF, shoreLine, shoreSkyCanvas, drawShoreChunk, capeRocks, drawCapeRock } from './border.ts';
 import { drawHeavenGround, drawHeavenPalace, drawAttraction, heavenMeta } from './heavenworld.ts';
-import { wingTexture, cloudTexture, heavenVignette, cloudStairTexture, heavenTowerTexture, terraceSkyTexture, hellPortalTexture, bedTexture, BED_ANCHOR, batWingTexture, hornTexture, devilTailTexture, demonArmTexture, ARM_PIVOT } from './heavengfx.ts';
+import { wingTexture, cloudTexture, heavenVignette, cloudStairTexture, heavenTowerTexture, terraceSkyTexture, hellPortalTexture, bedTexture, BED_ANCHOR, batWingTexture, hornTexture, devilTailTexture, succWingTexture, spadeTailTexture, SPADE_ANCHOR, demonArmTexture, ARM_PIVOT } from './heavengfx.ts';
 import { hellDecor } from './hellprops.ts';
 import { smithyChimney } from './hellbuild.ts';
 import { Application, ColorMatrixFilter, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture, TilingSprite } from 'pixi.js';
@@ -34,14 +34,25 @@ import { drawYuhwang } from './yuhwang.ts';
 import { drawLoanHouse, LOAN_TOP } from './loanhouse.ts';
 import { portraitUrl, type PortraitSlot } from './portraits.ts';
 
-/** 22차: 지옥 휴게소의 서큐버스 — 층마다 다른 모습 (1층 잿빛 살결·불씨 머리 · 2층 늪빛 살결·이끼 머리 · 3층 붉은 비단·금붙이) */
 /** 34차 4층 대장장이 칼드렉: 대머리 · 검게 그을린 살갗 · 그을린 가죽 앞치마 (팔 넷·뿔은 따로 붙인다) */
 const FERUM_LOOK: Look = { sex: 'm', build: 2, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: '#221a17', 10: '#221a17', 2: '#0a0706', 3: '#3a2416', 4: '#1a120e', 9: '#4a2e1a', 5: '#0a0706' } };
+/** 37차: 서큐버스를 사용자 컨셉 그림대로 새 3D 몸(드레스 · 긴 머리 · 감긴 뿔을 함께 구운 'succubus')으로 — 층마다 빛깔만 다르다
+ *  구역: 1 살 · 2 머리 · 3 코르셋 · 4 치마 · 5 신 · 6 눈 · 9 안감·끝동 · 12 보석 · 13 뿔 · 14 사슬 · 15 레이스
+ *  1층 — 컨셉 그대로 (보랏빛 검은 머리 · 검은 레이스 · 진홍 치마 · 은사슬 · 붉은 눈)
+ *  2층 — 늪의 밤빛 (포도주빛 치마 · 자줏빛 눈) · 3층 — 붉은 비단과 금사슬 · 4층 베르카 — 쇳빛 머리 · 그을린 가죽 · 쇠사슬 · 불씨 눈 */
+const SUCC = (c: Record<number, string>): Look => ({ sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'succubus', cols: { 5: '#120c10', 10: '#e8dcd0', ...c } });
 const SUCCUBUS_LOOK: Record<number, Look> = {
-  1: { sex: 'f', build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: '#a89c94', 10: '#a89c94', 2: '#e2622a', 3: '#1a1210', 4: '#1a1210', 9: '#a89c94', 5: '#0e0a08', 6: '#ffb02a' } },
-  2: { sex: 'f', build: 0, skin: 0, hair: 4, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: '#9cb08c', 10: '#9cb08c', 2: '#2e4a2a', 3: '#3a5a2a', 4: '#24301e', 9: '#9cb08c', 5: '#1a2214', 6: '#d8f05a' } },
-  4: { sex: 'f', build: 0, skin: 0, hair: 4, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: '#a8968a', 10: '#a8968a', 2: '#e8e2d8', 3: '#1a1412', 4: '#2a1a12', 9: '#a8968a', 5: '#ff8a1a' } }, // 24차: 4층 베르카 (쇳빛 머리·그을린 가죽)
-  3: { sex: 'f', build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: '#ecc8b8', 10: '#ecc8b8', 2: '#140a0a', 3: '#8a1020', 4: '#5a0a14', 9: '#ecc8b8', 5: '#c9a23e', 6: '#ff3a4a' } },
+  1: SUCC({ 1: '#ecd6d0', 2: '#2c1a34', 3: '#18121c', 4: '#8e1424', 6: '#ff2a3c', 9: '#4a0a16', 12: '#ff3a4e', 13: '#2a2028', 14: '#c8c4cc', 15: '#110c13' }),
+  2: SUCC({ 1: '#e2d2d6', 2: '#24162e', 3: '#151018', 4: '#5c1440', 6: '#ff3a8a', 9: '#300a24', 12: '#ff4aa0', 13: '#1e1a22', 14: '#a8a4b4', 15: '#0e0b12' }),
+  3: SUCC({ 1: '#f0d8cc', 2: '#1e1014', 3: '#1a0c0e', 4: '#a8101e', 6: '#ff2a2a', 9: '#5a0a12', 12: '#ff4a3a', 13: '#3a2420', 14: '#d8b048', 15: '#140a0c' }),
+  4: SUCC({ 1: '#cdb8ac', 2: '#8c8a90', 3: '#2a1a12', 4: '#5a2a16', 5: '#1a120c', 6: '#ff8a1a', 9: '#2a120a', 12: '#ff9a2a', 13: '#3a3030', 14: '#7a7470', 15: '#1a120c' }), // 24차: 4층 베르카
+};
+/** 37차: 층마다 날개 막 · 뼈 · 꼬리 · 꼬리 끝 빛깔 */
+const SUCC_WING: Record<number, [number, number, number, number]> = {
+  1: [0x3a0e1a, 0x1a1218, 0x5a1424, 0xb0182c],
+  2: [0x2e1030, 0x161018, 0x4a1840, 0x8a2068],
+  3: [0x5a0e18, 0x1e0e0e, 0x6a1018, 0xd0201e],
+  4: [0x3a2418, 0x1a120c, 0x4a2a1a, 0xd86a1a],
 };
 const SEOUL_CARS = ['sedan-white', 'sedan-white', 'sedan-black', 'sedan-silver', 'sedan-silver', 'sedan-blue', 'sedan-red', 'pickup', 'moto', 'bus'];
 /** 22차: 거리 사람 모습 묶음 (구역을 옮겨도 이어 쓴다) */
@@ -192,6 +203,8 @@ interface Walker {
   horns?: Sprite;
   /** 33차: 악마의 꼬리 (환전상) */
   devTail?: Sprite;
+  /** 37차: 꼬리가 나오는 높이 (발에서 위로 · 기본 17) */
+  tailY?: number;
   /** 31차: 마스크 소녀의 짐 — 몸 뒤(under)·앞(over)에 겹치는 화염방사기와 바구니 */
   pack?: { under: Sprite; over: Sprite; vend?: HellVendor };
   raider?: boolean; // 4층부터의 습격 때 마을로 몰려든 괴물
@@ -578,6 +591,13 @@ export class WorldScene {
       if (this.realm === 'real' && Math.random() < 0.7) this.spawnGoat(); // 24차: 떠도는 염소 (구역마다 있을 수도, 없을 수도)
       if (this.realm === 'real' && this.zone.home) this.placeYunae();
       if (this.realm === 'real' && this.zone.city !== 'seoul') this.spawnFieldBosses(); // 31차: 수쿰빗 필드 보스
+    }
+    if (this.zone.interior?.kind === 'home' && (this.zone.interior.age ?? 3) < 3) {
+      // 37차 회상: 바랜 사진처럼 누렇고 조금 어둡게
+      const cm = new ColorMatrixFilter();
+      cm.sepia(false);
+      cm.brightness(0.93, true);
+      this.camera.filters = [cm];
     }
     if (this.realm === 'ghost') {
       // 귀신: 세상이 잿빛으로. 돌아다니기만 하고 우주새 말고는 아무것도 만질 수 없다
@@ -1640,40 +1660,56 @@ export class WorldScene {
     };
     for (let n = 0; n < 3; n++) folk('admire');
     for (let n = 0; n < 2; n++) folk('chef');
-    // 35차 아큐버스: 천국 1층에만 산다. 내가 좋아할 얼굴의 이성 — 사람과 거의 같지만 눈동자에 옅은 빛이 돈다
+    // 35차 아큐버스: 천국 1층에만 산다. 내가 좋아할 얼굴의 이성
+    // 37차: 사용자 컨셉 그림대로 — 은빛 긴 머리 · 머리 위 금빛 고리 · 금실 무늬 흰 드레스와 별 브로치(남자는 금 영대를 건 흰 긴 옷) · 작은 흰 깃털 날개
     if (this.zone.heavenGen) for (let n = 0; n < 4; n++) {
       const s = randomWalkTileNear(this.zone, Math.floor(p.x), Math.floor(p.y), 26, ['walk', 'park', 'lot']);
       if (!s) continue;
       const r = (k: number) => Math.floor(Math.random() * k);
       const pick = <T,>(a: T[]) => a[r(a.length)];
-      const look: Look = Math.random() < 0.35 ? this.swimLook(mySex) : { sex: mySex, build: mySex === 'f' ? 0 : 1, skin: r(3), hair: mySex === 'f' ? pick([2, 3, 4]) : pick([0, 1]), hairColor: r(3), top: 0, bottom: 0, cols: { 3: pick(['#fbfaf6', '#f6e8ee', '#e8eef8', '#f2e6d6', '#1e1e22']), 4: pick(['#f2efe8', '#2a2a30', '#d8c8b0', '#e8e0f0']), 5: '#f2efe8' } };
+      const look: Look = { sex: mySex, build: 1, skin: r(3), hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'accubus', cols: { 2: pick(['#e8e6ee', '#dcdce8', '#efe8d6', '#e4dcef']), 3: pick(['#f8f4ec', '#f7eef0', '#eef2f8']), 4: '#fbf8f2', 5: '#e8dcc0', 6: pick(['#7ab8e8', '#e8c860', '#b08ae8']), 12: '#ffd65a', 14: '#e0b450' } };
       const w = this.makeWalker(look, s[0], s[1], 'passer');
       w.tail = { kind: 'accubus', t: 0, cool: 3 + Math.random() * 10, rep: 0 };
       w.speed = 1.25;
+      this.giveWings(w, 0xfbf8f2);
+      w.wingK = 0.8; // 천사보다 작은 날개
       this.walkers.push(w);
     }
     // 길가 침대와 편히 자는 사람들 (구역마다 같은 자리)
+    // 37차: 침대마다 꼭 한 사람, 매트리스 한가운데 — 침대끼리 붙지 않게 둘레 한 칸을 비우고, 침대 칸은 막아 지나가던 이가 올라서지 않게
     const hsh = (a: number) => { const v = Math.sin(a * 91.7 + this.zone.W * 3.1) * 43758.5; return v - Math.floor(v); };
-    let beds = 0;
-    for (let n = 0; n < 900 && beds < (this.zone.heavenGen ? 28 : 12); n++) { // 35차: 천국 1층은 곳곳에 침대
-      const i = Math.floor((e ? e.i0 : 0) + hsh(n) * ((e ? e.i1 - e.i0 : this.zone.W) - 2)), j = Math.floor((e ? e.j0 : 0) + hsh(n + 777) * ((e ? e.j1 - e.j0 : this.zone.H) - 2));
-      const tt = tileAt(this.zone, i, j);
-      if (!inside(i, j) || !['walk', 'park', 'lot'].includes(tt) || !walkable(this.zone, i, j) || !walkable(this.zone, i + 1, j) || !walkable(this.zone, i, j + 1)) continue;
-      const bed = beds % 3 !== 2;
-      if (bed) {
-        const sp = new Sprite(bedTexture(n));
-        sp.anchor.set(BED_ANCHOR[0], BED_ANCHOR[1]);
-        const [x, y] = iso(i, j);
-        sp.position.set(Math.round(x), Math.round(y));
-        sp.zIndex = i + j + 1.2;
-        this.objects.addChild(sp);
+    const zb = this.zone as Zone & { heavenBeds?: [number, number, number][] };
+    if (!zb.heavenBeds) {
+      const list: [number, number, number][] = [];
+      const taken = new Set<number>();
+      const key = (i: number, j: number) => j * this.zone.W + i;
+      for (let n = 0; n < 1400 && list.length < (this.zone.heavenGen ? 28 : 12); n++) { // 35차: 천국 1층은 곳곳에 침대
+        const i = Math.floor((e ? e.i0 : 0) + hsh(n) * ((e ? e.i1 - e.i0 : this.zone.W) - 2)), j = Math.floor((e ? e.j0 : 0) + hsh(n + 777) * ((e ? e.j1 - e.j0 : this.zone.H) - 2));
+        const tt = tileAt(this.zone, i, j);
+        if (!inside(i, j) || !['walk', 'park', 'lot'].includes(tt) || !walkable(this.zone, i, j) || !walkable(this.zone, i + 1, j) || !walkable(this.zone, i, j + 1) || !walkable(this.zone, i + 1, j + 1)) continue;
+        let clash = false;
+        for (let a2 = -1; a2 <= 2 && !clash; a2++) for (let c2 = -1; c2 <= 1; c2++) if (taken.has(key(i + a2, j + c2))) { clash = true; break; }
+        if (clash) continue;
+        for (let a2 = -1; a2 <= 2; a2++) for (let c2 = -1; c2 <= 1; c2++) taken.add(key(i + a2, j + c2));
+        list.push([i, j, n]);
       }
+      // 침대 두 칸은 걸어 들어가지 못한다 (구역 그림은 한 번 만들어 계속 쓰니 한 번만)
+      for (const [i, j] of list) for (const ii of [i, i + 1]) this.zone.blocked[j * this.zone.W + ii] = 1;
+      zb.heavenBeds = list;
+    }
+    for (const [i, j, n] of zb.heavenBeds) {
+      const sp = new Sprite(bedTexture(n));
+      sp.anchor.set(BED_ANCHOR[0], BED_ANCHOR[1]);
+      const [x, y] = iso(i, j);
+      sp.position.set(Math.round(x), Math.round(y));
+      sp.zIndex = i + j + 1.2;
+      this.objects.addChild(sp);
       const look = Math.random() < 0.3 ? this.swimLook(Math.random() < 0.5 ? 'm' : 'f') : this.npcLook('passer');
-      const sl = this.makeWalker(look, i + (bed ? 0 : 0), j, 'sleeper');
-      sl.still = 'lie'; sl.speed = 0; sl.wait = 1e9; sl.dir = bed ? 'se' : (['se', 'sw', 'ne', 'nw'] as const)[n % 4];
-      if (bed) { sl.x = i + 1.0; sl.y = j + 0.5; } // 매트리스 위
+      const sl = this.makeWalker(look, i, j, 'sleeper');
+      sl.still = 'lie'; sl.speed = 0; sl.wait = 1e9; sl.dir = 'se';
+      // 누운 그림은 발끝이 기준점이라 몸이 베개 쪽으로 쏠린다 — 매트리스 한가운데에 몸통이 오도록 발치 쪽으로 옮겨 둔다
+      sl.x = i + 1.3; sl.y = j + 0.33;
       this.walkers.push(sl);
-      beds++;
     }
     // 가게 앞 천사 (먹을 것을 판다) · 종교시설 앞 천사 (행사에 오라고 외친다)
     let nv = 0, np = 0;
@@ -1712,19 +1748,21 @@ export class WorldScene {
       }
     }
   }
-  /** 22차: 서큐버스 — 박쥐 날개와 뿔 (층마다 빛깔이 다르다) */
+  /** 22차 서큐버스 → 37차: 뿔은 몸에 함께 구웠다. 등에는 뼈와 발톱이 선 박쥐 날개, 허리 뒤로는 스페이드 꼬리 (층마다 빛깔이 다르다) */
   private dressSuccubus(w: Walker, floor: number) {
-    const wingCol = floor === 2 ? 0x2e3e2a : floor === 3 ? 0x5a0e18 : 0x2a2220;
-    const s = new Sprite(batWingTexture(wingCol));
+    const [mem, bone, tail, tip] = SUCC_WING[floor] ?? SUCC_WING[1];
+    const s = new Sprite(succWingTexture(mem, bone));
     s.anchor.set(0.5, 0.62);
     s.scale.set(0.5);
     this.objects.addChild(s);
     w.wings = s;
-    const hn = new Sprite(hornTexture(floor === 3 ? 0xd9b44a : floor === 2 ? 0xd8d0b8 : 0x2a1210));
-    hn.anchor.set(0.5, 1);
-    hn.scale.set(0.5);
-    this.objects.addChild(hn);
-    w.horns = hn;
+    w.wingK = 0.74; // 몸에 맞춘 크기 (컨셉: 어깨 너비의 두어 배)
+    const tl = new Sprite(spadeTailTexture(tail, tip));
+    tl.anchor.set(SPADE_ANCHOR[0], SPADE_ANCHOR[1]);
+    tl.scale.set(0.5);
+    this.objects.addChild(tl);
+    w.devTail = tl;
+    w.tailY = 25; // 드레스 허리 뒤에서 나와 옆으로 늘어진다
   }
   /** 따라오는 이(구애·요리사): 눈에 띄면 다가와 얼마쯤 곁을 따라다니며 말을 걸다 떠난다 */
   private thinkTail(w: Walker, moving: boolean, dt: number) {
@@ -2406,8 +2444,9 @@ export class WorldScene {
   }
   private wearGlasses(w: Walker) {
     const g = new Graphics();
-    g.circle(-2.2, 0, 1.6).stroke({ color: 0x1a1410, width: 0.8 }).circle(2.2, 0, 1.6).stroke({ color: 0x1a1410, width: 0.8 }).moveTo(-0.6, 0).lineTo(0.6, 0).stroke({ color: 0x1a1410, width: 0.6 });
-    g.circle(-2.2, 0, 1.2).fill({ color: 0xffffff, alpha: 0.25 }).circle(2.2, 0, 1.2).fill({ color: 0xffffff, alpha: 0.25 });
+    // 37차: 머리 꼭대기에 검은 띠처럼 보이던 것 — 눈높이로 내리고, 가는 금테 · 맑은 알로 (멀리서 검게 뭉치지 않게)
+    g.circle(-1.9, 0, 1.25).fill({ color: 0xffffff, alpha: 0.4 }).circle(1.9, 0, 1.25).fill({ color: 0xffffff, alpha: 0.4 });
+    g.circle(-1.9, 0, 1.25).stroke({ color: 0x8a6e3a, width: 0.5 }).circle(1.9, 0, 1.25).stroke({ color: 0x8a6e3a, width: 0.5 }).moveTo(-0.65, -0.1).lineTo(0.65, -0.1).stroke({ color: 0x8a6e3a, width: 0.45 });
     this.objects.addChild(g);
     w.glasses = g;
   }
@@ -2801,7 +2840,7 @@ export class WorldScene {
     this.grandpa = (info.kind === 'terrace' || info.kind === 'rebirth') && (this.forceGrandpa ?? Math.random() < 0.14);
     if (info.kind === 'goatroom' && info.clerk) { this.setupGoatFx(this.placeGoatKing(info.clerk.i, info.clerk.j)); this.placeChanger(13, 2); } // 32차: 뒤 모서리 흑요석 단 한가운데의 옥좌 · 33차: 오른쪽 벽가 환전 탁자 뒤의 환전상
     else if (info.clerk) {
-      const w = this.makeWalker(this.grandpa ? grandpaLook(info.kind === 'rebirth') : info.kind === 'home' ? yunaeLook(info.age ?? 1) : clerkLook(info.kind, info.from.b), info.clerk.i, info.clerk.j, 'clerk');
+      const w = this.makeWalker(this.grandpa ? grandpaLook(info.kind === 'rebirth') : info.kind === 'home' ? yunaeLook((info.age ?? 1) as 0 | 1 | 2) : clerkLook(info.kind, info.from.b), info.clerk.i, info.clerk.j, 'clerk');
       w.dir = 'sw';
       w.wait = 1e9;
       this.walkers.push(w);
@@ -4489,6 +4528,8 @@ export class WorldScene {
       if (k === -4) { this.cancelActs(); this.hooks.heavenAct('terrace'); return; } // 구름 계단 → 환생의 테라스
       if (k === -1 || this.zone.buildings[k]?.cat === 'ujusae') { this.hooks.heavenAct('shop'); return; }
       const hb = this.zone.buildings[k];
+      // 37차: 천국 1층(구름섬)의 가게·은행·호텔·오락실은 현실처럼 들어간다 (일자리는 없다 — 천국엔 돈이 모자랄 일이 없으니)
+      if (hb && this.zone.heavenGen) { if (canEnter(hb)) this.goEnter(k); return; }
       if (hb && ['food', 'cafe', 'mart'].includes(roomKindOf(hb))) this.hooks.heavenFood(this.nameOf(hb)); // 21차: 천국의 가게는 모두 열려 있다
       return;
     }
@@ -5858,7 +5899,7 @@ export class WorldScene {
       w.sprite.position.set(sx + sway + lx, sy + ly - (w.kind === 'goatking' ? GK_LIFT : 0)); // 32차: 염소대왕은 흑요석 단 위
       if (w.squashT && w.squashT > 0) { const q = w.squashT / 0.13; w.sprite.scale.x *= 1 + 0.16 * q; w.sprite.scale.y *= 1 - 0.13 * q; w.squashT -= dt; }
       w.sprite.zIndex = w.down > 0 ? w.x + w.y - 0.3 : w.x + w.y + (w.kind === 'goatking' ? 7.4 : 0) + (w.zb ?? 0); // 32차: 옥좌는 단의 앞 모서리보다 앞에 (단 위에 앉아 있다)
-      if (w.glasses) { const fr = w.dir === 'ne' || w.dir === 'nw' || w.dir === 'n'; w.glasses.visible = !fr && w.down <= 0 && w.sprite.visible; w.glasses.position.set(sx + (w.dir === 'sw' || w.dir === 'w' ? -2 : w.dir === 'se' || w.dir === 'e' ? 2 : 0), sy - 44.5 * (w.size ?? 1)); w.glasses.zIndex = w.x + w.y + 0.004; }
+      if (w.glasses) { const fr = w.dir === 'ne' || w.dir === 'nw' || w.dir === 'n'; w.glasses.visible = !fr && w.down <= 0 && w.sprite.visible; w.glasses.position.set(sx + (w.dir === 'sw' || w.dir === 'w' ? -1.5 : w.dir === 'se' || w.dir === 'e' ? 1.5 : 0), sy - (w.sprite.height * w.sprite.anchor.y - 5.5)); w.glasses.zIndex = w.x + w.y + 0.004; }
       if (w.pack?.vend) {
         // 31차: 장사꾼 차림 — 왼쪽 아래(sw)·오른쪽 아래(se)만 본다 (그림은 sw 기준, se는 좌우 뒤집기)
         if (w.dir !== 'sw' && w.dir !== 'se') w.dir = this.player.x - w.x - (this.player.y - w.y) >= 0 ? 'se' : 'sw';
@@ -5902,7 +5943,7 @@ export class WorldScene {
         const back = w.dir === 'ne' || w.dir === 'nw' || w.dir === 'n';
         const flip = w.dir === 'se' || w.dir === 'e' || w.dir === 'ne' ? -1 : 1;
         w.devTail.visible = w.down <= 0 && w.sprite.visible;
-        w.devTail.position.set(sx + flip * 5, sy - 17 * (w.size ?? 1));
+        w.devTail.position.set(sx + flip * 5, sy - (w.tailY ?? 17) * (w.size ?? 1));
         w.devTail.scale.set(0.5 * flip, 0.5);
         w.devTail.rotation = Math.sin(this.time * 2.1 + w.home[0]) * 0.22 * flip;
         w.devTail.zIndex = w.x + w.y + (back ? 0.004 : -0.004);

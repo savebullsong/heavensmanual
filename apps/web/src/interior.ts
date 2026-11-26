@@ -94,10 +94,10 @@ const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
 };
 
 /** 거리의 건물 k에 들어갈 때 방을 만든다 (같은 건물이면 늘 같은 방) */
-export function interiorZone(b: Building, k: number, out: { i: number; j: number }, name: string, yunaeAge?: 0 | 1 | 2, owned?: string[]): Zone {
+export function interiorZone(b: Building, k: number, out: { i: number; j: number }, name: string, yunaeAge?: 0 | 1 | 2 | 3, owned?: string[]): Zone {
   const kind = roomKind(b);
-  // 34차: 내 집 대문을 열면 그날의 유내가 있는 곳 — 10대 놀이터 · 20대 동네 미용실(일하는 중) · 30대 후반 진료실
-  const hAge = kind === 'home' ? (yunaeAge ?? (Math.floor(Math.random() * 3) as 0 | 1 | 2)) : undefined;
+  // 37차: 내 집은 한 곳(3 = 지금의 빈집). 가끔 대문을 열면 회상 — 10대 놀이터 · 20대 동네 미용실 · 30대 후반 진료실
+  const hAge = kind === 'home' ? (yunaeAge ?? 3) : undefined;
   const [W, H] = hAge === 0 ? [14, 12] : hAge !== undefined ? [10, 9] : kind === 'myhome' && b.estate === 'seoul' ? [16, 12] : SIZE[kind]; // 35차: 강남 아파트는 콘도보다 넓다
   const tiles = new Uint8Array(W * H);
   for (let j = 0; j < H; j++)
@@ -254,7 +254,12 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
       furnishShowroom(W, H, F);
       break;
     case 'home': {
-      if (hAge === 0) {
+      if (hAge === 3) {
+        // 37차 지금의 집: 달동네 단칸방 — 장판, 개어 둔 이불, 식은 밥상, 브라운관 TV, 자개 옷장, 낡은 냉장고. 아무도 없다
+        F(1, 1, 1, 2, 58, 'wardrobe'); F(3, 1, 2, 1, 50, 'shelf', 9); F(6, 1, 1, 1, 56, 'fridge');
+        F(x1, 3, 1, 1, 26, 'tv'); F(4, 4, 1, 1, 10, 'lowtable'); F(1, 4, 2, 3, 4, 'futon');
+        F(x1, 5, 1, 1, 46, 'mirror'); F(x1, y1, 1, 1, 12, 'plant', 1);
+      } else if (hAge === 0) {
         // 34차 놀이터 (해 질 녘): 그네 둘(하나에 유내) · 미끄럼틀 · 시소 · 정글짐 · 벤치 · 가로등
         F(2, 2, 4, 1, 46, 'swing'); F(8, 2, 2, 3, 40, 'slide'); F(8, 7, 3, 1, 12, 'seesaw'); F(2, 6, 2, 2, 34, 'jungle');
         F(2, y1 - 1, 2, 1, 14, 'pbench'); F(x1, 5, 1, 1, 92, 'plamp');
@@ -366,7 +371,7 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
   const look = kind === 'myhome' && b.estate === 'seoul' ? { floor: 'marble', wall: '#f2eee6', trim: '#9a8a6a' } : hAge === 0 ? { floor: 'sand', wall: '#b8b0a4', trim: '#6a6a66' } : hAge === 1 ? { floor: 'checker', wall: '#f2e6e0', trim: '#b85a74' } : hAge === 2 ? { floor: 'pale', wall: '#e6ecea', trim: '#3a8a7a' } : LOOKS[kind];
   const info: InteriorInfo = {
     // 28차: 내 집의 유내 — 거리에서 정해 둔 시절을 따른다. 20대(1)면 방은 비어 있다 (대문 앞에 나가 있거나, 그 사람 만나러 갔다)
-    kind, rest: REST_ROOMS.has(kind), name, ...look, exit, clerk: kind === 'myhome' ? undefined : clerk, counter: kind === 'myhome' ? undefined : counter, furn, age: hAge,
+    kind, rest: REST_ROOMS.has(kind), name, ...look, exit, clerk: kind === 'myhome' || hAge === 3 ? undefined : clerk, counter: kind === 'myhome' || hAge === 3 ? undefined : counter, furn, age: hAge,
     from: { b: k, out, bd: b }, store: kind === 'bank' ? 'bank' : kind === 'furnshop' ? 'furniture' : ['mart', 'pharmacy', 'food', 'cafe'].includes(kind) ? kind : streetSeller(b), cuisine: cuisineOf(b), seats: seats.filter(([i, j]) => tiles[j * W + i] === TI.walk),
   };
   return finalize({ id: `in-${k}`, W, H, tiles, buildings: [], props: [], lanes: [], door: exit, spawn: { i: exit.i, j: exit.j - 1 }, interior: info });
@@ -622,11 +627,31 @@ export function drawRoom(z: Zone, night: boolean): { canvas: HTMLCanvasElement; 
   // 바닥 (1..W-1 × 1..H-1)
   for (let j = 1; j < H - 1; j++)
     for (let i = 1; i < W - 1; i++) {
-      const alt = info.floor === 'prayer' ? j % 2 === 0 : info.floor === 'wood' || info.floor === 'dark' ? false : (i + j) % 2 === 0;
+      const alt = info.floor === 'prayer' ? j % 2 === 0 : info.floor === 'wood' || info.floor === 'dark' || info.floor === 'cloud' ? false : (i + j) % 2 === 0;
       poly([P(i, j, 0), P(i + 1, j, 0), P(i + 1, j + 1, 0), P(i, j + 1, 0)], alt ? fb : fa);
       if (info.floor === 'wood' || info.floor === 'dark') for (let k = 1; k < 4; k++) poly([P(i, j + k / 4, 0), P(i + 1, j + k / 4, 0), P(i + 1, j + k / 4 + 0.02, 0), P(i, j + k / 4 + 0.02, 0)], fb);
       if (info.floor === 'marble' && (i * 7 + j * 3) % 5 === 0) poly([P(i + 0.2, j + 0.3, 0), P(i + 0.7, j + 0.5, 0), P(i + 0.72, j + 0.53, 0), P(i + 0.22, j + 0.33, 0)], '#c4c0ba');
     }
+  if (info.floor === 'cloud') {
+    // 37차 환생의 테라스: 네모 칸 대신 구름을 밟는 듯 — 흰빛·모랫빛 번짐이 겹친 한 장의 바닥
+    const fl = [P(1, 1, 0), P(W - 1, 1, 0), P(W - 1, H - 1, 0), P(1, H - 1, 0)];
+    g.save();
+    g.beginPath(); g.moveTo(fl[0][0], fl[0][1]); for (const q of fl.slice(1)) g.lineTo(q[0], q[1]); g.closePath(); g.clip();
+    let sd = 7;
+    const rr = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
+    for (let n = 0; n < (W + H) * 6; n++) {
+      const [x, y] = P(1 + rr() * (W - 2), 1 + rr() * (H - 2), 0);
+      const rad = 24 + rr() * 60;
+      const col = rr() < 0.55 ? '#ffffff' : '#d8ccb4';
+      const gr = g.createRadialGradient(x, y, 0, x, y, rad);
+      gr.addColorStop(0, col); gr.addColorStop(1, col + '00');
+      g.globalAlpha = 0.18 + rr() * 0.22;
+      g.fillStyle = gr;
+      g.beginPath(); g.ellipse(x, y, rad, rad * 0.5, 0, 0, Math.PI * 2); g.fill();
+    }
+    g.globalAlpha = 1;
+    g.restore();
+  }
   if (info.floor === 'temple') {
     // 법당: 가운데 붉은 융단 + 금빛 테
     const a = Math.floor(W / 2) - 3, b2 = Math.floor(W / 2) + 2;

@@ -488,3 +488,5 @@ def forgeknight(self, g):
     ob = finish(P); bind(ob, self.arm, lambda co: {'head': smooth(co.z, 1.44 * s, 1.5 * s), 'spine': 1 - smooth(co.z, 1.44 * s, 1.5 * s)}); self.add(g, ob)
 
 NEW = {'ashwraith': ashwraith, 'ashgal': ashgal, 'gurma': gurma, 'cinder': cinder, 'bloat': bloat, 'glutton': glutton, 'hawker': hawker, 'forgeknight': forgeknight}
+import dreambodies   # 37차: 서큐버스 · 아큐버스
+NEW.update(dreambodies.NEW)

@@ -76,7 +76,7 @@ export interface InteriorInfo {
   clerk?: { i: number; j: number }; // 직원이 서는 곳
   counter?: { i: number; j: number }; // 직원에게 말을 거는 자리 (카운터 앞)
   furn: Furn[];
-  age?: 0 | 1 | 2; // 24차 내 집: 오늘 유내의 시절 (28차: 10대 · 20대 · 30대 후반)
+  age?: 0 | 1 | 2 | 3; // 24차 내 집: 유내의 시절 (28차: 10대 · 20대 · 30대 후반) · 37차: 0~2는 회상, 3은 지금의 빈집
   from: { b: number; out: { i: number; j: number }; bd?: Building }; // 거리의 건물 번호와 나왔을 때 설 자리 (bd = 그 건물, 21차 직종 판단용)
   store?: string; cuisine?: string; // 가게 창 (mart · pharmacy · food · cafe) / bank
   seats: [number, number][]; // 손님이 서 있을 자리

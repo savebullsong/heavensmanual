@@ -76,7 +76,7 @@ export interface Save {
     deepest?: number;
   };
   /** 26차: 환생 상담에서 미리 정한 다음 생 — 처음 모습의 운, 고른 몸, 도시, 선업으로 산 물건 */
-  nextLife?: { kind: import('./character.ts').Arrival; look: import('./character.ts').Look; region: string; bag: Record<string, number> };
+  nextLife?: { kind: import('./character.ts').Arrival; look: import('./character.ts').Look; region: string; bag: Record<string, number>; /** 37차 선업의 값 (바트 셈) */ cash?: number };
   /** 26차: 방금 환생해 몸이 미리 정해진 채 우주새에 왔다 (나갈 때 '나는 누구였지.'만) */
   freshLife?: boolean;
   /** 27차: 저격총탄 */

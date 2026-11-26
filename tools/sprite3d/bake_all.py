@@ -98,6 +98,9 @@ for sex in 'mf':
 # ── 20차: 한손검 · 왼팔 방패 (맨손 u · 무기 m 자세, 보통 체형 하나로 모든 체형에) ──
 for sex in 'mf':
     jobs.append({'sex': sex, 'build': 1, 'sets': [{'kind': 'weapon', 'weapon': 'arming'}] + [{'kind': 'armor', 'piece': 'shield', 'mode': m} for m in ('u', 'm')], 'tag': 'shield20'})
+# ── 37차: 서큐버스(여) · 아큐버스(여·남) — 서기·걷기만, 8방향 (사용자 컨셉 그림 두 장) ──
+for mk, sex, outfit in (('q', 'f', 'succubus'), ('j', 'f', 'accubus'), ('i', 'm', 'accubus')):
+    jobs.append({'sex': sex, 'build': 1, 'monster': mk, 'occluder': outfit, 'sets': [{'kind': 'base', 'outfit': outfit, 'mode': 'w'}], 'stride': .55, 'tag': 'dream37'})
 args = sys.argv[2:]
 # --scale2: 같은 크기의 인물을 픽셀 두 배로 (게임에서는 반으로 줄여 같은 크기, 더 섬세)
 if '--scale2' in args:
