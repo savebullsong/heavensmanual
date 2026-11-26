@@ -481,3 +481,17 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 .bank-quick .flex-break { flex-basis: 100%; height: 0; }
 /* 31차: 관리자 '다른 곳' — 염소대왕의 방 · 경계의 해변 */
 .set-admin .tp-more { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* 33차: 은행 단추 — 금빛, 돈이 많으면 깜빡 */
+.hud .to-bank { display: inline-flex; align-items: center; justify-content: center; padding: 4px 7px; color: #f2d27a; border-color: #8a6a2a; }
+.hud .to-bank.urge { animation: bank-urge 1.1s ease-in-out infinite; }
+@keyframes bank-urge { 0%, 100% { box-shadow: 0 0 0 0 rgba(242, 210, 122, 0); background: rgba(40, 30, 14, 0.9); } 50% { box-shadow: 0 0 0 3px rgba(242, 210, 122, 0.55); background: rgba(120, 90, 30, 0.95); } }
+
+/* 33차: 전부 수리 · 템브라 조립 틀 */
+.repair-all { width: 100%; margin: 2px 0 6px; padding: 9px; }
+.tembra-asm { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px; margin-bottom: 6px; border: 1px solid #5a3a24; border-radius: 8px; background: rgba(40, 18, 12, 0.55); }
+.tembra-asm .asm-title { color: #f2c84a; }
+.tembra-asm .cage-note { text-align: center; margin: 0; }
+.asm-ring { position: relative; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, #3a1a10 0 30%, #1a0c08 31% 100%); box-shadow: inset 0 0 0 2px #6a4a2a; }
+.asm-ring i { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; transform: rotate(45deg); background: #1a1210; border: 1px solid #6a4a2a; }
+.asm-ring i.on { background: linear-gradient(135deg, #ffd08a, #c84a1a); border-color: #ffb04a; box-shadow: 0 0 6px rgba(255, 140, 60, 0.8); }

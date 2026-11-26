@@ -269,6 +269,29 @@ export function batWingTexture(color: number): Texture {
 }
 /** 22차: 머리 위의 작은 뿔 한 쌍 */
 const hornTex = new Map<number, Texture>();
+/** 33차: 악마 꼬리 — 허리에서 나와 S자로 휘다가 끝이 세모(스페이드) (2배 크기, 반으로 줄여 쓴다 · 기준점 = 왼쪽 밑동) */
+const tailTex = new Map<number, Texture>();
+export function devilTailTexture(color: number): Texture {
+  const hit = tailTex.get(color);
+  if (hit) return hit;
+  const c = document.createElement('canvas');
+  c.width = 72; c.height = 56;
+  const g = c.getContext('2d')!;
+  const hex = '#' + color.toString(16).padStart(6, '0');
+  const curve = () => { g.beginPath(); g.moveTo(6, 40); g.bezierCurveTo(26, 52, 34, 20, 50, 26); g.bezierCurveTo(58, 29, 60, 20, 58, 14); };
+  g.lineCap = 'round';
+  curve(); g.strokeStyle = '#140606'; g.lineWidth = 8; g.stroke();
+  curve(); g.strokeStyle = hex; g.lineWidth = 5; g.stroke();
+  g.beginPath(); g.moveTo(10, 38); g.bezierCurveTo(26, 46, 32, 20, 48, 22); g.strokeStyle = 'rgba(255,170,150,0.45)'; g.lineWidth = 1.5; g.stroke();
+  // 끝의 세모
+  g.beginPath(); g.moveTo(58, 2); g.lineTo(68, 16); g.lineTo(58, 13); g.lineTo(49, 17); g.closePath();
+  g.fillStyle = '#140606'; g.fill(); g.lineWidth = 3; g.strokeStyle = '#140606'; g.stroke();
+  g.beginPath(); g.moveTo(58, 5); g.lineTo(65, 15); g.lineTo(58, 12); g.lineTo(52, 15); g.closePath(); g.fillStyle = hex; g.fill();
+  const t = Texture.from(c);
+  t.source.scaleMode = 'nearest';
+  tailTex.set(color, t);
+  return t;
+}
 export function hornTexture(color: number): Texture {
   const hit = hornTex.get(color);
   if (hit) return hit;

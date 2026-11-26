@@ -269,15 +269,17 @@ export const MENUS: Record<string, { key: string; price: number }[]> = {
   tea: M(['bubbletea', 60], ['thaitea', 45], ['matcha', 90]),
 };
 /** 32차: 서울 가게 메뉴 (태국 음식 대신). 업종(cuisine)이 없으면 가게 이름으로 분식 · 밥집 · 중국집 · 고깃집 · 치킨집 중 하나 */
+// 33차: 값은 원으로 딱 떨어지게 (฿ × 40 = ₩ — 김밥 ₩3,500 = ฿87.5)
+const W$ = (won: number) => won / 40;
 const KR_MENUS: Record<string, { key: string; price: number }[]> = {
-  bunsik: M(['gimbap', 88], ['tteok', 113], ['ramyeon', 113], ['sundae', 125], ['water', 25]),
-  rice: M(['kimchistew', 225], ['bibimbap', 225], ['gukbap', 250], ['water', 25]),
-  chinese: M(['jjajang', 175], ['jjamppong', 200], ['friedrice', 200], ['dimsum', 175], ['water', 25]),
-  bbq: M(['samgyeop', 400], ['naengmyeon', 275], ['kimchistew', 200], ['cola', 50]),
-  chicken: M(['friedchicken', 500], ['fries', 100], ['cola', 50]),
-  cafe: M(['coffee', 113], ['cake', 163], ['croissant', 100], ['water', 25]),
-  mart: M(['water', 25], ['cola', 50], ['noodle', 38], ['samgak', 38], ['bananamilk', 43], ['ricebox', 125], ['chips', 50], ['choco', 50], ['plaster', 75], ['umbrella', 250]),
-  pharmacy: M(['painkiller', 75], ['bandage', 113], ['saline', 50], ['firstaid', 625], ['water', 25]),
+  bunsik: M(['gimbap', W$(3500)], ['tteok', W$(4500)], ['ramyeon', W$(4500)], ['sundae', W$(5000)], ['water', W$(1000)]),
+  rice: M(['kimchistew', W$(9000)], ['bibimbap', W$(9000)], ['gukbap', W$(10000)], ['water', W$(1000)]),
+  chinese: M(['jjajang', W$(7000)], ['jjamppong', W$(8000)], ['friedrice', W$(8000)], ['dimsum', W$(7000)], ['water', W$(1000)]),
+  bbq: M(['samgyeop', W$(16000)], ['naengmyeon', W$(11000)], ['kimchistew', W$(8000)], ['cola', W$(2000)]),
+  chicken: M(['friedchicken', W$(20000)], ['fries', W$(4000)], ['cola', W$(2000)]),
+  cafe: M(['coffee', W$(4500)], ['cake', W$(6500)], ['croissant', W$(4000)], ['water', W$(1000)]),
+  mart: M(['water', W$(1000)], ['cola', W$(2000)], ['noodle', W$(1500)], ['samgak', W$(1500)], ['bananamilk', W$(1700)], ['ricebox', W$(5000)], ['chips', W$(2000)], ['choco', W$(2000)], ['plaster', W$(3000)], ['umbrella', W$(10000)]),
+  pharmacy: M(['painkiller', W$(3000)], ['bandage', W$(4500)], ['saline', W$(2000)], ['firstaid', W$(25000)], ['water', W$(1000)]),
 };
 const KR_PICK: Record<string, string> = { korean: '', chinese: 'chinese', chicken: 'chicken', barbecue: 'bbq', bbq: 'bbq', noodle: 'bunsik', fast_food: 'bunsik' };
 export function menuFor(kind: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept' | 'antique', cuisine?: string, seoul = false, seed = '') {
@@ -337,6 +339,10 @@ export const WON_RATE = 40;
 export function wonify(text: string): string {
   if (!WON || !text.includes('฿')) return text;
   return text.replace(/฿([\d,]+(?:\.\d+)?)/g, (_, num: string) => `₩${Math.round(parseFloat(num.replace(/,/g, '')) * WON_RATE).toLocaleString('en-US')}`);
+}
+/** 33차: 지역을 정해 이승 돈을 적는다 (지옥·천국에서도 서울 사람이면 ₩) */
+export function cashText(n: number, seoul: boolean): string {
+  return seoul ? `₩${Math.round(n * WON_RATE).toLocaleString('en-US')}` : `฿${Math.round(n).toLocaleString('en-US')}`;
 }
 export function moneyText(n: number): string {
   return WON ? `₩${Math.round(n * WON_RATE).toLocaleString('en-US')}` : `฿${Math.round(n).toLocaleString('en-US')}`;

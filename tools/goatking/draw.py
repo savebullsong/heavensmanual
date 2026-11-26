@@ -1,10 +1,16 @@
 # 32차: 염소대왕 — 손으로 찍은 도트 (사진을 줄인 그림이 아니라 면·선·명암 몇 단으로)
 # 12미터 거인이 흑요석 옥좌에 앉아 있다. 판관 관모 · 금테 두른 숫양 뿔 · 붉은 눈 · 검은 비단과 핏빛 관복 · 갈퀴 손
-#   python3 tools/goatking/draw.py apps/web/public/npc/goat-king.png [미리보기.png]
+#   python3 tools/goatking/draw.py apps/web/public/npc/goat-king.png [미리보기.png] [--in] [--blink]
+#   33차: --in = 숨을 들이쉰 그림(윗몸·머리가 2점 위로) · --blink = 눈을 감은 그림. 게임은 네 장을 번갈아 숨쉬고 깜빡인다
 # 2배 밀도(게임 속 크기의 두 배)로 그린다: 440×580 → 게임 속 220×290
 import sys, math
 from PIL import Image, ImageDraw
 import numpy as np
+
+INHALE = '--in' in sys.argv
+BLINK = '--blink' in sys.argv
+sys.argv = [a for a in sys.argv if not a.startswith('--')]
+LIFT = [0]  # 숨쉴 때 윗몸을 올리는 양 (점)
 
 W, H = 440, 626
 OY = 46  # 관모·뿔이 위로 커져서 전체를 아래로
@@ -47,7 +53,7 @@ XF = [None]
 def tf(x, y):
     f = XF[0]
     x, y = f(x, y) if f else (x, y)
-    return x, y + OY
+    return x, y + OY + LIFT[0]
 
 
 def sc():
@@ -106,7 +112,7 @@ def dither(x0, y0, x1, y1, k, phase=0, mask=None):
                 continue
             if mask is not None and not mask(x, y):
                 continue
-            img.putpixel((x, y + OY), col(k))
+            img.putpixel((x, y + OY + LIFT[0]), col(k))
 
 
 # ───────────────── 1) 옥좌 등받이 ─────────────────
@@ -241,6 +247,7 @@ for x in range(CX - 22, CX + 23, 6):
 rect(CX - 24, 518, CX + 24, 522, 'g2')
 
 # ───────────────── 5) 몸통: 관복 · 옷깃 · 허리띠 · 장식 ─────────────────
+LIFT[0] = -2 if INHALE else 0
 torso = [(122, 208), (318, 208), (312, 280), (300, 334), (140, 334), (128, 280)]
 poly(torso, 'k1', 'ol', 3)
 # 관복 옆판 (핏빛 · 금테) — 검은 비단과 핏빛이 겹친 판관복
@@ -330,6 +337,10 @@ poly(mirror([(186, 120), (206, 126), (214, 132), (212, 136), (204, 132), (188, 1
 for s in (-1, 1):
     ex = CX + s * 16
     poly([(ex - 9, 132), (ex + 7, 134), (ex + 6, 140), (ex - 7, 139)] if s < 0 else [(ex - 7, 134), (ex + 9, 132), (ex + 7, 139), (ex - 6, 140)], 'e0')
+    if BLINK:  # 감은 눈: 털 눈꺼풀과 붉은 실금 하나
+        poly([(ex - 9, 132), (ex + 7, 134), (ex + 6, 140), (ex - 7, 139)] if s < 0 else [(ex - 7, 134), (ex + 9, 132), (ex + 7, 139), (ex - 6, 140)], 'f1')
+        line([(ex - 7, 138), (ex + 6, 138)], 'e0', 1)
+        continue
     rect(ex - 6, 134, ex + 6, 139, 'e1')
     rect(ex - 4, 136, ex + 4, 138, 'e2')
     rect(ex - 3, 136, ex + 3, 137, 'ol')  # 가로 동공
@@ -443,6 +454,7 @@ XF[0] = None
 
 # ───────────────── 9) 소매 · 손 · 갈퀴 (팔걸이 위) ─────────────────
 for s in (-1, 1):
+    LIFT[0] = -2 if INHALE else 0
     sl = [(124, 206), (152, 222), (142, 270), (118, 318), (112, 336), (50, 336), (54, 300), (78, 250), (98, 220)]
     if s > 0:
         sl = mirror(sl)
@@ -465,6 +477,7 @@ for s in (-1, 1):
     rect(xs[0] + 2, 316, xs[-1] - 1, 318, 'g3' if s < 0 else 'g2')
     for x in range(int(xs[0]) + 6, int(xs[-1]) - 4, 9):
         px(x, 320, 'g0')
+    LIFT[0] = 0  # 손은 팔걸이에 그대로
     # 손: 팔걸이 위에 얹은 털 손 · 손가락이 앞으로 넘어와 갈퀴가 아래로
     hx = 68 if s < 0 else 372
     lit = s < 0

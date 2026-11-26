@@ -7,6 +7,7 @@ import { faithOf } from './street.ts';
 import { TW, TH } from './gfx.ts';
 import { BESK_LOOK } from './sprites.ts';
 import { drawShore, drawShoreFurn, BULDA_LOOK } from './border.ts';
+import { menuFor, itemByKey } from './items.ts';
 export { BESK_LOOK };
 
 const TI = Object.fromEntries(TYPES.map((t, k) => [t, k])) as Record<(typeof TYPES)[number], number>;
@@ -228,6 +229,7 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
       F(7, 1, 1, 1, 24, 'gkbrazier'); F(1, 7, 1, 1, 24, 'gkbrazier', 1);
       F(10, 1, 1, 1, 236, 'gkpillar', 2); F(1, 10, 1, 1, 236, 'gkpillar', 3);
       F(11, 7, 1, 1, 236, 'gkpillar'); F(7, 11, 1, 1, 236, 'gkpillar', 1);
+      F(12, 3, 3, 1, 20, 'xchdesk'); // 33차: 환전상 오볼로의 탁자 (오른쪽 벽가)
       break;
     }
     case 'home': {
@@ -528,6 +530,34 @@ export function drawRoom(z: Zone, night: boolean): { canvas: HTMLCanvasElement; 
     // 녹색 십자 (약국·의원 표시)
     const x0 = k === 'pharmacy' ? W - 2.6 : 2.4;
     onR(x0, x0 + 0.9, 64, 72, '#2a9a5a'); onR(x0 + 0.32, x0 + 0.58, 56, 80, '#2a9a5a');
+  } else if ((k === 'food' || k === 'cafe' || k === 'mart') && z.city === 'seoul' && info.store) {
+    // 33차 서울 가게: 한국어 메뉴판 (이 가게가 실제로 파는 것과 값 — 원)
+    const menu = menuFor(k as 'food' | 'cafe' | 'mart', info.cuisine, true, info.name).slice(0, 5);
+    const rows = menu.map((m) => [itemByKey(m.key).name.ko, Math.round(m.price * 40).toLocaleString('en-US')] as [string, string]);
+    // 벽 앞에 매단 정면 판 (글씨가 기울지 않게 — 가게 계산대 위에 매단 한국식 메뉴판)
+    const look = k === 'cafe' ? { bg: '#1e1e1c', ink: '#efe8d8', head: '#e8c86a', edge: '#6a4a32' } : k === 'mart' ? { bg: '#f4f4f0', ink: '#1e2a3a', head: '#ffffff', edge: '#2a6aa8' } : { bg: '#22302a', ink: '#f2ead6', head: '#f2c84a', edge: '#6a4a2a' };
+    const FONT = '"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR","Nanum Gothic",sans-serif';
+    const BW = 96, BH = 20 + rows.length * 11;
+    const [cx, cy] = P(k === 'mart' ? mid + 0.6 : k === 'cafe' ? mid - 1.4 : mid + 0.4, 1.2, 92);
+    const bx = Math.round(cx - BW / 2), by = Math.round(cy);
+    g.strokeStyle = '#3a3a3a'; g.lineWidth = 1;
+    for (const dx of [10, BW - 10]) { const [, ty] = P(1, 1, WALL); g.beginPath(); g.moveTo(bx + dx + 0.5, Math.max(ty, by - 26)); g.lineTo(bx + dx + 0.5, by); g.stroke(); } // 매단 줄
+    g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(bx + 3, by + 3, BW, BH); // 벽 그림자
+    g.fillStyle = look.edge; g.fillRect(bx - 2, by - 2, BW + 4, BH + 4);
+    g.fillStyle = look.bg; g.fillRect(bx, by, BW, BH);
+    if (k === 'mart') { g.fillStyle = look.edge; g.fillRect(bx, by, BW, 14); }
+    g.textBaseline = 'middle';
+    g.fillStyle = look.head; g.font = `800 10px ${FONT}`; g.textAlign = 'center';
+    g.fillText(k === 'mart' ? '오늘의 가격' : '메  뉴', bx + BW / 2, by + 8);
+    g.font = `700 9px ${FONT}`;
+    rows.forEach(([nm, pr], r) => {
+      const y = by + 21 + r * 11;
+      g.fillStyle = look.ink; g.textAlign = 'left'; g.fillText(nm, bx + 6, y);
+      g.textAlign = 'right'; g.fillText(pr, bx + BW - 6, y);
+      g.fillStyle = k === 'mart' ? 'rgba(30,42,58,0.3)' : 'rgba(242,234,214,0.3)';
+      for (let d = bx + 6 + g.measureText(nm).width + 3; d < bx + BW - 9 - g.measureText(pr).width; d += 3) g.fillRect(Math.round(d), y, 1, 1); // 점선
+    });
+    if (night) { g.fillStyle = 'rgba(255,240,200,0.08)'; g.fillRect(bx, by, BW, BH); }
   } else if (k === 'food' || k === 'cafe') {
     onR(mid - 2, mid + 2, 56, 84, k === 'cafe' ? '#2a2a28' : '#e8dcc0'); // 메뉴판
     for (let n = 0; n < 4; n++) onR(mid - 1.7, mid - 1.7 + 1.2 + (n % 2) * 0.8, 62 + n * 5, 64 + n * 5, k === 'cafe' ? '#d8d4c8' : '#8a3a2a');
@@ -608,14 +638,14 @@ export function drawRoom(z: Zone, night: boolean): { canvas: HTMLCanvasElement; 
     // 시력표: 흰 판에 아래로 갈수록 작아지는 검은 글자 줄
     onR(mid - 1.6, mid - 0.4, 36, 74, '#f4f4ee'); for (let r = 0; r < 6; r++) { const half = 0.42 - r * 0.06; onR(mid - 1 - half, mid - 1 + half, 68 - r * 5.5, 70.5 - r * 5.5, '#1e1e1e'); }
     frame(mid + 0.4, mid + 1.8, 40, 62, '#cfe6e0');
-  } else if (k === 'food') {
+  } else if (k === 'food' && z.city !== 'seoul') { // 33차: 서울 식당은 홍등 대신 매단 한국어 메뉴판
     // 홍등: 벽 위로 걸린 줄에 붉은 등 다섯
     onR(1.5, W - 1.5, 90, 91, '#2a2a2a');
     for (let x = 2.2; x < W - 2; x += (W - 4) / 5) { const [lx, ly] = P(x, 1, 84); g.fillStyle = '#c8282a'; g.beginPath(); g.ellipse(lx, ly, 5, 6, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#e8b83a'; g.fillRect(Math.round(lx) - 3, Math.round(ly) - 7, 6, 2); g.fillRect(Math.round(lx) - 3, Math.round(ly) + 5, 6, 2); if (night) { g.fillStyle = 'rgba(255,120,80,0.25)'; g.beginPath(); g.ellipse(lx, ly, 10, 11, 0, 0, Math.PI * 2); g.fill(); } }
   } else if (k === 'cafe') {
     // 컵 선반: 나무 선반 둘에 색 다른 머그
     for (const z of [40, 52]) { onR(W - 5, W - 2, z, z + 2, '#6a4a32'); for (let x = W - 4.8; x < W - 2.3; x += 0.42) onR(x, x + 0.26, z + 2, z + 7, ['#f2ece0', '#c86a4a', '#3a6a8a', '#e8c86a'][Math.floor(x * 7) % 4]); }
-    frame(2, 3.4, 44, 66, '#8aa86a');
+    if (z.city !== 'seoul') frame(2, 3.4, 44, 66, '#8aa86a'); // 33차: 서울 카페는 그 자리에 메뉴판
   } else if (k === 'massage') {
     // 족자 둘 (먹으로 친 대나무) · 난초 액자
     for (const x of [2.2, 4.4]) { onR(x, x + 0.9, 30, 78, '#efe6cc'); onR(x - 0.05, x + 0.95, 77, 80, '#6a4a2a'); onR(x - 0.05, x + 0.95, 28, 31, '#6a4a2a'); for (let n = 0; n < 3; n++) onR(x + 0.3 + n * 0.12, x + 0.34 + n * 0.12, 36 + n * 3, 70 - n * 4, '#3a4a3a'); }
@@ -670,7 +700,7 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
   }
   const { i, j, w, d, h } = f;
   const i1 = i + w, j1 = j + d;
-  const extra = f.kind === 'gkbrazier' ? 40 : f.kind === 'gkdesk' ? 20 : f.kind === 'altar' ? 64 : f.kind === 'rgate' ? 46 : f.kind === 'cpillar' ? 30 : f.kind === 'salonchair' || f.kind === 'candle' || f.kind === 'fan' || f.kind === 'lamp' || f.kind === 'cooler' ? 18 : 14;
+  const extra = f.kind === 'gkbrazier' ? 40 : f.kind === 'gkdesk' ? 20 : f.kind === 'xchdesk' ? 30 : f.kind === 'altar' ? 64 : f.kind === 'rgate' ? 46 : f.kind === 'cpillar' ? 30 : f.kind === 'salonchair' || f.kind === 'candle' || f.kind === 'fan' || f.kind === 'lamp' || f.kind === 'cooler' ? 18 : 14;
   const minX = (i - j1) * (TW / 2) - 4, maxX = (i1 - j) * (TW / 2) + 4;
   const minY = (i + j) * (TH / 2) - h - extra, maxY = (i1 + j1) * (TH / 2) + 4;
   const { c, g, P, poly } = painter(minX, minY, maxX - minX, maxY - minY);
@@ -854,6 +884,28 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       for (let n = 0; n < 5; n++) poly([P(i + 1.7, j + 0.32 + n * 0.08, h + 2.2), P(i + 2.3, j + 0.32 + n * 0.08, h + 2.2), P(i + 2.3, j + 0.34 + n * 0.08, h + 2.2), P(i + 1.7, j + 0.34 + n * 0.08, h + 2.2)], '#3a3028');
       B3(i + 3.6, j + 0.35, i + 3.85, j + 0.6, h, h + 5, '#8a1418'); // 인장
       poly([P(i + 0.7, j + 0.4, h + 1), P(i + 1.3, j + 0.6, h + 1), P(i + 1.3, j + 0.64, h + 1), P(i + 0.7, j + 0.44, h + 1)], '#2a1a12'); // 붓
+      break;
+    }
+    case 'xchdesk': {
+      // 33차 환전 탁자: 검게 탄 나무 · 놋쇠 테 · 위에 놋쇠 저울 · 금화 더미 · 이승 지폐 뭉치 · 장부 · 붉은 등
+      B3(i, j, i1, j1, 0, h - 3, '#2a1a14');
+      box(i - 0.05, j - 0.05, i1 + 0.05, j1 + 0.05, h - 3, h, '#4a3022', '#3a2418', '#2a1a10');
+      faceL(i, i1, h - 5, h - 3, '#b8902a'); faceR(j, j1, h - 5, h - 3, '#8a6a22');
+      faceL(i + 0.3, i1 - 0.3, 3, h - 7, '#5a0e14');
+      for (let n = 0; n < 5; n++) { const [cx, cy] = P(i + 0.5 + n * ((w - 1) / 4), j1, h / 2 - 2); g.fillStyle = '#c9a23e'; g.beginPath(); g.ellipse(cx, cy, 3, 3, 0, 0, Math.PI * 2); g.fill(); }
+      { // 놋쇠 저울
+        const [cx, cy] = P(i + 1.5, j + 0.5, h);
+        g.fillStyle = '#8a6a22'; g.fillRect(Math.round(cx) - 1, Math.round(cy) - 22, 3, 22);
+        g.fillStyle = '#d9b44a'; g.fillRect(Math.round(cx) - 14, Math.round(cy) - 22, 30, 2);
+        g.strokeStyle = '#a8822e'; g.lineWidth = 1;
+        for (const dx of [-13, 14]) { g.beginPath(); g.moveTo(cx + dx, cy - 21); g.lineTo(cx + dx - 4, cy - 10); g.moveTo(cx + dx, cy - 21); g.lineTo(cx + dx + 4, cy - 10); g.stroke(); g.fillStyle = '#c9a23e'; g.beginPath(); g.ellipse(cx + dx, cy - 9, 6, 2, 0, 0, Math.PI * 2); g.fill(); }
+        g.fillStyle = '#e8dcc0'; g.fillRect(Math.round(cx) + 9, Math.round(cy) - 13, 9, 4); // 저울 한쪽엔 이승 지폐
+        g.fillStyle = '#f2d27a'; g.beginPath(); g.ellipse(cx - 13, cy - 11, 3, 1.5, 0, 0, Math.PI * 2); g.fill(); // 다른 쪽엔 노전 한 닢 — 그래도 노전 쪽이 무겁다
+      }
+      for (const [a, b, n] of [[0.35, 0.3, 5], [0.6, 0.55, 3], [2.4, 0.35, 6]] as const) for (let k = 0; k < n; k++) { const [cx, cy] = P(i + a, j + b, h + k * 2); g.fillStyle = k % 2 ? '#a8822e' : '#e0b437'; g.beginPath(); g.ellipse(cx, cy, 4, 2, 0, 0, Math.PI * 2); g.fill(); }
+      box(i + 2.1, j + 0.55, i + 2.8, j + 0.85, h, h + 3, '#d8ccb0', '#bfb498', '#a89c80'); // 지폐 뭉치
+      poly([P(i + 2.2, j + 0.55, h + 3.1), P(i + 2.7, j + 0.55, h + 3.1), P(i + 2.7, j + 0.6, h + 3.1), P(i + 2.2, j + 0.6, h + 3.1)], '#8a3a2a');
+      { const [lx, ly] = P(i + 0.3, j + 0.7, h); g.fillStyle = '#2a1a10'; g.fillRect(Math.round(lx) - 1, Math.round(ly) - 14, 2, 14); const gl = g.createRadialGradient(lx, ly - 17, 1, lx, ly - 17, 14); gl.addColorStop(0, 'rgba(255,80,50,0.7)'); gl.addColorStop(1, 'rgba(255,40,20,0)'); g.fillStyle = gl; g.beginPath(); g.ellipse(lx, ly - 17, 14, 12, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#c8281e'; g.fillRect(Math.round(lx) - 3, Math.round(ly) - 21, 6, 7); g.fillStyle = '#ff8a4a'; g.fillRect(Math.round(lx) - 1, Math.round(ly) - 19, 2, 3); } // 붉은 등
       break;
     }
     case 'gkdais': {

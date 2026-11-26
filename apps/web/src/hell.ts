@@ -534,8 +534,13 @@ export function hellZone(floor: number): Zone {
   }
   // 30차 대장간: 모루와 숯불 화로 옆에 선 대장장이 (지옥 장비 수리 · 템브라 강화)
   {
-    const at = freeSpot(3, VR - 2, (i, j) => inV(i + 1, j, 1) && !taken(i + 1, j));
-    if (at) { vendors.push({ i: at[0], j: at[1], kind: 'smith' }); props.push({ i: at[0] + 1, j: at[1], kind: 'anvil' }); }
+    // 33차: 대장장이 등 뒤(한 칸 뒤 대각)에 대장간 — 벽돌 화덕·풀무·연장 걸이·담금질 통 (자리가 없으면 모루만)
+    const at = freeSpot(3, VR - 2, (i, j) => inV(i + 1, j, 1) && !taken(i + 1, j) && inV(i - 1, j - 1, 1) && !taken(i - 1, j - 1)) ?? freeSpot(3, VR - 2, (i, j) => inV(i + 1, j, 1) && !taken(i + 1, j));
+    if (at) {
+      vendors.push({ i: at[0], j: at[1], kind: 'smith' });
+      props.push({ i: at[0] + 1, j: at[1], kind: 'anvil' });
+      if (inV(at[0] - 1, at[1] - 1, 1)) props.push({ i: at[0] - 1, j: at[1] - 1, kind: 'forge' });
+    }
   }
   // 지옥호텔: 매트리스 셋이 한 줄 (사이를 한 칸씩 띄워 밟고 지나갈 수 있다)
   // 좁으면 두 장, 그래도 안 되면 세로로

@@ -185,6 +185,19 @@ export function drawShoreChunk(i0: number, j0: number): { canvas: HTMLCanvasElem
     g.fillStyle = gr; g.fillRect(i0 - 1, j0 - 1, SHORE_CHUNK + 2, Math.min(j1, 2) - j0 + 1);
     g.restore();
   }
+  // 5) 33차: 해변 양 끝 너머는 짙은 안개 벽 (곶 바위 너머로 아무것도 보이지 않는다)
+  if (i0 < -2 || i1 > SHORE_W + 1) {
+    g.save();
+    g.setTransform(TW / 2, TH / 2, -TW / 2, TH / 2, -minX + 6, -minY + 3);
+    const fogCol = (a: number) => `rgba(122,112,126,${a})`;
+    const gw = g.createLinearGradient(-2, 0, -13, 0);
+    gw.addColorStop(0, fogCol(0)); gw.addColorStop(0.5, fogCol(0.7)); gw.addColorStop(1, fogCol(1));
+    const ge = g.createLinearGradient(SHORE_W + 1, 0, SHORE_W + 12, 0);
+    ge.addColorStop(0, fogCol(0)); ge.addColorStop(0.5, fogCol(0.7)); ge.addColorStop(1, fogCol(1));
+    if (i0 < -2) { g.fillStyle = gw; g.fillRect(Math.min(i0, -40) - 2, j0 - 2, -2 - Math.min(i0, -40) + 2, SHORE_CHUNK + 4); }
+    if (i1 > SHORE_W + 1) { g.fillStyle = ge; g.fillRect(SHORE_W + 1, j0 - 2, Math.max(i1, SHORE_W + 40) - SHORE_W + 2, SHORE_CHUNK + 4); }
+    g.restore();
+  }
   g.restore();
   // 이 덩어리의 마름모(2~3px 넉넉히)만 남긴다 — 옆 덩어리와 겹치는 띠는 같은 그림이라 이음매가 없다
   g.globalCompositeOperation = 'destination-in';
@@ -192,6 +205,50 @@ export function drawShoreChunk(i0: number, j0: number): { canvas: HTMLCanvasElem
   g.fillStyle = '#000'; g.fill();
   g.globalCompositeOperation = 'source-over';
   return { canvas: c, x: minX - 6, y: minY - 3 };
+}
+
+/** 33차: 해변 양 끝의 바위 곶 — 모래밭에서 바다로 뻗어 나간 검은 바위 무더기 (끝 쪽일수록 높고, 바다 쪽엔 바위섬) */
+export interface CapeRock { i: number; j: number; w: number; d: number; h: number; v: number }
+export function capeRocks(): CapeRock[] {
+  const out: CapeRock[] = [];
+  for (const side of [-1, 1] as const) {
+    for (let a = 0; a < 9; a += 1.15) for (let j = -9; j < SHORE_H + 9; j += 1.2) {
+      const sea = j < shoreF(side < 0 ? 0 : SHORE_W) - 0.5;
+      const reach = sea ? 4.5 - (shoreF(0) - j) * 0.35 : 9; // 바다 쪽으로 갈수록 곶이 가늘어진다
+      if (a > reach) continue;
+      const n = hsh(a * 7 + (side + 3), j * 3);
+      if (n > (a < 2 ? 0.92 : a < 5 ? 0.75 : 0.55)) continue;
+      const w = 0.9 + hsh(j, a) * 1.6, d = 0.9 + hsh(a, j + 9) * 1.4;
+      const i = side < 0 ? 0.6 - a - w : SHORE_W - 1.6 + a;
+      const h = Math.round((sea ? 26 : 14) + hsh(a + 3, j) * (sea ? 50 : 34) + (a > 3 ? 18 : 0));
+      out.push({ i, j: j + hsh(a, j * 5) * 0.6, w, d, h, v: Math.floor(hsh(j * 3, a * 5) * 4) });
+    }
+  }
+  return out;
+}
+/** 바위 하나 (거친 덩어리: 위는 밝고 옆은 어둡게, 물에 잠긴 밑동은 젖어 검다) */
+export function drawCapeRock(r: CapeRock): { canvas: HTMLCanvasElement; x: number; y: number } {
+  const { i, j, w, d, h } = r;
+  const i1 = i + w, j1 = j + d;
+  const minX = (i - j1) * (TW / 2) - 6, maxX = (i1 - j) * (TW / 2) + 6;
+  const minY = (i + j) * (TH / 2) - h - 6, maxY = (i1 + j1) * (TH / 2) + 6;
+  const { c, g, P, poly } = painter(minX, minY, maxX - minX, maxY - minY);
+  const tones = [['#3e3a3c', '#2c2a2c', '#1e1c1e', '#565052'], ['#4a423c', '#34302c', '#24201e', '#62584e'], ['#38383e', '#28282e', '#1a1a20', '#504e58'], ['#443c3a', '#302a28', '#201c1c', '#5c524c']][r.v % 4];
+  const k = (a: number, b: number) => hsh(i * 13 + a, j * 7 + b);
+  // 깎인 윗면: 네 모서리 높이를 들쭉날쭉
+  const zA = h * (0.75 + k(1, 1) * 0.25), zB = h * (0.6 + k(2, 2) * 0.35), zC = h * (0.5 + k(3, 3) * 0.4), zD = h * (0.7 + k(4, 4) * 0.3);
+  const ins = 0.18;
+  poly([P(i1, j, 0), P(i1, j1, 0), P(i1 - ins, j1 - ins, zC), P(i1 - ins, j + ins, zB)], tones[1]); // 오른쪽 면
+  poly([P(i, j1, 0), P(i1, j1, 0), P(i1 - ins, j1 - ins, zC), P(i + ins, j1 - ins, zD)], tones[2]); // 앞면
+  poly([P(i + ins, j + ins, zA), P(i1 - ins, j + ins, zB), P(i1 - ins, j1 - ins, zC), P(i + ins, j1 - ins, zD)], tones[0]); // 윗면
+  poly([P(i + ins + 0.1, j + ins + 0.1, zA), P(i + w * 0.55, j + ins + 0.05, (zA + zB) / 2), P(i + ins + 0.15, j + d * 0.5, (zA + zD) / 2)], tones[3]); // 빛 받는 모서리
+  // 금 · 따개비 · 젖은 밑동
+  g.strokeStyle = 'rgba(10,10,12,0.6)'; g.lineWidth = 1;
+  for (let n = 0; n < 3; n++) { const a = P(i1 - ins, j + d * (0.2 + n * 0.3), h * (0.2 + k(n, 9) * 0.5)), b = P(i1 - ins * 0.5, j + d * (0.3 + n * 0.3), h * (0.05 + k(9, n) * 0.3)); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
+  poly([P(i, j1, 0), P(i1, j1, 0), P(i1, j1, 5), P(i, j1, 5)], 'rgba(14,16,18,0.55)');
+  poly([P(i1, j, 0), P(i1, j1, 0), P(i1, j1, 5), P(i1, j, 5)], 'rgba(14,16,18,0.5)');
+  for (let n = 0; n < 5; n++) { const [x, y] = P(i + 0.2 + k(n, 3) * (w - 0.4), j1, 3 + k(3, n) * 8); g.fillStyle = 'rgba(200,196,184,0.5)'; g.fillRect(Math.round(x), Math.round(y), 1, 1); }
+  return { canvas: c, x: minX, y: minY };
 }
 
 /** (예전 한 장짜리) 해변 전체 — 관리자 미리보기 등에서 걸을 수 있는 곳만 한 장으로 */

@@ -43,6 +43,10 @@ export interface Save {
   heaven?: { met?: boolean; admin?: boolean; adapted?: boolean; ywLost?: boolean; rites?: number }; // 21차: 행사에 다녀와 익숙해졌나 · 안내천사를 따돌렸나 · 다녀온 행사 수
   /** 19차 지옥면죄부: 앞으로 짓는 악행에서 지워 줄 남은 점수 (한 장 = 30, 최대 10장 = 300) */
   absolve?: number;
+  /** 33차: 염소대왕의 방 환전상 — 이번 지옥길(gk = 상담 번호)에 바꾼 이승 돈과 그때 통장 */
+  xch?: { gk: number; base: number; used: number };
+  /** 33차: 대장간 틀에 끼워 둔 템브라 파편 수 (13이면 템브라 하나) */
+  tasm?: number;
   /** 20차 훔치기: 처음 한 번은 가장 싼 무기를 반드시 훔친다 (그 뒤로는 값에 따라) */
   stoleOnce?: boolean;
   /** 20차: 우주새에서 훔친 일 — 다음에 들르면 미스 황(황혼)이 차갑게 맞는다 */
@@ -86,7 +90,7 @@ export interface Save {
   /** 31차: 염소대왕을 만난 횟수 (영혼) · 마지막으로 머문 때 · 이 기기에서 한 시간(초) */
   gk?: number;
   /** 31차: 142층 염소대왕의 방에서 상담을 기다리는 중 (창을 닫았다 열어도 그 방에서) */
-  gkWait?: { reason: 'death' | 'chose' | 'returned'; want: number };
+  gkWait?: { reason: 'death' | 'chose' | 'returned'; want: number; done?: boolean };
   seen?: number;
   played?: number;
   /** 하루에 한도가 있는 선행 (기도 3 · 읽기 1 · 기부 20) */

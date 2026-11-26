@@ -234,6 +234,37 @@ export function hellDecor(kind: string, theme: Theme, v: number, o = 0): HPic {
     p.L(cx - 20, by - 2, cx - 14, by - 26, 1, '#5a5a62'); p.L(cx - 18, by - 2, cx - 13, by - 25, 1, '#4a4a52');
     p.finish([22, 12, 8]);
     out = { canvas: p.c, ax: 0.5, ay: 56 / 70, glow: [22, -10], glowTint: 0xff7a2a };
+  } else if (kind === 'forge') {
+    // 33차 대장간 (대장장이 등 뒤): 그을린 벽돌 화덕(벌건 숯 · 위로 솟은 굴뚝 갓) · 가죽 풀무 · 연장 걸이(망치·집게·줄) · 담금질 물통
+    const p = pen(60, 96);
+    const cx = 60, by = 118;
+    p.E(cx, by + 4, 54, 12, '#0e0806');
+    // 화덕: 벽돌 몸통
+    p.R(cx - 30, by - 44, 60, 44, '#4a2a20'); p.R(cx - 30, by - 44, 60, 4, '#5e3628');
+    for (let row = 0; row < 7; row++) for (let col = 0; col < 6; col++) { const x = cx - 30 + col * 10 + (row % 2) * 5; if (x < cx + 26) p.R(x, by - 40 + row * 6, 9, 5, (row + col) % 3 ? '#5a3226' : '#4e2c22'); }
+    p.R(cx - 30, by - 4, 60, 4, '#2a1812');
+    // 불구멍: 벌건 숯
+    p.R(cx - 14, by - 30, 28, 16, '#140806');
+    for (let k = 0; k < 16; k++) p.R(cx - 12 + r(k) * 24, by - 22 + r(k + 5) * 7, 3, 2, k % 3 ? '#ff5a1a' : '#ffc04a');
+    p.R(cx - 14, by - 31, 28, 2, '#2a1a12');
+    // 굴뚝 갓과 굴뚝
+    p.poly([[cx - 34, by - 44], [cx + 34, by - 44], [cx + 16, by - 66], [cx - 16, by - 66]], '#2e2420');
+    p.poly([[cx - 34, by - 44], [cx + 34, by - 44], [cx + 30, by - 48], [cx - 30, by - 48]], '#3e322c');
+    p.R(cx - 9, by - 104, 18, 40, '#2a201c'); p.R(cx - 9, by - 104, 4, 40, '#3a2e28'); p.R(cx - 11, by - 108, 22, 5, '#1e1612');
+    for (let k = 0; k < 5; k++) p.E(cx - 4 + r(k + 30) * 8, by - 112 - k * 4, 3 + k, 2 + k * 0.6, `rgba(70,60,56,${0.35 - k * 0.05})`); // 연기
+    // 풀무 (왼쪽): 가죽 주름 · 나무 손잡이
+    p.poly([[cx - 52, by - 12], [cx - 34, by - 20], [cx - 34, by - 8], [cx - 52, by - 2]], '#6a4a30');
+    for (let k = 0; k < 3; k++) p.L(cx - 50 + k * 5, by - 12 + k, cx - 50 + k * 5, by - 3, 1, '#3a2818');
+    p.L(cx - 52, by - 8, cx - 60, by - 14, 2, '#8a6a42'); p.L(cx - 34, by - 14, cx - 30, by - 16, 2, '#2a2a2e');
+    // 연장 걸이 (오른쪽): 나무 틀에 망치 · 집게 · 줄
+    p.R(cx + 34, by - 50, 3, 48, '#4a3020'); p.R(cx + 54, by - 50, 3, 48, '#4a3020'); p.R(cx + 32, by - 50, 27, 3, '#5a3a24');
+    p.L(cx + 39, by - 47, cx + 39, by - 26, 1, '#6a5a4a'); p.R(cx + 36, by - 28, 7, 5, '#3a3a42');
+    p.L(cx + 46, by - 47, cx + 44, by - 22, 1, '#5a5a62'); p.L(cx + 48, by - 47, cx + 49, by - 22, 1, '#5a5a62');
+    p.L(cx + 52, by - 47, cx + 52, by - 28, 2, '#4a4a52');
+    // 담금질 물통 (앞 오른쪽)
+    p.E(cx + 40, by + 2, 12, 4, '#1a1210'); p.R(cx + 29, by - 14, 22, 15, '#4a3020'); p.R(cx + 29, by - 10, 22, 2, '#2a2a2e'); p.R(cx + 29, by - 4, 22, 2, '#2a2a2e'); p.E(cx + 40, by - 14, 11, 3, '#2a3a40'); p.E(cx + 38, by - 15, 4, 1, '#6a8a90');
+    p.finish([22, 12, 8]);
+    out = { canvas: p.c, ax: 0.5, ay: 122 / 192, glow: [0, -22], glowTint: 0xff6a2a };
   } else if (kind === 'mattress') {
     // 22차 지옥호텔: 바깥 공터에 깔아 둔 낡은 매트리스 (얼룩·찢어진 솔기·삐져나온 짚). 층마다 때가 다르다
     const p = pen(64, 42);

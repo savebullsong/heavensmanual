@@ -7,7 +7,7 @@ import { WorldScene, type WorldHooks, type Stance, type RemoteInfo } from './wor
 import { ShopRoom, type ShopTarget } from './shoproom.ts';
 import { Dialog } from './dialog.ts';
 import { openLookPanel, lookPanelInsets } from './lookpanel.ts';
-import { ITEMS, STORES, menuFor, itemByKey, iconFor, itemIcon, effectText, priceText, moneyText, setWon, wonify, wonRate, HELL_FOOD, type ItemDef, type ItemCat } from './items.ts';
+import { ITEMS, STORES, menuFor, itemByKey, iconFor, itemIcon, effectText, priceText, moneyText, setWon, wonify, wonRate, cashText, HELL_FOOD, type ItemDef, type ItemCat } from './items.ts';
 import * as net from './net.ts';
 import { preloadPortrait, type PortraitSlot } from './portraits.ts';
 import { sukhumvitTestZone, decodeZone, type Zone, type Building } from './zone.ts';
@@ -106,7 +106,25 @@ const COUNTER_KEY = 'heavensmanual.counter';
 const autoCounter = () => { try { return localStorage.getItem(COUNTER_KEY) !== '0'; } catch { return true; } };
 const invisible = () => !!net.account()?.admin && localStorage.getItem(INVIS_KEY) === '1';
 /** 노자돈 환율: ฿10 = 노전 1닢 */
-const OBOL_RATE = 10;
+// 33차 노자돈 환전: 업(묵을 층 ÷ 13)만큼만, 값은 양쪽 다 형편없이 — 이승 돈은 저승에선 종이, 노전은 이승에선 쇳조각
+const XCH_CASH_PER_OBOL = 1000; // 이승 돈 ฿1,000 = 1닢
+const XCH_CASH_FEE_RATE = 0.3, XCH_CASH_FEE_BASE = 500; // 수수료: 바꾸는 돈의 3할 + ฿500 (통장에서 따로)
+const XCH_BAHT_PER_OBOL = 1; // 1닢 = ฿1
+const XCH_OBOL_FEE_RATE = 0.3, XCH_OBOL_FEE_BASE = 20; // 수수료: 바꾸는 노전의 3할 + 20닢
+const xchShare = (floor: number) => Math.max(1, Math.min(13, floor)) / 13;
+/** 업으로 정해지는 층 (지옥에서 시작할 층 · 환생 때도 같은 기준) */
+function karmaFloor(): number {
+  const j = judge(state.deeds ?? { good: 0, evil: 0 });
+  return Math.max(HELL_START, j.world === 'hell' ? j.floor : HELL_START);
+}
+/** 33차 천국에서 환생할 때의 선업 보너스 (이승 돈): ฿300 × 선업^0.8, 10 단위, 최대 ฿30,000 */
+function heavenBonus(): number {
+  const g = state.deeds?.good ?? 0;
+  if (g < 0.5) return 0;
+  return Math.min(30000, Math.round((300 * Math.pow(g, 0.8)) / 10) * 10);
+}
+/** 서울 사람인가 (돈 표기) */
+const seoulCash = () => (state.nextLife?.region ?? state.region) === 'seoul';
 const inHell = () => realm() === 'hell';
 const hellState = () => (state.hell ??= { floor: 1, cleared: [], notes: 0 });
 
@@ -337,7 +355,7 @@ async function boot() {
   setInterval(updateHud, 1000);
   setInterval(() => { snapPos(); state.played = (state.played ?? 0) + 4; state.seen = Date.now(); save(state); }, 4000);
   addEventListener('pagehide', () => { snapPos(); save(state); });
-  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior(), store: (k: 'tools' | 'antique', n: string) => openStore(k, n), terrace: () => enterTerrace(), officer: () => talkToOfficer(), pasharTalk: () => talkToPashar(), cage: () => openCage(), parrot: () => talkToParrot(), hstore: (k: HellVendor) => openHellStore(k), soul: () => renderSoul(), give: (k: string) => { addToBag(itemByKey(k)); save(state); }, regear: () => world?.setGear(gear()) }; // 개발용 확인 창구
+  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior(), store: (k: 'tools' | 'antique', n: string) => openStore(k, n), terrace: () => enterTerrace(), officer: () => talkToOfficer(), pasharTalk: () => talkToPashar(), cage: () => openCage(), parrot: () => talkToParrot(), hstore: (k: HellVendor) => openHellStore(k), smith: () => openSmith(), soul: () => renderSoul(), give: (k: string) => { addToBag(itemByKey(k)); save(state); }, regear: () => world?.setGear(gear()) }; // 개발용 확인 창구
 }
 
 // ───────────────────────── 장면 전환 ─────────────────────────
@@ -589,7 +607,7 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
  * 관리자: 지옥 n층 휴식 마을로 바로 옮겨 간다 (지도 확인용). 지옥 밖(현실·천국·귀신)에서 왔으면 그 세계를 적어 두고
  * '원래 세계로' 단추로 돌아간다 — 환생이 아니라 시찰에서 돌아오는 것이라 몸·돈·업은 그대로다
  */
-function adminTeleport(to: number | 'back' | 'heaven' | 'bkk' | 'seoul' | 'goat' | 'border' | 'terrace' | 'hlobby') {
+function adminTeleport(to: number | 'back' | 'heaven' | 'bkk' | 'seoul' | 'goat' | 'border' | 'terrace' | 'hlobby' | 'home') {
   if (!net.account()?.admin || busy || dlg.isOpen) return;
   document.querySelector('.set-panel')?.remove();
   closeMenus();
@@ -623,6 +641,20 @@ function adminTeleport(to: number | 'back' | 'heaven' | 'bkk' | 'seoul' | 'goat'
     if (state.adminTrip === 'hell') delete state.adminTrip;
     if (inHell() && world) { openGoatRoom(null); return; }
     void enterHell(hellState().floor || HELL_START, 'teleport').then(() => openGoatRoom(null));
+    return;
+  }
+  // 33차: 서울 달동네 골목 끝 내 집 (현실로 · 바로 집 안)
+  if (to === 'home') {
+    state.region = 'seoul';
+    if (realm() !== 'real') { state.realm = 'real'; delete state.adminTrip; }
+    save(state);
+    if (world) { world.destroy(); world = null; net.leaveZone(); }
+    void loadZone('seoul-gangnam').then(async (z) => {
+      const h = z.home ?? z.door;
+      await enterWorld([h.i, h.j], 'seoul-gangnam');
+      const k = world?.zone.buildings.findIndex((b) => b.cat === 'home') ?? -1;
+      if (k >= 0) enterInterior(k, { i: h.i, j: h.j }, null, false);
+    });
     return;
   }
   // 32차: 지옥 1층 환생 로비 (파샤르) — 지옥 밖이면 1층으로 내려가서 바로 로비 안
@@ -689,6 +721,7 @@ const hooks: WorldHooks = {
     toast(state.unloaded && wi?.note !== 'fuel' ? L.unloadedToast : wi?.note === 'needsArrows' ? L.noArrows : wi?.note === 'needsRifle' ? L.noRifleAmmo : wi?.note === 'fuel' ? L.fuelOut : L.noAmmo);
   },
   goatKing: () => (gkPending ? talkToGoatKing(gkPending.reason, gkPending.want) : talkToGoatKing('visit')),
+  changer: () => void talkToChanger(),
   notice(text) { toast(text, 'evil'); },
   money(n) {
     state.wallet = (state.wallet ?? 0) + n;
@@ -885,7 +918,7 @@ const hooks: WorldHooks = {
     if (key === 'bat' && realm() === 'real') state.batGiven = true;
     addToBag(it);
     toast(t().lootGot.replace('{item}', it.name[lang()]), 'good');
-    if (key === 'tshard') shardsToTembra(); // 30차: 열세 개면 템브라
+    // 33차: 파편은 저절로 붙지 않는다 — 대장간에서 직접 틀에 끼워 템브라로 조립한다
     save(state);
     if (document.querySelector('.bag-panel')) renderBag();
     renderQuick();
@@ -1316,17 +1349,10 @@ async function talkToPashar() {
       else { spend(KERBEROS); state.kerberos = (state.kerberos ?? 0) + 1; save(state); await dlg.say(L.perkKerbGot); }
     } else break;
   }
-  let carry = 0;
   let region = 'bkk';
-  if (ratio >= 100) {
-    await dlg.say(L.lobbyNothing);
-    await dlg.say(L.lobbyCityRandom);
-  } else {
-    const all = Math.floor(h.notes + (h.bank ?? 0));
-    const most = Math.floor((all * (100 - ratio)) / 100);
-    if (most > 0) { await dlg.say(L.lobbyExchange.replace('{n}', all.toLocaleString('en-US')).replace('{m}', most.toLocaleString('en-US')).replace('{x}', String(OBOL_RATE))); carry = most; }
-    else await dlg.say(L.lobbyNoObol);
-  }
+  if (ratio >= 100) { await dlg.say(L.lobbyNoCity); await dlg.say(L.lobbyCityRandom); }
+  // 33차: 노전 → 현생의 돈은 업(시작할 층 ÷ 13)만큼만, 값은 형편없이 · 수수료는 따로
+  const x = await rebirthExchange();
   await dlg.say(L.lobbyAsk);
   const go = await dlg.choose([L.lobbyGo, L.lobbyWait]);
   if (go === 1) { dlg.close(); busy = false; return; }
@@ -1337,15 +1363,77 @@ async function talkToPashar() {
   await dlg.say(L.lobbyBye);
   dlg.close();
   busy = false;
-  // 가져가는 노전: 손에 든 것부터, 모자라면 은행에서
   state.region = region;
-  shipThenRebirth(() => {
-    const fromHand = Math.min(carry, Math.floor(h.notes));
-    h.notes -= fromHand;
-    h.bank = Math.max(0, (h.bank ?? 0) - (carry - fromHand));
-    rebirthFrom('hell', carry * OBOL_RATE);
-    if (carry > 0) setTimeout(() => toast(L.lobbyCarry.replace('{n}', carry.toLocaleString('en-US')).replace('{b}', (carry * OBOL_RATE).toLocaleString('en-US')), 'good'), 600);
-  });
+  shipThenRebirth(() => payRebirthExchange(x));
+}
+/**
+ * 33차 환생할 때의 환전 (파샤르 · 지옥의 할아버지): 가진 노전(손 + 지옥 은행) 중 업만큼(시작할 층 ÷ 13)만 현생의 돈으로.
+ * 노전은 저 위에선 쇳조각 — 1닢 = ฿1, 수수료는 바꾸는 노전의 3할 + 20닢 따로 (치를 노전이 있어야 바꾼다)
+ */
+async function rebirthExchange(): Promise<{ n: number; fee: number }> {
+  const L = t();
+  const h = hellState();
+  const own = Math.floor(h.notes + (h.bank ?? 0));
+  const F = karmaFloor();
+  const share = xchShare(F);
+  const fee = (n: number) => Math.ceil(n * XCH_OBOL_FEE_RATE) + XCH_OBOL_FEE_BASE;
+  let max = Math.min(Math.floor(own * share), Math.floor((own - XCH_OBOL_FEE_BASE) / (1 + XCH_OBOL_FEE_RATE)));
+  while (max > 0 && max + fee(max) > own) max--;
+  const sc = seoulCash();
+  await dlg.say(L.lobbyXRule.replace('{o}', own.toLocaleString('en-US')).replace(/\{f\}/g, String(F)).replace('{p}', (Math.floor(share * 1000) / 10).toFixed(1)).replace('{r}', cashText(XCH_BAHT_PER_OBOL, sc)).replace('{c}', String(XCH_OBOL_FEE_BASE)));
+  if (max < 1) { await dlg.say(L.lobbyXPoor); return { n: 0, fee: 0 }; }
+  const opts = [...new Set([max, ...(max >= 4 ? [Math.ceil(max / 2)] : [])])];
+  const c = await dlg.choose([...opts.map((n) => L.lobbyXOpt.replace('{n}', n.toLocaleString('en-US')).replace('{a}', cashText(n * XCH_BAHT_PER_OBOL, sc)).replace('{f}', fee(n).toLocaleString('en-US'))), L.lobbyXNone]);
+  if (c < 0 || c >= opts.length) return { n: 0, fee: 0 };
+  return { n: opts[c], fee: fee(opts[c]) };
+}
+/** 고른 환전을 치르고 현실로 (노전은 손에 든 것부터, 모자라면 지옥 은행에서) */
+function payRebirthExchange(x: { n: number; fee: number }) {
+  const h = hellState();
+  const total = x.n + x.fee;
+  const fromHand = Math.min(total, Math.floor(h.notes));
+  h.notes -= fromHand;
+  h.bank = Math.max(0, (h.bank ?? 0) - (total - fromHand));
+  const cash = x.n * XCH_BAHT_PER_OBOL;
+  rebirthFrom('hell', cash);
+  if (x.n > 0) setTimeout(() => toast(t().lobbyCarry2.replace('{n}', x.n.toLocaleString('en-US')).replace('{a}', cashText(cash, seoulCash())), 'good'), 600);
+}
+/** 33차 염소대왕의 방 환전상 오볼로: 이승 통장의 돈 → 노전. 이번 지옥길에 업만큼(묵을 층 ÷ 13)만, ฿1,000 = 1닢, 수수료 3할 + ฿500 (통장에서 따로) */
+async function talkToChanger() {
+  if (busy || dlg.isOpen) return;
+  const L = t();
+  busy = true;
+  dlg.open({ name: L.xchName, portrait: 'changer' });
+  await dlg.say(pick(L.xchGreet));
+  const F = inHell() ? hellState().floor : karmaFloor();
+  const share = xchShare(F);
+  const gk = state.gk ?? 0;
+  if (!state.xch || state.xch.gk !== gk) state.xch = { gk, base: Math.floor(state.bank ?? 0), used: 0 };
+  const xs = state.xch;
+  const sc = state.region === 'seoul';
+  const bank = Math.floor(state.bank ?? 0);
+  const R = XCH_CASH_PER_OBOL;
+  const fee = (a: number) => Math.ceil(a * XCH_CASH_FEE_RATE) + XCH_CASH_FEE_BASE;
+  const cap = Math.floor(xs.base * share) - xs.used;
+  let n = Math.floor(Math.min(cap, (bank - XCH_CASH_FEE_BASE) / (1 + XCH_CASH_FEE_RATE)) / R);
+  while (n > 0 && n * R + fee(n * R) > bank) n--;
+  await dlg.say(L.xchRule.replace('{b}', cashText(bank, sc)).replace(/\{f\}/g, String(F)).replace('{p}', (Math.floor(share * 1000) / 10).toFixed(1)).replace('{r}', cashText(R, sc)).replace('{c}', cashText(XCH_CASH_FEE_BASE, sc)));
+  if (n < 1) await dlg.say(xs.used > 0 && cap < R ? L.xchUsedUp : L.xchPoor);
+  else {
+    const opts = [...new Set([n, ...(n >= 4 ? [Math.ceil(n / 2)] : []), ...(n >= 2 ? [1] : [])])];
+    const c = await dlg.choose([...opts.map((k) => L.xchOpt.replace('{a}', cashText(k * R, sc)).replace('{n}', String(k)).replace('{f}', cashText(fee(k * R), sc))), L.xchQuit]);
+    if (c >= 0 && c < opts.length) {
+      const k = opts[c], a = k * R, f = fee(a);
+      state.bank = Math.max(0, (state.bank ?? 0) - a - f);
+      hellState().notes += k;
+      xs.used += a;
+      save(state); renderHud();
+      sfx.dice();
+      await dlg.say(L.xchDone.replace('{n}', String(k)).replace('{a}', cashText(a, sc)).replace('{f}', cashText(f, sc)));
+    }
+  }
+  await dlg.say(pick(L.xchBye));
+  endTalk();
 }
 
 /** 현실로 다시 태어난다 (지옥에서 파샤르를 거쳐, 또는 귀신이 앵무새를 만나) */
@@ -1902,17 +1990,19 @@ async function talkToGoatKing(reason: GkWhy | 'visit', want = 0) {
     for (const l of L.gkA[c]) await dlg.say(l);
   }
   for (const l of L.gkBye) await dlg.say(l);
+  if (reason !== 'visit') await dlg.say(L.gkChanger);
   endTalk();
-  if (reason !== 'visit') { delete state.gkWait; save(state); leaveGoatRoom(); } // 상담이 끝나면 묵을 층의 휴식 마을로 떨어진다
+  // 33차: 상담이 끝나도 바로 떨어지지 않는다 — 환전상에게 들렀다가 문(나가는 매트)으로 나서면 묵을 층의 휴식 마을로
+  if (reason !== 'visit') { state.gkWait = { reason, want, done: true }; save(state); }
 }
 /** 142층 염소대왕의 방을 연다 (이 층 휴식 마을 위에 겹쳐 연다 — 나가면 그 휴식 마을). why가 있으면 잠시 뒤 염소대왕이 먼저 말을 건다 */
-function openGoatRoom(g: { reason: GkWhy; want: number } | null) {
+function openGoatRoom(g: { reason: GkWhy; want: number; done?: boolean } | null) {
   if (!world || world.zone.interior) return;
   const zh = world.zone.hell;
   if (!zh) return;
   const b: Building = { i0: zh.rest.i, j0: zh.rest.j, w: 1, d: 1, h: 0, cat: 'goatroom', color: '#000000' };
   openRoom(interiorZone(b, -142, { i: zh.rest.i, j: zh.rest.j }, t().gkRoom), null, false);
-  if (!g) return;
+  if (!g || g.done) return; // 33차: 상담을 마친 뒤 다시 열면 방만 (환전상에게 들르고 문으로 나간다)
   gkPending = g;
   state.gkWait = g; // 상담 중에 창을 닫아도 다시 열면 이 방에서
   save(state);
@@ -1926,6 +2016,7 @@ function openGoatRoom(g: { reason: GkWhy; want: number } | null) {
 /** 방을 나선다: 아래로 떨어져 묵을 층의 휴식 마을로 */
 function leaveGoatRoom() {
   if (world?.zone.interior?.kind !== 'goatroom') return;
+  if (state.gkWait) { delete state.gkWait; save(state); }
   const fx = hellFall(true);
   fx.covered.then(() => {
     leaveInterior(true);
@@ -2275,6 +2366,25 @@ function repairList(list: Element, hell: boolean, redraw: () => void) {
   const items = repairables(hell);
   const p0 = document.createElement('p'); p0.className = 'cage-note'; p0.textContent = hell ? L.smithLine : L.repairLine; list.appendChild(p0);
   if (!items.length) { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = L.repairNothing; list.appendChild(p); return; }
+  // 33차: 한 번에 전부 고치기 (값은 하나씩 고칠 때와 같다)
+  if (items.length >= 2) {
+    const total = items.reduce((a, it) => a + repairCost(it.key), 0);
+    const all = document.createElement('button');
+    all.className = 'primary repair-all';
+    all.textContent = L.repairAll.replace('{n}', String(items.length)).replace('{p}', priceText(total, hell));
+    const have0 = hell ? hellState().notes : state.wallet ?? 0;
+    all.disabled = have0 < total;
+    all.onclick = () => {
+      const have = hell ? hellState().notes : state.wallet ?? 0;
+      if (have < total) { toast(hell ? L.hwNoMoney : L.noMoney); return; }
+      if (hell) hellState().notes -= total; else state.wallet = (state.wallet ?? 0) - total;
+      for (const it of items) delete state.dura![it.key];
+      save(state); updateHud(); world?.setGear(gear()); renderAmmo();
+      toast(L.repairAllDone.replace('{n}', String(items.length)), 'good');
+      redraw();
+    };
+    list.appendChild(all);
+  }
   for (const it of items) {
     const cost = repairCost(it.key);
     const row = itemRow(it, `${L.duraShort.replace('{n}', String(duraOf(it.key))).replace('{m}', String(duraMax(it)))} · ${priceText(cost, hell)}`, () => {
@@ -2295,7 +2405,29 @@ const ENH_ODDS = [1, 1, 1, 1, 0.7, 0.55, 0.42, 0.32, 0.24, 0.17, 0.12]; // 칸 =
 function enhanceList(list: Element, redraw: () => void) {
   const L = t();
   const tem = state.bag?.tembra ?? 0, sh = state.bag?.tshard ?? 0;
-  const p0 = document.createElement('p'); p0.className = 'cage-note'; p0.textContent = L.enhLine.replace('{t}', String(tem)).replace('{s}', String(sh)); list.appendChild(p0);
+  // 33차: ① 파편을 직접 틀에 끼워 템브라를 조립한다 (열세 칸) → ② 템브라를 쓸 장비를 고른다
+  const asm = document.createElement('div');
+  asm.className = 'tembra-asm';
+  const filled = Math.min(12, state.tasm ?? 0);
+  asm.innerHTML = `<b class="asm-title"></b><p class="cage-note"></p><div class="asm-ring"></div><button class="primary asm-put"></button>`;
+  asm.querySelector('.asm-title')!.textContent = L.asmTitle;
+  asm.querySelector('.cage-note')!.textContent = L.asmLine.replace('{s}', String(sh)).replace('{t}', String(tem));
+  const ring = asm.querySelector('.asm-ring') as HTMLElement;
+  for (let k = 0; k < 13; k++) { const d = document.createElement('i'); const a = (k / 13) * Math.PI * 2 - Math.PI / 2; d.style.left = `${50 + Math.cos(a) * 40}%`; d.style.top = `${50 + Math.sin(a) * 40}%`; if (k < filled) d.className = 'on'; ring.appendChild(d); }
+  const put = asm.querySelector('.asm-put') as HTMLButtonElement;
+  put.textContent = L.asmPut.replace('{n}', String(filled));
+  put.disabled = sh < 1;
+  put.onclick = () => {
+    if ((state.bag?.tshard ?? 0) < 1) { toast(L.asmNone); return; }
+    state.bag!.tshard -= 1;
+    state.tasm = (state.tasm ?? 0) + 1;
+    if (state.tasm >= 13) { state.tasm = 0; state.bag!.tembra = (state.bag!.tembra ?? 0) + 1; toast(L.tembraMade2, 'good'); sfx.chime(); }
+    else sfx.thud(sfx.spot(0, 0));
+    save(state); renderQuick();
+    redraw();
+  };
+  list.appendChild(asm);
+  const p0 = document.createElement('p'); p0.className = 'cage-note'; p0.textContent = `${L.asmPick} — ${L.enhRule}`; list.appendChild(p0);
   const ks = new Set<string>([...Object.values(state.equip ?? {}).filter(Boolean) as string[], ...Object.keys(state.bag ?? {}).filter((k) => (state.bag?.[k] ?? 0) > 0)]);
   const items = [...ks].map((k) => itemByKey(k)).filter((it) => it && it.hell && isGearItem(it) && it.note !== 'fuel' && (it.enh ?? 0) < ENH_MAX);
   if (!items.length) { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = L.enhNothing; list.appendChild(p); return; }
@@ -2303,7 +2435,7 @@ function enhanceList(list: Element, redraw: () => void) {
     const next = (it.enh ?? 0) + 1;
     const odds = ENH_ODDS[next];
     const row = itemRow(it, L.enhOdds.replace('{n}', String(next)).replace('{p}', String(Math.round(odds * 100))), async () => {
-      if ((state.bag?.tembra ?? 0) < 1) { toast(L.enhNoTembra); return; }
+      if ((state.bag?.tembra ?? 0) < 1) { toast(L.enhNoTem2); return; }
       if (!(await confirmBox(L.enhAsk.replace('{item}', it.name[lang()]).replace('{n}', String(next)).replace('{p}', String(Math.round(odds * 100))), L.enhGo))) return;
       if ((state.bag?.tembra ?? 0) < 1) return;
       state.bag!.tembra -= 1;
@@ -2345,13 +2477,6 @@ function confirmBox(text: string, ok: string): Promise<boolean> {
     row.append(no, yes); box.append(p, row); wrap.appendChild(box);
     document.body.appendChild(wrap);
   });
-}
-/** 템브라 파편 열세 개가 모이면 저절로 템브라 하나가 된다 */
-function shardsToTembra() {
-  const b = state.bag ?? {};
-  let made = 0;
-  while ((b.tshard ?? 0) >= 13) { b.tshard -= 13; b.tembra = (b.tembra ?? 0) + 1; made++; }
-  if (made) toast(t().tembraMade.replace('{n}', String(made)), 'good');
 }
 
 function gear() {
@@ -2916,10 +3041,13 @@ async function talkToOfficer() {
   if (fin !== 0) { await dlg.say(L.offRelief); dlg.close(); busy = false; return; }
   await dlg.say(L.offSigh);
   await prepareNextLife({ name: L.officer, portrait: 'luen' }, null);
+  // 33차: 선업의 값 — ฿300 × 선업^0.8 (10 단위 · 최대 ฿30,000)
+  const bonus = heavenBonus();
+  await dlg.say(bonus > 0 ? L.offBonus.replace('{g}', fmtKarma(state.deeds?.good ?? 0)).replace('{a}', cashText(bonus, seoulCash())) : L.offBonusNone);
   await dlg.say(L.offSend);
   dlg.close();
   busy = false;
-  shipThenRebirth(() => rebirthFrom('heaven'));
+  shipThenRebirth(() => heavenRebirth(bonus));
 }
 // ───────────────────────── 26차: 다음 생 상담 ─────────────────────────
 /** 선업(이번 생의 선행 점수)으로 다음 생에 가져갈 물건과 값 — 싸움을 막 시작할 만큼부터 권총까지 */
@@ -3015,20 +3143,20 @@ async function talkToGrandpa(hell: boolean) {
     const ratio0 = Math.round(evilRatio(state.deeds ?? { good: 0, evil: 0 }) ?? 100);
     await prepareNextLife({ name: L.grandpaName, portrait: 'grandpa' }, hell && ratio0 >= 100 ? (Math.random() < 0.5 ? 'seoul' : 'bkk') : null);
   }
+  // 33차: 지옥에선 파샤르와 같은 환전 (업만큼 · 형편없는 값), 천국에선 선업의 값
+  const x = hell ? await rebirthExchange() : null;
+  const bonus = hell ? 0 : heavenBonus();
+  if (!hell && bonus > 0) await dlg.say(L.grandpaBonus.replace('{a}', cashText(bonus, seoulCash())));
   await dlg.say(L.grandpaBye);
   dlg.close();
   busy = false;
-  if (!hell) { shipThenRebirth(() => rebirthFrom('heaven')); return; }
-  // 지옥: 파샤르와 같은 셈으로 노전을 바꿔 준다 (덤도 설교도 없이)
-  const h = hellState();
-  const ratio = Math.round(evilRatio(state.deeds ?? { good: 0, evil: 0 }) ?? 100);
-  const carry = Math.floor((Math.floor(h.notes + (h.bank ?? 0)) * (100 - ratio)) / 100);
-  shipThenRebirth(() => {
-    const fromHand = Math.min(carry, Math.floor(h.notes));
-    h.notes -= fromHand; h.bank = Math.max(0, (h.bank ?? 0) - (carry - fromHand));
-    rebirthFrom('hell', carry * OBOL_RATE);
-    if (carry > 0) setTimeout(() => toast(L.lobbyCarry.replace('{n}', carry.toLocaleString('en-US')).replace('{b}', (carry * OBOL_RATE).toLocaleString('en-US')), 'good'), 600);
-  });
+  if (!hell) { shipThenRebirth(() => heavenRebirth(bonus)); return; }
+  shipThenRebirth(() => payRebirthExchange(x ?? { n: 0, fee: 0 }));
+}
+/** 33차: 천국에서 환생 — 선업의 값을 쥐고 태어난다 */
+function heavenRebirth(bonus: number) {
+  rebirthFrom('heaven', bonus);
+  if (bonus > 0) setTimeout(() => toast(t().heavenBonusToast.replace('{a}', cashText(bonus, seoulCash())), 'good'), 600);
 }
 /** 21차: 안내천사가 따라다니는가 — 처음 온 영혼이 천국에 익숙해질 때까지 (종교행사에 한 번 다녀오면 끝, 따돌리면 멈춘다) */
 function ywShouldFollow() {
@@ -3520,13 +3648,16 @@ function renderHud() {
     <div class="hud-left${workLine ? ' working' : ''}"><div class="where" data-zone="${escHtml(place)}"><b>${escHtml(place)}</b></div>${scene === 'shop' && realm() === 'ghost' ? `<span class="hint">${L.hintGhost}</span>` : ''}<span class="work">${wonify(workLine)}</span>${workLine && world?.isWorkingInside ? `<button class="work-stop">${L.workStop}</button>` : ''}</div>
     <div class="hud-tools">${live}<div class="hud-right">
       <span class="hpbox" title="${L.hpLabel}"><span class="clock"></span><i class="hpbar"><i></i></i><b class="hp-over" hidden></b></span>
-      <span class="wallet"></span>
+      <span class="wallet"></span>${scene === 'world' && realm() === 'real' && !world?.zone.interior ? `<button class="to-bank" aria-label="${L.bankFind}" title="${L.bankFind}">${BANK_SVG}</button>` : ''}
       <button class="to-soul">${narrow ? L.rankShort : L.rank} <b class="rk">${state.soul?.rank ?? 1}</b></button>
       <button class="to-bag">${L.bag}</button>
       <button class="to-set" aria-label="${L.settings}" title="${L.settings}">${SET_SVG}${narrow ? '' : `<span>${L.settings}</span>`}</button>
     </div></div>
     ${scene === 'world' && world?.zone.attribution ? '<a class="attrib" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>' : ''}`;
   (hud.querySelector('.to-bag') as HTMLButtonElement).onclick = toggleBag;
+  // 33차: 은행 단추 — 가장 가까운 은행으로 길 안내 (돈을 맡겨야 죽어도 남는다)
+  const tb = hud.querySelector('.to-bank') as HTMLButtonElement | null;
+  if (tb) tb.onclick = () => { if (!world?.guideBank()) toast(L.bankNone); };
   (hud.querySelector('.to-set') as HTMLButtonElement).onclick = toggleSettings;
   (hud.querySelector('.to-soul') as HTMLButtonElement).onclick = toggleSoul;
   hud.querySelector('.work-stop')?.addEventListener('click', () => { world?.stopWorkInside(); leaveInterior(); });
@@ -3570,7 +3701,7 @@ function renderSettings() {
     <section class="set-sec"><h4 class="h-fight"></h4><div class="set-row"><span class="lbl l-counter"></span><div class="seg s-counter"></div></div><p class="note n-counter"></p></section>
     <section class="set-sec"><h4 class="h-lang"></h4><div class="seg s-lang wide"></div></section>
     <section class="set-sec set-acc"><h4 class="h-acc"></h4><div class="acc"></div></section>
-    ${net.account()?.admin ? `<section class="set-sec set-admin"><h4 class="h-admin"></h4><div class="set-row"><span class="lbl l-inv"></span><div class="seg s-inv"></div></div><div class="set-row"><span class="lbl l-tp"></span><div class="seg s-tp"></div></div><div class="set-row"><span class="lbl l-city"></span><div class="seg s-city"></div></div><div class="set-row"><span class="lbl l-dot3"></span><div class="seg s-dot3"></div></div><div class="set-row"><span class="lbl"></span><button class="tp-heaven"></button></div><div class="set-row"><span class="lbl l-worlds"></span><div class="tp-more"><button class="tp-terrace"></button><button class="tp-hlobby"></button><button class="tp-goat"></button><button class="tp-border"></button></div></div>${state.adminTrip && state.adminTrip !== realm() ? '<div class="set-row"><span class="lbl"></span><button class="tp-back"></button></div>' : ''}<p class="note n-admin"></p></section>` : ''}`;
+    ${net.account()?.admin ? `<section class="set-sec set-admin"><h4 class="h-admin"></h4><div class="set-row"><span class="lbl l-inv"></span><div class="seg s-inv"></div></div><div class="set-row"><span class="lbl l-tp"></span><div class="seg s-tp"></div></div><div class="set-row"><span class="lbl l-city"></span><div class="seg s-city"></div></div><div class="set-row"><span class="lbl l-dot3"></span><div class="seg s-dot3"></div></div><div class="set-row"><span class="lbl"></span><button class="tp-heaven"></button></div><div class="set-row"><span class="lbl l-worlds"></span><div class="tp-more"><button class="tp-home"></button><button class="tp-terrace"></button><button class="tp-hlobby"></button><button class="tp-goat"></button><button class="tp-border"></button></div></div>${state.adminTrip && state.adminTrip !== realm() ? '<div class="set-row"><span class="lbl"></span><button class="tp-back"></button></div>' : ''}<p class="note n-admin"></p></section>` : ''}`;
   el.querySelector('.menu-head b')!.textContent = L.settings;
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
   el.querySelector('.set-sec h4')!.textContent = L.setSound;
@@ -3634,6 +3765,8 @@ function renderSettings() {
     const tt = el.querySelector('.tp-terrace') as HTMLButtonElement, tl = el.querySelector('.tp-hlobby') as HTMLButtonElement;
     tt.textContent = L.adminTerrace; tt.onclick = () => adminTeleport('terrace');
     tl.textContent = L.adminHellLobby; tl.onclick = () => adminTeleport('hlobby');
+    const th = el.querySelector('.tp-home') as HTMLButtonElement;
+    th.textContent = L.adminHome; th.onclick = () => adminTeleport('home');
   }
   document.body.appendChild(el);
   const hudBottom = document.getElementById('hud')?.getBoundingClientRect().bottom ?? 56;
@@ -3745,6 +3878,8 @@ function placeName() {
 let hudNarrow = false;
 // 영혼 설정 단추: 빛살 두른 고리
 const SET_SVG = '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="10" cy="10" r="3.1" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 1.8v2.6M10 15.6v2.6M1.8 10h2.6M15.6 10h2.6M4.2 4.2l1.9 1.9M13.9 13.9l1.9 1.9M4.2 15.8l1.9-1.9M13.9 6.1l1.9-1.9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+/** 33차: 은행 단추 그림 (기둥 넷 · 박공 지붕) */
+const BANK_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 2 2 7v2h20V7z" fill="currentColor"/><path d="M4 10h3v8H4zm6.5 0h3v8h-3zM17 10h3v8h-3z" fill="currentColor"/><path d="M2 19h20v3H2z" fill="currentColor"/></svg>';
 document.addEventListener('pointerdown', unlockAudio, true);
 // 길게 누르기 = 이동이라, 게임 화면에서는 길게 눌러도 메뉴가 뜨지 않게
 document.getElementById('game')?.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -3790,6 +3925,8 @@ function updateHud() {
   if (w && !border) w.innerHTML = inHell()
     ? `<span class="lbl">${t().notesLabel}</span> <i class="obol-ic"></i>${Math.floor(hellState().notes).toLocaleString('en-US')}${(state.debt ?? 0) > 0 ? ` <span class="debt">${t().debtHud.replace('{n}', String(Math.ceil(state.debt ?? 0)))}</span>` : ''}`
     : `<span class="lbl">${t().wallet}</span> ${moneyText(Math.floor(state.wallet ?? 0))}`;
+  // 33차: 들고 다니는 돈이 많으면 은행 단추가 깜빡인다 (죽으면 길에 흩어진다)
+  hud.querySelector('.to-bank')?.classList.toggle('urge', (state.wallet ?? 0) >= 1000);
   updateHpBar(state.hp ?? maxHp(), maxHp());
 }
 
@@ -3970,7 +4107,6 @@ function openBank(name: string) {
       <div class="bank-quick"></div>
       <div class="bank-act"><button class="primary b-in">${L.bankIn}</button><button class="primary b-out">${L.bankOut}</button></div>
       <p class="bank-note">${L.bankNote}</p>
-      <div class="obol-ex"><div class="bank-row"><span>${L.obolEx}</span><b class="b-obol"></b></div><p class="bank-note">${wonify(L.obolExSub.replace('{r}', String(OBOL_RATE)))}</p><div class="bank-quick obol-quick"></div></div>
     </div>`;
   el.querySelector('.menu-head b')!.textContent = name;
   el.querySelector('.store-line')!.textContent = L.bankLine;
@@ -3979,23 +4115,8 @@ function openBank(name: string) {
   const draw = () => {
     el.querySelector('.b-wallet')!.textContent = moneyText(Math.floor(state.wallet ?? 0));
     el.querySelector('.b-bank')!.textContent = moneyText(Math.floor(state.bank ?? 0));
-    el.querySelector('.b-obol')!.textContent = L.obolFmt.replace('{n}', String(Math.floor(hellState().notes)));
   };
-  // 노자돈: 지갑의 바트를 노전으로 바꿔 둔다 (죽어서 지옥에 가면 그대로 들고 간다 · 되돌릴 수 없음)
-  for (const b of [100, 500, 1000]) {
-    const btn = document.createElement('button');
-    btn.textContent = wonify(L.obolExBtn.replace('{b}', b.toLocaleString('en-US')).replace('{n}', String(b / OBOL_RATE)));
-    btn.onclick = () => {
-      if ((state.wallet ?? 0) < b) { toast(L.noMoney); return; }
-      state.wallet = (state.wallet ?? 0) - b;
-      hellState().notes += b / OBOL_RATE;
-      save(state);
-      updateHud();
-      draw();
-      toast(L.obolDone.replace('{n}', String(b / OBOL_RATE)), 'good');
-    };
-    el.querySelector('.obol-quick')!.appendChild(btn);
-  }
+  // 33차: 현실 은행의 노자돈 미리 바꾸기는 없앴다 — 이승 돈은 염소대왕의 방 환전상에게서만 (업만큼 · 값은 형편없이)
   const quick = el.querySelector('.bank-quick')!;
   for (const n of [100, 500, 1000]) {
     const b = document.createElement('button');

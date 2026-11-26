@@ -6,13 +6,13 @@ import { goatCharSet } from './goat.ts';
 import { packFor, PACK_FOOT } from './maskgear.ts';
 import { vendorGear, hasVendorGear, VGEAR_FOOT } from './vendorgear.ts';
 import { drawDalHouse } from './dalgfx.ts';
-import { drownedCanvas, monkLook, shoreF, shoreLine, shoreSkyCanvas, drawShoreChunk } from './border.ts';
-import { wingTexture, cloudTexture, heavenVignette, cloudStairTexture, heavenTowerTexture, terraceSkyTexture, hellPortalTexture, bedTexture, BED_ANCHOR, batWingTexture, hornTexture } from './heavengfx.ts';
+import { drownedCanvas, monkLook, shoreF, shoreLine, shoreSkyCanvas, drawShoreChunk, capeRocks, drawCapeRock } from './border.ts';
+import { wingTexture, cloudTexture, heavenVignette, cloudStairTexture, heavenTowerTexture, terraceSkyTexture, hellPortalTexture, bedTexture, BED_ANCHOR, batWingTexture, hornTexture, devilTailTexture } from './heavengfx.ts';
 import { hellDecor } from './hellprops.ts';
 import { Application, ColorMatrixFilter, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture, TilingSprite } from 'pixi.js';
 import { type Look } from './character.ts';
 import { MISS_HWANG, TALUS_LOOK, MASKGIRL_LOOK, yunaeLook, charSet, frameOf, artDensity, mirrorFrameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, ANIM_FPS, IMPACT, TWO, type CharSet, type Dir, type Anim, type Frame } from './sprites.ts';
-import { type Zone, type Building, type Lane, type Prop, type HellVendor, type Furn, findPath, walkable, randomWalkTileNear, tileAt } from './zone.ts';
+import { type Zone, type Building, type Lane, type Prop, type HellVendor, type Furn, findPath, walkable, randomWalkTileNear, tileAt, groundAt } from './zone.ts';
 import { iso, TW, TH, drawBuilding, drawGroundChunk, buildingHeight } from './gfx.ts';
 import { beyondOf } from './beyond.ts';
 import { drawBuildingKit, drawGroundKit, buildingTop, upperFloors, carSprite, propSprite, CAR_MODELS, CHUNK, kitOk } from './street.ts';
@@ -52,6 +52,12 @@ const GK_LIFT = 16, GK_FACE = 218;
 /** 31차 염소대왕의 앉은 도트 (2배 밀도 · 발 자리 = 아래 가운데). 관리자 칸이 비면 기본 그림 npc/goat-king.png
  *  32차: 손으로 찍은 거인 도트 (옥좌째 440×626 · 게임 속 220×313) */
 let gkSet: Promise<CharSet | null> | null = null;
+/** 33차: 기본 그림일 때 숨쉬고 깜빡이는 네 장 (내쉼 · 들이쉼 · 내쉼+감음 · 들이쉼+감음). 관리자 그림이면 없음 */
+let gkAnim: Texture[] | null = null;
+function loadGkAnim() {
+  const names = ['goat-king', 'goat-king-in', 'goat-king-blink', 'goat-king-in-blink'];
+  void Promise.all(names.map((n) => new Promise<Texture | null>((res) => { const im = new Image(); im.onload = () => { const tx = Texture.from(im); tx.source.scaleMode = 'nearest'; res(tx); }; im.onerror = () => res(null); im.src = `npc/${n}.png`; }))).then((a) => { if (a.every(Boolean)) gkAnim = a as Texture[]; });
+}
 function goatKingSet(): Promise<CharSet | null> {
   gkSet ??= portraitUrl('sprite-goat-king').catch(() => null).then((u) => new Promise<CharSet | null>((res) => {
     const im = new Image(); im.crossOrigin = 'anonymous';
@@ -63,6 +69,7 @@ function goatKingSet(): Promise<CharSet | null> {
       res({ mode: 'u', attack: null, frames, counts: { idle: 1 }, eight: true, masks: new Map() });
     };
     im.onerror = () => res(null);
+    if (!u) loadGkAnim();
     im.src = u ?? 'npc/goat-king.png';
   }));
   return gkSet;
@@ -108,7 +115,7 @@ function tex(c: HTMLCanvasElement): Texture {
   return tx;
 }
 
-export type NpcKind = 'passer' | 'thug' | 'suturer' | 'monster' | 'pashar' | 'clerk' | 'angel' | 'yellowwing' | 'officer' | 'guard' | 'talus' | 'soul' | 'vendor' | 'fighter' | 'elder' | 'sleeper' | 'goat' | 'maskgirl' | 'yunae' | 'goatking';
+export type NpcKind = 'passer' | 'thug' | 'suturer' | 'monster' | 'pashar' | 'clerk' | 'angel' | 'yellowwing' | 'officer' | 'guard' | 'talus' | 'soul' | 'vendor' | 'fighter' | 'elder' | 'sleeper' | 'goat' | 'maskgirl' | 'yunae' | 'goatking' | 'changer';
 export type Realm = 'real' | 'ghost' | 'hell' | 'heaven' | 'border'; // 24차: border = 경계의 해변 (귀신 대신)
 export type Stance = 'talk' | 'hostile' | 'all';
 /** name = 아이디(프로필·신고에 쓰는 열쇠), nick = 게임 속 이름(보이는 이름) */
@@ -173,6 +180,8 @@ interface Walker {
   wingK?: number; // 21차: 날개 배율 (택시 천사는 아주 크다)
   /** 22차: 서큐버스의 뿔 (머리 위에 따라 그린다) */
   horns?: Sprite;
+  /** 33차: 악마의 꼬리 (환전상) */
+  devTail?: Sprite;
   /** 31차: 마스크 소녀의 짐 — 몸 뒤(under)·앞(over)에 겹치는 화염방사기와 바구니 */
   pack?: { under: Sprite; over: Sprite; vend?: HellVendor };
   raider?: boolean; // 4층부터의 습격 때 마을로 몰려든 괴물
@@ -241,6 +250,8 @@ export interface WorldHooks {
   fbossDown(key: string, mine: boolean): void;
   /** 31차 염소대왕: 말을 걸면 상담 (떨어진 자들의 상담자 — 싸우지 않는다) */
   goatKing(): void;
+  /** 33차: 염소대왕의 방 환전상 오볼로 */
+  changer(): void;
   /** 31차: 쏘는 무기에 쏠 것이 없을 때 알림 (화살·탄약·연료·빼 둠) */
   noShots(): void; // 30차: 길 안내 켜짐(이름) · 꺼짐(null) — 화면의 '길 안내 끄기' 칩
   /** 19차: 종교시설의 가장 높은 이 — 능력치 되돌리기 */
@@ -542,6 +553,7 @@ export class WorldScene {
     else if (this.realm === 'heaven') this.setupHeaven();
     else {
       this.setupCityHaze();
+      this.setupBankSigns(); // 33차
       for (let n = 0; n < PED_COUNT; n++) this.spawnNpc('passer');
       // 21차: 거리의 적은 구역 위험도대로 뽑는다 (rollThug). 수는 그대로(14)
       for (let n = 0; n < (this.realm === 'real' ? THUG_COUNT + DRUNK_COUNT + ROBBER_COUNT + MAFIA_COUNT : THUG_COUNT); n++) this.spawnNpc('thug');
@@ -558,6 +570,7 @@ export class WorldScene {
       this.player.sprite.alpha = 0.6;
     }
     if (this.realm !== 'heaven') this.spawnCars(); // 천국엔 차가 없다
+    this.setupBeyondLife(); // 33차: 지도 밖 거리의 차 · 행인 그림자
     this.root.eventMode = 'static';
     this.root.hitArea = this.app.screen;
     this.root.on('pointerdown', (e) => {
@@ -729,7 +742,7 @@ export class WorldScene {
     for (const p of this.zone.props) {
       const v = (p.i * 7 + p.j * 3) % 4;
       if (p.kind === 'torture') { this.addTorture(p.i, p.j, p.o ?? 0); continue; }
-      const decor = p.kind === 'fence' || p.kind === 'crag' || p.kind === 'htree' || p.kind === 'rock' || p.kind === 'crack' || p.kind === 'dicetable' || p.kind === 'campfire' || p.kind === 'bones' || p.kind === 'skulls' || p.kind === 'stake' || p.kind === 'cauldron' || p.kind === 'cage' || p.kind === 'bonfire' || p.kind === 'junk' || p.kind === 'reeds' || p.kind === 'mattress' || p.kind === 'anvil' || (p.kind === 'lantern' && theme !== 'ash');
+      const decor = p.kind === 'fence' || p.kind === 'crag' || p.kind === 'htree' || p.kind === 'rock' || p.kind === 'crack' || p.kind === 'dicetable' || p.kind === 'campfire' || p.kind === 'bones' || p.kind === 'skulls' || p.kind === 'stake' || p.kind === 'cauldron' || p.kind === 'cage' || p.kind === 'bonfire' || p.kind === 'junk' || p.kind === 'reeds' || p.kind === 'mattress' || p.kind === 'anvil' || p.kind === 'forge' || (p.kind === 'lantern' && theme !== 'ash');
       if (decor) {
         // 같은 그림이 되풀이되지 않게: 나무·바위·땅 자국은 24가지, 해골 더미·꼬챙이·철창·가마솥·뼈는 12가지
         const vv = Math.floor(((p.i * 73856093) ^ (p.j * 19349663)) >>> 0) % (p.kind === 'crag' ? 8 : p.kind === 'htree' || p.kind === 'rock' || p.kind === 'crack' ? 24 : p.kind === 'fence' ? 6 : 12);
@@ -1851,6 +1864,58 @@ export class WorldScene {
    * 31차 염소대왕 (지옥 142층 · 자기 방의 판관석 뒤에 앉아 있다): 사용자 그림을 따라 찍은 도트 — 판관 모자 · 숫양 뿔 · 붉은 눈 ·
    * 검붉은 관복 · 깍지 낀 손. 앉은 윗몸만 있고 아랫몸은 판관석이 가린다. 관리자 칸 sprite-goat-king에 그림을 올리면 그것으로
    */
+  /** 33차 염소대왕의 방: 숨쉬기 · 눈 깜빡임 · 눈빛 · 화로 불꽃 */
+  private gkFx: { king: Walker; eyes: Sprite[]; blinkT: number; blinkOn: number; breathIn: boolean; fires: { g: Graphics; glow: Sprite; pool: Sprite; x: number; y: number; seed: number }[] } | null = null;
+  private setupGoatFx(king: Walker) {
+    const eyes = [-1, 1].map(() => { const e = new Sprite(this.glowTex()); e.anchor.set(0.5); e.tint = 0xff3a22; e.blendMode = 'add'; e.scale.set(0.22, 0.14); e.eventMode = 'none'; this.objects.addChild(e); return e; });
+    const fires: NonNullable<typeof this.gkFx>['fires'] = [];
+    for (const f of this.zone.interior?.furn ?? []) {
+      if (f.kind !== 'gkbrazier') continue;
+      const [x, y0] = iso(f.i + 0.5, f.j + 0.5);
+      const y = y0 - (f.h - 6);
+      const g = new Graphics(); g.blendMode = 'add'; g.zIndex = f.i + f.j + 1.2; g.eventMode = 'none';
+      const glow = new Sprite(this.glowTex()); glow.anchor.set(0.5); glow.tint = 0xff6a2a; glow.blendMode = 'add'; glow.position.set(x, y - 14); glow.zIndex = f.i + f.j + 1.1; glow.eventMode = 'none';
+      const pool = new Sprite(this.glowTex()); pool.anchor.set(0.5); pool.tint = 0xff4a1a; pool.blendMode = 'add'; pool.position.set(x, y0 + 4); pool.zIndex = -50; pool.eventMode = 'none';
+      this.objects.addChild(pool, glow, g);
+      fires.push({ g, glow, pool, x, y, seed: f.i * 3 + f.j });
+    }
+    this.gkFx = { king, eyes, blinkT: 3 + Math.random() * 3, blinkOn: 0, breathIn: false, fires };
+  }
+  private updateGoatFx(dt: number) {
+    const fx = this.gkFx;
+    if (!fx) return;
+    const k = fx.king, t0 = this.time;
+    if (k.sprite.destroyed) { this.gkFx = null; return; }
+    // 숨: 천천히 들이쉬고 내쉰다 (넘나드는 자리에서 떨리지 않게 문턱을 둘로)
+    const br = Math.sin(t0 * 0.9);
+    if (br > 0.25) fx.breathIn = true; else if (br < -0.25) fx.breathIn = false;
+    // 깜빡임: 몇 초에 한 번, 아주 잠깐
+    fx.blinkT -= dt;
+    if (fx.blinkT <= 0) { fx.blinkOn = 0.14; fx.blinkT = 3.5 + Math.random() * 4.5; if (Math.random() < 0.25) fx.blinkT = 0.3; }
+    if (fx.blinkOn > 0) fx.blinkOn -= dt;
+    const blink = fx.blinkOn > 0;
+    if (gkAnim && k.cs?.frames.size) k.sprite.texture = gkAnim[(fx.breathIn ? 1 : 0) + (blink ? 2 : 0)];
+    // 붉은 눈빛 (기본 그림일 때만 — 관리자 그림은 눈 자리를 모른다)
+    const [sx, sy] = iso(k.x, k.y);
+    fx.eyes.forEach((e, n) => {
+      e.visible = !!gkAnim && !blink && k.sprite.visible;
+      e.position.set(sx + (n ? 10.3 : -10.3), sy - GK_LIFT - 227 - (fx.breathIn ? 1 : 0));
+      e.alpha = 0.4 + 0.22 * Math.sin(t0 * 3.3 + n) + 0.12 * Math.sin(t0 * 11.7 + n * 2);
+      e.zIndex = k.sprite.zIndex + 0.01;
+    });
+    // 화로: 일렁이는 불꽃 혀 · 빛무리 · 바닥의 붉은 빛
+    for (const f of fx.fires) {
+      const fl = 0.8 + 0.2 * Math.sin(t0 * 9.1 + f.seed) * Math.sin(t0 * 5.3 + f.seed * 2);
+      f.glow.alpha = 0.35 + 0.25 * fl; f.glow.scale.set(0.9 + 0.15 * fl, 0.8 + 0.15 * fl);
+      f.pool.alpha = 0.16 + 0.1 * fl; f.pool.scale.set(2.6 + 0.3 * fl, 1.2 + 0.15 * fl);
+      const g = f.g; g.clear();
+      for (let n = 0; n < 5; n++) {
+        const dx = -7 + n * 3.5, hh = 10 + 9 * Math.abs(Math.sin(t0 * (6 + n) + f.seed + n * 1.7)) + (n === 2 ? 6 : 0);
+        const col = n === 2 ? 0xffc04a : n % 2 ? 0xff5a2a : 0xd8301e;
+        g.moveTo(f.x + dx - 3, f.y).quadraticCurveTo(f.x + dx - 2 + Math.sin(t0 * 7 + n) * 2, f.y - hh * 0.6, f.x + dx + Math.sin(t0 * 5 + n) * 2.5, f.y - hh).quadraticCurveTo(f.x + dx + 2, f.y - hh * 0.5, f.x + dx + 3, f.y).fill({ color: col, alpha: 0.55 });
+      }
+    }
+  }
   private placeGoatKing(i: number, j: number) {
     const w = this.makeWalker(this.npcLook('passer'), i, j, 'goatking');
     w.dressId = -1; // 사람 옷을 입히지 않는다
@@ -1861,6 +1926,24 @@ export class WorldScene {
     this.walkers.push(w);
     void goatKingSet().then((cs) => { if (cs && !w.sprite.destroyed) w.cs = cs; });
     return w;
+  }
+  /** 33차 환전상 오볼로: 붉은 피부 · 검붉은 두건 로브 · 박쥐 날개 · 뿔 · 끝이 세모난 꼬리. 환전 탁자 뒤에 선다 (싸우지 않는다) */
+  private placeChanger(i: number, j: number) {
+    const look: Look = { sex: 'm', build: 2, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'raincoat', cols: { 1: '#c8322a', 10: '#c8322a', 2: '#1a0a0a', 8: '#6a1420', 3: '#7a1622', 9: '#7a1622', 4: '#3a0c12', 5: '#120808' } };
+    const w = this.makeWalker(look, i, j, 'changer');
+    w.maxHp = w.hp = 99999;
+    w.speed = 0; w.wait = 1e9; w.dir = 'sw';
+    const s = new Sprite(batWingTexture(0x4a0c14)); s.anchor.set(0.5, 0.62); s.scale.set(0.5); this.objects.addChild(s); w.wings = s; w.wingK = 1.1;
+    const hn = new Sprite(hornTexture(0xe0d2b4)); hn.anchor.set(0.5, 1); hn.scale.set(0.5); this.objects.addChild(hn); w.horns = hn;
+    const tl = new Sprite(devilTailTexture(0xb02a22)); tl.anchor.set(0.08, 0.72); tl.scale.set(0.5); this.objects.addChild(tl); w.devTail = tl;
+    this.walkers.push(w);
+    return w;
+  }
+  private thinkChanger(w: Walker, dt: number) {
+    const p = this.player, d = Math.hypot(p.x - w.x, p.y - w.y);
+    w.target = null; w.path = [];
+    if (d < 6) w.dir = p.x - w.x >= p.y - w.y ? 'se' : 'sw';
+    if (d < 9 && !w.bubble && Math.random() < dt * 0.05) { const c = t().xchIdle; this.bubble(w, c[Math.floor(Math.random() * c.length)]); }
   }
   private thinkGoatKing(w: Walker, dt: number) {
     const p = this.player, d = Math.hypot(p.x - w.x, p.y - w.y);
@@ -2217,6 +2300,27 @@ export class WorldScene {
       this.objects.addChild(s);
       return { s, t: -k * 9 - Math.random() * 6, T: 22 + Math.random() * 14, i: 0, j: 0 };
     });
+    // 33차: 해변 양 끝의 바위 곶 · 그 너머 안개 벽
+    for (const r of capeRocks()) {
+      const d = drawCapeRock(r);
+      const sp = new Sprite(tex(d.canvas));
+      sp.position.set(d.x, d.y);
+      sp.zIndex = r.i + r.j + (r.w + r.d) / 2;
+      sp.eventMode = 'none';
+      this.objects.addChild(sp);
+      this.cullAdd(sp, d.x, d.y, d.x + d.canvas.width, d.y + d.canvas.height);
+    }
+    for (const side of [-1, 1]) for (let j = -14; j < this.zone.H + 16; j += 3.2) {
+      const c = new Sprite(cloudTexture());
+      c.anchor.set(0.5, 0.6); c.tint = 0xa49aa8; c.alpha = 0.78;
+      const [x, y] = iso(side < 0 ? -11 - (j % 2) : this.zone.W + 10 + (j % 2), j);
+      c.position.set(x, y);
+      c.scale.set(1.9 + Math.abs(Math.sin(j)) * 0.6);
+      c.zIndex = 9e5;
+      c.eventMode = 'none';
+      this.objects.addChild(c);
+      this.cullAdd(c, x - 360, y - 120, x + 360, y + 80);
+    }
     const foam = new Graphics();
     foam.zIndex = -60;
     this.objects.addChild(foam);
@@ -2335,6 +2439,7 @@ export class WorldScene {
     w.bubble?.destroy();
     w.wings?.destroy();
     w.horns?.destroy();
+    w.devTail?.destroy();
     w.pack?.under.destroy(); w.pack?.over.destroy();
     w.sprite.destroy();
     for (const o of this.walkers) if (o.target === w) o.target = null;
@@ -2493,7 +2598,7 @@ export class WorldScene {
     }
     // 24차: 가끔은 루엔·파샤르 대신 안경 쓴 아주 늙은 할아버지가 앉아 있다 (천국·지옥 같은 사람, 옷차림만 다름)
     this.grandpa = (info.kind === 'terrace' || info.kind === 'rebirth') && (this.forceGrandpa ?? Math.random() < 0.14);
-    if (info.kind === 'goatroom' && info.clerk) this.placeGoatKing(info.clerk.i, info.clerk.j); // 32차: 뒤 모서리 흑요석 단 한가운데의 옥좌
+    if (info.kind === 'goatroom' && info.clerk) { this.setupGoatFx(this.placeGoatKing(info.clerk.i, info.clerk.j)); this.placeChanger(13, 2); } // 32차: 뒤 모서리 흑요석 단 한가운데의 옥좌 · 33차: 오른쪽 벽가 환전 탁자 뒤의 환전상
     else if (info.clerk) {
       const w = this.makeWalker(this.grandpa ? grandpaLook(info.kind === 'rebirth') : info.kind === 'home' ? yunaeLook(info.age ?? 1) : clerkLook(info.kind, info.from.b), info.clerk.i, info.clerk.j, 'clerk');
       w.dir = 'sw';
@@ -3306,6 +3411,78 @@ export class WorldScene {
     }
   }
 
+  /**
+   * 33차: 지도 밖 거울 거리에도 오가는 차와 행인 그림자 — 화면에 지도 밖이 보일 때만 몇 대·몇 명씩 (부딪히지도, 고를 수도 없다)
+   */
+  private beyondLife: { cars: { s: Sprite; x: number; j: number; dir: 1 | -1; v: number; end: number; on: boolean }[]; peds: { s: Sprite; x: number; y: number; dx: number; dy: number; t: number; on: boolean; ph: number }[]; t: number; cs: CharSet | null } | null = null;
+  private setupBeyondLife() {
+    if (!this.zone.beyond || this.realm !== 'real' || this.zone.interior) return;
+    const bl: NonNullable<typeof this.beyondLife> = { cars: [], peds: [], t: 0, cs: null };
+    for (let n = 0; n < 7; n++) { const s = new Sprite(); s.visible = false; s.eventMode = 'none'; this.objects.addChild(s); bl.cars.push({ s, x: 0, j: 0, dir: 1, v: 4, end: 0, on: false }); }
+    for (let n = 0; n < 10; n++) { const s = new Sprite(); s.visible = false; s.eventMode = 'none'; s.tint = 0x14141a; s.alpha = 0.55; this.objects.addChild(s); bl.peds.push({ s, x: 0, y: 0, dx: 0, dy: 0, t: 0, on: false, ph: Math.random() * 4 }); }
+    void charSet({ sex: 'm', build: 1, skin: 0, hair: 1, hairColor: 0, top: 0, bottom: 0, outfit: 'casual' }).then((cs) => { bl.cs = cs; });
+    this.beyondLife = bl;
+  }
+  private updateBeyondLife(dt: number) {
+    const bl = this.beyondLife, z = this.zone, by = z.beyond;
+    if (!bl || !by) return;
+    const m = by.m, W = z.W, H = z.H;
+    const out = (i: number, j: number) => i < m || j < m || i >= W - m || j >= H - m;
+    const r = this.visibleRange(false);
+    const showsOut = r.i0 < m + 2 || r.j0 < m + 2 || r.i1 > W - m - 2 || r.j1 > H - m - 2;
+    bl.t -= dt;
+    if (showsOut && bl.t <= 0) {
+      bl.t = 0.35;
+      // 차: 화면에 걸친 바깥 차선 하나를 골라 화면 끝에서 끝으로
+      const c = bl.cars.find((q) => !q.on);
+      if (c) {
+        const lanes = by.lanes.filter((l) => l.j >= r.j0 - 1 && l.j <= r.j1 + 1 && l.i1 > r.i0 && l.i0 < r.i1 && (out(Math.max(l.i0, Math.floor(r.i0)), l.j) || out(Math.min(l.i1, Math.floor(r.i1)), l.j)));
+        const l = lanes[Math.floor(Math.random() * lanes.length)];
+        if (l) {
+          const a = Math.max(l.i0, r.i0 - 3), b = Math.min(l.i1, r.i1 + 3);
+          const ct = carSprite((z.city === 'seoul' ? SEOUL_CARS : CAR_MODELS)[Math.floor(Math.random() * (z.city === 'seoul' ? SEOUL_CARS.length : CAR_MODELS.length))], l.dir);
+          if (ct && b - a > 6) {
+            c.s.texture = ct.tex; c.s.anchor.set(ct.ax, ct.ay);
+            Object.assign(c, { x: l.dir > 0 ? a : b, j: l.j + 0.5, dir: l.dir, v: 3.5 + Math.random() * 2.5, end: l.dir > 0 ? b : a, on: true });
+          }
+        }
+      }
+      // 행인 그림자: 화면 안 바깥 보도에서 나타나 보도를 따라 걷는다
+      const pd = bl.peds.find((q) => !q.on);
+      if (pd && bl.cs) {
+        for (let tries = 0; tries < 12; tries++) {
+          const i = Math.floor(r.i0 + Math.random() * (r.i1 - r.i0)), j = Math.floor(r.j0 + Math.random() * (r.j1 - r.j0));
+          if (!out(i, j)) continue;
+          const tt = groundAt(z, i, j);
+          if (tt !== 'walk' && tt !== 'soi') continue;
+          const alongI = groundAt(z, i + 1, j) === tt || groundAt(z, i - 1, j) === tt;
+          const sg = Math.random() < 0.5 ? 1 : -1;
+          Object.assign(pd, { x: i + 0.5, y: j + 0.5, dx: alongI ? sg : 0, dy: alongI ? 0 : sg, t: 6 + Math.random() * 8, on: true });
+          break;
+        }
+      }
+    }
+    for (const c of bl.cars) {
+      if (!c.on) { c.s.visible = false; continue; }
+      c.x += c.dir * c.v * dt;
+      if ((c.dir > 0 && c.x > c.end) || (c.dir < 0 && c.x < c.end) || !out(Math.floor(c.x), Math.floor(c.j))) { c.on = false; c.s.visible = false; continue; }
+      const [sx, sy] = iso(c.x, c.j);
+      c.s.position.set(sx, sy); c.s.zIndex = c.x + c.j; c.s.visible = true;
+    }
+    for (const p of bl.peds) {
+      if (!p.on || !bl.cs) { p.s.visible = false; continue; }
+      p.t -= dt;
+      const nx = p.x + p.dx * 1.1 * dt, ny = p.y + p.dy * 1.1 * dt;
+      const tt = groundAt(z, Math.floor(nx), Math.floor(ny));
+      if (p.t <= 0 || !out(Math.floor(nx), Math.floor(ny)) || (tt !== 'walk' && tt !== 'soi' && tt !== 'cross')) { p.on = false; p.s.visible = false; continue; }
+      p.x = nx; p.y = ny; p.ph += dt * 8;
+      const dir: Dir = p.dx > 0 ? 'se' : p.dx < 0 ? 'nw' : p.dy > 0 ? 'sw' : 'ne';
+      applyFrame(p.s, frameOf(bl.cs, 'walk', dir, Math.floor(p.ph) % (bl.cs.counts.walk ?? 1)));
+      const [sx, sy] = iso(p.x, p.y);
+      p.s.position.set(sx, sy); p.s.zIndex = p.x + p.y; p.s.visible = true;
+      p.s.alpha = Math.min(0.55, p.t * 0.4);
+    }
+  }
   private spawnCars() {
     const lanes = this.zone.lanes.slice().sort((a, b) => b.i1 - b.i0 - (a.i1 - a.i0));
     for (const lane of lanes) {
@@ -3869,6 +4046,43 @@ export class WorldScene {
   }
   /** 21차: 미스 황이 알려 준 곳 — 건물 위에 금빛 표시 (다다르거나 5분이 지나면 사라진다) */
   private guide: { at: [number, number]; lift: number; front: [number, number] | null; spr: Text; t: number; arrow: Graphics } | null = null;
+  /** 33차: 가장 가까운 은행으로 길 안내 (없으면 false) */
+  guideBank(): boolean {
+    if (this.realm !== 'real' || this.zone.interior) return false;
+    const p = this.player;
+    let best = -1, bd = 1e9;
+    this.zone.buildings.forEach((b, k) => { if (roomKindOf(b) !== 'bank') return; const d = Math.hypot(b.i0 + b.w / 2 - p.x, b.j0 + b.d / 2 - p.y); if (d < bd) { bd = d; best = k; } });
+    if (best < 0) return false;
+    this.setGuide(best);
+    return true;
+  }
+  /** 33차: 은행 건물 지붕 위 금빛 간판 — 멀리서도 보이게 (현실 거리만) */
+  private bankSigns: { o: Container; y: number; k: number }[] = [];
+  private setupBankSigns() {
+    if (this.realm !== 'real' || this.zone.interior || this.zone.hell) return;
+    this.zone.buildings.forEach((b, k) => {
+      if (roomKindOf(b) !== 'bank') return;
+      const o = new Container();
+      o.eventMode = 'none';
+      const g = new Graphics();
+      // 금테 두른 검푸른 판 + 기둥 넷 박공 지붕 그림
+      g.roundRect(-30, -24, 60, 34, 5).fill({ color: 0x14233a }).stroke({ color: 0xf2d27a, width: 2 });
+      g.poly([-12, -12, 0, -19, 12, -12]).fill({ color: 0xf2d27a });
+      for (const x of [-10, -4, 2, 8]) g.rect(x, -11, 2.5, 8).fill({ color: 0xf2d27a });
+      g.rect(-12, -3, 24, 2).fill({ color: 0xf2d27a });
+      g.poly([-5, 10, 5, 10, 0, 17]).fill({ color: 0xf2d27a }).stroke({ color: 0x14233a, width: 1 });
+      const tx = new Text({ text: t().bankSign, style: { fontFamily: 'system-ui, sans-serif', fontSize: 10, fontWeight: '800', fill: '#ffe9a8', letterSpacing: 1 } });
+      tx.anchor.set(0.5, 0.5); tx.position.set(0, 4);
+      o.addChild(g, tx);
+      const [x, y0] = iso(b.i0 + b.w / 2, b.j0 + b.d / 2);
+      const y = y0 - Math.min(b.h, 160) - 30;
+      o.position.set(x, y);
+      o.zIndex = 9e5 - 1;
+      this.objects.addChild(o);
+      this.cullAdd(o, x - 34, y - 30, x + 34, y + 22);
+      this.bankSigns.push({ o, y, k });
+    });
+  }
   setGuide(k: number) {
     const b = this.zone.buildings[k];
     if (!b) return;
@@ -4079,6 +4293,7 @@ export class WorldScene {
     if (w.kind === 'yellowwing' && pd.kind === 'talk') { w.path = []; w.wait = 6; w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); this.hooks.heavenAct('yellowwing'); return; }
     if (w.kind === 'goat') { this.hooks.say(L.goatName, pd.kind === 'look' ? L.goatTag : L.goatTalk); return; }
     if (w.kind === 'goatking') { w.path = []; w.dir = this.player.x - w.x - (this.player.y - w.y) >= 0 ? 'e' : 'w'; if (pd.kind === 'look') this.hooks.say(L.gkName, L.gkLook); else this.hooks.goatKing(); return; }
+    if (w.kind === 'changer') { w.path = []; if (pd.kind === 'look') this.hooks.say(L.xchName, L.xchSub); else this.hooks.changer(); return; }
     if (w.kind === 'angel' || w.kind === 'officer' || w.kind === 'yellowwing') {
       if (pd.kind === 'look') { this.hooks.say(this.npcName(w), this.npcSub(w)); return; }
       this.hooks.say(this.npcName(w), L.angelLines[Math.floor(Math.random() * L.angelLines.length)]);
@@ -4203,6 +4418,7 @@ export class WorldScene {
     if (w.cards) return L.angel;
     if (w.kind === 'goat') return L.goatName;
     if (w.kind === 'goatking') return L.gkName;
+    if (w.kind === 'changer') return L.xchName;
     if (w.kind === 'clerk') return this.zone.interior?.kind === 'loan' ? L.besk : this.zone.interior?.kind === 'rebirth' ? L.pashar : this.zone.interior?.kind === 'terrace' ? L.officer : this.zone.interior?.name ?? '';
     if (w.mdef) return w.mdef.name[lang()];
     if (w.gdef) return w.gdef.name[lang()];
@@ -4240,6 +4456,7 @@ export class WorldScene {
     if (w.cards) return L.cardSub;
     if (w.kind === 'goat') return L.goatSub;
     if (w.kind === 'goatking') return L.gkSub;
+    if (w.kind === 'changer') return L.xchSub;
     if (w.kind === 'clerk') return this.zone.interior?.kind === 'terrace' ? L.officerSub : L.clerkSub[(this.zone.interior?.kind ?? 'shop') as keyof typeof L.clerkSub] ?? '';
     if (w.mdef) return w.mdef.title ? `${L.hellBoss.replace('{n}', String(this.zone.hell?.floor ?? 1))} · ${w.mdef.title[lang()]}` : w.mdef.boss ? L.hellBoss.replace('{n}', String(this.zone.hell?.floor ?? 1)) : L.hellMonster;
     if (w.kind === 'pashar') return L.pasharSub;
@@ -4314,6 +4531,7 @@ export class WorldScene {
     if (this.invisible) { this.bubble(this.player, t().invisibleNoFight); return; } // 투명한 관리자는 싸우지 않는다
     if (w.kind === 'remote' && (this.safeAt(w.x, w.y) || this.safeAt(this.player.x, this.player.y))) { this.hooks.say('', t().pvpSafe); return; }
     if (w.kind === 'talus') { w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); this.bubble(w, t().talusNoFight); return; } // 총구 앞에서는 손을 들 수 없다
+    if (w.kind === 'changer') { const n = t().xchIdle; this.bubble(w, n[Math.floor(Math.random() * n.length)]); return; } // 33차: 환전상은 싸우지 않는다
     if (w.kind === 'goatking') { w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); const n = t().gkNoFight; this.bubble(w, n[Math.floor(Math.random() * n.length)]); return; } // 31차: 염소대왕은 싸우지 않는다 (뿔은 그냥 달려 있다)
     if (w.kind === 'maskgirl') { w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); this.bubble(w, t().maskNoFight); return; } // 25차: 중립 — 맞지도 때리지도 않는다
     if (w.kind === 'yunae') { w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); const n = t().yunaeNoFight; this.bubble(w, n[Math.floor(Math.random() * n.length)]); return; } // 28차: 유내에게는 손을 들 수 없다
@@ -4429,7 +4647,7 @@ export class WorldScene {
     return rollToHit(bonus, armorClass(this.gear.def, this.stats.agi)).hit;
   }
   private hit(from: Walker, to: Walker, dmg: number, crit = false, kind?: sfx.HitKind) {
-    if (to.kind === 'maskgirl' || to.kind === 'yunae' || to.kind === 'goatking') return;
+    if (to.kind === 'maskgirl' || to.kind === 'yunae' || to.kind === 'goatking' || to.kind === 'changer') return;
     if (to.fb && !from.isPlayer && from.kind !== 'remote' && from.kind !== 'fighter') return; // 31차: 필드 보스는 영혼(과 부른 켈베로스)에게만 맞는다 — 경비병·탈루스가 몰래 잡던 것 // 25차: 소녀는 맞지 않는다 · 28차: 유내도
     if (to.down > 0 || this.dead) return;
     // 17차 회피: 공격자가 d20 + 명중 보너스를 굴려 내 회피 등급(10 + 방어력 ÷ 2 + 민첩 ÷ 5)을 넘어야 맞는다. 방어력은 피해를 줄이지 않는다
@@ -5334,6 +5552,15 @@ export class WorldScene {
         }
       }
       if (w.horns) { w.horns.visible = w.down <= 0 && w.sprite.visible; w.horns.position.set(sx, sy - 47 * (w.size ?? 1)); w.horns.zIndex = w.x + w.y + 0.003; }
+      if (w.devTail) { // 33차: 허리 뒤로 나와 살랑인다 (돌아서면 앞쪽으로 보인다)
+        const back = w.dir === 'ne' || w.dir === 'nw' || w.dir === 'n';
+        const flip = w.dir === 'se' || w.dir === 'e' || w.dir === 'ne' ? -1 : 1;
+        w.devTail.visible = w.down <= 0 && w.sprite.visible;
+        w.devTail.position.set(sx + flip * 5, sy - 17 * (w.size ?? 1));
+        w.devTail.scale.set(0.5 * flip, 0.5);
+        w.devTail.rotation = Math.sin(this.time * 2.1 + w.home[0]) * 0.22 * flip;
+        w.devTail.zIndex = w.x + w.y + (back ? 0.004 : -0.004);
+      }
       if (w.wings) {
         const up = w.dir === 'ne' || w.dir === 'nw' || w.dir === 'n';
         w.wings.visible = w.down <= 0 && w.sprite.visible;
@@ -5506,6 +5733,9 @@ export class WorldScene {
     this.streamT -= dt;
     if (this.streamT <= 0 || this.streamMore) { this.streamT = 0.12; this.stream(false); } // 22차: 남은 일이 있으면 다음 프레임에 조금 더
     this.updateRaid(dt);
+    this.updateGoatFx(dt); // 33차
+    this.updateBeyondLife(dt);
+    for (const bs of this.bankSigns) if (bs.o.visible) bs.o.y = bs.y + Math.sin(this.time * 2.2 + bs.k) * 2.5; // 33차: 은행 간판이 살짝 떠 있다
     if (this.gjob) {
       const { key, job } = this.gjob;
       if (job.step(this.gjob.vis ? 14 : 5)) {
@@ -5549,6 +5779,7 @@ export class WorldScene {
     if (w.kind === 'sleeper') return;
     if (w.kind === 'goat') { this.thinkGoat(w, moving, dt); return; }
     if (w.kind === 'goatking') { this.thinkGoatKing(w, dt); return; }
+    if (w.kind === 'changer') { this.thinkChanger(w, dt); return; }
     if (w.tail && this.realm === 'heaven' && this.thinkTail(w, moving, dt)) return;
     if (w.kind === 'yellowwing' && this.ywFollow) { this.thinkYellowWing(w, moving, dt); return; }
     if (w.kind === 'angel' && this.realm === 'heaven' && this.thinkAngel(w, moving, dt)) return;
