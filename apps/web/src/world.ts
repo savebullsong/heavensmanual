@@ -331,8 +331,8 @@ export const PLAYER_MAX_HP = 1000;
 export const WAGE_PER_HOUR = 400 / 8;
 const WAGE_PER_SEC = WAGE_PER_HOUR / 3600;
 /** 32차: 서울(강남) 시급 = 한국 최저임금 ₩10,320 (2026) → 방콕(하루 ฿400 ÷ 8시간) 의 약 5.2배 */
-/** 32차: 쓰러진 사람이 든 무기를 떨어뜨릴 보통 확률 */
-const WEAPON_DROP = 0.25;
+/** 32차: 쓰러진 사람이 든 무기를 떨어뜨릴 보통 확률 (25%는 너무 잦다 — 5%, 총은 2%) */
+const WEAPON_DROP = 0.05, GUN_DROP = 0.02;
 export const SEOUL_WAGE = 10320 / 40 / WAGE_PER_HOUR;
 const ATK_INTERVAL = 0.62; // 6차: 더 빠르게
 /** 고문 장면 (26차: 층마다 다른 고문) */
@@ -4598,7 +4598,7 @@ export class WorldScene {
       // 32차: 쓰러뜨린 사람이 들고 있던 무기 — 처음 만난 야구 배트만 반드시, 그 뒤로는 무엇이든(배트·쇠파이프·칼·우산…) 보통 확률로
       if (this.realm === 'real' && (w.kind === 'thug' || w.kind === 'passer') && w.weapon) {
         const first = w.weapon === 'bat' && !this.loots.some((l) => l.key === 'bat') && this.hooks.beginnerBat();
-        if (first || Math.random() < WEAPON_DROP) this.dropLoot(w.x + 0.4, w.y + 0.2, w.weapon, first ? 300 : 240);
+        if (first || Math.random() < (w.weapon === 'pistol' ? GUN_DROP : WEAPON_DROP)) this.dropLoot(w.x + 0.4, w.y + 0.2, w.weapon, first ? 300 : 240);
       }
     }
     if (w.kind === 'suturer') { w.down = 4; return; }
