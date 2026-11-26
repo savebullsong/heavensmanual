@@ -6,7 +6,8 @@
 import { put, del, get } from '@vercel/blob';
 import { createHash, timingSafeEqual } from 'node:crypto';
 
-const SLOTS = ['miss-hwang', 'yellow-wing', 'hwanghon', 'parrot', 'luen', 'pashar', 'goat-king', 'besk', 'talus', 'grandpa', 'bulda', 'yunae', 'yunae-teen', 'yunae-20s', 'yunae-30s', 'maskgirl', 'sprite-miss-hwang', 'sprite-hwanghon', 'sprite-parrot', 'sprite-parrot-up', 'sprite-besk', 'sprite-talus', 'sprite-bulda', 'sprite-maskgirl', 'sprite-yunae-teen', 'sprite-yunae-20s', 'sprite-yunae-30s', 'bld-ujusae', 'bld-ujusae-night', 'bld-ujusae-heaven', 'bld-loan', 'bld-hell-1', 'bld-hell-2', 'bld-hell-3', 'bld-hell-4'];
+// 36차: src/portraits.ts의 PORTRAIT_SLOTS와 똑같아야 한다 (다르면 vite 빌드가 멈춘다 — vite.config.ts)
+const SLOTS = ['miss-hwang', 'yellow-wing', 'hwanghon', 'parrot', 'luen', 'pashar', 'goat-king', 'changer', 'ferum', 'succubus', 'accubus', 'besk', 'talus', 'grandpa', 'bulda', 'yunae', 'yunae-teen', 'yunae-20s', 'yunae-30s', 'maskgirl', 'sprite-miss-hwang', 'sprite-hwanghon', 'sprite-parrot', 'sprite-parrot-up', 'sprite-besk', 'sprite-talus', 'sprite-bulda', 'sprite-maskgirl', 'sprite-yunae-teen', 'sprite-yunae-20s', 'sprite-yunae-30s', 'sprite-goat-king', 'bld-ujusae', 'bld-ujusae-night', 'bld-ujusae-heaven', 'bld-loan', 'bld-hell-1', 'bld-hell-2', 'bld-hell-3', 'bld-hell-4'];
 const MANIFEST = 'portraits/manifest.json';
 const TYPES: Record<string, string> = { 'image/webp': 'webp', 'image/png': 'png', 'image/jpeg': 'jpg' };
 const MAX_BYTES = 4 * 1024 * 1024;
