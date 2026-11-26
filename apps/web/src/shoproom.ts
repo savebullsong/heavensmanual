@@ -438,7 +438,17 @@ export class ShopRoom {
   }
 
   private toWorld(gx: number, gy: number) {
-    return { x: gx - this.camera.x, y: gy - this.camera.y };
+    return { x: (gx - this.camera.x) / this.zoom, y: (gy - this.camera.y) / this.zoom };
+  }
+  /** 40차: 가게 안도 시야를 당긴다 (거리와 같은 설정 · 방이 좁아 최대 1.6배) */
+  private zoom = 1;
+  private zoomPref: string = (() => { try { return localStorage.getItem('heavensmanual.zoom') ?? 'auto'; } catch { return 'auto'; } })();
+  setZoomPref(v: string) { this.zoomPref = v; }
+  private wantZoom(): number {
+    if (this.zoomPref !== 'auto') return Math.max(1, Math.min(1.6, Number(this.zoomPref) || 1));
+    const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    if (!coarse) return 1.2;
+    return Math.min(this.app.screen.width, this.app.screen.height) < 600 ? 1.5 : 1.3;
   }
 
   private hit(gx: number, gy: number): ShopTarget | null {
@@ -609,8 +619,10 @@ export class ShopRoom {
     const follow = (lo: number, hi: number, p: number, span: number) => (hi - lo <= span ? (lo + hi) / 2 : Math.max(lo + span / 2, Math.min(hi - span / 2, p)));
     const roomCx = (B.x0 + B.x1) / 2;
     // 좁은 화면: 플레이어와 방 가운데의 중간을 본다 (미스 황과 문이 함께 보이도록)
-    const cx = follow(B.x0, B.x1, (sx + roomCx) / 2, vw), cy = follow(B.y0, B.y1, sy - 20, vh - 40);
-    this.camera.position.set(Math.round(vw / 2 - cx), Math.round(vh / 2 - cy + 16));
+    const z = (this.zoom = this.wantZoom());
+    this.camera.scale.set(z);
+    const cx = follow(B.x0, B.x1, (sx + roomCx) / 2, vw / z), cy = follow(B.y0, B.y1, sy - 20, (vh - 40) / z);
+    this.camera.position.set(Math.round(vw / 2 - cx * z), Math.round(vh / 2 - (cy - 16) * z));
     // 밤에는 방이 조금 어둡고 등불이 밝다
     const { h, m } = bangkokClock();
     const nf = nightFactor(h, m);

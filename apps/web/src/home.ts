@@ -127,4 +127,20 @@ export function designateHomes(z: Zone) {
     tools.b.sign = tools.face!;
     tools.b.pois = [{ t: 'hardware', ...NAMES[city].tools }];
   }
+  // 40차: 서울 집 가까운 골목의 낮은 벽돌집 하나가 '유내 미용실' — 간판은 그대로인데, 지금은 유내를 모르는 사람이 가위를 든다
+  if (city === 'seoul') {
+    const home = z.buildings.find((b) => b.cat === 'home');
+    if (home) {
+      const hc = [home.i0 + home.w / 2, home.j0 + home.d / 2];
+      const pick = (z.buildings as B[]).map((b, k) => ({ b, k, dist: Math.hypot(b.i0 + b.w / 2 - hc[0], b.j0 + b.d / 2 - hc[1]) }))
+        .filter((x) => x.b.hut && !x.b.pois?.length && x.dist >= 3 && x.dist <= 12 && x.b.w * x.b.d >= 4 && openFace(z, x.b) === 'left')
+        .sort((a, b) => Math.abs(a.dist - 5) - Math.abs(b.dist - 5) || a.k - b.k)[0];
+      if (pick) {
+        pick.b.cat = 'shop';
+        pick.b.sign = 'left';
+        pick.b.yunae = true;
+        pick.b.pois = [{ t: 'hairdresser', n: 'Yunae Hair', nko: '유내 미용실', nth: 'ร้านทำผมยูแน', nen: 'Yunae Hair Salon' }];
+      }
+    }
+  }
 }

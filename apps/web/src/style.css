@@ -548,3 +548,9 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 @keyframes da-l { to { transform: translate(-16px, 10px) rotate(-24deg); opacity: .25; } }
 @keyframes da-r { to { transform: translate(18px, 14px) rotate(30deg); opacity: .25; } }
 @keyframes da-shard { 0% { opacity: 1; transform: translate(0,0) rotate(0); } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--r)); } }
+
+/* 40차: 어느 삶을 이어갈까 */
+.life-overlay { z-index: 70; }
+.life-col { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.life-col button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 12px; text-align: left; }
+.life-col button small { opacity: 0.75; font-size: 12px; }

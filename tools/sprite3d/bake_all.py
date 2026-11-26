@@ -126,6 +126,25 @@ for mk, sex in (('an', 'm'), ('af', 'f')):
     sets = [{'kind': 'base', 'outfit': 'angelk', 'mode': 'u'}, {'kind': 'base', 'outfit': 'angelk', 'mode': 'm'}, {'kind': 'weapon', 'weapon': 'sword'}]
     jobs.append({'sex': sex, 'build': 1, 'monster': mk, 'occluder': 'angelk', 'sets': sets, 'dirs': ['se', 'sw', 'ne', 'nw'], 'stride': .85, 'tag': 'main39'})
     jobs.append({'sex': sex, 'build': 1, 'monster': mk, 'occluder': 'angelk', 'sets': sets, 'only': ['idle', 'walk'], 'merge': True, 'dirs': ['s', 'e', 'n', 'w'], 'stride': .85, 'tag': 'main39'})
+# ── 40차: 긴 겉옷(큰 갑옷) — 롱 코트 · 방화복 · 방탄 전투복 · 사슬 장포(지옥) · 판금 장갑(지옥). 체형마다, 맨손·무기·총 자세
+LONG40 = ['trench', 'firesuit', 'combatcoat', 'hauberk', 'platecoat']
+for sex in 'mf':
+    for b in (0, 1, 2):
+        sets = [{'kind': 'armor', 'piece': pc, 'mode': m, 'extra': ['stab', 'heavy', 'idle2', 'walk2'] if m == 'm' else []} for pc in LONG40 for m in MODES]
+        jobs.append({'sex': sex, 'build': b, 'sets': sets, 'dirs': ['se', 'sw', 'ne', 'nw'], 'tag': 'coat40' + sex})
+        jobs.append({'sex': sex, 'build': b, 'sets': [{'kind': 'armor', 'piece': pc, 'mode': m} for pc in LONG40 for m in MODES], 'only': ['idle', 'walk'], 'merge': True, 'dirs': ['s', 'e', 'n', 'w'], 'tag': 'coat40' + sex})
+# ── 40차: 휘두르기 다시 (치켜들 때 허리를 젖히지 않고, 고개는 상대를 본다) — 사람의 무기 자세(m) 층 모두에 swing만 덮어쓴다
+for sex in 'mf':
+    for b in (0, 1, 2):
+        sets = [{'kind': 'base', 'outfit': o, 'mode': 'm'} for o in ('casual', 'casualL', 'padding')]
+        sets += [{'kind': 'armor', 'piece': pc, 'mode': 'm'} for pc in (['jacket', 'vest', 'workpants'] + LONG40 + (['helmet', 'gloves', 'shinguard', 'boots', 'mask', 'shield'] if b == 1 else []))]
+        if b == 1:
+            sets += [{'kind': 'base', 'outfit': o, 'mode': 'm'} for o in ('raincoat', 'patient', 'parrot', 'robber', 'mafia')]
+            sets += [{'kind': 'hair', 'style': h} for h in HAIRS]
+            sets += [{'kind': 'weapon', 'weapon': w} for w in ONE_HAND]
+        jobs.append({'sex': sex, 'build': b, 'sets': sets, 'only': ['swing'], 'merge': True, 'dirs': ['se', 'sw', 'ne', 'nw'], 'tag': 'swing40' + sex})
+for mk, sex in (('an', 'm'), ('af', 'f')):
+    jobs.append({'sex': sex, 'build': 1, 'monster': mk, 'occluder': 'angelk', 'sets': [{'kind': 'base', 'outfit': 'angelk', 'mode': 'm'}, {'kind': 'weapon', 'weapon': 'sword'}], 'only': ['swing'], 'merge': True, 'dirs': ['se', 'sw', 'ne', 'nw'], 'stride': .85, 'tag': 'swing40' + sex})
 args = sys.argv[2:]
 # --scale2: 같은 크기의 인물을 픽셀 두 배로 (게임에서는 반으로 줄여 같은 크기, 더 섬세)
 if '--scale2' in args:

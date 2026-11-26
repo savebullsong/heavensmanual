@@ -37,6 +37,7 @@ function streetSeller(b: Building): 'tools' | 'dept' | 'antique' | undefined {
 export function roomKind(b: Building): string {
   if (b.cat === 'loan') return 'loan'; // 지옥 3층 베스크 대부소
   if (b.cat === 'estate') return 'myhome'; // 35차 내가 산 집
+  if (b.yunae) return 'ysalon'; // 40차 유내 미용실 (회상 속 그 미용실 그대로, 사람만 다르다)
   if (b.cat === 'hbank' || b.cat === 'atone' || b.cat === 'rebirth' || b.cat === 'terrace' || b.cat === 'home' || b.cat === 'goatroom') return b.cat; // 31차 goatroom = 지옥 142층 염소대왕의 방 // 지옥 은행 · 속죄의 회당 · 지옥 로비 · 천국 환생의 테라스
   const k = kindOf(b);
   if (k === 'place_of_worship' || b.cat === 'worship') {
@@ -69,7 +70,7 @@ export const REST_ROOMS = new Set(['home', 'myhome', 'temple', 'church', 'mosque
 
 const SIZE: Record<string, [number, number]> = {
   temple: [13, 11], church: [13, 11], mosque: [12, 11], gurdwara: [12, 11], bank: [12, 10], clinic: [12, 10], pharmacy: [9, 8],
-  mart: [11, 9], food: [12, 10], cafe: [10, 9], bar: [10, 9], salon: [9, 8], massage: [10, 9], laundry: [9, 8], lobby: [11, 9], shop: [9, 8], loan: [10, 8],
+  mart: [11, 9], food: [12, 10], cafe: [10, 9], bar: [10, 9], salon: [9, 8], ysalon: [10, 9], massage: [10, 9], laundry: [9, 8], lobby: [11, 9], shop: [9, 8], loan: [10, 8],
   hbank: [10, 8], atone: [11, 10], myhome: [14, 11], furnshop: [12, 10], hardware: [12, 10], arcade: [13, 10], rebirth: [31, 17], terrace: [23, 16], home: [11, 9], gym: [13, 11], dept: [26, 20], goatroom: [17, 17],
 };
 const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
@@ -279,6 +280,12 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
       }
       break;
     }
+    case 'ysalon':
+      // 40차 유내 미용실: 회상 속 미용실과 같은 자리에 같은 것들 — 거울 앞 의자 둘(하나엔 보자기 쓴 손님) · 머리 말리개 · 머리 감는 곳 · 소파와 잡지 탁자
+      F(2, 1, 1, 1, 14, 'salonchair', 9); F(4, 1, 1, 1, 14, 'salonchair'); F(6, 1, 1, 1, 40, 'hooddryer');
+      F(x1, 3, 1, 2, 22, 'washbasin'); F(1, y1 - 1, 2, 1, 14, 'sofa'); F(3, y1 - 1, 1, 1, 12, 'table', 2); F(x1, y1 - 1, 1, 1, 12, 'plant');
+      clerk = { i: 3, j: 1 }; counter = { i: 3, j: 3 };
+      break;
     case 'gym': {
       // 19차 헬스장: 거울 벽 앞 덤벨 걸이 · 러닝머신 줄 · 벤치 프레스 · 스쿼트 랙 · 샌드백 · 요가 매트 · 안내 데스크(트레이너)
       F(W - 5, y1 - 2, 3, 1, 22, 'counter', 4); clerk = { i: W - 4, j: y1 - 3 }; counter = { i: W - 4, j: y1 - 1 };
@@ -380,7 +387,7 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
   for (const f of furn) if (f.h > 2) for (let j = f.j; j < f.j + f.d; j++) for (let i = f.i; i < f.i + f.w; i++) tiles[j * W + i] = TI.block;
   const exit = kind === 'goatroom' ? { i: x1, j: y1 } : { i: mid, j: y1 }; // 32차: 염소대왕의 방은 옥좌 맞은편 앞 모서리가 문
   tiles[exit.j * W + exit.i] = TI.walk;
-  const look = kind === 'myhome' && b.estate === 'seoul' ? { floor: 'marble', wall: '#f2eee6', trim: '#9a8a6a' } : hAge === 0 ? { floor: 'sand', wall: '#b8b0a4', trim: '#6a6a66' } : hAge === 1 ? { floor: 'checker', wall: '#f2e6e0', trim: '#b85a74' } : hAge === 2 ? { floor: 'pale', wall: '#e6ecea', trim: '#3a8a7a' } : LOOKS[kind];
+  const look = kind === 'myhome' && b.estate === 'seoul' ? { floor: 'marble', wall: '#f2eee6', trim: '#9a8a6a' } : hAge === 0 ? { floor: 'sand', wall: '#b8b0a4', trim: '#6a6a66' } : hAge === 1 || kind === 'ysalon' ? { floor: 'checker', wall: '#f2e6e0', trim: '#b85a74' } : hAge === 2 ? { floor: 'pale', wall: '#e6ecea', trim: '#3a8a7a' } : LOOKS[kind];
   const info: InteriorInfo = {
     // 28차: 내 집의 유내 — 거리에서 정해 둔 시절을 따른다. 20대(1)면 방은 비어 있다 (대문 앞에 나가 있거나, 그 사람 만나러 갔다)
     kind, rest: REST_ROOMS.has(kind), name, ...look, exit, clerk: kind === 'myhome' || hAge === 3 ? undefined : clerk, counter: kind === 'myhome' || hAge === 3 ? undefined : counter, furn, age: hAge,
@@ -702,7 +709,7 @@ export function drawRoom(z: Zone, night: boolean): { canvas: HTMLCanvasElement; 
     poly([P(1, y0 + 0.08, z0 + 3), P(1, y2 - 0.08, z0 + 3), P(1, y2 - 0.08, z1 - 3), P(1, y0 + 0.08, z1 - 3)], col);
   };
   const onR = (x0: number, x2: number, z0: number, z1: number, col: string) => poly([P(x0, 1, z0), P(x2, 1, z0), P(x2, 1, z1), P(x0, 1, z1)], col);
-  const k = info.kind === 'home' && info.age === 1 ? 'salon' : info.kind === 'home' && info.age === 2 ? 'clinic' : info.kind, mid = Math.floor(W / 2); // 34차: 유내의 미용실·진료실은 그 가게처럼 꾸민다
+  const k = (info.kind === 'home' && info.age === 1) || info.kind === 'ysalon' ? 'salon' : info.kind === 'home' && info.age === 2 ? 'clinic' : info.kind, mid = Math.floor(W / 2); // 34차: 유내의 미용실·진료실은 그 가게처럼 꾸민다
   for (let y = 3; y < H - 2; y += 3) {
     if (k === 'church') { winL(y, y + 1, 34, 86, night ? '#3a2a5a' : '#c94a6a'); winL(y + 0.3, y + 0.7, 40, 80, night ? '#2a3a6a' : '#4a8ac9'); }
     else if (k === 'mosque') { winL(y, y + 1, 30, 76); poly([P(1, y, 76), P(1, y + 1, 76), P(1, y + 0.5, 88)], mixHex(info.trim, '#000000', 0.3)); }
@@ -1722,12 +1729,15 @@ export function grandpaLook(hell: boolean): Look {
     ? { 1: skin, 10: skin, 2: '#e8e4dc', 3: '#3a3634', 9: '#3a3634', 4: '#2a2624', 5: '#141210' }
     : { 1: skin, 10: skin, 2: '#f2efe8', 3: '#f2ede2', 9: '#f2ede2', 4: '#e8e2d4', 5: '#c8c0b0' } };
 }
+/** 40차: 유내 미용실의 지금 원장 (마흔 줄의 여자, 짧은 단발 · 검은 미용 가운 · 앞치마) */
+export const YSALON_LOOK: Look = { sex: 'f', build: 1, skin: 0, hair: 2, hairColor: 0, top: 0, bottom: 0, outfit: 'apron', cols: { 2: '#3a2620', 3: '#24212a', 9: '#24212a', 4: '#3a3638', 5: '#1e1a1a', 7: '#2e2a30' } };
 export function clerkLook(kind: string, seed: number): Look {
   if (kind === 'terrace') return LUEN_LOOK;
   if (kind === 'shore') return BULDA_LOOK;
   if (kind === 'loan') return BESK_LOOK;
   if (kind === 'rebirth') return PASHAR_LOOK;
   if (kind === 'hbank') return { sex: 'm', build: 0, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: '#9a948c', 10: '#9a948c', 2: '#2a2622', 3: '#1e1c1c', 4: '#1a1818', 9: '#1e1c1c', 5: '#0e0c0c' } }; // 잿빛 피부의 은행원
+  if (kind === 'ysalon') return YSALON_LOOK; // 40차: 유내 미용실의 지금 원장 — 단발 파마 머리, 검은 가운
   if (kind === 'atone') return { sex: 'f', build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'raincoat', cols: { 1: '#d8c8b8', 10: '#d8c8b8', 8: '#4a1a16', 3: '#2a1210', 4: '#2a1210', 5: '#1a0e0c' } }; // 붉은 두건의 속죄 수녀
   const [top, bottom] = STAFF[kind] ?? STAFF.shop;
   const sex = seed % 2 ? 'f' : 'm';

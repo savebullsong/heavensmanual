@@ -1,6 +1,7 @@
 """한 사람의 모든 부품을 만든다: 몸(체형 3가지), 차림 5가지, 머리 모양 6가지, 무기 9가지.
 부품마다 '구역 번호'가 있는 재질을 쓴다. 렌더 1번은 흰 재질로 음영만, 렌더 2번은 구역 번호 색으로."""
 from rig import *
+import math
 import hellbodies
 
 REG = {'void': 0, 'skin': 1, 'hair': 2, 'top': 3, 'bottom': 4, 'shoe': 5, 'eye': 6, 'apron': 7, 'raincoat': 8,
@@ -9,7 +10,7 @@ HAIRS = ['short', 'swept', 'bob', 'long', 'ponytail', 'buzz']
 OUTFITS = ['casual', 'apron', 'raincoat', 'patient', 'parrot']
 MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle', 'arming', 'umbrella', 'sickle', 'crowbar', 'wrench', 'machete', 'metalbat', 'saber', 'rapier', 'katana', 'whip']   # 35차 채찍 · 20차: arming = 한손검 · 26차 현실 무기
 TWO = ['sledge', 'fireaxe', 'greatsword', 'maul', 'boltcutter', 'spear']   # 35차 장창   # 16차 양손 무기 (heavy 동작) · 26차 볼트 커터
-ARMOR = ['helmet', 'jacket', 'vest', 'gloves', 'workpants', 'shinguard', 'boots', 'shield', 'mask']   # 25차: 검은 마스크 (헬멧 자리)   # 20차: 왼팔의 둥근 방패
+ARMOR = ['helmet', 'jacket', 'vest', 'gloves', 'workpants', 'shinguard', 'boots', 'shield', 'mask', 'trench', 'firesuit', 'combatcoat', 'hauberk', 'platecoat']   # 40차: 긴 겉옷(무릎까지 덮는 큰 갑옷)   # 25차: 검은 마스크 (헬멧 자리)   # 20차: 왼팔의 둥근 방패
 WEAPONS = MELEE + ['pistol']
 RANGED_G = ['pistol', 'shotgun', 'bow', 'flamer', 'rifle']   # 25차: 화염방사기   # 쏘는 자세(g)로 드는 것
 
@@ -913,6 +914,196 @@ class Doll:
         limb(P, hc + Vector((-.035 * s, -.1 * s, -.045 * s)), hc + Vector((.035 * s, -.1 * s, -.045 * s)), [(0, .006, .006), (1, .006, .006)], dark, None, segs=4)   # 입
         ob = finish(P); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
 
+    # ── 40차: 긴 겉옷 — 바지를 무엇을 입든 위옷이 보인다 (작은 사람이라 위옷의 실루엣이 곧 차림) ──
+    def long_body(self, g, main, hem=.5, flare=1.0, grow=1.13, cuff=None, sleeve_w=1.0):
+        """넉넉한 몸통 · 손목까지 오는 소매 · 엉덩이부터 hem 높이까지 내려오는 자락(걸으면 허벅지를 따라 밀린다)"""
+        s, bw, V = self.s, self.bw, self.V
+        def fit(rings):
+            return [(c, u, v, rs * grow + .014, rf * (grow + .06) + .016) for c, u, v, rs, rf in rings if c.z / s >= .9]
+        self.torso(g, main, main, hem=0, extra=fit)
+        am = self.p['arm'] * bw * sleeve_w
+        for k in 'LR':
+            sh, el = self.bones[f'upper_arm.{k}'][0], self.bones[f'upper_arm.{k}'][1]
+            wr = self.bones[f'forearm.{k}'][1]
+            P = Part(f'{g}.sleeve.{k}')
+            limb(P, sh + Vector((0, 0, .02)), el, [(0, .077 * am, .077 * am), (1, .063 * am, .063 * am)], main, None)
+            limb(P, el, wr - (wr - el) * .05, [(0, .061 * am, .061 * am), (1, .057 * am, .057 * am)], main, None)
+            blob(P, el, (.063 * am, .063 * am, .063 * am), main, None, segs=10, rings=7)
+            blob(P, sh + Vector((0, 0, .02)), (.086 * am, .08 * am, .072 * am), main, None, segs=12, rings=8)
+            if cuff is not None:
+                limb(P, wr - (wr - el) * .17, wr - (wr - el) * .05, [(0, .063 * am, .063 * am), (1, .063 * am, .063 * am)], cuff, None, segs=10)
+            ob = finish(P); bind(ob, self.arm, autow(self.bones, ['spine', f'upper_arm.{k}', f'forearm.{k}'], power=5)); self.add(g, ob)
+        def skirt_w(co):
+            h = (1 - smooth(co.z, .5 * s, 1.0 * s)) * .58
+            wl = smooth(co.x, -.07 * s, .07 * s)
+            return {'hips': 1 - h, 'thigh.L': h * wl, 'thigh.R': h * (1 - wl)}
+        zs = [1.02, .92, .82, .72, .62, .52, .44, .36]
+        zs = [z for z in zs if z > hem + .02] + [hem]
+        def rad(z):
+            t = 1.02 - z
+            return .19 + t * .07 * flare, .15 + t * .05 * flare
+        rings = []
+        for z in zs:
+            rx, ry = rad(z)
+            rings.append((V(0, .005, z), Vector((0, -1, 0)), Vector((1, 0, 0)), rx * s * bw + .022, ry * s + .026))
+        P = Part(g + '.skirt')
+        loft(P, rings, main, None, segs=18, caps=(False, False))
+        ob = finish(P); bind(ob, self.arm, skirt_w); self.add(g, ob)
+        return skirt_w, rad
+
+    def torso_r(self, z, grow=1.13, add=0.0):
+        """몸통 표 사이를 이어 z 높이의 (옆 반지름, 앞 반지름, 앞뒤 중심) — long_body 몸통과 같은 부풀림"""
+        T = TORSO[self.torso_key]; s, bw = self.s, self.bw
+        for (z0, rx0, ry0, c0), (z1, rx1, ry1, c1) in zip(T, T[1:]):
+            if z0 <= z <= z1:
+                t = (z - z0) / (z1 - z0); rx, ry, cy = rx0 + (rx1 - rx0) * t, ry0 + (ry1 - ry0) * t, c0 + (c1 - c0) * t
+                break
+        else:
+            z0, rx, ry, cy = T[-1] if z > T[-1][0] else T[0]
+        return rx * s * bw * grow + .014 + add, ry * s * (bw * .5 + .5) * (grow + .06) + .016 + add, cy * s
+
+    def torso_band(self, P, z, mat, grow=1.13, h=.03, add=.008):
+        rx, ry, cy = self.torso_r(z, grow, add)
+        V = self.V
+        loft(P, [(Vector((0, cy, (z - h / 2) * self.s)), Vector((0, -1, 0)), Vector((1, 0, 0)), rx, ry), (Vector((0, cy, (z + h / 2) * self.s)), Vector((0, -1, 0)), Vector((1, 0, 0)), rx, ry)], mat, None, segs=18, caps=(False, False))
+
+    def ring_band(self, P, z, mat, rad, h=.018, out=.004):
+        """자락·몸통을 두르는 띠 (z 높이, rad(z) → (rx, ry))"""
+        s, bw, V = self.s, self.bw, self.V
+        rx, ry = rad(z)
+        a = rx * s * bw + .022 + out; b = ry * s + .026 + out
+        loft(P, [(V(0, .005, z - h / 2), Vector((0, -1, 0)), Vector((1, 0, 0)), a, b), (V(0, .005, z + h / 2), Vector((0, -1, 0)), Vector((1, 0, 0)), a, b)], mat, None, segs=18, caps=(False, False))
+
+    def long_armor(self, g, piece, main, dark, metal):
+        s, bw, V = self.s, self.bw, self.V
+        fy = -(.152 if self.sex == 'm' else .17) * bw   # 가슴 앞면
+        upper = lambda co: ({'neck': smooth(co.z, 1.42 * s, 1.48 * s), 'spine': 1 - smooth(co.z, 1.42 * s, 1.48 * s)} if co.z > 1.08 * s else {'spine': smooth(co.z, .98 * s, 1.12 * s), 'hips': 1 - smooth(co.z, .98 * s, 1.12 * s)})
+        def collar(P, mat, hi=1.49, r0=.096, r1=.086):
+            limb(P, V(0, 0, 1.4), V(0, 0, hi), [(0, r0 * s * bw, r0 * .92 * s), (1, r1 * s * bw, r1 * .92 * s)], mat, None, segs=14, caps=(False, False))
+        if piece == 'trench':
+            # 롱 코트: 무릎 아래까지, 허리띠와 버클, 넓은 깃(라펠), 두 줄 단추, 어깨 견장, 소매 끈
+            skw, rad = self.long_body(g, main, hem=.42, flare=1.15, grow=1.12, cuff=dark)
+            P = Part(g + '.belt')
+            self.ring_band(P, 1.0, dark, lambda z: (.205, .158), h=.04, out=.008)
+            blob(P, V(0, -.19 * bw, 1.0), (.028 * s, .014 * s, .026 * s), metal, None, segs=8, rings=5)   # 버클
+            ob = finish(P); bind(ob, self.arm, lambda co: {'spine': .3, 'hips': .7}); self.add(g, ob)
+            P = Part(g + '.front')
+            collar(P, main, 1.5, .104, .094)
+            for sx in (1, -1):
+                limb(P, V(sx * .04 * bw, fy - .006, 1.39), V(sx * .1 * bw, fy - .004, 1.2), [(0, .05 * s, .01 * s), (1, .018 * s, .008 * s)], main, None, segs=6)   # 라펠
+                for z in (1.27, 1.17, 1.08):
+                    blob(P, V(sx * .058 * bw, fy - .01, z), (.011 * s, .008 * s, .011 * s), dark, None, segs=6, rings=4)   # 두 줄 단추
+                limb(P, V(sx * .1 * bw, 0, 1.43), V(sx * .19 * bw, 0, 1.42), [(0, .022 * s, .012 * s), (1, .022 * s, .012 * s)], dark, None, segs=6)   # 견장
+            ob = finish(P); bind(ob, self.arm, upper); self.add(g, ob)
+            return
+        if piece == 'firesuit':
+            # 방화복: 허벅지 중간까지, 가슴·허리·자락 끝·소매에 두른 반사띠(빛나는 노랑), 높이 세운 깃과 덮개, 앞을 덮는 어두운 여밈판
+            refl = rmat('bandage', .25, .7, tag='armor')   # 은빛 반사띠
+            skw, rad = self.long_body(g, main, hem=.72, flare=.9, grow=1.2, sleeve_w=1.12)
+            P = Part(g + '.bands')
+            self.ring_band(P, .78, refl, rad, h=.032)
+            self.ring_band(P, .86, refl, rad, h=.014)
+            ob = finish(P); bind(ob, self.arm, skw); self.add(g, ob)
+            P = Part(g + '.chest')
+            for z in (1.25, 1.07):
+                self.torso_band(P, z, refl, grow=1.2, h=.032)
+            collar(P, dark, 1.53, .108, .1)
+            limb(P, V(0, fy - .02, 1.42), V(0, fy - .03, .74), [(0, .036 * s, .01 * s), (1, .036 * s, .01 * s)], dark, None, segs=6)   # 여밈판
+            ob = finish(P); bind(ob, self.arm, lambda co: upper(co) if co.z > 1.0 * s else skw(co)); self.add(g, ob)
+            am = self.p['arm'] * bw * 1.12
+            for k in 'LR':
+                el, wr = self.bones[f'forearm.{k}'][0], self.bones[f'forearm.{k}'][1]
+                P = Part(f'{g}.cuffband.{k}')
+                for t in (.55, .72):
+                    c = el + (wr - el) * t
+                    limb(P, c - (wr - el) * .04, c + (wr - el) * .04, [(0, .066 * am, .066 * am), (1, .066 * am, .066 * am)], refl, None, segs=10)
+                ob = finish(P); bind(ob, self.arm, rigid(f'forearm.{k}')); self.add(g, ob)
+            return
+        if piece == 'combatcoat':
+            # 방탄 전투복: 허벅지 중간까지 오는 전투 상의 + 앞뒤 방탄판을 넣은 조끼 · 어깨 보호대 · 허리 띠와 주머니 · 세운 깃
+            skw, rad = self.long_body(g, main, hem=.76, flare=.85, grow=1.15, cuff=dark)
+            P = Part(g + '.carrier')
+            limb(P, V(0, fy - .02, 1.37), V(0, fy - .028, 1.06), [(0, .15 * bw * s, .03 * s), (1, .145 * bw * s, .032 * s)], dark, None, segs=6)   # 앞판
+            limb(P, V(0, .118 * bw, 1.37), V(0, .12 * bw, 1.08), [(0, .15 * bw * s, .028 * s), (1, .145 * bw * s, .028 * s)], dark, None, segs=6)   # 뒤판
+            for sx in (1, -1):
+                limb(P, V(sx * .09, -.1, 1.41), V(sx * .09, .1, 1.41), [(0, .034 * s, .014 * s), (1, .034 * s, .014 * s)], dark, None, segs=5)   # 어깨끈
+            for k2 in range(3):
+                x = (k2 - 1) * .09 * bw
+                limb(P, V(x, fy - .04, 1.1), V(x, fy - .04, 1.22), [(0, .038 * bw * s, .024 * s), (1, .038 * bw * s, .024 * s)], main, None, segs=6)   # 탄창 주머니
+                limb(P, V(x, fy - .046, 1.21), V(x, fy - .046, 1.235), [(0, .04 * bw * s, .026 * s), (1, .04 * bw * s, .026 * s)], dark, None, segs=6)
+            collar(P, main, 1.5)
+            ob = finish(P); bind(ob, self.arm, upper); self.add(g, ob)
+            P = Part(g + '.belt')
+            self.ring_band(P, 1.0, dark, lambda z: (.2, .155), h=.045, out=.01)
+            for sx in (1, -1):
+                blob(P, V(sx * .16 * bw, -.08, .98), (.04 * s, .03 * s, .045 * s), dark, None, segs=8, rings=6)   # 허리 주머니
+            ob = finish(P); bind(ob, self.arm, lambda co: {'spine': .3, 'hips': .7}); self.add(g, ob)
+            am = self.p['arm'] * bw
+            for k in 'LR':
+                sh = self.bones[f'upper_arm.{k}'][0]
+                P = Part(f'{g}.pad.{k}')
+                blob(P, sh + Vector((0, 0, .03)), (.096 * am, .09 * am, .072 * am), dark, None, segs=12, rings=8, cut=lambda co, z0=sh.z: co.z < z0 - .035)   # 어깨 보호대
+                ob = finish(P); bind(ob, self.arm, autow(self.bones, ['spine', f'upper_arm.{k}'], power=5)); self.add(g, ob)
+            return
+        if piece == 'hauberk':
+            # 사슬 장포: 무릎까지 오는 쇠사슬 옷(쇠 빛) 위에 앞뒤로 늘어뜨린 천 겉옷(층마다 색) · 허리띠 · 사슬 두건 깃
+            mail = rmat('metal', .45, .45, .6, tag='armor')
+            skw, rad = self.long_body(g, mail, hem=.5, flare=1.0, grow=1.12)
+            P = Part(g + '.tabard')
+            F, Sd = Vector((0, -1, 0)), Vector((1, 0, 0))
+            for side in (-1, 1):   # 앞 · 뒤 천: 사슬 옷 겉면에 바짝 붙어 늘어진다
+                rings = []
+                for z in (1.38, 1.2, 1.02, .9, .72, .53):
+                    if z >= 1.0:
+                        rx, ry, cy = self.torso_r(z, 1.12, .006)
+                        y = cy + side * ry
+                    else:
+                        rx, ry = rad(z)
+                        y = .005 * s + side * (ry * s + .026 + .006)
+                    rings.append((Vector((0, y, z * s)), F, Sd, (.12 if z > 1.25 else .14) * bw * s, .007 * s))
+                loft(P, rings, main, None, segs=8)
+            ob = finish(P); bind(ob, self.arm, lambda co: upper(co) if co.z > 1.0 * s else {'hips': 1.0}); self.add(g, ob)
+            P = Part(g + '.belt')
+            self.ring_band(P, 1.0, dark, lambda z: (.205, .16), h=.04, out=.012)
+            blob(P, V(0, -.2 * bw, 1.0), (.03 * s, .014 * s, .03 * s), metal, None, segs=8, rings=5)
+            ob = finish(P); bind(ob, self.arm, lambda co: {'spine': .3, 'hips': .7}); self.add(g, ob)
+            P = Part(g + '.coif')
+            limb(P, V(0, .005, 1.39), V(0, .005, 1.5), [(0, .13 * s * bw, .12 * s), (.6, .1 * s * bw, .095 * s), (1, .088 * s * bw, .085 * s)], mail, None, segs=14, caps=(False, False))   # 사슬 깃
+            ob = finish(P); bind(ob, self.arm, upper); self.add(g, ob)
+            return
+        # platecoat — 판금 장갑: 가슴판 · 둥근 어깨 갑 · 목 가리개 · 엉덩이부터 허벅지를 덮는 쇠 비늘판(태싯) · 그 아래로 무릎까지 늘어진 장의(층마다 색)
+        plate = rmat('metal', .3, .6, .75, tag='armor')
+        skw, rad = self.long_body(g, main, hem=.4, flare=1.25, grow=1.12, cuff=plate)
+        P = Part(g + '.cuirass')
+        cr = []
+        for z in (1.0, 1.1, 1.2, 1.3, 1.38, 1.43):
+            rx, ry, cy = self.torso_r(z, 1.12, .022 if z < 1.42 else .012)
+            cr.append((Vector((0, cy, z * s)), Vector((0, -1, 0)), Vector((1, 0, 0)), rx, ry))
+        loft(P, cr, plate, None, segs=18, caps=(False, False))
+        limb(P, V(0, .0, 1.41), V(0, .0, 1.5), [(0, .11 * s * bw, .1 * s), (1, .095 * s * bw, .088 * s)], plate, None, segs=14, caps=(False, False))   # 목 가리개
+        limb(P, V(0, fy - .03, 1.36), V(0, fy - .036, 1.06), [(0, .012 * s, .008 * s), (1, .012 * s, .008 * s)], dark, None, segs=5)   # 가슴 가운데 능선
+        ob = finish(P); bind(ob, self.arm, upper); self.add(g, ob)
+        P = Part(g + '.tassets')
+        for row, (z0, z1) in enumerate(((1.0, .86), (.88, .74), (.76, .62))):   # 겹친 쇠 비늘판 세 줄 (앞 · 옆 · 뒤)
+            for ang in range(-3, 4):
+                a = ang * .42
+                for back in (0, 1):
+                    th = a + (math.pi if back else 0)
+                    rx, ry = rad((z0 + z1) / 2)
+                    R0x = (rx * s * bw + .03 + row * .006); R0y = (ry * s + .034 + row * .006)
+                    c0 = V(0, .005, z0) + Vector((math.sin(th) * R0x, -math.cos(th) * R0y, 0))
+                    c1 = V(0, .005, z1) + Vector((math.sin(th) * (R0x + .012), -math.cos(th) * (R0y + .012), 0))
+                    limb(P, c0, c1, [(0, .046 * s, .008 * s), (1, .05 * s, .008 * s)], plate if (ang + row) % 2 == 0 else dark, None, segs=4)
+        ob = finish(P); bind(ob, self.arm, skw); self.add(g, ob)
+        am = self.p['arm'] * bw
+        for k in 'LR':
+            sh, el = self.bones[f'upper_arm.{k}'][0], self.bones[f'upper_arm.{k}'][1]
+            P = Part(f'{g}.pauldron.{k}')
+            blob(P, sh + Vector((0, 0, .035)), (.112 * am, .102 * am, .082 * am), plate, None, segs=14, rings=9, cut=lambda co, z0=sh.z: co.z < z0 - .05)
+            blob(P, sh + Vector((0, 0, -.015)), (.106 * am, .098 * am, .03 * am), dark, None, segs=14, rings=6)
+            blob(P, el, (.07 * am, .07 * am, .066 * am), plate, None, segs=10, rings=7)   # 팔꿈치 덮개
+            ob = finish(P); bind(ob, self.arm, autow(self.bones, ['spine', f'upper_arm.{k}', f'forearm.{k}'], power=6)); self.add(g, ob)
+
     # ── 방어구 (평상복 몸 위에 겹친다) ──
     def armor(self, piece):
         g = 'a.' + piece; s = self.s; V = self.V
@@ -932,6 +1123,9 @@ class Doll:
             for sx in (1, -1):
                 limb(P, hc + Vector((sx * .088 * s, -.06 * s, -.02 * s)), hc + Vector((sx * .104 * s, .0, .012 * s)), [(0, .007, .007), (1, .006, .006)], black, None, segs=4)
             ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
+            return
+        if piece in ('trench', 'firesuit', 'combatcoat', 'hauberk', 'platecoat'):
+            self.long_armor(g, piece, main, dark, metal)
             return
         if piece in ('jacket', 'vest'):
             grow = 1.12 if piece == 'jacket' else 1.18

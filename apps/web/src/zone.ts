@@ -25,6 +25,7 @@ export interface Building {
   hut?: boolean; // (예전) 지옥 마을의 오두막
   hk?: HellBuildKind; // 지옥의 집·덩어리 종류
   estate?: 'bkk' | 'seoul'; // 35차: 사는 집 매물의 도시
+  yunae?: boolean; // 40차: 서울 달동네의 '유내 미용실' (지금은 다른 사람이 한다)
 }
 /** 지옥: 초가집 · 감옥 · 뼈집 · 대형 짐승 시체 · 뼈 무더기 · 내장 더미 */
 export type HellBuildKind = 'thatch' | 'prison' | 'bonehouse' | 'carcass' | 'bonepile' | 'guts' | 'butcher' | 'stall' | 'burnt' | 'idol' | 'smithy'; // 34차 smithy = 4층 칼드렉의 대장간

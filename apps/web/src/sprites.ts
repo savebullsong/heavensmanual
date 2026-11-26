@@ -85,9 +85,10 @@ export const TWO = new Set(['sledge', 'fireaxe', 'greatsword', 'maul', 'boltcutt
 /** 16차 괴물 몸: 차림 → [굽기 키, 자세] (무기를 들면 m) */
 const MON16: Record<string, [string, string, Mode]> = { ashgal: ['h', 'ashgal', 'm'], gurma: ['u', 'gurma', 'u'], cinder: ['n', 'cinder', 'm'], bloat: ['l', 'bloat', 'm'], glutton: ['e', 'glutton', 'm'], hawker: ['v', 'hawker', 'm'], debtor: ['d', 'debtor', 'm'], broker: ['k', 'besk', 'm'], forgeknight: ['z', 'forgeknight', 'm'] }; // 24차: 4층 층주 바르칸 · 25차 철갑마
 /** 방어구 겉모습: 그리는 순서와 색 (구역 3 = 본색, 구역 5 = 신발) */
-const ARMOR_ORDER = ['workpants', 'shinguard', 'boots', 'jacket', 'vest', 'gloves', 'shield'];
-const ARMOR_COLOR: Record<string, string> = { mask: '#262322', helmet: '#b0302a', jacket: '#4a5236', vest: '#3a3f46', gloves: '#d8cfb4', workpants: '#4a4536', shinguard: '#2b2f36', boots: '#3a2a1a', shield: '#7a4a2a' };
-const PER_BUILD = new Set(['jacket', 'vest', 'workpants']);
+const ARMOR_ORDER = ['workpants', 'shinguard', 'boots', 'jacket', 'vest', 'trench', 'firesuit', 'combatcoat', 'hauberk', 'platecoat', 'gloves', 'shield']; // 40차: 긴 겉옷은 바지·신 위에, 장갑 아래에
+const ARMOR_COLOR: Record<string, string> = { mask: '#262322', helmet: '#b0302a', jacket: '#4a5236', vest: '#3a3f46', gloves: '#d8cfb4', workpants: '#4a4536', shinguard: '#2b2f36', boots: '#3a2a1a', shield: '#7a4a2a', trench: '#8a6a44', firesuit: '#b8954a', combatcoat: '#4e5638', hauberk: '#5a1a16', platecoat: '#3a2a5a' };
+const LONG_COATS = new Set(['trench', 'firesuit', 'combatcoat', 'hauberk', 'platecoat']);
+const PER_BUILD = new Set(['jacket', 'vest', 'workpants', 'trench', 'firesuit', 'combatcoat', 'hauberk', 'platecoat']);
 const COSTUMES = new Set(['raincoat', 'patient', 'parrot', 'robber']); // 강도: 복면이 머리를 덮는다
 /** 맨손 몸(u: 주먹질 장면)까지 구운 차림. 강도는 늘 무기를 들어 무기 자세(m) 몸만 있다 */
 const COSTUME_BARE = new Set(['raincoat', 'patient', 'parrot']);
@@ -186,7 +187,10 @@ function palette(look: Look): Uint8ClampedArray[] {
 }
 
 // ───────────────────────── 어떤 층을 쓰나 ─────────────────────────
-export function layerKeys(look: Look, weapon: string | null, armor: string[] = []): { base: string; hair: string | null; weapon: string | null; armor: { key: string; piece: string }[]; mode: Mode; two?: boolean; stab?: boolean } {
+export function layerKeys(look: Look, weapon: string | null, armorIn: string[] = []): { base: string; hair: string | null; weapon: string | null; armor: { key: string; piece: string; tint?: string }[]; mode: Mode; two?: boolean; stab?: boolean } {
+  // 40차: '그림#색' — 천 색이 있는 겉옷
+  const tints = new Map<string, string>();
+  const armor = armorIn.map((a) => { const i = a.indexOf('#'); if (i < 0) return a; tints.set(a.slice(0, i), a.slice(i)); return a.slice(0, i); });
   const o = look.outfit ?? 'casual';
   // 대식자: 사람 모습 / 변신한 모습 (머리카락·방어구 없음, 늘 큰 바늘)
   if ((o as string) === 'suturer') return { base: 'b-m1-suturer-m', hair: null, weapon: 'w-m-needle', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
@@ -235,7 +239,7 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
   else base = `b-${sex}${build}-casual-${mode}`;
   const style = HAIR_STYLES[look.hair] ?? 'short';
   const hair = costume ? null : child ? `h-c-${style}` : `h-${sex}-${style}`;
-  const arm: { key: string; piece: string }[] = [];
+  const arm: { key: string; piece: string; tint?: string }[] = [];
   if (mode !== 'w') {
     const ab = costume ? 1 : build;
     for (const piece of [...ARMOR_ORDER, 'mask', 'helmet']) { // 25차: 검은 마스크 (헬멧 자리)
@@ -243,7 +247,7 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
       if (piece === 'mask' && o === 'parrot') continue;
       if (piece === 'helmet' && costume && o !== 'patient') continue; // 우비 모자·앵무새 머리 위에는 헬멧을 씌우지 않는다
       if (piece === 'shield' && (mode === 'g' || (!!w && TWO.has(w)))) continue; // 20차: 권총·활·양손 무기와는 방패를 들지 않는다
-      arm.push({ key: `a-${sex}${PER_BUILD.has(piece) ? ab : 1}-${piece}-${mode}`, piece });
+      arm.push({ key: `a-${sex}${PER_BUILD.has(piece) ? ab : 1}-${piece}-${mode}`, piece, ...(tints.has(piece) ? { tint: tints.get(piece) } : {}) });
     }
   }
   return { base, hair, weapon: w ? `w-${sex}-${w}` : null, armor: arm, mode, two: !!w && TWO.has(w), stab: !!w && STABBERS.has(w) };
@@ -283,11 +287,15 @@ async function build0(look: Look, keys: ReturnType<typeof layerKeys>, P = PX, pr
   const dir = P === 3 && P !== PX ? 'sprites3x' : 'sprites';
   const [base, hair, weap, ...arms] = await Promise.all([loadLayer(keys.base, dir), keys.hair ? loadLayer(keys.hair, dir) : null, keys.weapon ? loadLayer(keys.weapon, dir) : null, ...keys.armor.map((a) => loadLayer(a.key, dir))]);
   const pal = palette(look);
+  // 40차: 긴 겉옷을 입으면 속 윗옷(어깨·목둘레로 살짝 비치는 곳)도 겉옷 색으로 — 반팔 티 색이 어깨에 점처럼 남던 것
+  const longA = keys.armor.find((a) => LONG_COATS.has(a.piece));
+  if (longA) pal[3] = ramp(longA.tint ?? ARMOR_COLOR[longA.piece]);
   // 그리는 순서: 몸 → 옷 방어구 → 머리카락 → 헬멧 → 무기. 방어구는 자기 색을 쓴다
   type Lay = { L: Layer | null; pal: Uint8ClampedArray[] };
   const armorLay = (k: number): Lay => {
     const piece = keys.armor[k].piece, p2 = pal.slice();
-    p2[3] = ramp(ARMOR_COLOR[piece]); p2[5] = ramp(ARMOR_COLOR[piece]);
+    const col = keys.armor[k].tint ?? ARMOR_COLOR[piece];
+    p2[3] = ramp(col); p2[5] = ramp(col);
     return { L: arms[k], pal: p2 };
   };
   const order: Lay[] = [{ L: base, pal }];
@@ -444,8 +452,8 @@ export function turnedDir(d: Dir): Dir {
 }
 
 /** 스프라이트에 장면을 건다 (장면마다 발 위치가 달라 기준점도 바꾼다). size = 괴물·층주처럼 크게 그릴 때 */
-/** 39차: 사람·몹 그림 배율 — 건물·차·땅은 그대로 두고 인물만 키운다 */
-export const BODY_K = 1.2;
+/** 39차: 사람·몹 그림 배율 (건물·차·땅은 그대로). 40차: 사람만 키우니 건물이 작아 보여 1로 — 대신 화면 전체(시야)를 1.2배 당긴다 */
+export const BODY_K = 1;
 
 export function applyFrame(s: { texture: Texture; anchor: { set(x: number, y: number): void }; scale: { set(x: number, y?: number): void } }, f: Frame | undefined, size = 1) {
   if (!f) return;

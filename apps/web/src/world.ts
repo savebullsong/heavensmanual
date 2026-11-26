@@ -424,10 +424,11 @@ export class WorldScene {
   private zoomPref = (() => { try { return localStorage.getItem('heavensmanual.zoom') ?? 'auto'; } catch { return 'auto'; } })();
   setZoomPref(v: string) { this.zoomPref = v; }
   private wantZoom(): number {
-    if (this.zoomPref !== 'auto') return Math.max(1, Math.min(2.2, Number(this.zoomPref) || 1));
+    if (this.zoomPref !== 'auto') return Math.max(1, Math.min(2.6, Number(this.zoomPref) || 1));
+    // 40차: 사람만 키우던 것(1.2배) 대신 화면 전체를 1.2배 더 당긴다 — PC 1.2 · 큰 화면 터치 1.55 · 휴대폰 1.9
     const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-    if (!coarse) return 1;
-    return Math.min(this.app.screen.width, this.app.screen.height) < 600 ? 1.6 : 1.3;
+    if (!coarse) return 1.2;
+    return Math.min(this.app.screen.width, this.app.screen.height) < 600 ? 1.9 : 1.55;
   }
   private ground = new Container();
   private objects = new Container();
@@ -1080,7 +1081,7 @@ export class WorldScene {
     const hf = this.zone.hell?.floor ?? 0;
     // 24차 서울 달동네: 낮은 벽돌집과 내 집은 따로 그린다
     const dal = this.zone.city === 'seoul' && (b.hut || b.cat === 'home');
-    let d = dal ? drawDalHouse(b, this.night === 1, b.cat === 'home') : b.cat === 'palace' ? drawHeavenPalace(b) : b.cat === 'attraction' ? drawAttraction(b) : b.cat === 'ujusae' ? (hf ? drawYuhwang(b, hf) : this.realm === 'heaven' ? drawCosmicBirdHeaven(b) : drawCosmicBird(b, this.night === 1)) : b.cat === 'hbank' ? drawHellBank(b, hf || 1) : b.cat === 'atone' ? drawAtone(b, hf || 1) : b.cat === 'rebirth' ? drawRebirthGate(b) : b.cat === 'loan' ? drawLoanHouse(b) : hellTheme ? drawHellStructure(b, hellTheme, true) : kitOk ? drawBuildingKit(b, this.nameOf(b), this.night === 1, this.low) : drawBuilding(b, this.nameOf(b), this.night === 1);
+    let d = dal ? drawDalHouse(b, this.night === 1, b.cat === 'home', !!b.yunae) : b.cat === 'palace' ? drawHeavenPalace(b) : b.cat === 'attraction' ? drawAttraction(b) : b.cat === 'ujusae' ? (hf ? drawYuhwang(b, hf) : this.realm === 'heaven' ? drawCosmicBirdHeaven(b) : drawCosmicBird(b, this.night === 1)) : b.cat === 'hbank' ? drawHellBank(b, hf || 1) : b.cat === 'atone' ? drawAtone(b, hf || 1) : b.cat === 'rebirth' ? drawRebirthGate(b) : b.cat === 'loan' ? drawLoanHouse(b) : hellTheme ? drawHellStructure(b, hellTheme, true) : kitOk ? drawBuildingKit(b, this.nameOf(b), this.night === 1, this.low) : drawBuilding(b, this.nameOf(b), this.night === 1);
     // 17차: 지옥 건물마다 층의 흔적 (1층 화산재 · 2층 이끼와 진흙 · 3층 핏빛과 홍등). 유황새는 따로 그린다, 환생 로비는 홀로 멀쩡하다
     if (hf && b.cat !== 'ujusae' && b.cat !== 'rebirth') d = { ...d, canvas: weatherHell(d.canvas, hf, b.i0 * 31 + b.j0 * 17, { lanterns: !['carcass', 'bonepile', 'guts', 'idol', 'smithy'].includes(b.hk ?? '') }) };
     // 관리자가 갈아 끼운 그림 (같은 크기 또는 2배)

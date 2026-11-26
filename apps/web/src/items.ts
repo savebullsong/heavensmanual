@@ -35,6 +35,8 @@ export interface ItemDef {
   /** 35차: 내구도가 바닥나 박살난 무기 — 고칠 수 없고 싸게 팔기만 한다 */
   wreck?: boolean;
   reach?: number; // 35차: 채찍·창 — 근접 무기지만 이만큼 떨어져서 때린다 (칸)
+  /** 40차: 긴 겉옷의 천 색 (같은 그림을 물건마다 다른 색으로) */
+  tint?: string;
   bloodFloor?: number; // 22차: 물장수가 파는 '그 층 괴물의 피' (그 층에서만 판다)
 }
 
@@ -116,7 +118,12 @@ export const ITEMS: ItemDef[] = [
   { key: 'tacboots', cat: 'armor', price: 32000, def: 4, sprite: 'boots', icon: 'boots', name: { ko: '전술 부츠', th: 'รองเท้ายุทธวิธี', en: 'Tactical boots' } },
   { key: 'vest3a', cat: 'armor', price: 85000, def: 9, sprite: 'vest', icon: 'vest', name: { ko: '방탄조끼 IIIA', th: 'เสื้อเกราะ IIIA', en: 'Body armor IIIA' } },
   { key: 'vest4', cat: 'armor', price: 380000, def: 11, sprite: 'vest', icon: 'vest', name: { ko: '세라믹 방탄복 IV', th: 'เสื้อเกราะเซรามิก IV', en: 'Ceramic plate armor IV' } },
-  { key: 'armorsuit', cat: 'armor', price: 2800000, def: 14, sprite: 'vest', icon: 'vest', name: { ko: '특수부대 방호복', th: 'ชุดเกราะหน่วยรบพิเศษ', en: 'Special-forces armor suit' } },
+  { key: 'armorsuit', cat: 'armor', price: 2800000, def: 14, sprite: 'combatcoat', icon: 'combatcoat', tint: '#2b2e31', name: { ko: '특수부대 방호복', th: 'ชุดเกราะหน่วยรบพิเศษ', en: 'Special-forces armor suit' } },
+  // 40차: 긴 겉옷 — 무릎·허벅지까지 덮어 바지는 가려지고 겉옷이 곧 차림이 된다
+  { key: 'trenchcoat', cat: 'armor', price: 2900, def: 3, store: 'dept', sprite: 'trench', icon: 'trench', tint: '#8a6a44', name: { ko: '낙타색 롱 코트', th: 'โค้ทยาวสีอูฐ', en: 'Camel long coat' } },
+  { key: 'leathercoat', cat: 'armor', price: 18000, def: 5, store: 'dept', sprite: 'trench', icon: 'trench', tint: '#2a2624', name: { ko: '검은 가죽 롱코트', th: 'โค้ทหนังยาวสีดำ', en: 'Black leather long coat' } },
+  { key: 'firecoat', cat: 'armor', price: 9500, def: 6, store: 'tools', sprite: 'firesuit', icon: 'firesuit', tint: '#b8954a', name: { ko: '방화복 상의', th: 'เสื้อดับเพลิง', en: 'Firefighter turnout coat' } },
+  { key: 'combatcoat', cat: 'armor', price: 150000, def: 10, sprite: 'combatcoat', icon: 'combatcoat', tint: '#4e5638', name: { ko: '방탄 전투복', th: 'ชุดรบกันกระสุน', en: 'Armored combat uniform' } },
   { key: 'riotshield', cat: 'armor', price: 150000, def: 8, sprite: 'shield', icon: 'shield', name: { ko: '진압 방패', th: 'โล่ปราบจลาจล', en: 'Riot shield' } },
   { key: 'gloves', cat: 'armor', price: 120, def: 1, name: { ko: '작업 장갑', th: 'ถุงมือช่าง', en: 'Work gloves' } },
   { key: 'workpants', cat: 'armor', price: 450, def: 2, name: { ko: '작업 바지', th: 'กางเกงช่าง', en: 'Work trousers' } },
@@ -255,6 +262,12 @@ export const ITEMS: ItemDef[] = [
     ['icecream', 80, 50, '아이스크림', 'ไอศกรีม', 'Ice cream'], ['bubbletea', 60, 40, '버블티', 'ชานมไข่มุก', 'Bubble tea'],
   ] as [string, number, number, string, string, string][]).map(([key, price, heal, ko, th, en]): ItemDef => ({ key, cat: 'goods', price, heal, store: 'cafe', now: true, name: { ko, th, en } })),
   // 25차 지옥 1층 마스크 팔이 소녀의 바구니: 검은 마스크(헬멧 자리 · 현실로도 가져간다 · 훔치기 +2%) · 화염방사기(하루 5분)
+  // 40차: 지옥의 큰 갑옷 — 층마다 천 색이 다르다
+  { key: 'ashhauberk', cat: 'armor', price: 260, def: 7, hell: true, sale: [1], sprite: 'hauberk', icon: 'hauberk', tint: '#5a5550', name: { ko: '재 사슬 장포', th: 'เสื้อเกราะโซ่ยาวเถ้า', en: 'Ash chain hauberk' } },
+  { key: 'boghauberk', cat: 'armor', price: 330, def: 8, hell: true, sale: [2], sprite: 'hauberk', icon: 'hauberk', tint: '#3e4a2e', name: { ko: '늪 이끼 사슬 장포', th: 'เสื้อเกราะโซ่ยาวตะไคร่บึง', en: 'Bog-moss chain hauberk' } },
+  { key: 'sealplate', cat: 'armor', price: 520, def: 10, hell: true, sale: [3], sprite: 'platecoat', icon: 'platecoat', tint: '#6a1414', name: { ko: '봉랍 판금 장의', th: 'ชุดเกราะแผ่นครั่งประทับ', en: 'Sealing-wax plate robe' } },
+  { key: 'slagplate', cat: 'armor', price: 900, def: 12, hell: true, sale: [4], sprite: 'platecoat', icon: 'platecoat', tint: '#3a2a22', name: { ko: '쇳물 판금 갑주', th: 'ชุดเกราะแผ่นน้ำเหล็ก', en: 'Slag plate armor' } },
+  { key: 'thornplate', cat: 'armor', price: 1400, def: 13, hell: true, floor: 4, store: 'drop', sprite: 'platecoat', icon: 'platecoat', tint: '#1e1a1a', name: { ko: '가시 기사의 장갑', th: 'เกราะอัศวินหนาม', en: "Thorn knight's plate" } },
   { key: 'blackmask', cat: 'armor', price: 1845, def: 1, hell: true, store: 'maskgirl', sprite: 'mask', icon: 'blackmask', cross: true, steal: 0.02, name: { ko: '검은 마스크', th: 'หน้ากากผ้าสีดำ', en: 'Black mask' } },
   { key: 'flamer', cat: 'weapon', price: 99999, atk: 16, ranged: true, note: 'fuel', hell: true, store: 'maskgirl', name: { ko: '화염방사기', th: 'เครื่องพ่นไฟ', en: 'Flamethrower' } },
 ];
@@ -410,7 +423,7 @@ export function itemByKey(k: string): ItemDef {
   return d;
 }
 export function iconFor(it: ItemDef): HTMLCanvasElement {
-  const c = itemIcon(it.icon ?? it.sprite ?? it.key);
+  const c = itemIcon(it.icon ?? it.sprite ?? it.key, it.tint);
   if (it.wreck) {
     // 35차 박살난 무기: 빛이 빠지고, 가운데가 깨져 갈라진 금 · 떨어져 나간 조각
     const g0 = c.getContext('2d')!;
@@ -436,9 +449,14 @@ export function iconFor(it: ItemDef): HTMLCanvasElement {
 }
 
 // ───────────────────────── 32×32 아이콘 ─────────────────────────
+/** 색을 밝게(+)·어둡게(-) */
+function shade(hex: string, k: number): string {
+  const n = parseInt(hex.slice(1), 16), f = (v: number) => Math.round(Math.max(0, Math.min(255, k < 0 ? v * (1 + k) : v + (255 - v) * k)));
+  return '#' + [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => f(v).toString(16).padStart(2, '0')).join('');
+}
 const OUTLINE = [20, 14, 10];
 
-export function itemIcon(key: string): HTMLCanvasElement {
+export function itemIcon(key: string, tint?: string): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = c.height = 32;
   const g = c.getContext('2d')!;
@@ -679,6 +697,44 @@ export function itemIcon(key: string): HTMLCanvasElement {
       R(15, 6, 2, 22, '#2e3322'); R(16, 6, 1, 22, '#b9b49a'); R(10, 5, 4, 3, '#3a4028'); R(18, 5, 4, 3, '#3a4028');
       for (let y = 10; y < 28; y += 5) { R(8, y, 7, 1, '#3a4028'); R(17, y, 7, 1, '#3a4028'); }
       break;
+    // 40차: 긴 겉옷 (천 색 = tint)
+    case 'trench': {
+      const C = tint ?? '#8a6a44', D = shade(C, -0.32);
+      P([[11, 2], [21, 2], [27, 8], [29, 20], [26, 21], [25, 11], [25, 31], [7, 31], [7, 11], [6, 21], [3, 20], [5, 8]], C);
+      P([[11, 2], [16, 10], [13, 14], [10, 6]], D); P([[21, 2], [16, 10], [19, 14], [22, 6]], D);
+      R(7, 16, 18, 3, D); R(15, 16, 3, 3, '#c9b48a'); R(16, 19, 1, 12, D);
+      R(13, 11, 1, 1, '#2a2420'); R(19, 11, 1, 1, '#2a2420'); R(13, 13, 1, 1, '#2a2420'); R(19, 13, 1, 1, '#2a2420');
+      break;
+    }
+    case 'firesuit': {
+      const C = tint ?? '#b8954a', D = shade(C, -0.3);
+      P([[10, 3], [22, 3], [28, 9], [29, 22], [25, 22], [24, 12], [24, 28], [8, 28], [8, 12], [7, 22], [3, 22], [4, 9]], C);
+      R(8, 13, 16, 2, '#e8ecef'); R(8, 23, 16, 2, '#e8ecef'); R(3, 18, 4, 2, '#e8ecef'); R(25, 18, 4, 2, '#e8ecef');
+      R(15, 3, 3, 25, D); R(12, 2, 9, 3, D);
+      break;
+    }
+    case 'combatcoat': {
+      const C = tint ?? '#4e5638', D = shade(C, -0.38);
+      P([[10, 3], [22, 3], [28, 9], [29, 21], [25, 21], [24, 12], [24, 28], [8, 28], [8, 12], [7, 21], [3, 21], [4, 9]], C);
+      E(7, 8, 4, 3, D); E(25, 8, 4, 3, D);
+      R(9, 9, 14, 11, D); R(10, 14, 3, 5, C); R(14, 14, 3, 5, C); R(19, 14, 3, 5, C); R(8, 20, 16, 2, D);
+      break;
+    }
+    case 'hauberk': {
+      const C = tint ?? '#5a1a16';
+      P([[10, 3], [22, 3], [28, 9], [29, 20], [25, 20], [24, 11], [25, 30], [7, 30], [8, 11], [7, 20], [3, 20], [4, 9]], '#8a929c');
+      for (let y = 5; y < 30; y += 2) for (let x = 6 + (y % 4 ? 1 : 0); x < 27; x += 2) R(x, y, 1, 1, '#5e666f');
+      P([[12, 5], [20, 5], [21, 30], [11, 30]], C); R(11, 16, 10, 2, '#2a2420'); R(15, 16, 2, 2, '#c9a23e');
+      break;
+    }
+    case 'platecoat': {
+      const C = tint ?? '#3a2a5a', D = shade(C, -0.3);
+      P([[9, 18], [23, 18], [27, 31], [5, 31]], C); R(15, 20, 2, 11, D);
+      E(16, 11, 8, 8, '#9aa3ad'); R(8, 3, 16, 5, '#7c8590'); E(6, 8, 4, 4, '#b8c0c8'); E(26, 8, 4, 4, '#b8c0c8');
+      for (let k = 0; k < 5; k++) R(8 + k * 3, 18, 3, 7, k % 2 ? '#7c8590' : '#a9b2bb');
+      R(16, 6, 1, 12, '#4a5058');
+      break;
+    }
     case 'vest':
       P([[9, 4], [13, 4], [16, 8], [19, 4], [23, 4], [26, 10], [26, 28], [6, 28], [6, 10]], '#3a3f46');
       R(9, 12, 6, 9, '#4f5660'); R(17, 12, 6, 9, '#4f5660'); R(6, 23, 20, 3, '#2a2e33');

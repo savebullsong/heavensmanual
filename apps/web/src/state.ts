@@ -38,6 +38,8 @@ export interface Save {
   border?: { since: number; met?: boolean };
   /** 24차: 서울 달동네 골목에서 '내 집이 여기 있다…'를 이미 보았는가 (한 번만) */
   homeSeen?: boolean;
+  /** 40차 유내 미용실: 원장에게 유내를 물은 횟수 · 들어가 본 적 있는가 */
+  ysAsk?: number; ysSeen?: boolean;
   adminTrip?: 'real' | 'ghost' | 'heaven' | 'hell'; // 관리자가 시찰(지옥 층 이동·천국)을 떠나기 전의 세계 (돌아갈 곳)
   /** 천국: 환생할 때 받을 선행 보너스 (영혼 경험치) */
   heaven?: { met?: boolean; admin?: boolean; adapted?: boolean; ywLost?: boolean; rites?: number; acc?: 'lover' | 'friend' | 'family' | 'alone' }; // 35차 acc = 아큐버스와 정한 사이 // 21차: 행사에 다녀와 익숙해졌나 · 안내천사를 따돌렸나 · 다녀온 행사 수
