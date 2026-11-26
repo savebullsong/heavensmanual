@@ -1,5 +1,6 @@
 // Heaven's Manual — 1단계: 우주새 상점(첫 장면, 무작위 처음 모습) → "나는 누구였지" → 이번 생의 모습 → 수쿰빗 거리
 // 1단계-B: 대상 메뉴와 싸움, 체력·위험 상태·차 사고, 돈 줍기와 노동, 가방(먹기·장착), 죽음과 심판, 다시 우주새에서 눈뜨기
+import './canvasfix.ts'; // 29차: 맨 먼저 — 2D 캔버스를 메모리 쪽에
 import { Application } from 'pixi.js';
 import './style.css';
 import { WorldScene, type WorldHooks, type Stance, type RemoteInfo } from './world.ts';
@@ -96,7 +97,7 @@ function loadZone(id: string): Promise<Zone> {
 }
 loadZone(homeZone());
 
-const shopLabels = () => ({ hwang: state.realm === 'hell' ? t().hwanghon : t().clerk, parrot: t().parrot, door: t().doorLabel, goat: t().goatName });
+const shopLabels = () => ({ hwang: state.realm === 'hell' ? t().hwanghon : t().clerk, parrot: t().parrot, door: t().doorLabel, goat: t().goatName, cage: t().cageName });
 const realm = () => state.realm ?? 'real';
 /** 관리자 캐릭터의 투명 모드 (관리자로 지정된 계정만) */
 const INVIS_KEY = 'heavensmanual.invisible';
@@ -149,6 +150,119 @@ function reclaim(w: 'real' | 'hell') {
   delete state.vault![w];
 }
 
+// ───────────────────────── 29차: 우주새 보관 우리 ─────────────────────────
+/** 현실과 지옥의 우리는 따로 — 현실 우주새는 현실 우리, 유황새는 지옥 우리 */
+const cageW = (): 'real' | 'hell' => (inHell() ? 'hell' : 'real');
+/** 우리 칸의 열쇠 → 물건 (봉인할 때 화살은 'arrows20' 묶음으로 넣는다) */
+const stashItem = (k: string) => itemByKey(k === 'arrows20' ? 'arrows' : k);
+/** 꺼낼 때 수수료: 물건 값의 1할, 적어도 ฿20 (지옥 2닢) — 한 개마다 */
+const stashFee = (it: ItemDef, hell: boolean) => Math.max(hell ? 2 : 20, Math.round(it.price * 0.1));
+/** 가게 안 우리 그림에 맡긴 물건 몇 개를 보인다 */
+function refreshCage() {
+  const v = state.vault?.[cageW()];
+  const icons: HTMLCanvasElement[] = [];
+  if (v) for (const [k, n] of Object.entries(v.bag)) if (n > 0 && stashItem(k)) icons.push(iconFor(stashItem(k)));
+  if (v?.ammo) icons.push(iconFor(itemByKey('ammo')));
+  shop.setCage(icons);
+}
+/** 우리 창: 꺼내기(수수료) · 맡기기(공짜). 맡기는 것은 무엇이든 — 끼고 있는 하나뿐인 장비만 빼고 */
+function openCage() {
+  closeMenus();
+  document.querySelector('.store-panel')?.remove();
+  const L = t();
+  const hell = inHell(), w = cageW();
+  shop.lock(true);
+  const el = document.createElement('div');
+  el.className = 'store-panel shop-menu cage-panel';
+  el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close">✕</button></div><p class="store-line"></p><div class="menu-tabs store-tabs"></div><div class="menu-list"></div>`;
+  el.querySelector('.menu-head b')!.textContent = L.cageName;
+  el.querySelector('.store-line')!.textContent = hell ? L.cageLineHell : L.cageLine;
+  const close = () => { el.remove(); if (!busy) shop.lock(false); };
+  (el.querySelector('.menu-close') as HTMLButtonElement).onclick = close;
+  const list = el.querySelector('.menu-list')!;
+  const tabs = el.querySelector('.store-tabs')!;
+  let mode: 'take' | 'store' = vaultOf(w) ? 'take' : 'store';
+  const bTake = document.createElement('button'), bStore = document.createElement('button');
+  bTake.textContent = L.cageTakeTab; bStore.textContent = L.cageStoreTab; bStore.className = 'sell';
+  bTake.onclick = () => { mode = 'take'; draw(); }; bStore.onclick = () => { mode = 'store'; draw(); };
+  tabs.append(bTake, bStore);
+  const empty = (txt: string) => { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = txt; list.appendChild(p); };
+  const draw = () => {
+    list.innerHTML = '';
+    bTake.classList.toggle('on', mode === 'take'); bStore.classList.toggle('on', mode === 'store');
+    if (mode === 'store') {
+      const bag = state.bag ?? {};
+      const worn = new Set(Object.values(state.equip ?? {}));
+      const mine = Object.keys(bag).filter((k) => bag[k] > 0 && !(worn.has(k) && bag[k] <= 1)).map(itemByKey).filter(Boolean);
+      if (!mine.length) { empty(L.cageNothingBag); return; }
+      for (const it of mine) {
+        const row = itemRow(it, `×${(bag[it.key] ?? 0) - (worn.has(it.key) ? 1 : 0)}`, async () => {
+          const room = (state.bag?.[it.key] ?? 0) - (worn.has(it.key) ? 1 : 0);
+          const n = room > 1 ? await askQty(it, 0, room, 'store') : 1;
+          if (n <= 0 || (state.bag?.[it.key] ?? 0) < n) return;
+          state.bag![it.key] -= n;
+          state.vault ??= {};
+          const v = (state.vault[w] ??= { bag: {}, ammo: 0 });
+          v.bag[it.key] = (v.bag[it.key] ?? 0) + n;
+          save(state); updateHud(); renderQuick(); refreshCage();
+          toast(L.cageStored.replace('{item}', it.name[lang()]).replace('{n}', String(n)));
+          draw();
+        });
+        list.appendChild(row); // 탭 이름과 같은 글('맡기기')은 줄마다 다시 쓰지 않는다
+      }
+      return;
+    }
+    const v = vaultOf(w);
+    if (!v) { empty(L.cageEmpty); return; }
+    const rows: { key: string; it: ItemDef; n: number; ammo?: boolean }[] = Object.entries(v.bag).filter(([k, n]) => n > 0 && stashItem(k)).map(([k, n]) => ({ key: k, it: stashItem(k), n }));
+    if (v.ammo > 0) rows.push({ key: 'ammo', it: itemByKey('ammo'), n: Math.ceil(v.ammo / 12), ammo: true });
+    for (const r of rows) {
+      const fee = stashFee(r.it, hell);
+      const row = itemRow(r.it, `×${r.n} · ${L.cageFeeEach.replace('{p}', priceText(fee, hell))}`, async () => {
+        const n = r.n > 1 ? await askQty(r.it, fee, r.n, 'take') : 1;
+        if (n <= 0) return;
+        el.remove();
+        await parrotFee(r, n, fee * n, hell);
+        if (document.body.contains(el)) return;
+        openCage();
+      });
+      list.appendChild(row);
+    }
+  };
+  draw();
+  panelAt(el);
+}
+/** 꺼낼 때 — 앵무새가 여자 목소리로 수수료를 받는다 */
+async function parrotFee(r: { key: string; it: ItemDef; n: number; ammo?: boolean }, n: number, fee: number, hell: boolean) {
+  const L = t();
+  const w = cageW();
+  busy = true;
+  shop.lock(true);
+  dlg.open({ name: L.parrot, portrait: 'parrot' });
+  await dlg.say(L.parrotVoice);
+  await dlg.say(pick(L.parrotFee));
+  const c = await dlg.choose([L.cagePay.replace('{p}', priceText(fee, hell)), L.cageNo]);
+  if (c === 0) {
+    const have = hell ? hellState().notes : state.wallet ?? 0;
+    if (have < fee) { await dlg.say(pick(L.parrotBroke)); }
+    else {
+      if (hell) hellState().notes -= fee; else state.wallet = (state.wallet ?? 0) - fee;
+      const v = state.vault![w]!;
+      if (r.ammo) { const k = Math.min(v.ammo, n * 12); state.ammo = (state.ammo ?? 0) + k; v.ammo -= k; }
+      else {
+        v.bag[r.key] = Math.max(0, (v.bag[r.key] ?? 0) - n);
+        if (r.key === 'arrows20') state.arrows = (state.arrows ?? 0) + n * 20;
+        else if (r.key === 'rifleammo') state.rifle = (state.rifle ?? 0) + n * 10;
+        else { state.bag ??= {}; state.bag[r.key] = (state.bag[r.key] ?? 0) + n; }
+      }
+      if (!vaultOf(w)) delete state.vault![w];
+      save(state); renderHud(); renderQuick(); refreshCage();
+      await dlg.say(L.cageOpened.replace('{item}', r.it.name[lang()]).replace('{n}', String(n)));
+    }
+  } else await dlg.say(L.cageLeave);
+  endTalk();
+}
+
 async function boot() {
   await app.init({ resizeTo: window, background: '#14110f', antialias: false, autoDensity: true, resolution: Math.min(2, window.devicePixelRatio || 1) });
   // 느린 기기: 처음 몇 초 평균이 40fps 아래면 화면 밀도를 1로 낮춘다 (한 번만, 고해상도 휴대폰의 버벅임 줄이기)
@@ -185,7 +299,7 @@ async function boot() {
   setInterval(updateHud, 1000);
   setInterval(() => { snapPos(); save(state); }, 4000);
   addEventListener('pagehide', () => { snapPos(); save(state); });
-  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior(), store: (k: 'tools' | 'antique', n: string) => openStore(k, n), terrace: () => enterTerrace(), officer: () => talkToOfficer(), pasharTalk: () => talkToPashar() }; // 개발용 확인 창구
+  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior(), store: (k: 'tools' | 'antique', n: string) => openStore(k, n), terrace: () => enterTerrace(), officer: () => talkToOfficer(), pasharTalk: () => talkToPashar(), cage: () => openCage(), parrot: () => talkToParrot(), hstore: (k: HellVendor) => openHellStore(k), soul: () => renderSoul() }; // 개발용 확인 창구
 }
 
 // ───────────────────────── 장면 전환 ─────────────────────────
@@ -231,6 +345,7 @@ function enterShop(fromStreet: boolean) {
   shop.setGoat(realm() === 'real' && Math.random() < 0.16); // 24차: 가끔 가게 안에 염소 (안에서는 들이받지 않는다)
   if (inHell()) preloadPortrait('hwanghon');
   shop.setLook(bodyLook(), gear()); // 입은 방어구 그대로 (맨몸이면 환자복 같은 처음 옷이 드러난다)
+  refreshCage(); // 29차: 우리 안에 맡긴 물건
   shop.enter(fromStreet);
   shop.start();
   renderHud();
@@ -1283,6 +1398,7 @@ function onShopArrive(target: ShopTarget) {
   if (busy) return;
   if (realm() === 'ghost' && target !== 'door') { ghostParrot(); return; }
   if (target === 'hwang') talkToHwang();
+  else if (target === 'cage') openCage();
   else if (target === 'door') goOut();
 }
 
@@ -1322,15 +1438,8 @@ async function talkToHwang() {
       await dlg.say(L.react[state.arrival!.kind]);
     } else await dlg.say(L.greetUsual);
     // 이 세계의 우주새에 봉인해 둔 물건
-    const w = hell ? 'hell' : 'real';
-    if (vaultOf(w)) {
-      await dlg.say(L.vaultHas);
-      if ((await dlg.choose([L.vaultTake, L.vaultLater])) === 0) {
-        reclaim(w);
-        save(state);
-        await dlg.say(L.vaultBack);
-      }
-    }
+    // 29차: 맡긴 물건(죽거나 다시 태어날 때 봉인된 것 포함)은 데스크 앞 보관 우리에 — 꺼낼 때는 앵무새가 수수료를 받는다
+    if (vaultOf(hell ? 'hell' : 'real')) await dlg.say(hell ? L.cageHintHw : L.cageHintHwang);
   }
   talkedThisVisit = true;
   // 물건 고르기 → (소비품은 수량) → 사고 나면 한마디 뒤 다시 목록. '나가기'나 빈 곳을 누르면 말없이 끝
@@ -1381,8 +1490,8 @@ async function talkToHwang() {
     }
     if (money() < it.price) { await dlg.say(hell ? L.hwNoMoney : L.noMoney); continue; }
     // 회복하는 물건은 몇 개 살지 고른다
-    const most = Math.min(99, Math.floor(money() / it.price));
-    const n = it.heal && !it.now ? await askQty(it, it.price, most, 'buy') : 1;
+    const most = Math.min(it.cat === 'weapon' || it.cat === 'armor' ? 9 : 99, Math.floor(money() / it.price));
+    const n = needsConfirm(it) ? await askQty(it, it.price, most, 'buy') : 1; // 29차: 장비도 한 번 더 (누르자마자 돈이 사라지지 않게)
     if (n <= 0) continue;
     if (n === 1) {
       // 지옥에서 무기를 사는 건 당연한 일: '그걸로 뭘 하시려고요'는 현실에서만
@@ -1580,6 +1689,21 @@ async function talkToParrot() {
   shop.lock(true);
   dlg.open({ name: L.parrot, portrait: 'parrot' });
   await dlg.say(Math.random() < 0.01 ? L.parrotRare : '......');
+  // 29차: 먹이 주기 — 해바라기씨 한 줌 (현실 ฿10 · 지옥 1닢). 가끔 여자 목소리로 한마디
+  const hell = inHell(), price = hell ? 1 : 10;
+  const c = await dlg.choose([L.parrotFeed.replace('{p}', priceText(price, hell)), L.parrotLeave]);
+  if (c === 0) {
+    const have = hell ? hellState().notes : state.wallet ?? 0;
+    if (have < price) await dlg.say(hell ? L.hwNoMoney : L.noMoney);
+    else {
+      if (hell) hellState().notes -= price; else state.wallet = (state.wallet ?? 0) - price;
+      save(state); renderHud();
+      shop.crest(true);
+      await dlg.say(pick(L.parrotEat));
+      if (Math.random() < 0.25) { await dlg.say(L.parrotVoice); await dlg.say(pick(L.parrotAfter)); }
+      shop.crest(false);
+    }
+  }
   endTalk();
 }
 
@@ -1663,7 +1787,7 @@ function pickItem(hell: boolean, start: ShopTab): Promise<{ it: ItemDef; sell: b
 }
 
 /** 몇 개: − 숫자 + 와 1·5·10·최대, 사기/팔기 단추에 모두 얼마인지. 뒤로 = 0 */
-function askQty(it: ItemDef, unit: number, max: number, verb: 'buy' | 'sell'): Promise<number> {
+function askQty(it: ItemDef, unit: number, max: number, verb: 'buy' | 'sell' | 'store' | 'take'): Promise<number> {
   const L = t();
   const hell = inHell();
   return new Promise((resolve) => {
@@ -1675,29 +1799,82 @@ function askQty(it: ItemDef, unit: number, max: number, verb: 'buy' | 'sell'): P
         <div class="qty-row"><button class="q-m" aria-label="-">−</button><output class="q-n">1</output><button class="q-p" aria-label="+">+</button></div>
         <div class="qty-quick"></div>
         <button class="primary q-go"></button></div>`;
-    el.querySelector('.menu-head b')!.textContent = verb === 'buy' ? L.qtyBuyTitle : L.qtySellTitle;
+    el.querySelector('.menu-head b')!.textContent = verb === 'buy' ? L.qtyBuyTitle : verb === 'sell' ? L.qtySellTitle : verb === 'store' ? L.qtyStoreTitle : L.qtyTakeTitle;
     const back = el.querySelector('.q-back') as HTMLButtonElement;
     back.textContent = L.qtyBack;
-    const row = itemRow(it, priceText(unit, hell), () => undefined);
+    const row = itemRow(it, verb === 'store' ? '' : verb === 'take' ? L.cageFeeEach.replace('{p}', priceText(unit, hell)) : priceText(unit, hell), () => undefined);
     row.disabled = true;
     el.querySelector('.qty-item')!.appendChild(row);
     const out = el.querySelector('.q-n') as HTMLOutputElement, go = el.querySelector('.q-go') as HTMLButtonElement;
     const draw = () => {
       out.textContent = String(n);
-      go.textContent = (verb === 'buy' ? L.qtyBuy : L.qtySell).replace('{n}', String(n)).replace('{p}', priceText(unit * n, hell));
+      go.textContent = (verb === 'buy' ? L.qtyBuy : verb === 'sell' ? L.qtySell : verb === 'store' ? L.qtyStore : L.qtyTake).replace('{n}', String(n)).replace('{p}', priceText(unit * n, hell));
     };
     const set = (v: number) => { n = Math.max(1, Math.min(max, v)); draw(); };
     (el.querySelector('.q-m') as HTMLButtonElement).onclick = () => set(n - 1);
     (el.querySelector('.q-p') as HTMLButtonElement).onclick = () => set(n + 1);
     for (const q of [1, 5, 10]) if (q <= max) { const b = document.createElement('button'); b.textContent = `×${q}`; b.onclick = () => set(q); el.querySelector('.qty-quick')!.appendChild(b); }
     if (max > 1) { const b = document.createElement('button'); b.textContent = L.qtyMax.replace('{n}', String(max)); b.onclick = () => set(max); el.querySelector('.qty-quick')!.appendChild(b); }
-    const finish = (v: number) => { dlg.setPanel(null); resolve(v); };
+    // 29차: 대화창이 없을 때(거리 가게·지옥 장사꾼 창)는 화면 가운데 작은 창으로 — 한 번 더 확인하고 산다/판다
+    const inDlg = dlg.isOpen;
+    const wrap = inDlg ? null : document.createElement('div');
+    const finish = (v: number) => { if (wrap) wrap.remove(); else dlg.setPanel(null); resolve(v); };
     back.onclick = () => finish(0);
     go.onclick = () => finish(n);
     draw();
+    if (wrap) {
+      wrap.className = 'qty-overlay';
+      const ask = document.createElement('p');
+      ask.className = 'qty-ask';
+      ask.textContent = (verb === 'buy' ? L.qtyAsk : verb === 'sell' ? L.qtyAskSell : verb === 'store' ? L.qtyAskStore : L.qtyAskTake).replace('{item}', it.name[lang()]);
+      el.querySelector('.qty-body')!.prepend(ask);
+      wrap.appendChild(el);
+      wrap.onpointerdown = (e) => { if (e.target === wrap) finish(0); };
+      document.body.appendChild(wrap);
+      return;
+    }
     dlg.setPanel(el);
-    dlg.say((verb === 'buy' ? L.qtyAsk : L.qtyAskSell).replace('{item}', it.name[lang()]));
+    dlg.say((verb === 'buy' ? L.qtyAsk : verb === 'sell' ? L.qtyAskSell : verb === 'store' ? L.qtyAskStore : L.qtyAskTake).replace('{item}', it.name[lang()]));
   });
+}
+/** 29차: 장비(무기·방어구·탄약)는 눌러도 바로 사지지 않는다 — 몇 개 살지 한 번 더 */
+const needsConfirm = (it: ItemDef) => !it.now;
+/** 29차: 모든 가게의 '사기 · 팔기' 탭 (가게 이름 줄 아래) */
+function storeTabs(el: HTMLElement, mode: () => 'buy' | 'sell', set: (m: 'buy' | 'sell') => void) {
+  const L = t();
+  const tabs = document.createElement('div');
+  tabs.className = 'menu-tabs store-tabs';
+  const mk = (m: 'buy' | 'sell', label: string) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.className = m === 'sell' ? 'sell' : '';
+    b.onclick = () => set(m);
+    return b;
+  };
+  const bBuy = mk('buy', L.tabBuy), bSell = mk('sell', L.tabSell);
+  tabs.append(bBuy, bSell);
+  el.querySelector('.store-line')!.after(tabs);
+  return () => { bBuy.classList.toggle('on', mode() === 'buy'); bSell.classList.toggle('on', mode() === 'sell'); };
+}
+/** 29차: 가게 창의 '팔기' 목록 — 이 세계의 물건만 (현실 가게는 현실 물건 · 지옥 장사꾼은 지옥 물건), 값은 4할 */
+function sellList(list: Element, hell: boolean, redraw: () => void) {
+  const L = t();
+  const mine = sellable(hell);
+  if (!mine.length) { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = L.sellNothing; list.appendChild(p); return; }
+  for (const it of mine) {
+    const p = sellPrice(it);
+    const row = itemRow(it, `×${state.bag![it.key]} · ${priceText(p, hell)}`, async () => {
+      const have = state.bag?.[it.key] ?? 0;
+      const n = await askQty(it, p, have, 'sell');
+      if (n <= 0 || (state.bag?.[it.key] ?? 0) < n) return;
+      state.bag![it.key] -= n;
+      if (hell) hellState().notes += p * n; else state.wallet = (state.wallet ?? 0) + p * n;
+      save(state); updateHud(); renderQuick();
+      toast(L.sold.replace('{item}', it.name[lang()]).replace('{n}', String(n)).replace('{p}', priceText(p * n, hell)));
+      redraw();
+    });
+    list.appendChild(row); // '팔기' 탭 안에서는 줄마다 '팔기'를 다시 쓰지 않는다
+  }
 }
 
 function itemRow(it: ItemDef, right: string, onClick: () => void, dim = false) {
@@ -2816,8 +2993,12 @@ function openHellStore(kind: HellVendor) {
   // 넝마장수의 헌 물건: 날마다 층마다 바뀌는 네 가지 (값 7할)
   const day = Math.floor(Date.now() / 86400000);
   const used = ITEMS.filter((x) => x.hell && x.cat === 'armor' && !x.store).sort((a, b) => ((a.key.length * 7 + day * 13 + h.floor * 5 + a.price) % 11) - ((b.key.length * 7 + day * 13 + h.floor * 5 + b.price) % 11)).slice(0, 2);
+  let mode: 'buy' | 'sell' = 'buy';
+  const tabsOn = storeTabs(el, () => mode, (m) => { mode = m; draw(); });
   const draw = () => {
     list.innerHTML = '';
+    tabsOn();
+    if (mode === 'sell') { sellList(list, true, draw); return; }
     const of = (st: ItemDef['store']) => ITEMS.filter((x) => x.store === st).map((x): [ItemDef, number] => [x, x.price]);
     // 장사꾼: 이름만 장사꾼 — 날마다 바뀌는 잡동사니 넷 (값은 조금 비싸게)
     const odd = ITEMS.filter((x) => x.hell && !x.floor && x.store !== 'drop' && x.store !== 'maskgirl' && x.note !== 'ammo' && x.note !== 'arrows' && !x.bloodFloor).sort((a, b) => ((a.key.charCodeAt(1) * 31 + day * 17 + h.floor * 7 + a.price) % 13) - ((b.key.charCodeAt(1) * 31 + day * 17 + h.floor * 7 + b.price) % 13)).slice(0, 4);
@@ -2830,28 +3011,17 @@ function openHellStore(kind: HellVendor) {
       : [...of('hjunk'), ...used.map((x): [ItemDef, number] => [x, Math.max(1, Math.round(x.price * 0.7))])];
     const shelf = stock.map(([x, p]) => ({ it: x, price: p }));
     for (const [it, price] of stock) {
-      const row = itemRow(it, priceText(price, true), () => {
+      const row = itemRow(it, priceText(price, true), async () => {
         if (h.notes < price) { toast(L.hwNoMoney); return; }
-        h.notes -= price;
-        addToBag(it);
+        const n = it.cat === 'weapon' || it.cat === 'armor' ? await askQty(it, price, Math.min(9, Math.floor(h.notes / price)), 'buy') : 1; // 29차: 장비는 한 번 더
+        if (n <= 0 || h.notes < price * n) return;
+        h.notes -= price * n;
+        for (let k = 0; k < n; k++) addToBag(it);
         save(state); updateHud(); renderQuick();
-        toast(L.bought.replace('{item}', it.name[lang()]));
+        toast(n > 1 ? L.boughtN.replace('{item}', it.name[lang()]).replace('{n}', String(n)) : L.bought.replace('{item}', it.name[lang()]));
         draw();
       }, h.notes < price);
-      const tag = document.createElement('span'); tag.className = 'act'; tag.textContent = L.buy; row.appendChild(tag); row.classList.add('has-act');
       list.appendChild(withSteal(row, it, price, shelf, () => streetSteal(it, price, shelf, el, draw)));
-    }
-    if (kind === 'junk') for (const it of sellable(true)) {
-      const p = sellPrice(it);
-      const row = itemRow(it, `×${state.bag![it.key]} · ${priceText(p, true)}`, () => {
-        state.bag![it.key] -= 1;
-        h.notes += p;
-        save(state); updateHud();
-        toast(L.sold.replace('{item}', it.name[lang()]).replace('{n}', '1').replace('{p}', priceText(p, true)));
-        draw();
-      });
-      const tag = document.createElement('span'); tag.className = 'act'; tag.textContent = L.sellBtn; row.appendChild(tag); row.classList.add('has-act');
-      list.appendChild(row);
     }
   };
   draw();
@@ -3242,8 +3412,26 @@ function renderSoul() {
   ac.querySelector('em')!.textContent = L.defenseVal.replace('{d}', String(g.def)).replace('{ac}', String(armorClass(g.def, s.agi)));
   kd.appendChild(ac);
   // 선행·악행: 이번 생(심판은 이것으로) · 모든 생에 걸친 영혼의 기록
+  // 29차: 이번 생은 선악 저울 그래프 — 이번 생 전체의 누적량만 센다 (선행 1000 · 악행 1001이면 바늘이 악 쪽으로 살짝 → 지옥)
   const life = state.deeds ?? { good: 0, evil: 0 }, all = state.deedsAll ?? life;
-  for (const [label, d] of [[L.karmaLife, life], [L.karmaAll, all]] as const) {
+  {
+    const tot = life.good + life.evil;
+    const ev = tot > 0 ? (life.evil / tot) * 100 : 50;
+    const box = document.createElement('div');
+    box.className = 'karma-life';
+    box.innerHTML = '<b></b><div class="kbar"><span class="kb-g"></span><div class="kb"><i class="kb-good"></i><i class="kb-evil"></i><i class="kb-mid"></i><i class="kb-mark"></i></div><span class="kb-e"></span></div>';
+    box.querySelector('b')!.textContent = L.karmaLife;
+    box.querySelector('.kb-g')!.textContent = L.karmaGood.replace('{n}', fmtKarma(life.good));
+    box.querySelector('.kb-e')!.textContent = L.karmaEvil.replace('{n}', fmtKarma(life.evil));
+    (box.querySelector('.kb-good') as HTMLElement).style.width = `${tot > 0 ? 100 - ev : 0}%`;
+    (box.querySelector('.kb-evil') as HTMLElement).style.width = `${tot > 0 ? ev : 0}%`;
+    (box.querySelector('.kb-mark') as HTMLElement).style.left = `${ev}%`;
+    box.classList.toggle('lean-evil', tot > 0 && life.evil > life.good);
+    box.classList.toggle('lean-good', tot > 0 && life.good > life.evil);
+    kd.appendChild(box);
+  }
+  // 모든 생의 기록은 이번 생과 다를 때만 (첫 생이면 같은 숫자를 두 번 쓰지 않는다)
+  for (const [label, d] of (all.good !== life.good || all.evil !== life.evil ? [[L.karmaAll, all]] : []) as [string, typeof all][]) {
     const row = document.createElement('div');
     row.className = 'stat-row soft';
     row.innerHTML = '<b></b><em></em>';
@@ -3287,32 +3475,36 @@ function openStore(kind: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept
   el.querySelector('.store-line')!.textContent = kind === 'tools' ? L.storeTools : kind === 'dept' ? L.storeDept : kind === 'antique' ? L.storeAntique : L.storeLine;
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
   const list = el.querySelector('.menu-list')!;
+  let mode: 'buy' | 'sell' = 'buy';
+  const tabsOn = storeTabs(el, () => mode, (m) => { mode = m; draw(); });
   const draw = () => {
     list.innerHTML = '';
+    tabsOn();
+    if (mode === 'sell') { sellList(list, false, draw); return; }
     const menu = menuFor(kind, cuisine);
     const shelf = menu.map((m) => ({ it: itemByKey(m.key), price: m.price }));
     for (const { key, price } of menu) {
       const it = itemByKey(key);
       const poor = (state.wallet ?? 0) < price;
-      const row = itemRow(it, priceText(price), () => {
+      const row = itemRow(it, priceText(price), async () => {
         if ((state.wallet ?? 0) < price) { toast(L.noMoney); return; }
-        state.wallet = (state.wallet ?? 0) - price;
+        // 29차: 무기·방어구 같은 물건은 몇 개 살지 한 번 더 (그 자리에서 먹는 것만 바로)
+        const n = it.cat === 'weapon' || it.cat === 'armor' ? await askQty(it, price, Math.min(9, Math.floor((state.wallet ?? 0) / price)), 'buy') : 1;
+        if (n <= 0 || (state.wallet ?? 0) < price * n) return;
+        state.wallet = (state.wallet ?? 0) - price * n;
         if (it.now) {
           world?.heal(it.heal ?? 0);
           toast(L.ate.replace('{item}', it.name[lang()]));
         } else {
-          addToBag(it);
-          toast(L.bought.replace('{item}', it.name[lang()]));
+          for (let k = 0; k < n; k++) addToBag(it);
+          toast(n > 1 ? L.boughtN.replace('{item}', it.name[lang()]).replace('{n}', String(n)) : L.bought.replace('{item}', it.name[lang()]));
         }
         save(state);
         updateHud();
         draw();
       }, poor);
-      const tag = document.createElement('span');
-      tag.className = 'act';
-      tag.textContent = it.now ? L.eatHere : L.buy;
-      row.appendChild(tag);
-      row.classList.add('has-act');
+      // 29차: '사기' 탭이 생겨 줄마다 '사기'는 빼고, 그 자리에서 먹는 것만 표시
+      if (it.now) { const tag = document.createElement('span'); tag.className = 'act'; tag.textContent = L.eatHere; row.appendChild(tag); row.classList.add('has-act'); }
       list.appendChild(withSteal(row, it, price, shelf, () => streetSteal(it, price, shelf, el, draw)));
     }
   };

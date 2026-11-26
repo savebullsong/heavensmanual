@@ -52,6 +52,12 @@ button.primary:hover { background: #e0b437; }
 .qty-quick { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
 .qty-quick button { padding: 4px 12px; font-size: 13px; }
 .q-go { align-self: stretch; padding: 10px; font-size: 15px; }
+/* 29차: 대화창 밖(거리 가게·지옥 장사꾼)에서 사고팔 때 한 번 더 묻는 작은 창 */
+.qty-overlay { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(8, 6, 4, 0.55); padding: 16px; }
+.qty-overlay .qty-panel { flex: 0 1 auto; width: min(380px, 100%); }
+.qty-ask { margin: 0; color: #eadfc8; font-size: 14px; text-align: center; }
+.store-tabs { padding: 0 8px; margin-top: 6px; border-bottom: 1px solid #4f3a28; }
+.store-tabs button.sell { margin-left: 0; }
 .menu-list { overflow: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
 .menu-item { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; column-gap: 12px; align-items: center; text-align: left; padding: 6px 10px; background: rgba(42, 31, 24, 0.75); border-color: #4f3a28; }
 .menu-item .icon { grid-row: 1 / span 2; width: 32px; height: 32px; image-rendering: pixelated; }
@@ -188,6 +194,21 @@ button.primary:hover { background: #e0b437; }
 .stat-row span { color: #a8987c; font-size: 12px; }
 .stat-row em { font-style: normal; color: #e0b437; font-variant-numeric: tabular-nums; min-width: 1.6em; text-align: right; }
 .stat-row button { padding: 0 9px; font-size: 15px; line-height: 22px; }
+/* 29차: 이번 생의 선악 저울 — 왼쪽 선 · 오른쪽 악, 가운데 선을 넘어 기우는 쪽으로 간다 */
+.karma-life { padding: 7px 8px 8px; background: rgba(42, 31, 24, 0.75); border: 1px solid #4f3a28; border-radius: 4px; }
+.karma-life > b { display: block; color: #eadfc8; font-size: 14px; margin-bottom: 6px; }
+.kbar { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; }
+.kbar > span { font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.kbar .kb-g { color: #9fd6a6; }
+.kbar .kb-e { color: #e08a7a; }
+.kb { position: relative; height: 12px; border-radius: 6px; background: #2a201a; overflow: visible; box-shadow: inset 0 0 0 1px #4f3a28; }
+.kb-good, .kb-evil { position: absolute; top: 0; bottom: 0; }
+.kb-good { left: 0; background: linear-gradient(90deg, #3f8a52, #6fb07a); border-radius: 6px 0 0 6px; }
+.kb-evil { right: 0; background: linear-gradient(90deg, #a0483c, #6e2420); border-radius: 0 6px 6px 0; }
+.kb-mid { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: #e0d4b8; opacity: 0.55; }
+.kb-mark { position: absolute; top: -4px; width: 0; height: 0; margin-left: -5px; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #f2e6c8; }
+.karma-life.lean-evil .kb-mark { border-top-color: #ff9c86; }
+.karma-life.lean-good .kb-mark { border-top-color: #b8f0c0; }
 .soul-account { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px 12px; border-top: 1px solid #4a3424; margin-top: 4px; }
 .soul-account .note { margin: 0; font-size: 12px; color: #b8a888; }
 .soul-account .prof-title { color: #e0b437; font-size: 13px; }

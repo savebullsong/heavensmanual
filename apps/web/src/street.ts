@@ -129,7 +129,8 @@ export function drawBuildingKit(b: Building, signText: string, night: boolean, l
   const W = (w + d) * (TW / 2) + MX * 2, H = (w + d) * (TH / 2) + top + MT + MB;
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
-  const g = c.getContext('2d')!;
+  // 29차: 가림 판정(opaqueAt)이 이 그림의 픽셀을 한 번 읽는다 — 그래픽 카드 쪽 캔버스면 읽을 때 크게 멈칫하므로 처음부터 메모리 쪽에 둔다
+  const g = c.getContext('2d', { willReadFrequently: true })!;
   const img = g.createImageData(W, H);
   const D = img.data;
   const P = (x: number, y: number, z: number): [number, number] => [Math.round((x - y) * (TW / 2) - minX), Math.round((x + y) * (TH / 2) - topY - z)];

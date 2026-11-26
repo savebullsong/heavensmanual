@@ -1,4 +1,5 @@
 // 관리자 페이지: 주요 인물 그림(대화창) · 게임 속 도트 그림 교체 — 두 메뉴로 나눔
+import './canvasfix.ts'; // 29차: 맨 먼저 — 2D 캔버스를 메모리 쪽에
 import './admin.css';
 import { PORTRAIT_SLOTS, SPRITE_SLOTS, DEFAULT_PORTRAITS, type PortraitSlot } from './portraits.ts';
 import { charSet, frameOf, MISS_HWANG, HWANGHON, BESK_LOOK, TALUS_LOOK, MASKGIRL_LOOK, yunaeLook, PX } from './sprites.ts';
@@ -43,6 +44,7 @@ const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   'bld-hell-1': { name: '유황새 · 지옥 1층', where: '재의 문턱 마을 (그을음·재 더미) · 바닥 2×2칸' },
   'bld-hell-2': { name: '유황새 · 지옥 2층', where: '굶주림의 늪 마을 (진흙·이끼·판자 창) · 바닥 2×2칸' },
   'bld-hell-3': { name: '유황새 · 지옥 3층', where: '피의 시장 마을 (금 간 벽·봉랍·붉은 등롱) · 바닥 2×2칸' },
+  'bld-hell-4': { name: '유황새 · 지옥 4층', where: '비명의 용광로 마을 (그을음·쇳물빛 실금·쇠사슬·찌꺼기 더미) · 바닥 2×2칸' },
 };
 
 type Tab = 'portraits' | 'sprites' | 'chars';

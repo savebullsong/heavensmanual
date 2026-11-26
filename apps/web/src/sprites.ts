@@ -390,6 +390,15 @@ export function frameOf(cs: CharSet, anim: Anim, dir: Dir, i: number): Frame | u
   const k = Math.max(0, Math.min(n - 1, i));
   return cs.frames.get(`${anim}-${dir}-${k}`) ?? cs.frames.get(`${anim}-${DIAG[dir] ?? dir}-${k}`);
 }
+/**
+ * 29차 맨손 주먹을 양손 번갈아: 거울 방향의 장면을 좌우로 뒤집으면 같은 쪽을 보며 다른 손으로 친다.
+ * (그 방향 장면이 없으면 쓰는 대각선 방향을 먼저 정하고 그 거울을 쓴다)
+ */
+const MIRROR: Record<Dir, Dir> = { se: 'sw', sw: 'se', ne: 'nw', nw: 'ne', s: 's', n: 'n', e: 'w', w: 'e' };
+export function mirrorFrameOf(cs: CharSet, anim: Anim, dir: Dir, i: number): Frame | undefined {
+  const real: Dir = cs.frames.has(`${anim}-${dir}-0`) ? dir : (DIAG[dir] ?? dir);
+  return frameOf(cs, anim, MIRROR[real], i);
+}
 /** 반대로 돌아선 방향 (문을 나서며 뒤돌기 등): 위아래만 뒤집는다 */
 export function turnedDir(d: Dir): Dir {
   if (d.length === 2) return ((d[0] === 's' ? 'n' : 's') + d[1]) as Dir;

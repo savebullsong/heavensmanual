@@ -6,7 +6,7 @@ import { goatIdleCanvas } from './goat.ts';
 import { toCanvas } from './raster.ts';
 import { iso } from './gfx.ts';
 import { MISS_HWANG, HWANGHON, charSet, frameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, type CharSet, type Dir, type Frame } from './sprites.ts';
-import { RW, RD, COUNTER, ROOM_BOUNDS, PARROT_PERCH, drawRoomBackground, drawCounterPieces, drawLamp, nightFactor } from './shopgfx.ts';
+import { RW, RD, COUNTER, ROOM_BOUNDS, PARROT_PERCH, CAGE, drawCage, drawRoomBackground, drawCounterPieces, drawLamp, nightFactor } from './shopgfx.ts';
 import { bangkokClock } from './clock.ts';
 import { shopKitReady, counterStrips, type ShopKit } from './shopkit.ts';
 
@@ -30,7 +30,8 @@ const START_FIRST: [number, number] = [4, 5];
 const START_BACK: [number, number] = [2, 6];
 const SPEED = 2.3;
 /** 유황새: 바닥에 선 큰 앵무새 (사람 키쯤), 베스크 자리와 말 거는 칸 */
-const BIRD_START = { x: 7.5, y: 3.5 };
+const BIRD_START = { x: 6.5, y: 4.5 }; // 29차: 데스크 앞은 보관 우리 자리
+const CAGE_TILE: [number, number] = [7, 4]; // 29차: 보관 우리 앞에 서는 칸
 const BIRD_SPEED = 1.15;
 /** 유황새의 앵무새: 사람 키로 자라 두 발로 걷는 유황앵무 (사람 NPC처럼 가게 안을 돌아다닌다) */
 const BIRD_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'cockatoo', cols: { 5: '#8a8078', 6: '#141010', 11: '#efede4', 12: '#efc63a', 15: '#2a2624' } };
@@ -49,6 +50,7 @@ function blocked(i: number, j: number) {
   if (hellRoom && i === 1 && j === 3) return true;
   if (i === 0 && (j === 4 || j === 5 || j === 7)) return true;
   if (i === 8 && j === 4) return true;
+  if (j === 3 && (i === 7 || i === 8)) return true; // 29차: 앵무새 데스크 앞의 보관 우리
   return false;
 }
 
@@ -77,13 +79,14 @@ function roomPath(si: number, sj: number, ti: number, tj: number): [number, numb
   return path;
 }
 
-export type ShopTarget = 'hwang' | 'parrot' | 'door' | 'goat';
+export type ShopTarget = 'hwang' | 'parrot' | 'door' | 'goat' | 'cage';
 
 export interface ShopLabels {
   hwang: string;
   parrot: string;
   door: string;
   goat: string;
+  cage: string;
 }
 
 export class ShopRoom {
@@ -145,6 +148,8 @@ export class ShopRoom {
   /** 20차: 앵무새를 눌렀다 (대화) */
   onParrot?: () => void;
   onGoat?: () => void;
+  private cage = new Sprite();
+  private cageItems: HTMLCanvasElement[] = [];
   /** 24차: 가끔 가게 안에 들어와 있는 염소 (안에서는 얌전하다) */
   private goat: Sprite | null = null;
   setGoat(on: boolean) {
@@ -190,6 +195,10 @@ export class ShopRoom {
     this.parrot.position.set(ax + 1, ay - PARROT_PERCH.z);
     this.parrot.zIndex = PARROT_PERCH.x + PARROT_PERCH.y + 1;
     this.objects.addChild(this.parrot);
+    // 29차: 데스크 앞 보관 우리 (맡긴 물건이 몇 개 보인다)
+    this.cage.zIndex = 11.2;
+    this.objects.addChild(this.cage);
+    this.redrawCage();
     // 유황새: 같은 앵무새가 사람 키만큼 자라 두 발로 가게 안을 걷는다
     this.birdShadow.ellipse(0, 0, 11, 4.5).fill({ color: 0x000000, alpha: 0.3 });
     this.bird.visible = this.birdShadow.visible = false;
@@ -323,10 +332,24 @@ export class ShopRoom {
     });
   }
 
+  /** 29차: 보관 우리 안에 보일 맡긴 물건 그림 (현실 · 지옥 따로) */
+  setCage(items: HTMLCanvasElement[]) {
+    this.cageItems = items;
+    this.redrawCage();
+  }
+  private redrawCage() {
+    const d = drawCage(this.cageItems, this.hellOn);
+    const old = this.cage.texture;
+    this.cage.texture = tex(d.canvas);
+    if (old && old !== Texture.EMPTY) old.destroy(true);
+    this.cage.position.set(d.x, d.y);
+  }
   /** 세계마다 같은 가게, 다른 빛: 귀신에게는 잿빛, 지옥에서는 황혼의 붉은 가게 */
   setRealm(r: 'real' | 'ghost' | 'hell') {
     this.dressKeeper(r === 'hell');
+    const wasHell = this.hellOn;
     this.hellOn = hellRoom = r === 'hell';
+    if (wasHell !== this.hellOn) this.redrawCage();
     this.parrot.visible = !this.hellOn;
     this.bird.visible = this.birdShadow.visible = this.hellOn;
     if (this.hellOn && !this.birdCS) charSet(BIRD_LOOK).then((cs) => { this.birdCS = cs; });
@@ -404,7 +427,7 @@ export class ShopRoom {
 
   /** 지정한 대상 앞으로 걸어간다 */
   goTo(t: ShopTarget) {
-    const [ti, tj] = t === 'door' ? DOOR_TILE : TALK_TILE;
+    const [ti, tj] = t === 'door' ? DOOR_TILE : t === 'cage' ? CAGE_TILE : TALK_TILE;
     const si = Math.floor(this.px), sj = Math.floor(this.py);
     this.pending = t;
     if (si === ti && sj === tj) { this.path = []; return; }
@@ -428,6 +451,7 @@ export class ShopRoom {
     } else if (inSprite(this.parrot, 6)) return 'parrot';
     if (this.goat && inSprite(this.goat, 4)) return 'goat';
     if (inSprite(this.hwang)) return 'hwang';
+    if (inSprite(this.cage)) return 'cage';
     // 남서쪽 앞 벽(j = RD)의 문: 화면 좌표를 그 벽 위의 (i, 높이)로 바꿔 본다
     const di = x / 32 + RD, dz = (di + RD) * 16 - y;
     if (di >= 0.85 && di <= 2.35 && dz >= -14 && dz <= 36) return 'door';
@@ -484,6 +508,7 @@ export class ShopRoom {
   private labelAnchor(t: ShopTarget): [number, number] {
     if (t === 'hwang') { const [x, y] = iso(HWANG.x, HWANG.y); return [x, y - 48]; }
     if (t === 'goat') { const [x, y] = iso(GOAT_SPOT[0], GOAT_SPOT[1]); return [x, y - 34]; }
+    if (t === 'cage') { const [x, y] = iso((CAGE.x0 + CAGE.x1) / 2, (CAGE.y0 + CAGE.y1) / 2); return [x, y - CAGE.h - 12]; }
     if (t === 'parrot' && this.hellOn) { const [x, y] = iso(this.bx, this.by); return [x, y - 64]; }
     if (t === 'parrot') { const [x, y] = iso(PARROT_PERCH.x, PARROT_PERCH.y); return [x + 1, y - PARROT_PERCH.z - 20]; }
     const [x, y] = iso(1.6, RD);

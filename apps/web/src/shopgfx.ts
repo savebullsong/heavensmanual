@@ -466,6 +466,59 @@ export function drawCounterPieces(): { canvas: HTMLCanvasElement; x: number; y: 
 /** 앵무새가 앉는 곳 (카운터 위 횃대 가로대) */
 export const PARROT_PERCH = { x: 8.35, y: COUNTER.y0 + 0.25, z: COUNTER.h + 9 };
 
+/**
+ * 29차: 앵무새 데스크 앞의 보관 우리 (큰 짐승을 가두던 쇠창살 우리). 안에 잡동사니와 무기가 보이고,
+ * 맡겨 둔 물건의 그림도 몇 개 바닥에 놓인다. 화면 좌표 (minX, minY)에 놓는 캔버스를 돌려준다
+ */
+export const CAGE = { x0: 6.75, x1: 8.85, y0: 3.1, y1: 3.95, h: 38 };
+export function drawCage(items: HTMLCanvasElement[], hell: boolean): { canvas: HTMLCanvasElement; x: number; y: number } {
+  const { x0, x1, y0, y1, h } = CAGE;
+  const pts: Pt[] = [];
+  const raw = (x: number, y: number, z: number): Pt => [(x - y) * 32, (x + y) * 16 - z];
+  for (const x of [x0, x1]) for (const y of [y0, y1]) for (const z of [0, h + 4]) pts.push(raw(x, y, z));
+  const minX = Math.floor(Math.min(...pts.map((p) => p[0]))) - 4, minY = Math.floor(Math.min(...pts.map((p) => p[1]))) - 6;
+  const maxX = Math.ceil(Math.max(...pts.map((p) => p[0]))) + 4, maxY = Math.ceil(Math.max(...pts.map((p) => p[1]))) + 4;
+  const [c, g] = cv(maxX - minX, maxY - minY);
+  const at = (x: number, y: number, z: number): Pt => { const [a, b] = raw(x, y, z); return [a - minX, b - minY]; };
+  const iron = hell ? ['#5a2a1e', '#3a1812', '#22100c'] : ['#5c5a56', '#3a3836', '#242220'];
+  const wood = hell ? tones('#3a2018') : tones('#5a3e28');
+  // 바닥 판 (윗면 · 앞 두 면)
+  quad(g, [at(x0, y0, 4), at(x1, y0, 4), at(x1, y1, 4), at(x0, y1, 4)], wood[1]);
+  quad(g, [at(x0, y1, 4), at(x1, y1, 4), at(x1, y1, 0), at(x0, y1, 0)], wood[2]);
+  quad(g, [at(x1, y0, 4), at(x1, y1, 4), at(x1, y1, 0), at(x1, y0, 0)], wood[3]);
+  for (let k = 1; k < 6; k++) { const xx = x0 + ((x1 - x0) * k) / 6; line(g, ...at(xx, y0, 4), ...at(xx, y1, 4), 1, wood[2]); } // 널빤지 틈
+  // 뒤쪽 창살 (어둡게)
+  const bars = (ax: number, ay: number, bx: number, by: number, n: number, col: string) => {
+    for (let k = 0; k <= n; k++) { const t = k / n; const [px, py] = at(ax + (bx - ax) * t, ay + (by - ay) * t, 4); R(g, px, py - h, 1, h, col); }
+  };
+  bars(x0, y0, x1, y0, 14, iron[2]);
+  bars(x0, y0, x0, y1, 5, iron[2]);
+  // 안의 잡동사니: 나무 궤짝 · 자루 · 기대 세운 배트와 칼 · 헌 헬멧
+  const [cx, cy] = at(x0 + 0.35, y0 + 0.3, 4);
+  R(g, cx - 2, cy - 14, 14, 13, wood[1]); R(g, cx - 2, cy - 14, 14, 2, wood[0]); R(g, cx + 4, cy - 14, 1, 13, wood[2]); R(g, cx - 2, cy - 8, 14, 1, wood[2]);
+  const [sx, sy] = at(x0 + 0.95, y0 + 0.25, 4);
+  ellipse(g, sx + 4, sy - 6, 6, 6, hell ? '#6a4a3a' : '#8a7a5a'); R(g, sx + 2, sy - 13, 4, 3, hell ? '#5a3a2a' : '#6e6046');
+  const [bx2, by2] = at(x1 - 0.5, y0 + 0.2, 4);
+  line(g, bx2, by2 - 1, bx2 + 5, by2 - 22, 2, '#b88a52'); line(g, bx2 + 4, by2 - 18, bx2 + 6, by2 - 24, 3, '#c89a62'); // 배트
+  line(g, bx2 + 9, by2, bx2 + 13, by2 - 26, 1, '#d8dce0'); R(g, bx2 + 7, by2 - 6, 6, 2, '#6a4a2a'); // 칼
+  const [hx, hy] = at(x0 + 1.45, y0 + 0.55, 4);
+  ellipse(g, hx, hy - 4, 5, 4, hell ? '#4a1a12' : '#4e5a4a'); R(g, hx - 6, hy - 1, 12, 1, hell ? '#2a0e0a' : '#2e362c');
+  // 맡겨 둔 물건 (몇 개만 바닥에)
+  items.slice(0, 5).forEach((ic, k) => { const [ix, iy] = at(x0 + 0.45 + k * 0.33, y1 - 0.25, 4); g.drawImage(ic, Math.round(ix - 8), Math.round(iy - 15), 16, 16); });
+  // 앞 창살 · 위 틀 · 자물쇠
+  bars(x1, y0, x1, y1, 5, iron[1]);
+  bars(x0, y1, x1, y1, 14, iron[0]);
+  for (const z of [h + 4, 6]) {
+    line(g, ...at(x0, y1, z), ...at(x1, y1, z), 1, iron[0]);
+    line(g, ...at(x1, y0, z), ...at(x1, y1, z), 1, iron[1]);
+  }
+  line(g, ...at(x0, y0, h + 4), ...at(x1, y0, h + 4), 1, iron[2]);
+  line(g, ...at(x0, y0, h + 4), ...at(x0, y1, h + 4), 1, iron[2]);
+  const [lx, ly] = at((x0 + x1) / 2, y1, 18);
+  R(g, lx - 3, ly - 2, 6, 5, '#c8a040'); R(g, lx - 2, ly - 5, 4, 3, '#8a6a20'); R(g, lx - 1, ly - 4, 2, 1, '#2a1c08'); R(g, lx, ly, 1, 2, '#3a2810');
+  return { canvas: c, x: minX, y: minY };
+}
+
 /** 천장에 매달린 등 */
 export function drawLamp(): HTMLCanvasElement {
   const [c, g] = cv(16, 64);

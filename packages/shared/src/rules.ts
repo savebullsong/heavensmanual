@@ -93,13 +93,15 @@ export type DeedKind = 'good' | 'evil' | 'none';
 export interface DeedRule { kind: DeedKind; points: number; exp: number; note?: string }
 
 export const DEED_TABLE = {
-  // 선행
-  counterWin: { kind: 'good', points: 2, exp: 20, note: '선제공격 없이 반격만 해서 싸움을 끝냄' },
-  thugDown: { kind: 'good', points: 3, exp: 30, note: '불량배·건달 처치' },
-  drunkDown: { kind: 'good', points: 1, exp: 10, note: '시비 거는 취객 제압 (약한 적)' },
-  shadeDown: { kind: 'good', points: 1, exp: 8, note: '천국의 그림자(미련)를 흩음 (약한 적)' },
-  robberDown: { kind: 'good', points: 4, exp: 45, note: '강도 처치 (17차)' },
-  gangDown: { kind: 'good', points: 5, exp: 60, note: '범죄조직원(마피아) 처치' },
+  // 선행 — 29차: 적대 NPC(취객·불량배·강도·마피아·그림자)를 쓰러뜨리는 것은 더 이상 선행이 아니다 (경험치만).
+  // 천국으로 가는 길: 아무도 먼저 치지 않고(반격은 괜찮다) 병원·학교·종교시설에 기부하고 기도하는 것, 그리고 적대 행인에게 맞서는 사람을 돕는 것
+  counterWin: { kind: 'none', points: 0, exp: 20, note: '선제공격 없이 반격만 해서 싸움을 끝냄 (29차: 경험치만)' },
+  thugDown: { kind: 'none', points: 0, exp: 30, note: '불량배·건달 처치 (29차: 경험치만)' },
+  drunkDown: { kind: 'none', points: 0, exp: 10, note: '시비 거는 취객 제압 (29차: 경험치만)' },
+  shadeDown: { kind: 'none', points: 0, exp: 8, note: '천국의 그림자(미련)를 흩음 (29차: 경험치만)' },
+  robberDown: { kind: 'none', points: 0, exp: 45, note: '강도 처치 (29차: 경험치만)' },
+  gangDown: { kind: 'none', points: 0, exp: 60, note: '범죄조직원(마피아) 처치 (29차: 경험치만)' },
+  helpNpc: { kind: 'good', points: 3, exp: 40, note: '적대 행인에게 맞서는 사람을 도와 그 적을 쓰러뜨림 (29차)' },
   criminalUserDown: { kind: 'good', points: 8, exp: 80, note: '범죄 표시가 된 유저 처치' },
   donate100: { kind: 'good', points: 1, exp: 5, note: '병원·학교 기부 ฿100마다 (하루 20점까지)' },
   pray: { kind: 'good', points: 1, exp: 5, note: '종교시설 기도 (하루 3번)' },

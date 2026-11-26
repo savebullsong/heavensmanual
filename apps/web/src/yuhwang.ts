@@ -59,6 +59,15 @@ export function drawYuhwang(b: Building, floor: number): { canvas: HTMLCanvasEle
       const [x0, y0] = onL ? P(i0 + t * w, j1, z) : P(i1, j0 + t * d, z);
       dot(x0, y0, 2 + Math.floor(r() * 3), 1 + Math.floor(r() * 2), r() < 0.5 ? '#4a6a2a' : '#5a7a34', 0.7);
     }
+  } else if (floor >= 4) {
+    // 29차 4층 비명의 용광로: 쇳가루 그을음 띠 + 벽 틈으로 새는 쇳물빛 실금
+    qL(i0, i1, 0, 12, '#1a1210', 0.7); qR(j0, j1, 0, 12, '#140e0c', 0.7);
+    for (let k = 0; k < 6; k++) { qL(i0 + 0.1 + k * 0.03, i1 - 0.1 - k * 0.03, 58 + k * 3, 61 + k * 3, '#000', 0.14); qR(j0 + 0.2, j1 - 0.2, 50 + k * 3, 53 + k * 3, '#000', 0.13); }
+    for (let k = 0; k < 9; k++) {
+      const onL = k < 5, t = 0.08 + r() * 0.84, z = 6 + r() * (TOP - 24);
+      let p: Pt = onL ? P(i0 + t * w, j1, z) : P(i1, j0 + t * d, z);
+      for (let s2 = 0; s2 < 7; s2++) { const q: Pt = [p[0] + (r() - 0.5) * 5, p[1] + 2 + r() * 4]; line(p, q, s2 % 3 === 0 ? '#ffb24a' : '#ff6a1a', 1, 0.9); p = q; }
+    }
   } else {
     // 금 간 회벽: 검은 실금과 떨어져 나간 회칠 (속의 붉은 벽돌)
     for (const [a, bb, z0, z1, onL] of [[i0 + 0.05, i0 + 0.5, 64, 86, true], [i1 - 0.5, i1 - 0.1, 70, 90, true], [j0 + 0.1, j0 + 0.6, 56, 80, false], [j1 - 0.6, j1 - 0.15, 6, 30, false]] as const) {
@@ -79,12 +88,12 @@ export function drawYuhwang(b: Building, floor: number): { canvas: HTMLCanvasEle
     }
   }
   // 층이 깊을수록 전체가 어둡고 칙칙하다
-  g.fillStyle = floor === 1 ? 'rgba(30,20,16,0.12)' : floor === 2 ? 'rgba(20,26,10,0.22)' : 'rgba(40,8,6,0.28)';
+  g.fillStyle = floor === 1 ? 'rgba(30,20,16,0.12)' : floor === 2 ? 'rgba(20,26,10,0.22)' : floor >= 4 ? 'rgba(34,14,6,0.3)' : 'rgba(40,8,6,0.28)';
   g.fillRect(0, 0, W, H);
   g.restore();
   // 빛바랜 색: 층이 깊을수록 색이 빠지고 그 층의 빛(재·늪·피)으로 물든다
   {
-    const [sat, tr, tg, tb, dim] = floor === 1 ? [0.5, 1.05, 0.95, 0.88, 0.86] : floor === 2 ? [0.35, 0.92, 1.0, 0.72, 0.74] : [0.4, 1.12, 0.78, 0.7, 0.72];
+    const [sat, tr, tg, tb, dim] = floor === 1 ? [0.5, 1.05, 0.95, 0.88, 0.86] : floor === 2 ? [0.35, 0.92, 1.0, 0.72, 0.74] : floor >= 4 ? [0.3, 1.1, 0.86, 0.72, 0.68] : [0.4, 1.12, 0.78, 0.7, 0.72];
     const im = g.getImageData(0, 0, W, H), D = im.data;
     for (let k = 0; k < D.length; k += 4) {
       if (!D[k + 3]) continue;
@@ -127,6 +136,17 @@ export function drawYuhwang(b: Building, floor: number): { canvas: HTMLCanvasEle
       for (let s = 0; s < 6; s++) line([x0 + s - 3, y0], [x0 + s * 1.6 - 1, y0 - 20 - r() * 8], s % 2 ? '#8a8a4a' : '#6a6a34', 1);
     }
     g.fillStyle = 'rgba(40,38,20,0.75)'; { const [x0, y0] = P(i0 + 0.7, j1 + 0.25, 0); g.beginPath(); g.ellipse(x0, y0, 14, 4, 0, 0, Math.PI * 2); g.fill(); }
+  } else if (floor >= 4) {
+    // 29차 4층: 문 옆에 식어 가는 쇳물 찌꺼기 더미 · 처마에 늘어진 쇠사슬 · 진열창 위 쇠판
+    for (const [x, y] of [[i0 + 0.35, j1 + 0.25], [i1 + 0.22, j0 + 0.5]] as const) {
+      const [x0, y0] = P(x, y, 0);
+      g.fillStyle = '#2a201c'; g.beginPath(); g.ellipse(x0, y0, 9, 3.6, 0, Math.PI, 0); g.fill();
+      dot(x0 - 4, y0 - 3, 3, 1, '#ff7a2a'); dot(x0 + 1, y0 - 2, 2, 1, '#ffb24a'); dot(x0 + 4, y0 - 1, 2, 1, '#c8401a');
+    }
+    for (let k = 0; k < 6; k++) { const [x0, y0] = P(i0 + 0.15 + k * 0.33, j1 + 0.12, TOP - 2); for (let c2 = 0; c2 < 3 + (k % 3); c2++) dot(x0, y0 + c2 * 3, 2, 2, c2 % 2 ? '#3a3430' : '#5a524a'); }
+    poly([P(i0 + 0.14, j1 + 0.04, 40), P(i0 + 0.86, j1 + 0.04, 40), P(i0 + 0.86, j1 + 0.04, 46), P(i0 + 0.14, j1 + 0.04, 46)], '#3a3632');
+    for (const x of [i0 + 0.2, i0 + 0.5, i0 + 0.8]) { const [nx, ny] = P(x, j1 + 0.05, 43); dot(nx, ny, 1, 1, '#8a8278'); }
+    g.globalAlpha = 0.35; g.fillStyle = '#ff6a1a'; { const [x0, y0] = P(i0 + 1.35, j1 + 0.35, 0); g.beginPath(); g.ellipse(x0, y0, 12, 4, 0, 0, Math.PI * 2); g.fill(); } g.globalAlpha = 1;
   } else {
     // 진열창을 판자 엇대어 막았다
     for (const [za, zb] of [[12, 44], [44, 14]] as const) poly([P(i0 + 0.16, j1 + 0.04, za), P(i0 + 0.84, j1 + 0.04, zb), P(i0 + 0.84, j1 + 0.04, zb + 5), P(i0 + 0.16, j1 + 0.04, za + 5)], '#4a3424');
