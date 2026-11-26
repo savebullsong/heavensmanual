@@ -12,7 +12,9 @@ const CW = 250, CH = 210;
 const cx = full.door.i, cy = full.door.j;
 const I0 = Math.max(0, Math.min(full.W - CW, cx - Math.round(CW * 0.55))), J0 = Math.max(0, Math.min(full.H - CH, cy - Math.round(CH * 0.5)));
 const W = CW, H = CH;
-const { codes, types } = full;
+// 35차: 달동네 산비탈 'hill' (걸을 수 없는 비탈 · 축대) 땅을 더한다
+const types = [...full.types, 'hill'];
+const codes = full.codes + 'h';
 const T = Object.fromEntries(types.map((t, k) => [t, k]));
 const tiles = new Uint8Array(W * H);
 for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) tiles[j * W + i] = codes.indexOf(full.tiles[(j + J0) * full.W + i + I0]);
@@ -42,7 +44,7 @@ const DI0 = ci === 0 ? 0 : W - DW, DJ0 = cj === 0 ? 0 : H - DH;
 const inDal = (i, j) => i >= DI0 && i < DI0 + DW && j >= DJ0 && j < DJ0 + DH;
 buildings = buildings.filter((b) => !(inDal(b.i0, b.j0) || inDal(b.i0 + b.w - 1, b.j0 + b.d - 1)));
 props = props.filter((p) => !inDal(p.i, p.j));
-for (let j = DJ0; j < DJ0 + DH; j++) for (let i = DI0; i < DI0 + DW; i++) set(i, j, 'park');
+for (let j = DJ0; j < DJ0 + DH; j++) for (let i = DI0; i < DI0 + DW; i++) set(i, j, 'hill'); // 35차: 달동네는 막힌 산비탈 — 골목 한 길로만 오른다
 // 골목 들머리: 달동네 안쪽 모서리 근처에서 가장 가까운 거리(골목·보도)
 const inner = [ci === 0 ? DW : W - DW - 1, cj === 0 ? DH : H - DH - 1];
 let start = null;
@@ -73,9 +75,14 @@ for (let k = 0; k < path.length - 1; k++) {
 }
 const occ = new Uint8Array(W * H);
 for (const b of buildings) for (let j = b.j0; j < b.j0 + b.d; j++) for (let i = b.i0; i < b.i0 + b.w; i++) if (i >= 0 && j >= 0 && i < W && j < H) occ[j * W + i] = 1;
-const free = (i0, j0, w, d) => { for (let j = j0; j < j0 + d; j++) for (let i = i0; i < i0 + w; i++) { if (!inDal(i, j) || get(i, j) !== T.park || occ[j * W + i]) return false; } return true; };
-const addB = (i0, j0, w, d, h, cat, color, extra = {}) => {
-  if (!free(i0, j0, w, d)) return null;
+const free = (i0, j0, w, d, gap = 0) => {
+  for (let j = j0; j < j0 + d; j++) for (let i = i0; i < i0 + w; i++) { if (!inDal(i, j) || get(i, j) !== T.hill || occ[j * W + i]) return false; }
+  // 35차: 집끼리 붙지 않게 둘레 gap칸에 다른 집이 없어야 한다 (지붕이 겹쳐 깨져 보이던 것)
+  for (let j = j0 - gap; j < j0 + d + gap; j++) for (let i = i0 - gap; i < i0 + w + gap; i++) if (i >= 0 && j >= 0 && i < W && j < H && occ[j * W + i]) return false;
+  return true;
+};
+const addB = (i0, j0, w, d, h, cat, color, extra = {}, gap = 0) => {
+  if (!free(i0, j0, w, d, gap)) return null;
   for (let j = j0; j < j0 + d; j++) for (let i = i0; i < i0 + w; i++) { occ[j * W + i] = 1; set(i, j, 'block'); }
   const b = { i0, j0, w, d, h, cat, color, ...extra };
   buildings.push(b);
@@ -83,22 +90,31 @@ const addB = (i0, j0, w, d, h, cat, color, extra = {}) => {
 };
 // 내 집: 골목 끝 바로 옆 (문이 골목을 본다)
 const HOME = { i0: end[0] - 1, j0: end[1] - 4, w: 3, d: 3 };
-for (let j = HOME.j0; j < HOME.j0 + HOME.d; j++) for (let i = HOME.i0; i < HOME.i0 + HOME.w; i++) { set(i, j, 'park'); occ[j * W + i] = 0; }
+for (let j = HOME.j0; j < HOME.j0 + HOME.d; j++) for (let i = HOME.i0; i < HOME.i0 + HOME.w; i++) { set(i, j, 'hill'); occ[j * W + i] = 0; }
 addB(HOME.i0, HOME.j0, 3, 3, 46, 'home', '#9a8a74', { pois: [{ t: 'home', n: '내 집', nko: '내 집', nen: 'My home', nth: 'บ้านของฉัน' }], sign: 'left' });
 const home = { i: HOME.i0 + 1, j: HOME.j0 + 3 };
 set(home.i, home.j, 'soi');
 const DALC = ['#7a5a4a', '#8a6a52', '#9a8a74', '#6e5e50', '#a8947a'];
-for (const k of pathTiles) {
-  const i = k % W, j = Math.floor(k / W);
-  for (const [di, dj] of [[2, 0], [-3, 0], [0, 2], [0, -3], [2, 2], [-3, -3]]) {
-    if (r() < 0.5) continue;
-    const w = ri(2, 3), d = ri(2, 3);
-    addB(i + di, j + dj, w, d, ri(32, 52), 'generic', pick(DALC), { hut: true });
+// 35차: 작은 집들이 산비탈에 옹기종기 — 골목 양옆에 바짝 줄지어 서고(첫 줄), 그 뒤로 한 줄 더. 그 밖은 나무가 듬성한 비탈
+const nearPath = (i, j, rad) => { for (let b = -rad; b <= rad; b++) for (let a = -rad; a <= rad; a++) if (pathTiles.has((j + b) * W + i + a)) return true; return false; };
+for (const [reach, skip] of [[2, 0.15], [4, 0.35]]) {
+  for (let j = DJ0 + 1; j < DJ0 + DH - 2; j++) for (let i = DI0 + 1; i < DI0 + DW - 2; i++) {
+    if (r() < skip) continue;
+    const w = r() < 0.6 ? 2 : 3, d = r() < 0.6 ? 2 : 3;
+    if (!nearPath(i + (w >> 1), j + (d >> 1), reach)) continue;
+    addB(i, j, w, d, ri(28, 40), 'generic', pick(DALC), { hut: true }, 1);
   }
 }
-for (const k of pathTiles) { const i = k % W, j = Math.floor(k / W); if (r() < 0.07) props.push({ i, j, kind: r() < 0.5 ? 'pole' : 'plant' }); }
+for (let j = DJ0 + 2; j < DJ0 + DH - 2; j++) for (let i = DI0 + 2; i < DI0 + DW - 2; i++) if (get(i, j) === T.hill && !occ[j * W + i] && !nearPath(i, j, 3) && r() < 0.07) props.push({ i, j, kind: 'tree' });
+// 골목 가의 전봇대·화분은 골목 위가 아니라 옆 비탈에 (외길을 막지 않게)
+for (const k of pathTiles) {
+  const i = k % W, j = Math.floor(k / W);
+  if (r() >= 0.09) continue;
+  const side = [[2, 0], [0, 2], [-1, 0], [0, -1]].map(([a, b]) => [i + a, j + b]).find(([a, b]) => get(a, b) === T.hill && !occ[b * W + a] && !pathTiles.has(b * W + a));
+  if (side) props.push({ i: side[0], j: side[1], kind: r() < 0.5 ? 'pole' : 'plant' });
+}
 // 가장 바깥 둘레: 걸을 수 없다 (달동네 쪽은 수풀 벼랑)
-for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) if (i < 2 || j < 2 || i >= W - 2 || j >= H - 2) set(i, j, inDal(i, j) ? 'park' : 'block');
+for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) if (i < 2 || j < 2 || i >= W - 2 || j >= H - 2) set(i, j, inDal(i, j) ? 'hill' : 'block');
 // 32차: 한국스탠다드차타드은행 — 원래 건물의 문이 뒤쪽 좁은 골목에 나서 들어가기 힘들다.
 //   같은 건물 단지의 큰길 쪽 동(남쪽 건물)으로 은행을 옮겨 문이 큰길 보도를 보게 한다.
 {

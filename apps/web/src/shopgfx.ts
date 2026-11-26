@@ -357,7 +357,7 @@ export function drawRoomBackground(): { canvas: HTMLCanvasElement; x: number; y:
   R(g, ux - 4, uy - 12, 8, 12, '#3a3f46'); R(g, ux - 4, uy - 12, 2, 12, '#5a616b'); R(g, ux - 4, uy - 13, 8, 2, '#22252a');
   line(g, ux - 1, uy - 12, ux - 3, uy - 26, 1, '#14100c'); line(g, ux + 2, uy - 12, ux + 3, uy - 24, 1, '#5a1a1c');
   R(g, ux - 4, uy - 29, 2, 3, '#14100c'); R(g, ux + 2, uy - 27, 2, 3, '#7a2a26');
-  const [px2, py2] = p(8.5, 7.5, 0); // 30차: 화분은 앞 오른쪽 구석으로 (데스크 앞은 보관 우리 자리 — 우리 밑에 깔려 받침대처럼 보였다)
+  const [px2, py2] = p(8.5, 3.5, 0); // 35차: 화분은 카운터 끝 앞으로 (보관 우리는 앞 오른쪽 바닥)
   ellipse(g, px2, py2, 8, 3.4, 'rgba(0,0,0,0.35)');
   R(g, px2 - 5, py2 - 9, 10, 9, '#8a4a2e'); R(g, px2 - 5, py2 - 9, 2, 9, '#a8603e'); R(g, px2 - 6, py2 - 10, 12, 2, '#6e3a24');
   const rr = rnd(3);
@@ -467,32 +467,32 @@ export function drawCounterPieces(): { canvas: HTMLCanvasElement; x: number; y: 
 export const PARROT_PERCH = { x: 8.35, y: COUNTER.y0 + 0.25, z: COUNTER.h + 9 };
 
 /**
- * 29차: 앵무새 데스크 앞의 보관 우리 (큰 짐승을 가두던 쇠창살 우리). 안에 잡동사니와 무기가 보이고,
- * 맡겨 둔 물건의 그림도 몇 개 바닥에 놓인다. 화면 좌표 (minX, minY)에 놓는 캔버스를 돌려준다
- * 34차 다시 그림: 방 앞 오른쪽 모서리 밖으로 삐져나가던 것과 횃대의 앵무새가 우리 안에 든 것처럼 겹치던 것을 바로잡아
- * 바닥 안쪽으로 들이고(오른쪽 끝 = 횃대 왼쪽), 굵은 모서리 기둥 · 바닥 쇠테 · 지붕 창살 · 앞면 가운데 쪽문(경첩 · 자물쇠)으로 우리답게
+ * 29차: 보관 우리 (큰 짐승을 가두던 쇠창살 우리). 안에 잡동사니와 무기가 보이고, 맡겨 둔 물건 몇 개가 바닥에 놓인다.
+ * 35차 다시: 카운터에 붙어 끼어 있던 것을 오른쪽 바닥 한가운데로 — 낮고 넓게(짐승 우리답게), 검은 쇠 바닥 테와 짙은 그림자로 바닥에 딛게,
+ * 안의 물건은 모두 바닥에 눕혀 (세워 그린 물건 그림이 사람처럼 보이던 것)
  */
-export const CAGE = { x0: 6.25, x1: 8.05, y0: 3.12, y1: 3.98, h: 40 };
+export const CAGE = { x0: 6.5, x1: 8.75, y0: 5.0, y1: 6.6, h: 34 };
 export function drawCage(items: HTMLCanvasElement[], hell: boolean): { canvas: HTMLCanvasElement; x: number; y: number } {
   const { x0, x1, y0, y1, h } = CAGE;
   const pts: Pt[] = [];
   const raw = (x: number, y: number, z: number): Pt => [(x - y) * 32, (x + y) * 16 - z];
-  for (const x of [x0, x1]) for (const y of [y0, y1]) for (const z of [0, h + 2]) pts.push(raw(x, y, z));
+  for (const x of [x0 - 0.1, x1 + 0.15]) for (const y of [y0 - 0.1, y1 + 0.2]) for (const z of [0, h + 2]) pts.push(raw(x, y, z));
   const minX = Math.floor(Math.min(...pts.map((p) => p[0]))) - 6, minY = Math.floor(Math.min(...pts.map((p) => p[1]))) - 6;
   const maxX = Math.ceil(Math.max(...pts.map((p) => p[0]))) + 6, maxY = Math.ceil(Math.max(...pts.map((p) => p[1]))) + 6;
   const [c, g] = cv(maxX - minX, maxY - minY);
   const at = (x: number, y: number, z: number): Pt => { const [a, b] = raw(x, y, z); return [a - minX, b - minY]; };
-  const [ironL, iron, ironD, ironK] = hell ? ['#8a3a26', '#5a2418', '#3a160e', '#200a06'] : ['#8a8680', '#5c5a56', '#3a3836', '#1e1c1a'];
+  const [ironL, iron, ironD, ironK] = hell ? ['#8a3a26', '#5a2418', '#3a160e', '#1a0806'] : ['#8a8680', '#5c5a56', '#3a3836', '#1a1816'];
   const wood = hell ? tones('#3a2018') : tones('#6a4a2e');
   const straw = hell ? ['#5a3a22', '#4a2c18', '#6a4a2a'] : ['#b89a5a', '#9a7e44', '#cfb06a'];
-  // 바닥 그림자 (우리 둘레로 조금 넓게) · 짚
-  quad(g, [at(x0 - 0.04, y0 - 0.04, 0), at(x1 + 0.08, y0 - 0.04, 0), at(x1 + 0.08, y1 + 0.1, 0), at(x0 - 0.04, y1 + 0.1, 0)], 'rgba(0,0,0,0.28)');
+  // 짙은 바닥 그림자 (오른쪽 아래로 번진다) · 검은 쇠 바닥판 · 짚
+  quad(g, [at(x0 - 0.06, y0 - 0.04, 0), at(x1 + 0.14, y0 - 0.04, 0), at(x1 + 0.14, y1 + 0.18, 0), at(x0 - 0.06, y1 + 0.18, 0)], 'rgba(0,0,0,0.34)');
+  quad(g, [at(x0, y0, 0), at(x1, y0, 0), at(x1, y1, 0), at(x0, y1, 0)], hell ? '#2a120c' : '#2e2a26');
+  quad(g, [at(x0 + 0.05, y0 + 0.05, 1), at(x1 - 0.05, y0 + 0.05, 1), at(x1 - 0.05, y1 - 0.05, 1), at(x0 + 0.05, y1 - 0.05, 1)], hell ? '#3a1c12' : '#4a443c');
   const rr = rnd(29);
-  for (let k = 0; k < 80; k++) {
-    const [sx0, sy0] = at(x0 + 0.06 + rr() * (x1 - x0 - 0.12), y0 + 0.06 + rr() * (y1 - y0 - 0.12), 0);
+  for (let k = 0; k < 110; k++) {
+    const [sx0, sy0] = at(x0 + 0.08 + rr() * (x1 - x0 - 0.16), y0 + 0.08 + rr() * (y1 - y0 - 0.16), 1);
     line(g, Math.round(sx0), Math.round(sy0), Math.round(sx0 + (rr() - 0.5) * 6), Math.round(sy0 + (rr() - 0.5) * 2), 1, straw[k % 3]);
   }
-  // 창살: 면 하나를 n칸으로 (바닥 0 ~ 꼭대기 h)
   const bars = (ax: number, ay: number, bx: number, by: number, n: number, col: string, skip?: (k: number) => boolean) => {
     for (let k = 0; k <= n; k++) {
       if (skip?.(k)) continue;
@@ -502,44 +502,42 @@ export function drawCage(items: HTMLCanvasElement[], hell: boolean): { canvas: H
     }
   };
   const rail = (ax: number, ay: number, bx: number, by: number, z: number, w: number, col: string) => line(g, ...at(ax, ay, z), ...at(bx, by, z), w, col);
-  const post = (x: number, y: number, col: string, hi: string) => { const [px, py] = at(x, y, 0); R(g, px - 1, py - h - 1, 2, h + 2, col); R(g, px - 1, py - h - 1, 1, h + 2, hi); };
-  // 1) 뒤쪽 두 면 (어둡게) · 뒤 기둥
-  bars(x0, y0, x1, y0, 16, ironD);
-  bars(x0, y0, x0, y1, 6, ironD);
+  const post = (x: number, y: number, col: string, hi: string) => { const [px, py] = at(x, y, 0); R(g, px - 1, py - h - 1, 3, h + 2, col); R(g, px - 1, py - h - 1, 1, h + 2, hi); };
+  // 1) 뒤쪽 두 면 (어둡게)
+  bars(x0, y0, x1, y0, 18, ironD);
+  bars(x0, y0, x0, y1, 10, ironD);
   rail(x0, y0, x1, y0, 2, 2, ironK); rail(x0, y0, x0, y1, 2, 2, ironK);
-  rail(x0, y0, x1, y0, h * 0.55, 1, ironD); rail(x0, y0, x0, y1, h * 0.55, 1, ironD);
+  rail(x0, y0, x1, y0, h * 0.5, 1, ironD); rail(x0, y0, x0, y1, h * 0.5, 1, ironD);
   post(x0, y0, ironK, ironD);
-  // 2) 안: 뒤 왼쪽 나무 궤짝 · 자루 · 뒤 오른쪽에 기대 세운 배트와 칼 · 헌 헬멧
-  { const [cx, cy] = at(x0 + 0.32, y0 + 0.3, 0); R(g, cx - 7, cy - 13, 14, 12, wood[1]); R(g, cx - 7, cy - 13, 14, 2, wood[0]); R(g, cx - 1, cy - 13, 1, 12, wood[2]); R(g, cx - 7, cy - 7, 14, 1, wood[2]); R(g, cx + 6, cy - 12, 1, 11, wood[3]); }
-  { const [sx, sy] = at(x0 + 0.85, y0 + 0.28, 0); ellipse(g, sx, sy - 6, 6, 6, hell ? '#6a4a3a' : '#8a7a5a'); R(g, sx - 2, sy - 13, 4, 3, hell ? '#5a3a2a' : '#6e6046'); R(g, sx - 1, sy - 11, 2, 1, hell ? '#3a2418' : '#4e4430'); }
-  { const [bx, by] = at(x1 - 0.32, y0 + 0.22, 0); line(g, bx - 2, by - 1, bx + 2, by - 24, 2, hell ? '#8a5a32' : '#b88a52'); line(g, bx + 1, by - 19, bx + 3, by - 26, 3, hell ? '#9a6a3a' : '#c89a62'); line(g, bx + 6, by, bx + 9, by - 27, 1, '#d8dce0'); R(g, bx + 4, by - 6, 6, 2, '#6a4a2a'); }
-  { const [hx, hy] = at(x0 + 1.25, y0 + 0.45, 0); ellipse(g, hx, hy - 4, 5, 4, hell ? '#4a1a12' : '#4e5a4a'); R(g, hx - 6, hy - 1, 12, 1, hell ? '#2a0e0a' : '#2e362c'); }
-  // 3) 맡겨 둔 물건 (앞줄 바닥에 몇 개 — 그림자를 깔고)
+  // 2) 안: 모두 바닥에 — 뒤 왼쪽 나무 궤짝 · 쌀자루 · 누운 배트와 칼 · 엎어진 헬멧
+  { const [cx, cy] = at(x0 + 0.4, y0 + 0.35, 1); R(g, cx - 8, cy - 12, 16, 11, wood[1]); R(g, cx - 8, cy - 12, 16, 2, wood[0]); R(g, cx - 1, cy - 12, 1, 11, wood[2]); R(g, cx - 8, cy - 7, 16, 1, wood[2]); R(g, cx + 7, cy - 11, 1, 10, wood[3]); }
+  { const [sx, sy] = at(x0 + 1.05, y0 + 0.4, 1); ellipse(g, sx, sy - 4, 8, 5, hell ? '#6a4a3a' : '#8a7a5a'); R(g, sx - 3, sy - 9, 5, 2, hell ? '#5a3a2a' : '#6e6046'); }
+  { const [bx, by] = at(x1 - 0.75, y0 + 0.75, 1); line(g, bx - 10, by - 1, bx + 10, by - 5, 2, hell ? '#8a5a32' : '#b88a52'); R(g, bx + 8, by - 7, 4, 3, hell ? '#9a6a3a' : '#c89a62'); line(g, bx - 8, by + 4, bx + 12, by + 1, 1, '#d8dce0'); R(g, bx - 10, by + 3, 4, 2, '#6a4a2a'); }
+  { const [hx, hy] = at(x0 + 1.65, y0 + 0.5, 1); ellipse(g, hx, hy - 3, 6, 3.5, hell ? '#4a1a12' : '#4e5a4a'); R(g, hx - 6, hy - 1, 12, 1, hell ? '#2a0e0a' : '#2e362c'); }
+  // 3) 맡겨 둔 물건: 앞쪽 바닥에 눕혀 (납작하게 줄여 그린다)
   items.slice(0, 4).forEach((ic, k) => {
-    const [ix, iy] = at(x0 + 0.38 + k * 0.36, y1 - 0.22, 0);
-    ellipse(g, ix, iy, 6, 2, 'rgba(0,0,0,0.25)');
-    g.drawImage(ic, Math.round(ix - 7), Math.round(iy - 13), 14, 14);
+    const [ix, iy] = at(x0 + 0.45 + k * 0.45, y1 - 0.35, 1);
+    ellipse(g, ix, iy + 1, 7, 2, 'rgba(0,0,0,0.3)');
+    g.drawImage(ic, Math.round(ix - 7), Math.round(iy - 6), 14, 8);
   });
-  // 4) 앞쪽 두 면: 오른쪽 면 · 앞면 (가운데는 쪽문이라 문틀만)
-  const doorA = 0.36, doorB = 0.64; // 앞면에서 쪽문이 차지하는 몫
-  bars(x1, y0, x1, y1, 6, iron);
-  bars(x0, y1, x1, y1, 16, ironL, (k) => k / 16 > doorA + 0.02 && k / 16 < doorB - 0.02);
-  // 쪽문: 조금 들어간 문틀 · 문 창살 · 가운데 가로대 · 경첩 · 자물쇠
+  // 4) 앞쪽 두 면 · 앞면 가운데 쪽문
+  const doorA = 0.38, doorB = 0.62;
+  bars(x1, y0, x1, y1, 10, iron);
+  bars(x0, y1, x1, y1, 18, ironL, (k) => k / 18 > doorA + 0.02 && k / 18 < doorB - 0.02);
   const dx0 = x0 + (x1 - x0) * doorA, dx1 = x0 + (x1 - x0) * doorB;
   for (let k = 0; k <= 5; k++) { const [px, py] = at(dx0 + (dx1 - dx0) * (k / 5), y1 + 0.02, 0); R(g, px, py - h + 4, 1, h - 6, ironL); }
   rail(dx0, y1 + 0.02, dx1, y1 + 0.02, 3, 2, iron); rail(dx0, y1 + 0.02, dx1, y1 + 0.02, h - 3, 2, iron); rail(dx0, y1 + 0.02, dx1, y1 + 0.02, h * 0.5, 1, ironL);
-  { const [p1x, p1y] = at(dx0, y1 + 0.02, 0); R(g, p1x - 1, p1y - h + 2, 2, h - 2, ironD); R(g, p1x - 2, p1y - 10, 3, 3, ironK); R(g, p1x - 2, p1y - h + 8, 3, 3, ironK); }
+  { const [p1x, p1y] = at(dx0, y1 + 0.02, 0); R(g, p1x - 1, p1y - h + 2, 2, h - 2, ironD); R(g, p1x - 2, p1y - 9, 3, 3, ironK); R(g, p1x - 2, p1y - h + 7, 3, 3, ironK); }
   { const [p2x, p2y] = at(dx1, y1 + 0.02, 0); R(g, p2x - 1, p2y - h + 2, 2, h - 2, ironD); }
-  // 5) 굵은 모서리 기둥 · 바닥 쇠테 · 가운데 가로대 · 꼭대기 테
-  rail(x0, y1, x1, y1, 2, 2, iron); rail(x1, y0, x1, y1, 2, 2, ironD);
-  rail(x0, y1, x1, y1, h * 0.55, 1, ironL); rail(x1, y0, x1, y1, h * 0.55, 1, iron);
+  // 5) 바닥 쇠테 · 모서리 기둥 · 가운데 가로대 · 지붕 창살과 테
+  rail(x0, y1, x1, y1, 1, 3, ironK); rail(x1, y0, x1, y1, 1, 3, ironK);
+  rail(x0, y1, x1, y1, h * 0.5, 1, ironL); rail(x1, y0, x1, y1, h * 0.5, 1, iron);
   post(x1, y0, ironD, iron); post(x0, y1, iron, ironL); post(x1, y1, iron, ironL);
-  // 지붕: 창살이 앞뒤로 건너가고, 네 테두리
-  for (let k = 1; k < 8; k++) { const t = k / 8; rail(x0 + (x1 - x0) * t, y0, x0 + (x1 - x0) * t, y1, h, 1, ironD); }
+  for (let k = 1; k < 10; k++) { const t = k / 10; rail(x0 + (x1 - x0) * t, y0, x0 + (x1 - x0) * t, y1, h, 1, ironD); }
   rail(x0, y0, x1, y0, h, 2, ironD); rail(x0, y0, x0, y1, h, 2, ironD);
   rail(x0, y1, x1, y1, h, 2, iron); rail(x1, y0, x1, y1, h, 2, iron);
   rail(x0, y1, x1, y1, h + 1, 1, ironL);
-  // 자물쇠 (쪽문 오른쪽 문설주에)
+  // 자물쇠
   { const [lx, ly] = at(dx1, y1 + 0.03, h * 0.5); R(g, lx - 3, ly - 1, 6, 6, '#c8a040'); R(g, lx - 2, ly - 4, 4, 3, '#8a6a20'); R(g, lx - 1, ly - 3, 2, 1, '#2a1c08'); R(g, lx - 1, ly + 1, 1, 2, '#3a2810'); R(g, lx - 3, ly - 1, 1, 6, '#e8c860'); }
   return { canvas: c, x: minX, y: minY };
 }

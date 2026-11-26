@@ -276,3 +276,22 @@ export function horn(s: Spot, long = false) {
   tone(o, t, dur, 'square', 494, 490, 0.12);
   if (long) { tone(o, t + 0.65, 0.18, 'square', 392, 388, 0.14); tone(o, t + 0.65, 0.18, 'square', 494, 490, 0.1); }
 }
+
+/** 35차: 무기가 박살나는 소리 — 쇠가 꺾이는 날카로운 울림과 흩어지는 파편 */
+export function shatter() {
+  if (!ready()) return;
+  const t = ctx!.currentTime, o = out({ pan: 0, vol: 1 }, 1);
+  noise(o, t, 0.22, 'highpass', 2400, 5200, 0.8, 0.9, 0.002);
+  tone(o, t, 0.5, 'square', 1840, 1210, 0.08);
+  tone(o, t, 0.9, 'triangle', 2960, 2950, 0.12);
+  tone(o, t + 0.01, 0.35, 'sawtooth', 220, 70, 0.25);
+  for (let k = 0; k < 6; k++) { const dt = 0.09 + k * 0.06 + Math.random() * 0.04; tone(o, t + dt, 0.12, 'triangle', jit(3200 - k * 260, 0.15), 2400 - k * 200, 0.1 * (1 - k / 7)); noise(o, t + dt, 0.04, 'bandpass', jit(4200), 3000, 5, 0.25 * (1 - k / 7), 0.001); }
+}
+/** 35차: 무기가 갈라지기 시작할 때 — 짧게 삐걱이는 금속음 */
+export function crack() {
+  if (!ready()) return;
+  const t = ctx!.currentTime, o = out({ pan: 0, vol: 0.9 }, 1);
+  noise(o, t, 0.09, 'bandpass', 3800, 2200, 6, 0.55, 0.001);
+  tone(o, t, 0.28, 'triangle', 2100, 1650, 0.1);
+  noise(o, t + 0.11, 0.06, 'bandpass', 3000, 2000, 6, 0.3, 0.001);
+}

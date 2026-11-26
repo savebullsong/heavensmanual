@@ -34,9 +34,9 @@ function noiseTex() {
   NOISE = out;
   return out;
 }
-const TYPE_IDX: TileType[] = ['void', 'lot', 'park', 'water', 'walk', 'soi', 'road', 'median', 'cross', 'block'];
+const TYPE_IDX: TileType[] = ['void', 'lot', 'park', 'water', 'walk', 'soi', 'road', 'median', 'cross', 'block', 'hill'];
 /** 땅의 종류 (칸 종류를 그림 종류로): 0 바닥 · 1 마른 모래/이끼 · 2 물(용암·늪·핏물) · 3 돌길·널빤지 · 4 골목 흙길 · 5 다리 · 6 바위 바닥 */
-const CLASS_OF: Record<TileType, number> = { void: 6, lot: 0, park: 1, water: 2, walk: 3, soi: 4, road: 4, median: 4, cross: 5, block: 6 };
+const CLASS_OF: Record<TileType, number> = { void: 6, lot: 0, park: 1, water: 2, walk: 3, soi: 4, road: 4, median: 4, cross: 5, block: 6, hill: 6 };
 
 /** 바닥 한 덩어리를 그리는 일: 한 번에 다 그리면 휴대폰에서 0.2초 넘게 멈춘다 → 줄 단위로 나눠 프레임마다 몇 ms씩 */
 export interface GroundJob { canvas: HTMLCanvasElement; x: number; y: number; done: boolean; step(ms: number): boolean }

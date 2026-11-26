@@ -1,5 +1,6 @@
 // 거리의 작은 것들 (점으로 직접 그린다): 전봇대·산프라품(정령의 집)·세워 둔 오토바이·화분·쓰레기통·울타리
 // 모두 1배 그림(거리·건물과 같은 밀도). 화면 근처만 그렸다가 멀어지면 버린다 (world.stream)
+import { HEAVEN_PROPS, heavenProp } from './heavenworld.ts';
 export interface PropPic { canvas: HTMLCanvasElement; ax: number; ay: number; top?: [number, number] }
 
 const cache = new Map<string, PropPic>();
@@ -23,6 +24,7 @@ export function streetProp(kind: string, v: number, o = 0, night = false, hell =
   const key = `${kind}-${v}-${o}-${night ? 1 : 0}-${hell ? 1 : 0}`;
   const hit = cache.get(key);
   if (hit) return hit;
+  if (HEAVEN_PROPS.has(kind)) { const hp = heavenProp(kind, v); cache.set(key, hp); return hp; } // 35차 천국 1층의 썬베드·파라솔·동물·분수
   let out: PropPic;
   if (kind === 'pole') {
     // 콘크리트 전봇대: 가로대·애자·변압기 통, 아래로 처진 전선 뭉치

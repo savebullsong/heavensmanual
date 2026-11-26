@@ -2,7 +2,7 @@
 // 건물 조각은 '구역 번호 × 16 + 음영'이라 건물마다 벽색·차양색·밤 창문 불빛을 따로 입힌다.
 import { Rectangle, Texture } from 'pixi.js';
 import { type Building, type Zone, tileAt, groundAt } from './zone.ts';
-import { TW, TH, iso } from './gfx.ts';
+import { TW, TH, iso, paintHill } from './gfx.ts';
 import { kindOf, mainPoi } from './names.ts';
 
 export const GPX = 100, UPX = 52, PPX = 20; // 1층 · 위층 · 옥상 난간 높이 (px)
@@ -378,7 +378,7 @@ function putTo(D: Uint8ClampedArray, W: number, H: number, key: string, sx: numb
 
 // ───────────────────────── 바닥 ─────────────────────────
 export const CHUNK = 24;
-const GROUND_KEY: Record<string, string> = { road: 'road', median: 'median', walk: 'walk', soi: 'soi', cross: 'cross', lot: 'lot', block: 'block', park: 'park', water: 'water' };
+const GROUND_KEY: Record<string, string> = { road: 'road', median: 'median', walk: 'walk', soi: 'soi', cross: 'cross', lot: 'lot', block: 'block', park: 'park', water: 'water', hill: 'park' };
 // ───────────────────────── 21차: 땅의 프랙탈 결 ─────────────────────────
 // 같은 타일 네 장이 되풀이되어도 넓게 보면 한 번도 같은 데가 없도록: 큰 결(동네의 볕·그늘) → 중간 결(닳은 자리·젖은 자리)
 // → 작은 결(얼룩) 세 겹을 전체 지도 좌표로 겹치고(구역 경계에서 이어진다), 그 위에 흔적(기름 자국·금·껌·낙엽·꽃·맨홀)을 뿌린다.
@@ -491,7 +491,7 @@ export function drawGroundKit(z: Zone, i0: number, j0: number, clip?: { i0: numb
   const minX = (i0 - j1) * (TW / 2), minY = (i0 + j0) * (TH / 2);
   const c = document.createElement('canvas');
   c.width = (i1 - i0 + j1 - j0) * (TW / 2) + 2;
-  c.height = (i1 - i0 + j1 - j0) * (TH / 2) + 2;
+  c.height = (i1 - i0 + j1 - j0) * (TH / 2) + 18; // 35차: 아래 끝 축대가 잘리지 않게
   const g = c.getContext('2d')!;
   g.imageSmoothingEnabled = false;
   const S = (x: number, y: number): [number, number] => { const [a, b] = iso(x, y); return [a - minX, b - minY]; };
@@ -588,6 +588,7 @@ export function drawGroundKit(z: Zone, i0: number, j0: number, clip?: { i0: numb
     else if (down === 'walk') { line(l.j + 1, l.i0, l.i1, '#8e877b', false, 3); line(l.j + 1, l.i0, l.i1, '#c9c2b4', false, 1); }
   }
   g.setLineDash([]);
+  paintHill(g, z, i0, i1, j0, j1, S); // 35차 달동네 산비탈 · 축대 · 골목 계단
   return { canvas: c, x: minX, y: minY };
 }
 

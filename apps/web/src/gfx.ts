@@ -17,6 +17,7 @@ function rnd(seed: number) {
 const TILE_COLORS: Record<string, string> = {
   void: '#14110f', road: '#4a4b4e', median: '#7c7a72', walk: '#a59a8c', soi: '#56575a', cross: '#4a4b4e',
   lot: '#3d3a36', block: '#3d3a36', park: '#55703f', water: '#3b6478',
+  hill: '#4a5a34', // 35차 달동네 산비탈
 };
 const RAMPS: Record<string, string[]> = Object.fromEntries(Object.entries(TILE_COLORS).map(([k, v]) => [k, ramp(v)]));
 
@@ -31,7 +32,7 @@ export function drawGroundChunk(z: Zone, i0: number, j0: number): { canvas: HTML
   const minX = (i0 - j1) * (TW / 2), minY = (i0 + j0) * (TH / 2);
   const c = document.createElement('canvas');
   c.width = (i1 - i0 + j1 - j0) * (TW / 2) + 2;
-  c.height = (i1 - i0 + j1 - j0) * (TH / 2) + 2;
+  c.height = (i1 - i0 + j1 - j0) * (TH / 2) + 18; // 35차: 아래 끝 축대가 잘리지 않게
   const g = c.getContext('2d')!;
   g.imageSmoothingEnabled = false;
   const S = (x: number, y: number): [number, number] => { const [a, b] = iso(x, y); return [a - minX, b - minY]; };
@@ -104,6 +105,7 @@ export function drawGroundChunk(z: Zone, i0: number, j0: number): { canvas: HTML
         }
       }
     }
+  paintHill(g, z, i0, i1, j0, j1, S); // 35차 달동네
   // 차선 표시: 위쪽이 같은 차도면 흰 점선, 중앙분리대면 노란 실선, 보도면 경계석
   const line = (j: number, a0: number, a1: number, color: string, dashed: boolean) => {
     if (j < j0 || j > j1) return;
@@ -125,6 +127,51 @@ export function drawGroundChunk(z: Zone, i0: number, j0: number): { canvas: HTML
   }
   g.setLineDash([]);
   return { canvas: c, x: minX, y: minY };
+}
+
+
+/**
+ * 35차 달동네 산비탈 (두 바닥 그리기에서 함께 쓴다): 풀이 짙은 비탈 · 다섯 줄마다 계단식 돌 축대 ·
+ * 동네가 큰 도시와 맞닿는 곳엔 높은 축대 · 골목 양옆엔 낮은 담 · 비탈을 오르는 골목엔 돌 계단
+ */
+export function paintHill(g: CanvasRenderingContext2D, z: Zone, i0: number, i1: number, j0: number, j1: number, S: (x: number, y: number) => [number, number]) {
+  let any = false;
+  for (let j = j0; j < j1 && !any; j++) for (let i = i0; i < i1; i++) if (groundAt(z, i, j) === 'hill') { any = true; break; }
+  if (!any) return;
+  const hsh = (a: number, b: number) => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); };
+  // 비탈 풀빛 (아래 바닥 그림 위로 덮는다) · 풀포기 · 돌 · 가끔 텃밭 고랑
+  for (let j = j0; j < j1; j++) for (let i = i0; i < i1; i++) {
+    if (groundAt(z, i, j) !== 'hill') continue;
+    const [x, y] = S(i, j);
+    const tier = Math.floor((i + j) / 5), v = hsh(i >> 2, j >> 2);
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + TW / 2, y + TH / 2); g.lineTo(x, y + TH); g.lineTo(x - TW / 2, y + TH / 2); g.closePath();
+    g.fillStyle = (tier % 2 ? ['#4e6236', '#55693a', '#4a5c33'] : ['#56693c', '#5c7040', '#51653a'])[Math.floor(v * 3)]; g.fill();
+    for (let n = 0; n < 5; n++) { const px = x + (hsh(i * 7 + n, j) - 0.5) * TW * 0.55, py = y + TH / 2 + (hsh(i, j * 5 + n) - 0.5) * TH * 0.45; g.fillStyle = n % 2 ? '#3a4a2a' : '#6a7e48'; g.fillRect(Math.round(px), Math.round(py) - 2, 1, 3); g.fillRect(Math.round(px) + 1, Math.round(py) - 1, 1, 2); }
+    if (hsh(i, j) < 0.2) { const px = x + (hsh(j, i) - 0.5) * TW * 0.4, py = y + TH / 2; g.fillStyle = '#7a766c'; g.fillRect(Math.round(px), Math.round(py), 3, 2); g.fillStyle = '#4e4a42'; g.fillRect(Math.round(px), Math.round(py) + 2, 3, 1); }
+    if ((i * 7 + j * 3) % 23 === 0) for (let k = 0; k < 3; k++) { const a = S(i + 0.2, j + 0.25 + k * 0.22), b = S(i + 0.8, j + 0.25 + k * 0.22); g.strokeStyle = '#5a4a32'; g.lineWidth = 1; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
+  }
+  const wall = (a: [number, number], b: [number, number], h: number) => {
+    g.fillStyle = '#5e5a52';
+    g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(b[0], b[1] + h); g.lineTo(a[0], a[1] + h); g.closePath(); g.fill();
+    const dx = b[0] - a[0], dy = b[1] - a[1], n = Math.max(1, Math.round(Math.abs(dx)));
+    for (let z = 3; z < h; z += 4) { g.fillStyle = 'rgba(30,28,24,0.55)'; for (let k = 0; k < n; k += 1) if ((k + (z >> 2) * 3) % 7 !== 0) g.fillRect(Math.round(a[0] + (dx * k) / n), Math.round(a[1] + (dy * k) / n + z), 1, 1); else g.fillRect(Math.round(a[0] + (dx * k) / n), Math.round(a[1] + (dy * k) / n + z - 3), 1, 3); }
+    g.strokeStyle = '#8a857a'; g.lineWidth = 1; g.beginPath(); g.moveTo(a[0], a[1] + 0.5); g.lineTo(b[0], b[1] + 0.5); g.stroke();
+    g.strokeStyle = 'rgba(20,18,16,0.6)'; g.beginPath(); g.moveTo(a[0], a[1] + h); g.lineTo(b[0], b[1] + h); g.stroke();
+  };
+  for (let j = j0; j < j1; j++) for (let i = i0; i < i1; i++) {
+    const t = groundAt(z, i, j);
+    if (t === 'hill') {
+      for (const [a, b] of [[1, 0], [0, 1]] as const) {
+        const n = groundAt(z, i + a, j + b);
+        const h = n === 'hill' ? ((i + j + 1) % 5 === 0 ? 7 : 0) : n === 'soi' ? 6 : n === 'void' ? 0 : 14;
+        if (!h) continue;
+        wall(a ? S(i + 1, j) : S(i, j + 1), S(i + 1, j + 1), h);
+      }
+    } else if (t === 'soi' && (groundAt(z, i - 1, j) === 'hill' || groundAt(z, i, j - 1) === 'hill' || groundAt(z, i + 1, j) === 'hill' || groundAt(z, i, j + 1) === 'hill') && (i + j) % 3 === 0) {
+      // 골목 계단: 돌 디딤판 셋
+      for (let k = 0; k < 3; k++) { const a = S(i + 0.05, j + 0.2 + k * 0.3), b = S(i + 0.95, j + 0.2 + k * 0.3); g.strokeStyle = 'rgba(25,24,22,0.55)'; g.lineWidth = 2; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); g.strokeStyle = 'rgba(150,146,138,0.35)'; g.lineWidth = 1; g.beginPath(); g.moveTo(a[0], a[1] - 1.5); g.lineTo(b[0], b[1] - 1.5); g.stroke(); }
+    }
+  }
 }
 
 /** 등각 상자 건물: 지붕 + 왼쪽 면(+j) + 오른쪽 면(+i), 창문과 1층 상점, 간판 */

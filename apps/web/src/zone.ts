@@ -1,5 +1,5 @@
 // 존(동네) 데이터 — OSM 변환기(v2)와 시험 구역 생성기가 같은 형식을 쓴다
-export const TYPES = ['void', 'lot', 'park', 'water', 'walk', 'soi', 'road', 'median', 'cross', 'block'] as const;
+export const TYPES = ['void', 'lot', 'park', 'water', 'walk', 'soi', 'road', 'median', 'cross', 'block', 'hill'] as const; // 35차 hill = 달동네 산비탈 (못 걷는다 · 축대)
 export type TileType = (typeof TYPES)[number];
 const TI = Object.fromEntries(TYPES.map((t, k) => [t, k])) as Record<TileType, number>;
 
@@ -10,7 +10,9 @@ export type Category =
   | 'hbank' | 'atone' | 'rebirth' // 지옥: 지옥 은행 · 속죄의 회당 · (1층 불탄 도시 골목 끝) 환생 로비 입구
   | 'terrace' // 천국: 구름 계단 위 환생의 테라스 (환생관 루엔)
   | 'goatroom' // 31차 지옥 142층: 염소대왕의 방 (떨어진 자가 맨 먼저 오는 곳)
-  | 'home'; // 24차 서울 달동네 골목 끝의 내 집 (유내)
+  | 'home' // 24차 서울 달동네 골목 끝의 내 집 (유내)
+  | 'palace' | 'attraction' // 35차 천국 1층: 천국 본청 · 놀이공원 탈것
+  | 'estate'; // 35차 사서 들어가 사는 집: 방콕 아속의 콘도 · 서울 역삼의 아파트
 
 export interface Building {
   /** 31차: 지옥 좌판에 자리 잡은 장사꾼 (좌판 모양이 장사마다 다르다) */
@@ -22,11 +24,12 @@ export interface Building {
   color: string;
   hut?: boolean; // (예전) 지옥 마을의 오두막
   hk?: HellBuildKind; // 지옥의 집·덩어리 종류
+  estate?: 'bkk' | 'seoul'; // 35차: 사는 집 매물의 도시
 }
 /** 지옥: 초가집 · 감옥 · 뼈집 · 대형 짐승 시체 · 뼈 무더기 · 내장 더미 */
-export type HellBuildKind = 'thatch' | 'prison' | 'bonehouse' | 'carcass' | 'bonepile' | 'guts' | 'butcher' | 'stall' | 'burnt' | 'idol' | 'smithy'; // 34차 smithy = 4층 페룸의 대장간
+export type HellBuildKind = 'thatch' | 'prison' | 'bonehouse' | 'carcass' | 'bonepile' | 'guts' | 'butcher' | 'stall' | 'burnt' | 'idol' | 'smithy'; // 34차 smithy = 4층 칼드렉의 대장간
 /** fence o: 0 = i 방향, 1 = j 방향, 2 = 모서리 기둥 */
-export interface Prop { i: number; j: number; kind: 'tree' | 'lamp' | 'pillar' | 'cart' | 'fence' | 'pole' | 'spirit' | 'moto' | 'plant' | 'bin' | 'stools' | 'pushcart' | HellDecorKind; o?: number }
+export interface Prop { i: number; j: number; kind: 'tree' | 'lamp' | 'pillar' | 'cart' | 'fence' | 'pole' | 'spirit' | 'moto' | 'plant' | 'bin' | 'stools' | 'pushcart' | HellDecorKind | 'sunbed' | 'parasol' | 'giraffe' | 'elephant' | 'lion' | 'zebra' | 'flamingo' | 'panda' | 'fountain' | 'balloons' | 'icecream'; o?: number }
 /** 지옥 소품: 경계 바위·성벽, 뼈, 해골 더미, 꼬챙이, 가마솥, 철창, 마을 불빛, 고문 장면(움직임) */
 export type HellDecorKind = 'crag' | 'bones' | 'skulls' | 'stake' | 'cauldron' | 'cage' | 'lantern' | 'bonfire' | 'torture' | 'htree' | 'rock' | 'crack' | 'dicetable' | 'campfire' | 'junk' | 'reeds' | 'mattress' | 'anvil' | 'forge';
 /** 차가 달리는 구간: j 행의 i0~i1, dir = +1 이면 +i 방향 */
@@ -54,6 +57,8 @@ export interface Zone {
   origin?: { i: number; j: number };
   /** 24차: 도시 (서울이면 간판·차·시계·화폐가 서울식) · 내 집으로 가는 골목 들머리 · 내 집 문 앞 */
   city?: 'seoul';
+  /** 35차: 구름 위에 따로 지은 천국 1층 (현실 지도를 덮지 않는다) */
+  heavenGen?: boolean;
   homeAlley?: { i0: number; j0: number; i1: number; j1: number };
   home?: { i: number; j: number };
   /** 32차: 지도 밖(갈 수 없는 곳)까지 그린다 — 그리기 전용. 가장자리 m칸 안쪽을 거울삼아 바깥을 비춘다 (빈 땅은 지어낸 골목·건물로) */
@@ -133,7 +138,7 @@ export function finalize(z: Omit<Zone, 'blocked'>): Zone {
   for (let k = 0; k < blocked.length; k++) {
     const t = TYPES[z.tiles[k]];
     // 빈 땅(주차장·공터·광장)은 걸을 수 있다. 건물·물·지도 바깥만 막는다
-    blocked[k] = t === 'block' || t === 'void' || t === 'water' ? 1 : 0;
+    blocked[k] = t === 'block' || t === 'void' || t === 'water' || t === 'hill' ? 1 : 0;
   }
   for (const p of z.props) if (p.kind !== 'tree' && p.kind !== 'bones' && p.kind !== 'crack' && p.kind !== 'reeds' && p.kind !== 'mattress') blocked[p.j * z.W + p.i] = 1; // 나무·흩어진 뼈·땅의 자국은 밟고 지나간다
   // 구역 둘레(이웃 거리가 보이기만 하는 곳)는 걸을 수 없다

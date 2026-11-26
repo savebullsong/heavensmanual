@@ -8,6 +8,7 @@ import { TW, TH } from './gfx.ts';
 import { BESK_LOOK } from './sprites.ts';
 import { drawShore, drawShoreFurn, BULDA_LOOK } from './border.ts';
 import { menuFor, itemByKey } from './items.ts';
+import { furnishHome, furnishShowroom } from './home.ts';
 export { BESK_LOOK };
 
 const TI = Object.fromEntries(TYPES.map((t, k) => [t, k])) as Record<(typeof TYPES)[number], number>;
@@ -15,7 +16,7 @@ const TI = Object.fromEntries(TYPES.map((t, k) => [t, k])) as Record<(typeof TYP
 /** 들어갈 수 있는 건물: 가게·시설이 있고 문(간판 면)이 있는 곳 */
 export function canEnter(b: Building) {
   const p = mainPoi(b);
-  if (b.cat === 'home') return true; // 24차 내 집
+  if (b.cat === 'home' || b.cat === 'estate') return true; // 24차 내 집 · 35차 사는 집
   if (!p || b.cat === 'ujusae') return false;
   // 간판이 없어도 들어갈 수 있는 곳: 종교시설·병원·은행
   // 32차: 물건을 파는 곳·은행은 반드시 안으로 들어가서 산다 (문 앞에서 사던 버그)
@@ -35,6 +36,7 @@ function streetSeller(b: Building): 'tools' | 'dept' | 'antique' | undefined {
 
 export function roomKind(b: Building): string {
   if (b.cat === 'loan') return 'loan'; // 지옥 3층 베스크 대부소
+  if (b.cat === 'estate') return 'myhome'; // 35차 내가 산 집
   if (b.cat === 'hbank' || b.cat === 'atone' || b.cat === 'rebirth' || b.cat === 'terrace' || b.cat === 'home' || b.cat === 'goatroom') return b.cat; // 31차 goatroom = 지옥 142층 염소대왕의 방 // 지옥 은행 · 속죄의 회당 · 지옥 로비 · 천국 환생의 테라스
   const k = kindOf(b);
   if (k === 'place_of_worship' || b.cat === 'worship') {
@@ -55,17 +57,19 @@ export function roomKind(b: Building): string {
   if (k === 'massage') return 'massage';
   if (k === 'laundry' || b.cat === 'laundry') return 'laundry';
   if (['hotel', 'hostel', 'guest_house', 'apartment_hotel'].includes(k) || b.cat === 'hotel') return 'lobby';
+  if (k === 'furniture') return 'furnshop'; // 35차 가구점
+  if (k === 'amusement_arcade') return 'arcade'; // 35차 천국 오락실
   if (hasBank(b)) return 'bank';
   return 'shop';
 }
 
 /** 쉬는 곳: 종교시설·은행·병원·약국 (싸움 불가 · 빠른 회복) */
-export const REST_ROOMS = new Set(['home', 'temple', 'church', 'mosque', 'gurdwara', 'bank', 'clinic', 'pharmacy', 'hbank', 'atone', 'rebirth', 'terrace', 'goatroom']);
+export const REST_ROOMS = new Set(['home', 'myhome', 'temple', 'church', 'mosque', 'gurdwara', 'bank', 'clinic', 'pharmacy', 'hbank', 'atone', 'rebirth', 'terrace', 'goatroom']);
 
 const SIZE: Record<string, [number, number]> = {
   temple: [13, 11], church: [13, 11], mosque: [12, 11], gurdwara: [12, 11], bank: [12, 10], clinic: [12, 10], pharmacy: [9, 8],
   mart: [11, 9], food: [12, 10], cafe: [10, 9], bar: [10, 9], salon: [9, 8], massage: [10, 9], laundry: [9, 8], lobby: [11, 9], shop: [9, 8], loan: [10, 8],
-  hbank: [10, 8], atone: [11, 10], rebirth: [31, 17], terrace: [23, 16], home: [11, 9], gym: [13, 11], dept: [26, 20], goatroom: [17, 17],
+  hbank: [10, 8], atone: [11, 10], myhome: [14, 11], furnshop: [12, 10], arcade: [13, 10], rebirth: [31, 17], terrace: [23, 16], home: [11, 9], gym: [13, 11], dept: [26, 20], goatroom: [17, 17],
 };
 const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   temple: { floor: 'temple', wall: '#e9dcc0', trim: '#a8322a' }, church: { floor: 'stone', wall: '#e8e2d4', trim: '#6b4a30' },
@@ -80,18 +84,21 @@ const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   hbank: { floor: 'dark', wall: '#34302c', trim: '#8a6a2a' }, atone: { floor: 'stone', wall: '#4a4440', trim: '#6a2a22' },
   rebirth: { floor: 'marble', wall: '#dfe3e6', trim: '#56687a' },
   terrace: { floor: 'cloud', wall: '#f6f2ea', trim: '#c9a23e' },
-  home: { floor: 'jangpan', wall: '#e6dcc6', trim: '#7a5a3e' }, // 24차 내 집: 누런 장판 · 바랜 벽지
+  home: { floor: 'jangpan', wall: '#e6dcc6', trim: '#7a5a3e' },
+  myhome: { floor: 'wood', wall: '#ece4d6', trim: '#7a6450' }, // 35차 방콕 콘도 (서울 아파트는 아래에서 대리석)
+  furnshop: { floor: 'wood', wall: '#e6ddd0', trim: '#5a4636' },
+  arcade: { floor: 'dark', wall: '#241e3a', trim: '#c83ac8' }, // 24차 내 집: 누런 장판 · 바랜 벽지
   gym: { floor: 'rubber', wall: '#d6d8da', trim: '#c83a2a' },
   dept: { floor: 'marble', wall: '#ece6dc', trim: '#b08a4a' },
   goatroom: { floor: 'obsidian', wall: '#2c1214', trim: '#a8822e' }, // 31차: 검붉은 벽 · 금빛 띠 · 흑요석 바닥
 };
 
 /** 거리의 건물 k에 들어갈 때 방을 만든다 (같은 건물이면 늘 같은 방) */
-export function interiorZone(b: Building, k: number, out: { i: number; j: number }, name: string, yunaeAge?: 0 | 1 | 2): Zone {
+export function interiorZone(b: Building, k: number, out: { i: number; j: number }, name: string, yunaeAge?: 0 | 1 | 2, owned?: string[]): Zone {
   const kind = roomKind(b);
   // 34차: 내 집 대문을 열면 그날의 유내가 있는 곳 — 10대 놀이터 · 20대 동네 미용실(일하는 중) · 30대 후반 진료실
   const hAge = kind === 'home' ? (yunaeAge ?? (Math.floor(Math.random() * 3) as 0 | 1 | 2)) : undefined;
-  const [W, H] = hAge === 0 ? [14, 12] : hAge !== undefined ? [10, 9] : SIZE[kind];
+  const [W, H] = hAge === 0 ? [14, 12] : hAge !== undefined ? [10, 9] : kind === 'myhome' && b.estate === 'seoul' ? [16, 12] : SIZE[kind]; // 35차: 강남 아파트는 콘도보다 넓다
   const tiles = new Uint8Array(W * H);
   for (let j = 0; j < H; j++)
     for (let i = 0; i < W; i++) tiles[j * W + i] = i === 0 || j === 0 ? TI.block : i === W - 1 || j === H - 1 ? TI.void : TI.walk;
@@ -234,6 +241,18 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
       F(12, 3, 3, 1, 20, 'xchdesk'); // 33차: 환전상 오볼로의 탁자 (오른쪽 벽가)
       break;
     }
+    case 'myhome': furnishHome(owned ?? [], W, H, F); break; // 35차: 산 가구가 저절로 놓인다 (직원 없음)
+    case 'arcade':
+      // 35차 오락실: 뒤 벽을 따라 게임기 줄 · 왼쪽 벽 인형 뽑기 둘 · 가운데 에어하키 · 앞쪽 리듬 발판 · 동전 바꾸는 계산대
+      for (let n = 0; n < 6; n++) F(1 + n, 1, 1, 1, 44, 'arcadecab', n);
+      F(1, 4, 1, 1, 50, 'claw', 0); F(1, 6, 1, 1, 50, 'claw', 1);
+      F(4, 5, 2, 1, 14, 'airhockey'); F(8, 5, 2, 2, 3, 'ddr');
+      F(W - 4, 2, 2, 1, 24, 'counter', 5); clerk = { i: W - 3, j: 1 }; counter = { i: W - 3, j: 3 };
+      break;
+    case 'furnshop':
+      F(W - 5, 2, 3, 1, 24, 'counter', 3); clerk = { i: W - 4, j: 1 }; counter = { i: W - 4, j: 3 };
+      furnishShowroom(W, H, F);
+      break;
     case 'home': {
       if (hAge === 0) {
         // 34차 놀이터 (해 질 녘): 그네 둘(하나에 유내) · 미끄럼틀 · 시소 · 정글짐 · 벤치 · 가로등
@@ -344,11 +363,11 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
   for (const f of furn) if (f.h > 2) for (let j = f.j; j < f.j + f.d; j++) for (let i = f.i; i < f.i + f.w; i++) tiles[j * W + i] = TI.block;
   const exit = kind === 'goatroom' ? { i: x1, j: y1 } : { i: mid, j: y1 }; // 32차: 염소대왕의 방은 옥좌 맞은편 앞 모서리가 문
   tiles[exit.j * W + exit.i] = TI.walk;
-  const look = hAge === 0 ? { floor: 'sand', wall: '#b8b0a4', trim: '#6a6a66' } : hAge === 1 ? { floor: 'checker', wall: '#f2e6e0', trim: '#b85a74' } : hAge === 2 ? { floor: 'pale', wall: '#e6ecea', trim: '#3a8a7a' } : LOOKS[kind];
+  const look = kind === 'myhome' && b.estate === 'seoul' ? { floor: 'marble', wall: '#f2eee6', trim: '#9a8a6a' } : hAge === 0 ? { floor: 'sand', wall: '#b8b0a4', trim: '#6a6a66' } : hAge === 1 ? { floor: 'checker', wall: '#f2e6e0', trim: '#b85a74' } : hAge === 2 ? { floor: 'pale', wall: '#e6ecea', trim: '#3a8a7a' } : LOOKS[kind];
   const info: InteriorInfo = {
     // 28차: 내 집의 유내 — 거리에서 정해 둔 시절을 따른다. 20대(1)면 방은 비어 있다 (대문 앞에 나가 있거나, 그 사람 만나러 갔다)
-    kind, rest: REST_ROOMS.has(kind), name, ...look, exit, clerk, counter, furn, age: hAge,
-    from: { b: k, out, bd: b }, store: kind === 'bank' ? 'bank' : ['mart', 'pharmacy', 'food', 'cafe'].includes(kind) ? kind : streetSeller(b), cuisine: cuisineOf(b), seats: seats.filter(([i, j]) => tiles[j * W + i] === TI.walk),
+    kind, rest: REST_ROOMS.has(kind), name, ...look, exit, clerk: kind === 'myhome' ? undefined : clerk, counter: kind === 'myhome' ? undefined : counter, furn, age: hAge,
+    from: { b: k, out, bd: b }, store: kind === 'bank' ? 'bank' : kind === 'furnshop' ? 'furniture' : ['mart', 'pharmacy', 'food', 'cafe'].includes(kind) ? kind : streetSeller(b), cuisine: cuisineOf(b), seats: seats.filter(([i, j]) => tiles[j * W + i] === TI.walk),
   };
   return finalize({ id: `in-${k}`, W, H, tiles, buildings: [], props: [], lanes: [], door: exit, spawn: { i: exit.i, j: exit.j - 1 }, interior: info });
 }
@@ -857,7 +876,7 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
   }
   const { i, j, w, d, h } = f;
   const i1 = i + w, j1 = j + d;
-  const extra = f.kind === 'vbed' ? 24 : f.kind === 'plamp' ? 30 : f.kind === 'salonchair' && f.v === 9 ? 30 : f.kind === 'ivstand' || f.kind === 'hooddryer' ? 16 : f.kind === 'gkbrazier' ? 40 : f.kind === 'gkdesk' ? 20 : f.kind === 'xchdesk' ? 30 : f.kind === 'altar' ? 64 : f.kind === 'rgate' ? 46 : f.kind === 'cpillar' ? 30 : f.kind === 'salonchair' || f.kind === 'candle' || f.kind === 'fan' || f.kind === 'lamp' || f.kind === 'cooler' ? 18 : 14;
+  const extra = f.kind === 'kbed' ? 34 : f.kind === 'flattv' ? 14 : f.kind === 'homesofa' ? 14 : f.kind === 'vbed' ? 24 : f.kind === 'plamp' ? 30 : f.kind === 'salonchair' && f.v === 9 ? 30 : f.kind === 'ivstand' || f.kind === 'hooddryer' ? 16 : f.kind === 'gkbrazier' ? 40 : f.kind === 'gkdesk' ? 20 : f.kind === 'xchdesk' ? 30 : f.kind === 'altar' ? 64 : f.kind === 'rgate' ? 46 : f.kind === 'cpillar' ? 30 : f.kind === 'salonchair' || f.kind === 'candle' || f.kind === 'fan' || f.kind === 'lamp' || f.kind === 'cooler' ? 18 : 14;
   const minX = (i - j1) * (TW / 2) - 4, maxX = (i1 - j) * (TW / 2) + 4;
   const minY = (i + j) * (TH / 2) - h - extra, maxY = (i1 + j1) * (TH / 2) + 4;
   const { c, g, P, poly } = painter(minX, minY, maxX - minX, maxY - minY);
@@ -1378,6 +1397,90 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       g.fillStyle = '#cfe6f0'; for (let n = 0; n < 3; n++) { const a = n * 2.1 + (f.v ?? 0); g.beginPath(); g.ellipse(hx + Math.cos(a) * 3.5, hy + Math.sin(a) * 4, 3.5, 2, a, 0, Math.PI * 2); g.fill(); }
       g.strokeStyle = '#6a8a9a'; g.lineWidth = 1; g.beginPath(); g.ellipse(hx, hy, 8, 9, 0, 0, Math.PI * 2); g.stroke();
       g.fillStyle = '#4a6a7a'; g.fillRect(Math.round(hx) - 1, Math.round(hy) - 1, 3, 3);
+      break;
+    }
+    // ── 35차 내 집 가구 ──
+    case 'flattv': {
+      // 벽걸이처럼 얇은 TV: 낮은 원목 받침장 위, 화면은 +i 쪽(소파 쪽)을 본다. v=2는 85인치 (화면이 받침장보다 넓다)
+      const big = f.v === 2;
+      B3(i + 0.1, j + 0.15, i1 - 0.35, j1 - 0.15, 0, 9, big ? '#2a2420' : '#8a6a4a');
+      const y0 = big ? j + 0.05 : j + 0.45, y2 = big ? j1 - 0.05 : j1 - 0.45, z0 = 12, z1 = big ? h + 6 : h;
+      B3(i + 0.2, (y0 + y2) / 2 - 0.08, i + 0.3, (y0 + y2) / 2 + 0.08, 9, z0 + 2, '#1a1a1c');
+      poly([P(i + 0.32, y0, z0), P(i + 0.32, y2, z0), P(i + 0.32, y2, z1), P(i + 0.32, y0, z1)], '#121214');
+      poly([P(i + 0.33, y0 + 0.04, z0 + 1.5), P(i + 0.33, y2 - 0.04, z0 + 1.5), P(i + 0.33, y2 - 0.04, z1 - 1.5), P(i + 0.33, y0 + 0.04, z1 - 1.5)], night ? '#4a7ab8' : '#1e2a3a');
+      if (night) poly([P(i + 0.34, y0 + 0.2, z0 + 4), P(i + 0.34, y0 + 0.6, z0 + 4), P(i + 0.34, y0 + 0.6, z1 - 5), P(i + 0.34, y0 + 0.2, z1 - 5)], '#9ac8f0');
+      break;
+    }
+    case 'homesofa': {
+      // 거실 소파: 등받이가 +i 쪽(벽 반대편 TV를 본다) — v=0 회색 천 · v=1 밤색 가죽(단추 박음)
+      const col = f.v === 1 ? '#5a3424' : '#8a8e94', dk = f.v === 1 ? '#3e2218' : '#6a6e74';
+      B3(i + 0.1, j + 0.05, i1 - 0.05, j1 - 0.05, 0, h - 4, dk);
+      box(i + 0.1, j + 0.15, i1 - 0.3, j1 - 0.15, h - 4, h, col, mixHex(col, '#000000', 0.15), mixHex(col, '#000000', 0.3));
+      B3(i1 - 0.3, j + 0.05, i1 - 0.05, j1 - 0.05, h - 4, h + 12, dk);
+      for (const y of [j + 0.05, j1 - 0.22]) B3(i + 0.1, y, i1 - 0.3, y + 0.17, h - 4, h + 5, dk);
+      if (f.v === 1) for (let y = j + 0.5; y < j1 - 0.3; y += 0.5) { const [bx, by] = P(i1 - 0.3, y, h + 7); g.fillStyle = '#2a1810'; g.fillRect(Math.round(bx), Math.round(by), 1, 1); }
+      for (const y of [j + 0.4, j1 - 0.9]) B3(i1 - 0.55, y, i1 - 0.32, y + 0.5, h, h + 7, f.v === 1 ? '#c9a23e' : '#d8c8a8');
+      break;
+    }
+    case 'arcadecab': {
+      // 오락기: 검은 몸통 · 위에 번쩍이는 간판 · 앞으로 기운 화면 · 조이스틱과 버튼
+      const hue = ['#e83a8a', '#3ac8e8', '#f2c83a', '#8a5ae8', '#3ae88a', '#f27a3a'][(f.v ?? 0) % 6];
+      B3(i + 0.1, j + 0.15, i1 - 0.1, j1 - 0.1, 0, h, '#1e1a2a');
+      B3(i + 0.08, j + 0.12, i1 - 0.08, j1 - 0.1, h - 8, h + 2, hue);
+      faceL(i + 0.18, i1 - 0.18, h - 24, h - 10, night ? '#b8f0ff' : '#6ad8f0');
+      faceL(i + 0.22, i1 - 0.22, h - 22, h - 12, ['#2a3a8a', '#8a2a5a', '#2a6a3a'][(f.v ?? 0) % 3]);
+      B3(i + 0.12, j1 - 0.35, i1 - 0.12, j1 - 0.05, h - 32, h - 28, '#2a2438');
+      { const [bx, by] = P(i + 0.35, j1 - 0.2, h - 27); g.fillStyle = '#e83a3a'; g.fillRect(Math.round(bx), Math.round(by) - 3, 2, 3); g.fillStyle = '#f2d23a'; g.fillRect(Math.round(bx) + 5, Math.round(by) - 1, 2, 2); g.fillStyle = '#3a8ae8'; g.fillRect(Math.round(bx) + 9, Math.round(by) + 1, 2, 2); }
+      break;
+    }
+    case 'claw': {
+      // 인형 뽑기: 유리 상자 안 알록달록한 인형 더미 · 위에 집게
+      B3(i + 0.08, j + 0.08, i1 - 0.08, j1 - 0.08, 0, 16, f.v ? '#e85a8a' : '#3a8ae8');
+      poly([P(i + 0.1, j1 - 0.1, 16), P(i1 - 0.1, j1 - 0.1, 16), P(i1 - 0.1, j1 - 0.1, h - 6), P(i + 0.1, j1 - 0.1, h - 6)], '#d8f0ff', 0.35);
+      poly([P(i1 - 0.1, j + 0.1, 16), P(i1 - 0.1, j1 - 0.1, 16), P(i1 - 0.1, j1 - 0.1, h - 6), P(i1 - 0.1, j + 0.1, h - 6)], '#c8e8f8', 0.3);
+      for (let n = 0; n < 7; n++) { const [px, py] = P(i + 0.25 + (n % 3) * 0.22, j + 0.3 + Math.floor(n / 3) * 0.2, 18 + (n % 2) * 3); g.fillStyle = ['#f2a8b8', '#f2d27a', '#a8e0a0', '#c8a8f2', '#ffffff'][n % 5]; g.fillRect(Math.round(px) - 2, Math.round(py) - 3, 5, 4); }
+      { const [cx2, cy2] = P(i + 0.5, j + 0.5, h - 8); g.fillStyle = '#c8c8d0'; g.fillRect(Math.round(cx2), Math.round(cy2), 1, 8); g.fillRect(Math.round(cx2) - 2, Math.round(cy2) + 8, 5, 1); }
+      B3(i + 0.06, j + 0.06, i1 - 0.06, j1 - 0.06, h - 6, h, f.v ? '#e85a8a' : '#3a8ae8');
+      break;
+    }
+    case 'airhockey': {
+      B3(i + 0.05, j + 0.1, i1 - 0.05, j1 - 0.1, 0, h - 3, '#2a2a3a');
+      box(i + 0.05, j + 0.1, i1 - 0.05, j1 - 0.1, h - 3, h, '#e8f2f8', '#3a6ad8', '#2a5ac8');
+      { const [mx, my] = P(i + w / 2, j + 0.5, h); g.fillStyle = '#e83a3a'; g.fillRect(Math.round(mx) - 1, Math.round(my) - 1, 3, 2); g.strokeStyle = '#e83a3a'; g.lineWidth = 0.8; g.beginPath(); g.ellipse(mx, my, 6, 3, 0, 0, Math.PI * 2); g.stroke(); }
+      break;
+    }
+    case 'ddr': {
+      // 리듬 발판: 화살표 넷이 번갈아 빛난다
+      box(i + 0.05, j + 0.05, i1 - 0.05, j1 - 0.05, 0, h, '#2a2a34', '#1e1e28', '#16161e');
+      const cols = ['#e83a8a', '#3ac8e8', '#f2c83a', '#3ae88a'];
+      for (let n = 0; n < 4; n++) { const x = i + 0.3 + (n % 2) * 0.9, y = j + 0.3 + Math.floor(n / 2) * 0.9; poly([P(x, y, h + 0.3), P(x + 0.5, y, h + 0.3), P(x + 0.5, y + 0.5, h + 0.3), P(x, y + 0.5, h + 0.3)], cols[n]); }
+      break;
+    }
+    case 'mtable': {
+      // 대리석 식탁: 흰 대리석 상판(잿빛 결) · 검은 쇠다리 둘 · 꽃병
+      for (const x of [i + 0.3, i1 - 0.35]) B3(x, j + 0.35, x + 0.06, j1 - 0.35, 0, h - 3, '#1e1e20');
+      box(i + 0.05, j + 0.08, i1 - 0.05, j1 - 0.08, h - 3, h, '#f2f0ec', '#d8d4ce', '#c4c0ba');
+      g.strokeStyle = 'rgba(120,120,130,0.45)'; g.lineWidth = 0.6; g.beginPath(); { const a = P(i + 0.3, j + 0.3, h), b2 = P(i + 1.2, j + 0.6, h), c2 = P(i1 - 0.3, j + 0.4, h); g.moveTo(a[0], a[1]); g.lineTo(b2[0], b2[1]); g.lineTo(c2[0], c2[1]); } g.stroke();
+      B3(i + w / 2 - 0.08, j + 0.42, i + w / 2 + 0.08, j + 0.58, h, h + 9, '#3a6a8a');
+      { const [fx, fy] = P(i + w / 2, j + 0.5, h + 11); g.fillStyle = '#e85a6a'; g.fillRect(Math.round(fx) - 2, Math.round(fy) - 2, 4, 3); g.fillStyle = '#f2c84a'; g.fillRect(Math.round(fx), Math.round(fy) - 3, 2, 2); }
+      break;
+    }
+    case 'ctable': {
+      // 유리 거실 탁자: 검은 쇠다리 · 맑은 유리 상판 · 책 한 권과 컵
+      for (const [x, y] of [[i + 0.15, j + 0.15], [i1 - 0.2, j + 0.15], [i + 0.15, j1 - 0.2], [i1 - 0.2, j1 - 0.2]]) B3(x, y, x + 0.05, y + 0.05, 0, h - 1, '#2a2a2c');
+      poly([P(i + 0.1, j + 0.1, h), P(i1 - 0.1, j + 0.1, h), P(i1 - 0.1, j1 - 0.1, h), P(i + 0.1, j1 - 0.1, h)], '#bcdce6', 0.55);
+      B3(i + 0.3, j + 0.3, i + 0.6, j + 0.5, h, h + 2, '#a8382a');
+      B3(i + 0.62, j + 0.6, i + 0.7, j + 0.68, h, h + 4, '#f2f0ea');
+      break;
+    }
+    case 'kbed': {
+      // 킹사이즈 호텔 침대: 높고 넓은 패브릭 머리판 · 흰 시트 · 회색 띠 이불 · 베개 넷
+      B3(i + 0.05, j + 0.05, i1 - 0.05, j1 - 0.05, 0, h - 5, '#4a4642');
+      box(i + 0.05, j + 0.1, i1 - 0.05, j1 - 0.05, h - 5, h, '#fbfaf6', '#e2e0da', '#cecbc4');
+      B3(i - 0.02, j + 0.0, i1 + 0.02, j + 0.14, 0, h + 26, '#7a7066');
+      for (let n = 0; n < 4; n++) { const x = i + 0.12 + n * (w - 0.24) / 4; B3(x, j + 0.2, x + (w - 0.3) / 4, j + 0.55, h, h + 5, n % 3 ? '#ffffff' : '#e8e2d6'); }
+      poly([P(i + 0.05, j + 1.9, h + 0.5), P(i1 - 0.05, j + 1.9, h + 0.5), P(i1 - 0.05, j + 2.35, h + 0.5), P(i + 0.05, j + 2.35, h + 0.5)], '#6a6e78');
+      faceL(i + 0.05, i1 - 0.05, h - 5, h, '#e2e0da');
       break;
     }
     case 'tv': {

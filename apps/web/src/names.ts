@@ -20,7 +20,7 @@ const TYPES: Record<string, [string, string, string]> = {
   mobile_phone: ['휴대폰 가게', 'ร้านมือถือ', 'Phone shop'], electronics: ['전자제품 가게', 'ร้านเครื่องใช้ไฟฟ้า', 'Electronics'],
   hardware: ['철물점', 'ร้านวัสดุก่อสร้าง', 'Hardware store'], travel_agency: ['여행사', 'บริษัทนำเที่ยว', 'Travel agency'],
   cannabis: ['대마 판매점', 'ร้านกัญชา', 'Cannabis shop'], chemist: ['드러그스토어', 'ร้านขายยาและเครื่องสำอาง', 'Drugstore'],
-  jewelry: ['보석상', 'ร้านเพชรพลอย', 'Jeweller'], florist: ['꽃집', 'ร้านดอกไม้', 'Florist'], furniture: ['가구점', 'ร้านเฟอร์นิเจอร์', 'Furniture store'],
+  jewelry: ['보석상', 'ร้านเพชรพลอย', 'Jeweller'], florist: ['꽃집', 'ร้านดอกไม้', 'Florist'], furniture: ['가구점', 'ร้านเฟอร์นิเจอร์', 'Furniture store'], residence: ['분양 중', 'เปิดขาย', 'Now selling'], ownedhome: ['내 집', 'บ้านของฉัน', 'My home'],
   alcohol: ['주류 판매점', 'ร้านขายเหล้า', 'Liquor store'], butcher: ['정육점', 'ร้านขายเนื้อ', 'Butcher'], greengrocer: ['청과물 가게', 'ร้านผักผลไม้', 'Greengrocer'],
   car_repair: ['자동차 정비소', 'อู่ซ่อมรถ', 'Car repair'], motorcycle: ['오토바이 가게', 'ร้านมอเตอร์ไซค์', 'Motorbike shop'], motorcycle_repair: ['오토바이 정비소', 'ร้านซ่อมมอเตอร์ไซค์', 'Motorbike repair'],
   bicycle: ['자전거 가게', 'ร้านจักรยาน', 'Bicycle shop'], tattoo: ['타투숍', 'ร้านสัก', 'Tattoo studio'], pet: ['애견숍', 'ร้านสัตว์เลี้ยง', 'Pet shop'],

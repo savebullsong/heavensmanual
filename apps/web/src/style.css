@@ -514,3 +514,28 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 .cage-slots { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0 8px; font-size: 13px; color: #e8dcc0; }
 .cage-slots .full { color: #f08a6a; font-weight: 700; }
 .cage-slots button { font-size: 12px; padding: 4px 10px; }
+
+/* 35차 내구도 그림 알림: 금 가는 무기 · 박살나는 무기 */
+.dura-alert { position: fixed; left: 50%; top: 14%; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 14px; padding: 12px 18px 12px 12px; background: linear-gradient(180deg, rgba(30,20,14,.94), rgba(18,12,9,.94)); border: 2px solid #8a5a2a; border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,210,140,.08); color: #f4e6cc; pointer-events: none; animation: da-in .28s ease-out; max-width: min(92vw, 440px); }
+.dura-alert.dire { border-color: #c8402a; animation: da-in .28s ease-out, da-shake .5s .3s 2; }
+.dura-alert.gone { border-color: #e0463a; box-shadow: 0 0 0 2px rgba(224,70,58,.25), 0 8px 30px rgba(0,0,0,.6); }
+.dura-alert.out { opacity: 0; transform: translate(-50%, -10px); transition: .5s; }
+.dura-alert .da-pic { position: relative; width: 88px; height: 88px; flex: none; background: radial-gradient(circle at 50% 55%, rgba(255,200,120,.16), transparent 68%); }
+.dura-alert .da-pic canvas { position: absolute; inset: 0; width: 88px; height: 88px; image-rendering: pixelated; }
+.dura-alert .da-crack { animation: da-crack 1.1s ease-in-out infinite alternate; }
+.dura-alert .da-half.l { animation: da-l .9s .15s cubic-bezier(.2,.7,.3,1) forwards; }
+.dura-alert .da-half.r { animation: da-r .9s .15s cubic-bezier(.2,.7,.3,1) forwards; }
+.dura-alert .da-pic i { position: absolute; left: 44px; top: 44px; width: 5px; height: 4px; background: #d8d0c4; box-shadow: 1px 1px 0 #5a524a; opacity: 0; animation: da-shard .8s .15s ease-out forwards; }
+.dura-alert .da-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.dura-alert .da-text b { font-size: 17px; letter-spacing: -.2px; color: #ffd8a8; }
+.dura-alert.gone .da-text b { color: #ff8a6a; }
+.dura-alert .da-text span { font-size: 12.5px; line-height: 1.4; color: #d8c8b0; }
+.dura-alert .da-bar { display: block; height: 6px; border-radius: 3px; background: rgba(255,255,255,.1); overflow: hidden; margin-top: 2px; }
+.dura-alert .da-bar::before { content: ''; display: block; height: 100%; width: var(--p); background: #e0463a; animation: da-blink .6s steps(2) infinite; }
+@keyframes da-in { from { opacity: 0; transform: translate(-50%, -14px) scale(.94); } }
+@keyframes da-shake { 25% { margin-left: -4px; } 75% { margin-left: 4px; } }
+@keyframes da-crack { from { opacity: .55; } to { opacity: 1; } }
+@keyframes da-blink { 50% { opacity: .35; } }
+@keyframes da-l { to { transform: translate(-16px, 10px) rotate(-24deg); opacity: .25; } }
+@keyframes da-r { to { transform: translate(18px, 14px) rotate(30deg); opacity: .25; } }
+@keyframes da-shard { 0% { opacity: 1; transform: translate(0,0) rotate(0); } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--r)); } }

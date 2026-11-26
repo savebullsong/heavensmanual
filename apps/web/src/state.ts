@@ -40,7 +40,7 @@ export interface Save {
   homeSeen?: boolean;
   adminTrip?: 'real' | 'ghost' | 'heaven' | 'hell'; // 관리자가 시찰(지옥 층 이동·천국)을 떠나기 전의 세계 (돌아갈 곳)
   /** 천국: 환생할 때 받을 선행 보너스 (영혼 경험치) */
-  heaven?: { met?: boolean; admin?: boolean; adapted?: boolean; ywLost?: boolean; rites?: number }; // 21차: 행사에 다녀와 익숙해졌나 · 안내천사를 따돌렸나 · 다녀온 행사 수
+  heaven?: { met?: boolean; admin?: boolean; adapted?: boolean; ywLost?: boolean; rites?: number; acc?: 'lover' | 'friend' | 'family' | 'alone' }; // 35차 acc = 아큐버스와 정한 사이 // 21차: 행사에 다녀와 익숙해졌나 · 안내천사를 따돌렸나 · 다녀온 행사 수
   /** 19차 지옥면죄부: 앞으로 짓는 악행에서 지워 줄 남은 점수 (한 장 = 30, 최대 10장 = 300) */
   absolve?: number;
   /** 33차: 염소대왕의 방 환전상 — 이번 지옥길(gk = 상담 번호)에 바꾼 이승 돈과 그때 통장 */
@@ -49,7 +49,7 @@ export interface Save {
   tasm?: number;
   /** 34차 관리자 경제 통계: 날짜별(YYYY-MM-DD) 들어온 돈·나간 돈 (현실 e·s, 지옥 he·hs, 갈래별) · 논 시간(초) — 최근 14일 */
   eco?: Record<string, { e: Record<string, number>; s: Record<string, number>; he: Record<string, number>; hs: Record<string, number>; t: number }>;
-  /** 34차 앵무새 먹이: 준 횟수 (108·144번째에 짧은 장면, 144 다음은 다시 1부터) · 34차 페룸의 완성 템브라: 마지막으로 산 날 */
+  /** 34차 앵무새 먹이: 준 횟수 (108·144번째에 짧은 장면, 144 다음은 다시 1부터) · 34차 칼드렉의 완성 템브라: 마지막으로 산 날 */
   parrotFed?: number;
   ferumDay?: number;
   ferumMet?: boolean;
@@ -93,6 +93,12 @@ export interface Save {
   vault?: Partial<Record<'real' | 'hell', Stash>>;
   /** 30차 내구도: 쓰고 있는 장비(열쇠)마다 남은 내구도 — 없으면 새것 */
   dura?: Record<string, number>;
+  /** 35차: 내구도 셈이 바뀐 판 (2 = 더 오래 가는 셈, 무기는 바닥나면 박살) */
+  duraV?: number;
+  /** 35차 내 집 (방콕 콘도 · 서울 아파트) — 통장처럼 다음 생에도 남는다 */
+  homes?: { bkk?: boolean; seoul?: boolean };
+  /** 35차 가구점에서 산 가구 (가진 집에 저절로 놓인다) */
+  furn?: string[];
   /** 31차 필드 보스: 나와 있는 자리·체력(alive) · 다시 나올 수 있는 때(due) · 지옥은 그날(day)에 쓰러졌는지(dead) */
   fb?: Record<string, { alive?: { zone: string; i: number; j: number; hp: number }; due?: number; day?: string; dead?: boolean }>;
   /** 31차: 염소대왕을 만난 횟수 (영혼) · 마지막으로 머문 때 · 이 기기에서 한 시간(초) */

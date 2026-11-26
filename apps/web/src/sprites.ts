@@ -78,9 +78,9 @@ export function yunaeLook(age: 0 | 1 | 2): Look {
 export const TALUS_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'talus', cols: { 1: '#d8ccb0', 3: '#5a4430', 4: '#3a2e22', 5: '#1a1410', 6: '#ffd08a', 10: '#d8ccb0', 12: '#a8281e', 13: '#2e2420', 14: '#c9a23e', 15: '#140e0c' } };
 export const HWANGHON: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'apron', cols: { 1: '#ead2c4', 2: '#3a0e12', 3: '#5a0e18', 4: '#2a0a10', 5: '#0c0808', 6: '#1a1210', 7: '#140a0c', 9: '#5a0e18', 10: '#ead2c4' } };
 
-export const MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle', 'arming', 'umbrella', 'sickle', 'crowbar', 'wrench', 'machete', 'metalbat', 'saber', 'rapier', 'katana']; // 26차 현실 무기 더
+export const MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle', 'arming', 'umbrella', 'sickle', 'crowbar', 'wrench', 'machete', 'metalbat', 'saber', 'rapier', 'katana', 'whip', 'spear']; // 26차 현실 무기 더 · 35차 채찍·창
 /** 양손 무기 (16차): 두 손으로 크게 들어 내려찍는다 (heavy 동작) — 느리지만 묵직하다 */
-export const TWO = new Set(['sledge', 'fireaxe', 'greatsword', 'maul', 'boltcutter']);
+export const TWO = new Set(['sledge', 'fireaxe', 'greatsword', 'maul', 'boltcutter', 'spear']);
 /** 16차 괴물 몸: 차림 → [굽기 키, 자세] (무기를 들면 m) */
 const MON16: Record<string, [string, string, Mode]> = { ashgal: ['h', 'ashgal', 'm'], gurma: ['u', 'gurma', 'u'], cinder: ['n', 'cinder', 'm'], bloat: ['l', 'bloat', 'm'], glutton: ['e', 'glutton', 'm'], hawker: ['v', 'hawker', 'm'], debtor: ['d', 'debtor', 'm'], broker: ['k', 'besk', 'm'], forgeknight: ['z', 'forgeknight', 'm'] }; // 24차: 4층 층주 바르칸 · 25차 철갑마
 /** 방어구 겉모습: 그리는 순서와 색 (구역 3 = 본색, 구역 5 = 신발) */

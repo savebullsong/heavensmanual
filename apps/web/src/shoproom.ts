@@ -30,8 +30,8 @@ const START_FIRST: [number, number] = [4, 5];
 const START_BACK: [number, number] = [2, 6];
 const SPEED = 2.3;
 /** 유황새: 바닥에 선 큰 앵무새 (사람 키쯤), 베스크 자리와 말 거는 칸 */
-const BIRD_START = { x: 6.5, y: 4.5 }; // 29차: 데스크 앞은 보관 우리 자리
-const CAGE_TILE: [number, number] = [7, 4]; // 29차: 보관 우리 앞에 서는 칸
+const BIRD_START = { x: 3.5, y: 5.5 }; // 35차: 보관 우리를 오른쪽 바닥으로 옮기며 앵무새는 가운데에서
+const CAGE_TILE: [number, number] = [5, 6]; // 35차: 보관 우리 왼쪽에 서는 칸
 const BIRD_SPEED = 1.15;
 /** 유황새의 앵무새: 사람 키로 자라 두 발로 걷는 유황앵무 (사람 NPC처럼 가게 안을 돌아다닌다) */
 const BIRD_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'cockatoo', cols: { 5: '#8a8078', 6: '#141010', 11: '#efede4', 12: '#efc63a', 15: '#2a2624' } };
@@ -49,8 +49,8 @@ function blocked(i: number, j: number) {
   if (j <= 2) return true;
   if (hellRoom && i === 1 && j === 3) return true;
   if (i === 0 && (j === 4 || j === 5 || j === 7)) return true;
-  if (i === 8 && j === 7) return true; // 30차: 화분을 앞 오른쪽 구석으로
-  if (j === 3 && (i === 6 || i === 7 || i === 8)) return true; // 29차: 앵무새 데스크 앞의 보관 우리 (34차: 바닥 안쪽으로 들이며 한 칸 왼쪽까지)
+  if (i === 8 && j === 3) return true; // 35차: 화분은 카운터 끝 앞
+  if ((j === 5 || j === 6) && (i === 6 || i === 7 || i === 8)) return true; // 35차: 보관 우리는 카운터에서 떨어진 앞 오른쪽 바닥 (6~8, 5~6)
   return false;
 }
 
@@ -196,7 +196,7 @@ export class ShopRoom {
     this.parrot.zIndex = PARROT_PERCH.x + PARROT_PERCH.y + 1;
     this.objects.addChild(this.parrot);
     // 29차: 데스크 앞 보관 우리 (맡긴 물건이 몇 개 보인다)
-    this.cage.zIndex = 11.2;
+    this.cage.zIndex = 13.1; // 35차: 우리 한가운데 (앞에 선 사람은 앞으로, 뒤의 사람은 뒤로)
     this.objects.addChild(this.cage);
     this.redrawCage();
     // 유황새: 같은 앵무새가 사람 키만큼 자라 두 발로 가게 안을 걷는다

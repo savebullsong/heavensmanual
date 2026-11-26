@@ -400,7 +400,7 @@ export function hellZone(floor: number): Zone {
     // 4층 용광로: 대부소 없이 · 쇠를 두드리는 대장간 노점 · 가운데 큰 모루 조형물
     forge: [[-1, -6, 2, 2, 58, 'ujusae', undefined, 'left'], [4, -6, 2, 2, 48, 'hbank', undefined, 'left'], [-7, -6, 2, 2, 46, 'atone', undefined, 'left'],
       [3, 3, 2, 1, 26, 'generic', 'butcher'], [-3, 5, 2, 1, 22, 'generic', 'stall'], [5, -1, 1, 2, 22, 'generic', 'stall'], [-7, 1, 1, 2, 22, 'generic', 'stall'], [-3, -2, 2, 2, 76, 'generic', 'idol'],
-      [5, 3, 2, 2, 54, 'generic', 'smithy']], // 34차: 페룸의 낡은 대장간 (4층엔 이 대장장이 하나뿐)
+      [5, 3, 2, 2, 54, 'generic', 'smithy']], // 34차: 칼드렉의 낡은 대장간 (4층엔 이 대장장이 하나뿐)
   };
   let shop: Building | null = null;
   for (const [di, dj, w, d, h, cat, hk, sign] of LAYOUT[T]) {
@@ -534,7 +534,7 @@ export function hellZone(floor: number): Zone {
     if (at) vendors.push({ i: at[0], j: at[1], kind });
   }
   // 30차 대장간: 모루와 숯불 화로 옆에 선 대장장이 (지옥 장비 수리 · 템브라 강화)
-  // 34차: 4층은 페룸 — 제 대장간(건물) 앞에 선다. 다른 대장장이는 없다
+  // 34차: 4층은 칼드렉 — 제 대장간(건물) 앞에 선다. 다른 대장장이는 없다
   const smithy = buildings.find((b) => b.hk === 'smithy');
   if (smithy) { vendors.push({ i: smithy.i0 + 1, j: smithy.j0 + smithy.d, kind: 'smith' }); props.push({ i: smithy.i0 + smithy.w, j: smithy.j0 + smithy.d, kind: 'anvil' }); }
   else {
