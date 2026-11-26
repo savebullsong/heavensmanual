@@ -49,7 +49,7 @@ function blocked(i: number, j: number) {
   if (j <= 2) return true;
   if (hellRoom && i === 1 && j === 3) return true;
   if (i === 0 && (j === 4 || j === 5 || j === 7)) return true;
-  if (i === 8 && j === 4) return true;
+  if (i === 8 && j === 7) return true; // 30차: 화분을 앞 오른쪽 구석으로
   if (j === 3 && (i === 7 || i === 8)) return true; // 29차: 앵무새 데스크 앞의 보관 우리
   return false;
 }
@@ -315,11 +315,11 @@ export class ShopRoom {
     if (this.keeperHell === hell) return;
     this.keeperHell = hell;
     const id = ++this.keeperId;
-    Promise.all([charSet(hell ? HWANGHON : MISS_HWANG), portraitUrl(hell ? 'sprite-hwanghon' : 'sprite-miss-hwang')]).then(async ([cs, u]) => {
+    Promise.all([charSet(hell ? HWANGHON : MISS_HWANG, null, [], true), portraitUrl(hell ? 'sprite-hwanghon' : 'sprite-miss-hwang')]).then(async ([cs, u]) => {
       if (id !== this.keeperId) return;
       const f = frameOf(cs, 'idle', 'sw', 0);
       applyFrame(this.hwang, f);
-      if (!u || !f) return;
+      if (!u || !f || cs.px === 3) return; // 31차: 도트 3배 시험 중에는 관리자 도트 대신 3배로 구운 그림을 보여 준다
       const tx = await loadPixel(u);
       if (!tx) return;
       this.hwang.texture = tx;
@@ -370,7 +370,7 @@ export class ShopRoom {
   /** 몸과 입은 것: 방어구도 거리처럼 그린다 (안 주면 맨몸 — 처음 모습 고르기) */
   setLook(look: Look, g?: { weapon: string | null; armor: string[] }) {
     const id = ++this.dressId;
-    charSet(look, g?.weapon ?? null, g?.armor ?? []).then((cs) => {
+    charSet(look, g?.weapon ?? null, g?.armor ?? [], true).then((cs) => {
       if (id !== this.dressId) return;
       this.cs = cs;
       this.auraTex = look.aura ? auraFor(cs) : null;

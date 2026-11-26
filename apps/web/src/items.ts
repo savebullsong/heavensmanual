@@ -24,8 +24,14 @@ export interface ItemDef {
   icon?: string; // 아이콘 그림 (없으면 key)
   two?: boolean; // 양손 무기: 두 손으로 내려찍는다 (느리지만 묵직하다)
   ranged?: boolean; // 멀리서 쏜다 (권총·활) — 민첩이 공격력에 더해진다
+  /** 30차: 가방에서 '읽기' — diary = 가장 가까운 우주새로 (현실은 그 도시의 우주새 · 지옥은 그 층의 유황새) */
+  use?: 'diary';
+  /** 30차 템브라 강화: '+n' 단계와 바탕 물건 (강화한 것은 'hsword+4' 같은 열쇠로 따로 쌓인다) */
+  enh?: number; base?: string;
   dr?: number; // 피해 감소 (17차: 방어력은 회피만 올린다. 피해를 줄이는 건 이 값이 있는 물건뿐)
   floor?: number; // 20차: 지옥 그 층의 괴물만 떨어뜨리는 고유 물건 (가게에서 팔지 않는다)
+  /** 31차: 유황새(황혼)가 이 층들에서만 판다 (없으면 모든 층 — 기본적이거나 약한 공통 장비). 그 층 괴물도 가끔 떨어뜨린다 */
+  sale?: number[];
   bloodFloor?: number; // 22차: 물장수가 파는 '그 층 괴물의 피' (그 층에서만 판다)
 }
 
@@ -37,6 +43,7 @@ export const ITEMS: ItemDef[] = [
   { key: 'cola', cat: 'goods', price: 17, heal: 15, name: { ko: '콜라', th: 'โคล่า', en: 'Cola' } },
   { key: 'water', cat: 'goods', price: 10, heal: 10, name: { ko: '물', th: 'น้ำเปล่า', en: 'Water' } },
   { key: 'rope', cat: 'goods', price: 120, note: 'rope', name: { ko: '밧줄', th: 'เชือก', en: 'Rope' } },
+  { key: 'diary', cat: 'goods', price: 500, use: 'diary', name: { ko: '일기장', th: 'สมุดบันทึก', en: 'Diary' } }, // 30차: 읽으면 가까운 우주새로
   { key: 'bandage', cat: 'goods', price: 45, heal: 120, name: { ko: '붕대', th: 'ผ้าพันแผล', en: 'Bandage' } },
   // 무기 — 26차: 공격력은 좁은 폭(3~12)에 모으고(나중에 강화로 키운다), 값은 현실 값을 따른다. 파는 곳은 겹치지 않게 나눈다
   //  우주새: 식칼 · 단검 · 한손검 · 장검 · 대검 · 츠바이핸더 · 장인 장검 · 활 · 권총 · 저격총 셋
@@ -107,23 +114,58 @@ export const ITEMS: ItemDef[] = [
   { key: 'hdagger', cat: 'weapon', price: 30, atk: 5, hell: true, sprite: 'dagger', name: { ko: '녹슨 망자의 단검', th: 'มีดสั้นสนิมของผู้ตาย', en: 'Rusted dead man’s dagger' } },
   { key: 'hhammer', cat: 'weapon', price: 70, atk: 6, hell: true, sprite: 'hammer', name: { ko: '뼈 망치', th: 'ค้อนกระดูก', en: 'Bone hammer' } },
   { key: 'hspear', cat: 'weapon', price: 110, atk: 6, hell: true, sprite: 'pipe', name: { ko: '쇠사슬 창', th: 'หอกโซ่', en: 'Chain spear' } },
-  { key: 'hsword', cat: 'weapon', price: 200, atk: 7, hell: true, sprite: 'sword', name: { ko: '흑철 검', th: 'ดาบเหล็กดำ', en: 'Black-iron sword' } },
-  { key: 'hmaul', cat: 'weapon', price: 260, atk: 8, hell: true, two: true, sprite: 'maul', name: { ko: '가시 철퇴', th: 'กระบองหนาม', en: 'Spiked maul' } },
-  { key: 'hgreatsword', cat: 'weapon', price: 360, atk: 9, hell: true, two: true, sprite: 'greatsword', name: { ko: '흑철 대검', th: 'ดาบใหญ่เหล็กดำ', en: 'Black-iron greatsword' } },
-  { key: 'hblade', cat: 'weapon', price: 150, atk: 7, hell: true, sprite: 'arming', icon: 'arming', name: { ko: '망자의 한손검', th: 'ดาบมือเดียวของผู้ตาย', en: "Dead man's arming sword" } },
+  { key: 'hsword', cat: 'weapon', price: 200, atk: 7, sale: [2, 3], hell: true, sprite: 'sword', name: { ko: '흑철 검', th: 'ดาบเหล็กดำ', en: 'Black-iron sword' } },
+  { key: 'hmaul', cat: 'weapon', price: 260, atk: 8, sale: [2], hell: true, two: true, sprite: 'maul', name: { ko: '가시 철퇴', th: 'กระบองหนาม', en: 'Spiked maul' } },
+  { key: 'hgreatsword', cat: 'weapon', price: 360, atk: 9, sale: [3, 4], hell: true, two: true, sprite: 'greatsword', name: { ko: '흑철 대검', th: 'ดาบใหญ่เหล็กดำ', en: 'Black-iron greatsword' } },
+  { key: 'hblade', cat: 'weapon', price: 150, atk: 7, sale: [1], hell: true, sprite: 'arming', icon: 'arming', name: { ko: '망자의 한손검', th: 'ดาบมือเดียวของผู้ตาย', en: "Dead man's arming sword" } },
   { key: 'hshield', cat: 'armor', price: 120, def: 5, hell: true, sprite: 'shield', icon: 'shield', name: { ko: '쇠테 망자 방패', th: 'โล่ขอบเหล็กของผู้ตาย', en: "Dead man's iron-rim shield" } },
   { key: 'hhelm', cat: 'armor', price: 45, def: 3, hell: true, sprite: 'helmet', icon: 'helmet', name: { ko: '그을린 투구', th: 'หมวกเกราะไหม้เกรียม', en: 'Scorched helm' } },
-  { key: 'hvest', cat: 'armor', price: 150, def: 6, hell: true, sprite: 'vest', icon: 'vest', name: { ko: '망자의 가죽 조끼', th: 'เสื้อหนังของผู้ตาย', en: 'Dead man’s leather vest' } },
+  { key: 'hvest', cat: 'armor', price: 150, def: 6, sale: [1, 2], hell: true, sprite: 'vest', icon: 'vest', name: { ko: '망자의 가죽 조끼', th: 'เสื้อหนังของผู้ตาย', en: 'Dead man’s leather vest' } },
   { key: 'hgloves', cat: 'armor', price: 20, def: 1, hell: true, sprite: 'gloves', icon: 'gloves', name: { ko: '사슬 장갑', th: 'ถุงมือโซ่', en: 'Chain gloves' } },
+  { key: 'hpants', cat: 'armor', price: 40, def: 2, hell: true, sprite: 'workpants', icon: 'workpants', name: { ko: '꿰맨 망자 바지', th: 'กางเกงปะของผู้ตาย', en: 'Stitched dead-man trousers' } }, // 31차: 지옥에도 바지 (모든 층)
   { key: 'hshin', cat: 'armor', price: 35, def: 2, hell: true, sprite: 'shinguard', icon: 'shinguard', name: { ko: '뼈 정강이받이', th: 'สนับแข้งกระดูก', en: 'Bone greaves' } },
   { key: 'hboots', cat: 'armor', price: 60, def: 2, hell: true, sprite: 'boots', icon: 'boots', name: { ko: '숯 장화', th: 'รองเท้าถ่าน', en: 'Charcoal boots' } },
   { key: 'lethe', cat: 'goods', price: 3, heal: 60, hell: true, icon: 'water', name: { ko: '망각의 물', th: 'น้ำแห่งการลืมเลือน', en: 'Water of oblivion' } },
   { key: 'ashcake', cat: 'goods', price: 6, heal: 130, hell: true, icon: 'cake', name: { ko: '재떡', th: 'ขนมเถ้า', en: 'Ash cake' } },
   { key: 'hbandage', cat: 'goods', price: 8, heal: 150, hell: true, icon: 'bandage', name: { ko: '검은 붕대', th: 'ผ้าพันแผลสีดำ', en: 'Black bandage' } },
+  // 30차 템브라: 지옥 어디서나 아주 드물게 떨어지는 파편 — 열세 개를 모으면 템브라가 된다 (지옥 대장간에서 지옥 장비 강화)
+  { key: 'tshard', cat: 'goods', price: 30, hell: true, store: 'drop', name: { ko: '템브라 파편', th: 'เศษเท็มบรา', en: 'Tembra Shard' } },
+  { key: 'tembra', cat: 'goods', price: 400, hell: true, store: 'drop', name: { ko: '템브라', th: 'เท็มบรา', en: 'Tembra' } },
+  // 31차 필드 보스의 희귀 전리품 (설정집) — 지금은 귀한 재료로 비싸게 팔 수 있다 (제작은 나중에 대장간에서)
+  { key: 'ashhide', cat: 'goods', price: 900, hell: true, store: 'drop', name: { ko: '재등의 가죽', th: 'หนังหลังเถ้า', en: 'Ashback hide' } },
+  { key: 'gulonstone', cat: 'goods', price: 1000, hell: true, store: 'drop', name: { ko: '굴론의 위석', th: 'นิ่วในกระเพาะกูลอน', en: "Gulon's gastrolith" } },
+  { key: 'redseal', cat: 'goods', price: 1100, hell: true, store: 'drop', name: { ko: '붉은 봉랍', th: 'ครั่งแดง', en: 'Red sealing wax' } },
+  { key: 'heartstone', cat: 'goods', price: 1300, hell: true, store: 'drop', name: { ko: '페론의 심장석', th: 'หินหัวใจเฟอร์รอน', en: "Ferron's heartstone" } },
+  { key: 'hdiary', cat: 'goods', price: 40, use: 'diary', hell: true, icon: 'diary', name: { ko: '그을린 일기장', th: 'สมุดบันทึกไหม้เกรียม', en: 'Scorched diary' } }, // 30차: 읽으면 그 층의 유황새로
   { key: 'bloodfruit', cat: 'goods', price: 12, heal: 260, hell: true, icon: 'choco', name: { ko: '피 열매', th: 'ผลไม้เลือด', en: 'Blood fruit' } },
   // 지옥 마을 고깃간 (노전) — 무엇의 고기인지는 묻지 않는 게 좋다
   // 20차: 층마다 고유한 물건 — 그 층의 괴물만 떨어뜨린다 (1층 화산재 · 2층 늪과 이끼 · 3층 핏빛 시장)
   { key: 'cinderbread', cat: 'goods', price: 9, heal: 180, hell: true, floor: 1, store: 'drop', icon: 'cake', name: { ko: '화산재 구운 빵', th: 'ขนมปังอบเถ้าภูเขาไฟ', en: 'Cinder-baked bread' } },
+  // ── 31차: 층마다 다른 지옥 장비 — 그 층 괴물의 뼈·이빨·껍질로 만든 것 (유황새가 그 층에서만 팔고, 그 층 괴물도 가끔 떨어뜨린다)
+  // 1층 재의 문턱: 재충 집게 · 망령 손톱 · 뼈지기 곤봉 · 재 껍질
+  { key: 'mitepincer', cat: 'weapon', price: 35, atk: 5, hell: true, sale: [1], sprite: 'dagger', icon: 'dagger', name: { ko: '재충 집게 단검', th: 'มีดสั้นก้ามหนอนเถ้า', en: 'Ash-mite pincer' } },
+  { key: 'wraithclaw', cat: 'weapon', price: 90, atk: 6, hell: true, sale: [1], sprite: 'knife', icon: 'knife', name: { ko: '망령 손톱', th: 'กรงเล็บวิญญาณ', en: 'Wraith claw' } },
+  { key: 'wardenclub', cat: 'weapon', price: 170, atk: 7, hell: true, sale: [1], sprite: 'bat', icon: 'bat', name: { ko: '뼈지기 곤봉', th: 'กระบองผู้เฝ้ากระดูก', en: "Warden's bone club" } },
+  { key: 'ashpants', cat: 'armor', price: 85, def: 3, hell: true, sale: [1], sprite: 'workpants', icon: 'workpants', name: { ko: '재 가죽 바지', th: 'กางเกงหนังเถ้า', en: 'Ash-hide trousers' } },
+  { key: 'ashshell', cat: 'armor', price: 110, def: 5, hell: true, sale: [1], sprite: 'vest', icon: 'vest', name: { ko: '재 껍질 조끼', th: 'เสื้อเปลือกเถ้า', en: 'Ash-shell vest' } },
+  // 2층 굶주림의 늪: 늪충 송곳니 · 탐식귀 어금니 · 진흙거인 갈비 · 늪가죽
+  { key: 'wormfang', cat: 'weapon', price: 70, atk: 6, hell: true, sale: [2], sprite: 'dagger', icon: 'dagger', name: { ko: '늪충 송곳니', th: 'เขี้ยวหนอนบึง', en: 'Mud-worm fang' } },
+  { key: 'molarmace', cat: 'weapon', price: 240, atk: 8, hell: true, sale: [2], sprite: 'hammer', icon: 'hammer', name: { ko: '탐식귀 어금니 철퇴', th: 'กระบองฟันกรามผีตะกละ', en: 'Glutton molar mace' } },
+  { key: 'ribblade', cat: 'weapon', price: 330, atk: 8, two: true, hell: true, sale: [2], sprite: 'greatsword', icon: 'greatsword', name: { ko: '진흙거인 갈비 대검', th: 'ดาบใหญ่ซี่โครงยักษ์โคลน', en: 'Mud-giant rib blade' } },
+  { key: 'bogpants', cat: 'armor', price: 95, def: 3, hell: true, sale: [2], sprite: 'workpants', icon: 'workpants', name: { ko: '늪가죽 바지', th: 'กางเกงหนังบึง', en: 'Bog-hide trousers' } },
+  { key: 'bogboots', cat: 'armor', price: 70, def: 3, hell: true, sale: [2], sprite: 'boots', icon: 'boots', name: { ko: '늪가죽 장화', th: 'รองเท้าหนังบึง', en: 'Bog-hide boots' } },
+  // 3층 피의 시장: 계약충 침 · 가면도적 단도 · 세라네 이빨 검 · 봉랍 조끼
+  { key: 'pactsting', cat: 'weapon', price: 120, atk: 6, hell: true, sale: [3], sprite: 'knife', icon: 'knife', name: { ko: '계약충 침', th: 'เหล็กในหนอนสัญญา', en: 'Pact-worm stinger' } },
+  { key: 'thiefstiletto', cat: 'weapon', price: 280, atk: 8, hell: true, sale: [3], sprite: 'rapier', icon: 'rapier', name: { ko: '가면도적의 단도', th: 'กริชโจรหน้ากาก', en: "Masked thief's stiletto" } },
+  { key: 'serafang', cat: 'weapon', price: 440, atk: 9, hell: true, sale: [3], sprite: 'saber', icon: 'saber', name: { ko: '세라네 이빨 검', th: 'ดาบฟันเซราเน', en: 'Serane-tooth saber' } },
+  { key: 'waxpants', cat: 'armor', price: 160, def: 4, hell: true, sale: [3], sprite: 'workpants', icon: 'workpants', name: { ko: '봉랍 무늬 바지', th: 'กางเกงลายครั่ง', en: 'Wax-sealed trousers' } },
+  { key: 'sealvest', cat: 'armor', price: 210, def: 7, hell: true, sale: [3], sprite: 'vest', icon: 'vest', name: { ko: '봉랍 가죽 조끼', th: 'เสื้อหนังครั่งประทับ', en: 'Sealing-wax vest' } },
+  // 4층 비명의 용광로: 불씨귀 뿔 · 사슬 해골 갈고리 · 망치병 쇠망치 · 철갑 투구
+  { key: 'imphorn', cat: 'weapon', price: 150, atk: 7, hell: true, sale: [4], sprite: 'dagger', icon: 'dagger', name: { ko: '불씨귀 뿔 단검', th: 'มีดสั้นเขาผีลูกไฟ', en: 'Cinder-imp horn' } },
+  { key: 'chainhook', cat: 'weapon', price: 270, atk: 8, hell: true, sale: [4], sprite: 'hook', icon: 'hook', name: { ko: '사슬 해골 갈고리', th: 'ขอโครงกระดูกโซ่', en: 'Chain-bone hook' } },
+  { key: 'warhammer', cat: 'weapon', price: 500, atk: 9, two: true, hell: true, sale: [4], sprite: 'sledge', icon: 'sledge', name: { ko: '망치병의 쇠망치', th: 'ค้อนเหล็กทหารค้อน', en: "Hammerman's war hammer" } },
+  { key: 'slagpants', cat: 'armor', price: 230, def: 5, hell: true, sale: [4], sprite: 'workpants', icon: 'workpants', name: { ko: '쇳물 가죽 바지', th: 'กางเกงหนังน้ำเหล็ก', en: 'Slag-leather trousers' } },
+  { key: 'ironhelm', cat: 'armor', price: 190, def: 5, hell: true, sale: [4], sprite: 'helmet', icon: 'helmet', name: { ko: '철갑 투구', th: 'หมวกเกราะเหล็ก', en: 'Ironclad helm' } },
   { key: 'ashmask', cat: 'armor', price: 70, def: 4, hell: true, floor: 1, store: 'drop', sprite: 'helmet', icon: 'helmet', name: { ko: '재의 가면 투구', th: 'หมวกหน้ากากเถ้า', en: 'Ash-mask helm' } },
   { key: 'cinderaxe', cat: 'weapon', price: 300, atk: 8, two: true, hell: true, floor: 1, store: 'drop', sprite: 'fireaxe', icon: 'fireaxe', name: { ko: '불씨 도끼', th: 'ขวานถ่านเพลิง', en: 'Ember axe' } },
   { key: 'bogroot', cat: 'goods', price: 14, heal: 260, hell: true, floor: 2, store: 'drop', icon: 'water', name: { ko: '늪 뿌리즙', th: 'น้ำรากหนองบึง', en: 'Bog-root sap' } },
@@ -269,8 +311,26 @@ export function priceText(n: number, hell = false): string {
 }
 
 /** 물건 아이콘 — 지옥 물건은 현실 그림을 빌려 그을리고 붉게 물들인다 */
+/** 30차: 물건 찾기 — 강화한 장비('hsword+4')는 바탕 물건에서 이름·공격력·방어력만 바꿔 만든다 */
+const derived = new Map<string, ItemDef>();
+export function itemByKey(k: string): ItemDef {
+  const hit = ITEMS.find((x) => x.key === k);
+  if (hit) return hit;
+  const m = /^(.+)\+(\d+)$/.exec(k);
+  if (!m) return undefined as unknown as ItemDef;
+  const got = derived.get(k);
+  if (got) return got;
+  const b = ITEMS.find((x) => x.key === m[1]);
+  if (!b) return undefined as unknown as ItemDef;
+  const n = +m[2];
+  const nm = (l: Lang) => `+${n} ${b.name[l]}`;
+  const d: ItemDef = { ...b, key: k, base: b.key, enh: n, icon: b.icon ?? b.key, sprite: b.sprite ?? b.key, atk: b.cat === 'weapon' ? (b.atk ?? 0) + n : b.atk, def: b.cat === 'armor' ? (b.def ?? 0) + n : b.def, name: { ko: nm('ko'), th: nm('th'), en: nm('en') } };
+  derived.set(k, d);
+  return d;
+}
 export function iconFor(it: ItemDef): HTMLCanvasElement {
   const c = itemIcon(it.icon ?? it.sprite ?? it.key);
+  if (it.enh) { const g0 = c.getContext('2d')!; g0.fillStyle = '#1a120a'; g0.fillRect(0, 0, 13, 9); g0.fillStyle = '#ffd45a'; g0.font = 'bold 9px system-ui, sans-serif'; g0.fillText(`+${it.enh}`, 1, 8); }
   if (!it.hell) return c;
   const g = c.getContext('2d')!;
   g.globalCompositeOperation = 'source-atop';
@@ -333,6 +393,32 @@ export function itemIcon(key: string): HTMLCanvasElement {
     case 'water':
       R(13, 3, 6, 3, '#2f6fb8'); R(12, 6, 8, 2, '#9fc6e4'); P([[11, 8], [21, 8], [23, 12], [23, 28], [9, 28], [9, 12]], '#b9dcef');
       R(9, 15, 14, 7, '#e8f2f6'); R(11, 17, 10, 3, '#3f8fd0'); R(10, 9, 2, 18, '#e6f4fb'); R(20, 12, 2, 15, '#8fbcd6');
+      break;
+    case 'ashhide':
+      P([[5, 9], [14, 5], [26, 7], [28, 18], [22, 27], [9, 26], [4, 18]], '#5a5450'); P([[8, 11], [15, 8], [24, 10], [25, 18], [20, 24], [10, 23], [7, 17]], '#7a7268');
+      for (let k = 0; k < 6; k++) R(9 + k * 3, 12 + (k % 3) * 3, 2, 2, '#3a3430'); R(14, 15, 5, 3, '#ff8a3a');
+      break;
+    case 'gulonstone':
+      E(16, 17, 11, 10, '#3a4226'); E(15, 16, 9, 8, '#6a7a3a'); E(13, 13, 3, 2, '#c8e05a'); R(18, 19, 4, 1, '#2a3018'); R(10, 20, 3, 1, '#2a3018');
+      break;
+    case 'redseal':
+      E(16, 17, 11, 9, '#5a0e0c'); E(16, 16, 9, 7, '#a8201a'); E(16, 16, 5, 4, '#7a1410'); R(14, 14, 4, 1, '#e0b437'); R(15, 17, 2, 2, '#e0b437');
+      break;
+    case 'heartstone':
+      P([[16, 3], [26, 13], [22, 28], [10, 28], [6, 13]], '#2a1a14'); P([[16, 6], [23, 13], [20, 25], [12, 25], [9, 13]], '#c8401a'); E(16, 16, 4, 5, '#ffb04a'); E(16, 15, 2, 2, '#fff0b0');
+      break;
+    case 'tshard':
+      P([[16, 4], [23, 14], [18, 28], [10, 20], [11, 10]], '#3a1a2a'); P([[16, 6], [21, 14], [17, 25], [12, 19], [13, 11]], '#8a2a5a');
+      Ln(16, 7, 17, 24, 1, '#ff8ac8'); R(14, 12, 2, 2, '#ffd0ea');
+      break;
+    case 'tembra':
+      P([[16, 2], [27, 12], [22, 29], [10, 29], [5, 12]], '#2a1020'); P([[16, 4], [25, 12], [21, 27], [11, 27], [7, 12]], '#a02a6a');
+      P([[16, 7], [21, 13], [16, 24], [11, 13]], '#ff6ab0'); Ln(16, 7, 16, 24, 1, '#ffd0ea'); R(13, 11, 2, 2, '#fff0f8');
+      break;
+    case 'diary':
+      R(7, 5, 18, 23, '#5a2a24'); R(8, 6, 16, 21, '#7a3a30'); R(7, 5, 3, 23, '#3a1a16'); R(24, 7, 2, 20, '#e8dcc4');
+      R(12, 10, 9, 1, '#c8a060'); R(12, 13, 7, 1, '#c8a060'); E(16, 20, 3, 3, '#c8a060'); E(16, 20, 1.5, 1.5, '#7a3a30');
+      R(19, 27, 2, 4, '#c8a040');
       break;
     case 'rope':
       E(16, 17, 12, 10, '#b08a52'); E(16, 17, 9, 7, '#8a6838'); E(16, 17, 6, 4.5, '#c49a5e'); E(16, 17, 3, 2, '#2b2014');
@@ -657,7 +743,7 @@ export function itemIcon(key: string): HTMLCanvasElement {
 export const HELL_FOOD = ['lethe', 'ashcake', 'bloodfruit', 'bulgogichips', 'hjerky', 'hskewer', 'hstew'];
 /** 지옥 괴물이 드물게 떨어뜨리는 물건: 층이 깊을수록 좋은 것이 섞인다 [물건, 무게] */
 /** 20차: 모든 층의 괴물이 떨어뜨리는 공통 물건 */
-export const COMMON_LOOT: [string, number][] = [['hbandage', 20], ['lethe', 16], ['hgloves', 6], ['hdagger', 5], ['hhelm', 5], ['hshin', 5], ['hboots', 5], ['hhammer', 4], ['hspear', 3], ['hvest', 2], ['hsword', 2], ['hmaul', 1.5], ['hgreatsword', 1]];
+export const COMMON_LOOT: [string, number][] = [['hbandage', 20], ['lethe', 16], ['hgloves', 6], ['hdagger', 5], ['hhelm', 5], ['hshin', 5], ['hboots', 5], ['hpants', 4], ['hhammer', 4], ['hspear', 3], ['hvest', 2], ['hsword', 2], ['hmaul', 1.5], ['hgreatsword', 1]];
 /** 층마다 고유한 물건 (그 층 괴물만) — 공통 물건과 섞어 뽑는다 */
 export const FLOOR_LOOT: Record<number, [string, number][]> = {
   1: [['ashcake', 18], ['cinderbread', 14], ['ashmask', 4], ['cinderaxe', 1.5]],
@@ -667,7 +753,10 @@ export const FLOOR_LOOT: Record<number, [string, number][]> = {
 };
 /** 25차: 깊을수록 무기·방어구가 잘 나온다 (층마다 장비 무게 +35%) */
 const gearW = (k: string, w: number, f: number) => { const it = ITEMS.find((x) => x.key === k); return it && (it.atk || it.def) ? w * (1 + 0.35 * (f - 1)) : w; };
-export const HELL_LOOT: Record<number, [string, number][]> = Object.fromEntries([1, 2, 3, 4].map((f) => [f, [...FLOOR_LOOT[f], ...COMMON_LOOT].map(([k, w]) => [k, gearW(k, w, f)] as [string, number])]));
+/** 31차: 그 층에서 파는 층 장비도 그 층 괴물이 가끔 떨어뜨린다 · 다른 층 전용 장비(예전 공통이던 흑철 검 등)는 그 층에서만 */
+const saleLoot = (f: number): [string, number][] => ITEMS.filter((x) => x.hell && x.sale?.includes(f) && (x.cat === 'weapon' || x.cat === 'armor')).map((x) => [x.key, 2]);
+const commonFor = (f: number) => COMMON_LOOT.filter(([k]) => { const it = ITEMS.find((x) => x.key === k); return !it?.sale || it.sale.includes(f); });
+export const HELL_LOOT: Record<number, [string, number][]> = Object.fromEntries([1, 2, 3, 4].map((f) => [f, [...FLOOR_LOOT[f], ...saleLoot(f), ...commonFor(f)].map(([k, w]) => [k, gearW(k, w, f)] as [string, number])]));
 export function rollLoot(floor: number, rnd = Math.random): string {
   const t = HELL_LOOT[floor] ?? COMMON_LOOT;
   let s = t.reduce((a, [, w]) => a + w, 0) * rnd();

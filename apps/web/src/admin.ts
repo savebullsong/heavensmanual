@@ -16,7 +16,7 @@ const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   parrot: { name: '앵무새', where: '우주새 · 환생시키는 순간에만 말함' },
   luen: { name: '루엔', where: '천국 · 구름 계단 위 환생의 테라스' },
   pashar: { name: '파샤르', where: '지옥 1층 · 환생관' },
-  'goat-king': { name: '염소대왕', where: '지옥 13층 · 최종 보스' },
+  'goat-king': { name: '염소대왕', where: '지옥 142층 · 떨어진 자들의 상담자 (지옥에 오면 맨 먼저 만난다)' },
   besk: { name: '베스크', where: '지옥 3층 · 베스크 대부소의 대부업자' },
   talus: { name: '탈루스', where: '지옥 2층 들판 · 뼈주사위 노름꾼' },
   grandpa: { name: '환생관 할아버지', where: '천국 환생의 테라스 · 지옥 로비 — 가끔 루엔·파샤르 대신 나오는 안경 쓴 아주 늙은 할아버지 (천국·지옥 같은 사람, 옷차림만 다름)' },

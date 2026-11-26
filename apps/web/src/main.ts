@@ -7,7 +7,7 @@ import { WorldScene, type WorldHooks, type Stance, type RemoteInfo } from './wor
 import { ShopRoom, type ShopTarget } from './shoproom.ts';
 import { Dialog } from './dialog.ts';
 import { openLookPanel, lookPanelInsets } from './lookpanel.ts';
-import { ITEMS, STORES, menuFor, iconFor, itemIcon, effectText, priceText, moneyText, setWon, HELL_FOOD, type ItemDef, type ItemCat } from './items.ts';
+import { ITEMS, STORES, menuFor, itemByKey, iconFor, itemIcon, effectText, priceText, moneyText, setWon, HELL_FOOD, type ItemDef, type ItemCat } from './items.ts';
 import * as net from './net.ts';
 import { preloadPortrait, type PortraitSlot } from './portraits.ts';
 import { sukhumvitTestZone, decodeZone, type Zone, type Building } from './zone.ts';
@@ -15,17 +15,17 @@ import { streetReady } from './street.ts';
 import { ARRIVALS, rollArrival, arrivalLook, type Arrival, type Look, type Outfit } from './character.ts';
 import { t, lang, setLang, LANGS, type Lang } from './i18n.ts';
 import { load, save, type Slot, type Stash } from './state.ts';
-import { hellZone, OPEN_FLOORS, floorDef, MONSTERS, GUARDS, TOLL, ATONE_GOAL, GURMA_FULL, setRaidForce, FLOORS } from './hell.ts';
+import { hellZone, OPEN_FLOORS, floorDef, MONSTERS, GUARDS, TOLL, ATONE_GOAL, GURMA_FULL, setRaidForce, FLOORS, FIELD_BOSS } from './hell.ts';
 import type { HellVendor } from './zone.ts';
 import { interiorZone, roomKind as roomKindOf, canEnter } from './interior.ts';
 import { borderZone } from './border.ts';
-import { TWO } from './sprites.ts';
+import { TWO, DOT3, setDot3 } from './sprites.ts';
 import { buildingName, hasBank } from './names.ts';
 import { bangkokClock, seoulClock } from './clock.ts';
 import { unlockAudio, isMuted, setMuted, plunge, chime } from './sfx.ts';
 import * as sfx from './sfx.ts';
 import { bgmMode, setBgmMode, setIndoor, type BgmMode } from './bgm.ts';
-import { applyDeed, karmaPoints, fmtKarma, armorClass, addSoulExp, judge, evilRatio, prayerAnswerChance, restRegenPerMinute, isDanger, DEED_TABLE, newStats, soulExpToNext, maxHp as maxHpFor, POINTS_PER_RANK, STAT_KEYS, STAT_MAX, type DeedKey, type StatKey } from '../../../packages/shared/src/rules.ts';
+import { applyDeed, karmaPoints, fmtKarma, armorClass, addSoulExp, judge, evilRatio, HELL_START, prayerAnswerChance, restRegenPerMinute, isDanger, DEED_TABLE, newStats, soulExpToNext, maxHp as maxHpFor, POINTS_PER_RANK, STAT_KEYS, STAT_MAX, type DeedKey, type StatKey } from '../../../packages/shared/src/rules.ts';
 
 const state = load();
 if (state.realm === 'ghost') { state.realm = 'border'; delete state.pos; } // 24차: 귀신은 없어졌다 — 떠돌던 영혼은 경계의 해변으로
@@ -48,7 +48,7 @@ function newLife(kind?: Arrival) {
   delete state.look;
   state.wallet = 0;
   // 26차: 세계를 건너도 몸에 남는 물건(검은 마스크)은 새 생에도 그대로
-  const cross = (k: string) => !!ITEMS.find((x) => x.key === k)?.cross;
+  const cross = (k: string) => !!itemByKey(k)?.cross;
   const keepBag: Record<string, number> = {}, keepEq: Partial<Record<Slot, string>> = {};
   for (const [k, n] of Object.entries(state.bag ?? {})) if (n > 0 && cross(k)) keepBag[k] = n;
   for (const [slot, k] of Object.entries(state.equip ?? {})) if (k && cross(k)) keepEq[slot as Slot] = k;
@@ -114,7 +114,7 @@ const hellState = () => (state.hell ??= { floor: 1, cleared: [], notes: 0 });
 /** 지금 가방(장착 포함)을 그 세계의 우주새에 봉인한다 */
 function seal(w: 'real' | 'hell') {
   // 25차: 세계를 건너도 몸에 남는 물건(검은 마스크)은 봉인하지 않는다 — 끼고 있던 그대로 따라온다
-  const cross = (k: string) => !!ITEMS.find((x) => x.key === k)?.cross;
+  const cross = (k: string) => !!itemByKey(k)?.cross;
   const keepBag: Record<string, number> = {}, keepEq: Partial<Record<Slot, string>> = {};
   for (const [k, n] of Object.entries(state.bag ?? {})) if (n > 0 && cross(k)) keepBag[k] = n;
   for (const [slot, k] of Object.entries(state.equip ?? {})) if (k && cross(k)) keepEq[slot as Slot] = k;
@@ -181,15 +181,16 @@ function openCage() {
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = close;
   const list = el.querySelector('.menu-list')!;
   const tabs = el.querySelector('.store-tabs')!;
-  let mode: 'take' | 'store' = vaultOf(w) ? 'take' : 'store';
-  const bTake = document.createElement('button'), bStore = document.createElement('button');
-  bTake.textContent = L.cageTakeTab; bStore.textContent = L.cageStoreTab; bStore.className = 'sell';
-  bTake.onclick = () => { mode = 'take'; draw(); }; bStore.onclick = () => { mode = 'store'; draw(); };
-  tabs.append(bTake, bStore);
+  // 30차: 탭 셋 — 맡기기 / 현실 우리 / 지옥 우리. 현실 물건은 현실 우주새에서만, 지옥 물건은 유황새에서만 꺼낸다 (다른 쪽은 보기만)
+  let mode: 'store' | 'real' | 'hell' = vaultOf(w) ? w : 'store';
+  const bStore = document.createElement('button'), bReal = document.createElement('button'), bHell = document.createElement('button');
+  bStore.textContent = L.cageStoreTab; bReal.textContent = L.cageRealTab; bHell.textContent = L.cageHellTab;
+  bStore.onclick = () => { mode = 'store'; draw(); }; bReal.onclick = () => { mode = 'real'; draw(); }; bHell.onclick = () => { mode = 'hell'; draw(); };
+  tabs.append(bStore, bReal, bHell);
   const empty = (txt: string) => { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = txt; list.appendChild(p); };
   const draw = () => {
     list.innerHTML = '';
-    bTake.classList.toggle('on', mode === 'take'); bStore.classList.toggle('on', mode === 'store');
+    bStore.classList.toggle('on', mode === 'store'); bReal.classList.toggle('on', mode === 'real'); bHell.classList.toggle('on', mode === 'hell');
     if (mode === 'store') {
       const bag = state.bag ?? {};
       const worn = new Set(Object.values(state.equip ?? {}));
@@ -212,20 +213,23 @@ function openCage() {
       }
       return;
     }
-    const v = vaultOf(w);
+    const tw = mode, here = tw === w;
+    const v = vaultOf(tw);
+    if (!here) { const p = document.createElement('p'); p.className = 'cage-note'; p.textContent = tw === 'real' ? L.cageOnlyReal : L.cageOnlyHell; list.appendChild(p); } // 비어 있어도 규칙은 알려 준다
     if (!v) { empty(L.cageEmpty); return; }
     const rows: { key: string; it: ItemDef; n: number; ammo?: boolean }[] = Object.entries(v.bag).filter(([k, n]) => n > 0 && stashItem(k)).map(([k, n]) => ({ key: k, it: stashItem(k), n }));
     if (v.ammo > 0) rows.push({ key: 'ammo', it: itemByKey('ammo'), n: Math.ceil(v.ammo / 12), ammo: true });
     for (const r of rows) {
-      const fee = stashFee(r.it, hell);
-      const row = itemRow(r.it, `×${r.n} · ${L.cageFeeEach.replace('{p}', priceText(fee, hell))}`, async () => {
+      const fee = stashFee(r.it, tw === 'hell');
+      const row = itemRow(r.it, here ? `×${r.n} · ${L.cageFeeEach.replace('{p}', priceText(fee, hell))}` : `×${r.n}`, async () => {
+        if (!here) return;
         const n = r.n > 1 ? await askQty(r.it, fee, r.n, 'take') : 1;
         if (n <= 0) return;
         el.remove();
         await parrotFee(r, n, fee * n, hell);
         if (document.body.contains(el)) return;
         openCage();
-      });
+      }, !here);
       list.appendChild(row);
     }
   };
@@ -264,7 +268,7 @@ async function parrotFee(r: { key: string; it: ItemDef; n: number; ammo?: boolea
 }
 
 async function boot() {
-  await app.init({ resizeTo: window, background: '#14110f', antialias: false, autoDensity: true, resolution: Math.min(2, window.devicePixelRatio || 1) });
+  await app.init({ resizeTo: window, background: '#14110f', antialias: false, autoDensity: true, resolution: Math.min(DOT3 ? 3 : 2, window.devicePixelRatio || 1) }); // 31차: 도트 3배 시험 중에는 3배 화면까지
   // 느린 기기: 처음 몇 초 평균이 40fps 아래면 화면 밀도를 1로 낮춘다 (한 번만, 고해상도 휴대폰의 버벅임 줄이기)
   {
     let acc = 0, n = 0, skip = 360; // 불러오는 동안(처음 몇 초)은 세지 않는다
@@ -291,13 +295,17 @@ async function boot() {
   preloadPortrait('miss-hwang');
   // 다시 열면 마지막 자리에서 (현실·천국·귀신은 거리의 그 자리, 가게 안에서 일하던 중이면 그 가게 안에서 계속)
   const pos = state.pos && state.pos.w === realm() ? state.pos : null;
-  if (realm() === 'hell') enterHell(hellState().floor, 'resume');
+  const ghosted = returnedGhost(); // 31차: 살기로 결정하지 않고 며칠 비웠다 — 모르는 사이에 죽었다
+  state.played ??= state.look ? RETURN_PLAYED : 0; // 예전 저장은 오래 한 사람으로 친다
+  state.seen = Date.now();
+  if (ghosted) fallToGoat('returned');
+  else if (realm() === 'hell') enterHell(hellState().floor, 'resume');
   else if (realm() === 'border') enterBorder('resume');
   else if (pos && (state.look || realm() !== 'real')) resumeAt(pos);
   else if (realm() === 'ghost' || realm() === 'heaven') enterWorld(realm() === 'heaven' ? 'door' : undefined);
   else enterShop(false);
   setInterval(updateHud, 1000);
-  setInterval(() => { snapPos(); save(state); }, 4000);
+  setInterval(() => { snapPos(); state.played = (state.played ?? 0) + 4; state.seen = Date.now(); save(state); }, 4000);
   addEventListener('pagehide', () => { snapPos(); save(state); });
   if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior(), store: (k: 'tools' | 'antique', n: string) => openStore(k, n), terrace: () => enterTerrace(), officer: () => talkToOfficer(), pasharTalk: () => talkToPashar(), cage: () => openCage(), parrot: () => talkToParrot(), hstore: (k: HellVendor) => openHellStore(k), soul: () => renderSoul() }; // 개발용 확인 창구
 }
@@ -330,8 +338,35 @@ function restInShop() {
   state.hp = Math.min(max, (state.hp ?? max) + (restRegenPerMinute(max, state.soul?.stats?.fai ?? 1) / 60) * sec);
 }
 
+/** 31차 수쿰빗 필드 보스가 나올 수 있는 구역 · 다시 나올 때까지의 시간 · 구역을 열 때 나올 확률 */
+const FB_REAL: Record<string, { zones: string[]; every: number; chance: number }> = {
+  mafiaboss: { zones: ['bkk-soi8-17', 'bkk-soi20-33', 'bkk-nana', 'bkk-phromphong'], every: 2 * 3600e3, chance: 0.3 },
+  bkkeater: { zones: ['bkk-nana', 'bkk-phromphong'], every: 6 * 3600e3, chance: 0.2 },
+};
+/** 30차 길 안내 칩: 미스 황(황색날개)이 알려 준 곳으로 화살표가 이끄는 동안 위에 뜬다 — ✕로 끈다 */
+function navChip(label: string | null) {
+  document.querySelector('.nav-chip')?.remove();
+  if (!label) return;
+  const b = document.createElement('button');
+  b.className = 'nav-chip';
+  const s1 = document.createElement('span'); s1.textContent = t().navTo.replace('{place}', label);
+  const x = document.createElement('i'); x.textContent = '✕';
+  b.append(s1, x);
+  b.title = t().navOff;
+  b.onclick = () => { world?.clearGuide(); b.remove(); };
+  document.body.appendChild(b);
+}
+// 30차: 가게 안에서도 차오르는 체력이 바로 보이게 — 1초마다 셈하고 체력 막대를 고친다 (예전엔 나갈 때 한 번에 계산)
+setInterval(() => {
+  if (scene !== 'shop' || !shopSince) return;
+  restInShop();
+  shopSince = performance.now();
+  updateHpBar(state.hp ?? maxHp(), maxHp());
+}, 1000);
+
 function enterShop(fromStreet: boolean) {
   scene = 'shop';
+  navChip(null); // 30차: 다른 곳으로 가면 길 안내는 끝
   workLine = '';
   shopSince = performance.now();
   document.querySelector('.store-panel')?.remove(); // 거리 가게·은행 창은 두고 오지 않는다
@@ -510,6 +545,8 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
   if (zh.exit === 'ford' && (h.fed ?? 0) >= GURMA_FULL && !h.cleared.includes(f)) w.gurmaSleep(); // 배불러 잠든 구르마
   w.start();
   if (pendingEater) { pendingEater = false; setTimeout(() => world?.sendEater(), 1500); } // 황혼의 가게에서 훔치다 걸렸다
+  // 31차: 오늘 염소대왕이 놀러 온 층이면 휴식 마을 가장자리 어딘가에 (떨어진 자 앞에는 상담하러 따로 나온다)
+  if (how !== 'fall' && f === goatKingFloor() && !w.goatKingHere) { w.spawnGoatKing(false); if (how !== 'shop' && w.goatKingHere) setTimeout(() => toast(t().gkHeard), 2600); }
   renderHud();
   showStance(true);
   if (how !== 'shop' && how !== 'resume') showPlace(t().hellPlace.replace('{n}', String(f)).replace('{name}', floorDef(f).name[lang()]), floorDef(f).sin[lang()]);
@@ -580,6 +617,7 @@ function leaveShop() {
 
 // ───────────────────────── 거리에서 오는 일 ─────────────────────────
 const hooks: WorldHooks = {
+  goatKing: () => (gkPending ? talkToGoatKing(gkPending.reason, gkPending.want) : talkToGoatKing('wander')),
   notice(text) { toast(text, 'evil'); },
   money(n) {
     state.wallet = (state.wallet ?? 0) + n;
@@ -608,6 +646,46 @@ const hooks: WorldHooks = {
   hp(hp, max) {
     state.hp = Math.max(0, hp);
     updateHpBar(hp, max);
+  },
+  nav(label) {
+    navChip(label);
+  },
+  wear(kind) {
+    wear(kind);
+  },
+  // 31차 필드 보스 — 수쿰빗: 마피아 두목(아속 밖 구역, 2시간마다 다시 나올 수 있다) · 방콕의 대식자(나나·프롬퐁, 6시간).
+  // 구역을 열 때 가끔 나타나고, 나타나면 쓰러질 때까지 그 자리에 남는다. 지옥: 층마다 하루 한 번 (쓰러뜨리면 다음 날)
+  fieldBoss(zoneId) {
+    const out: { key: string; i?: number; j?: number; hp?: number }[] = [];
+    const fb = (state.fb ??= {});
+    if (inHell()) {
+      const key = FIELD_BOSS[hellState().floor];
+      if (!key) return out;
+      const s0 = fb[key];
+      if (s0?.day === today() && s0.dead) return out;
+      if (s0?.day === today() && s0.alive?.zone === zoneId) out.push({ key, ...s0.alive });
+      else out.push({ key });
+      return out;
+    }
+    if (realm() !== 'real') return out;
+    for (const [key, rule] of Object.entries(FB_REAL)) {
+      const s0 = fb[key];
+      if (s0?.alive) { if (s0.alive.zone === zoneId) out.push({ key, ...s0.alive }); continue; }
+      if (!rule.zones.includes(zoneId) || Date.now() < (s0?.due ?? 0)) continue;
+      if (Math.random() < rule.chance) out.push({ key });
+    }
+    return out;
+  },
+  fbossAt(key, i, j, hp) {
+    const fb = (state.fb ??= {});
+    fb[key] = { ...(fb[key] ?? {}), alive: { zone: world?.zone.id ?? '', i, j, hp }, day: today(), dead: false };
+    save(state);
+  },
+  fbossDown(key) {
+    const fb = (state.fb ??= {});
+    fb[key] = { due: Date.now() + (FB_REAL[key]?.every ?? 0), day: today(), dead: true };
+    save(state);
+    toast(t().fbDownToast.replace('{name}', (t().fbName as Record<string, string>)[key] ?? key), 'good');
   },
   over(n) {
     // 21차: 넘치는 체력 — 체력 막대 오른쪽에 금빛 +숫자
@@ -737,13 +815,15 @@ const hooks: WorldHooks = {
     if (!it) return;
     if (key === 'bat' && realm() === 'real') state.batGiven = true;
     addToBag(it);
-    save(state);
     toast(t().lootGot.replace('{item}', it.name[lang()]), 'good');
+    if (key === 'tshard') shardsToTembra(); // 30차: 열세 개면 템브라
+    save(state);
     if (document.querySelector('.bag-panel')) renderBag();
     renderQuick();
   },
   vendor(kind) {
-    openHellStore(kind);
+    if (kind === 'smith') openSmith();
+    else openHellStore(kind);
   },
   homeAlley() {
     // 24차: 서울 달동네 — 집으로 가는 골목 들머리. 처음 한 번은 '내 집이 여기 있다…', 그다음부터는 갈 때마다 망설이는 혼잣말
@@ -1464,7 +1544,7 @@ async function talkToHwang() {
     const it = picked.it, name = it.name[lang()];
     if (picked.steal) {
       // 20차: 우주새에서 훔치기 — 미스 황(황혼)은 몹시 화를 내고 내쫓는다. 걸리면 밖에서 대식자가 기다린다
-      const shelf = ITEMS.filter((x) => x.cat === it.cat && !x.store && !!x.hell === hell).map((x) => ({ it: x, price: x.price }));
+      const shelf = ITEMS.filter((x) => x.cat === it.cat && !x.store && !!x.hell === hell && onSale(x)).map((x) => ({ it: x, price: x.price }));
       const ok = trySteal(it, it.price, shelf);
       if (ok) await dlg.say(L.stealSlip.replace('{item}', name));
       for (const line of (hell ? L.hwFury : L.hwangFury)) await dlg.say(line);
@@ -1631,7 +1711,7 @@ function stealChance(it: ItemDef, price: number, shelf: { it: ItemDef; price: nu
 /** 25차: 검은 마스크를 쓰면 현실과 지옥에서 훔치기 확률이 오른다 */
 function maskSteal() {
   if (realm() !== 'real' && realm() !== 'hell') return 0;
-  return Object.values(state.equip ?? {}).reduce((s, k) => s + (k ? ITEMS.find((x) => x.key === k)?.steal ?? 0 : 0), 0);
+  return Object.values(state.equip ?? {}).reduce((s, k) => s + (k ? itemByKey(k)?.steal ?? 0 : 0), 0);
 }
 /** 훔치기 한 번: 악행은 늘 기록된다. 성공하면 가방에 (그 자리에서 먹는 음식은 먹는다) */
 function trySteal(it: ItemDef, price: number, shelf: { it: ItemDef; price: number }[]) {
@@ -1707,6 +1787,93 @@ async function talkToParrot() {
   endTalk();
 }
 
+// ───────────────────────── 31차 염소대왕 ─────────────────────────
+/**
+ * 지옥에 떨어진 자가 맨 먼저 만나는 상담자. 142층에 살지만 심심하면 층을 옮긴다. 싸우지 않는다.
+ * death = 현실에서 죽어 떨어짐 · chose = 살지 않기로 결정 · returned = 살기로 결정하지 않은 채 며칠 비웠다가 (모르는 사이에 죽었다) ·
+ * wander = 오늘 이 층에 놀러 온 염소대왕에게 말을 건다 (꾸중 없이 묻고 답하기만)
+ */
+let gkPending: { reason: 'death' | 'chose' | 'returned'; want: number } | null = null;
+async function talkToGoatKing(reason: 'death' | 'chose' | 'returned' | 'wander', want = 0) {
+  if (busy || dlg.isOpen) return;
+  if (reason !== 'wander') gkPending = null;
+  const L = t();
+  busy = true;
+  dlg.open({ name: L.gkName, portrait: 'goat-king' });
+  const first = !(state.gk ?? 0);
+  if (reason === 'wander') for (const l of L.gkWander) await dlg.say(l);
+  else {
+    await dlg.say(L.gkArrive);
+    state.gk = (state.gk ?? 0) + 1;
+    save(state);
+    for (const l of first ? L.gkFirst : L.gkAgain) await dlg.say(l);
+    if (reason === 'chose') for (const l of L.gkChose) await dlg.say(l);
+    if (reason === 'returned') for (const l of L.gkReturned) await dlg.say(l);
+    // 꾸중 · 업의 수치 · 이번에 묵을 층
+    const d = state.deeds ?? { good: 0, evil: 0 };
+    const r = Math.round(evilRatio(d) ?? 100);
+    const tier = d.good >= d.evil && d.evil < 1 ? 3 : r >= 80 ? 0 : r >= 60 ? 1 : r > 50 ? 2 : 3;
+    await dlg.say(L.gkScold[tier]);
+    await dlg.say(L.gkKarma.replace('{g}', fmtKarma(d.good)).replace('{e}', fmtKarma(d.evil)).replace('{r}', String(r)));
+    const f = hellState().floor;
+    await dlg.say(L.gkFloor.replace('{n}', String(f)).replace('{name}', floorDef(f).name[lang()]));
+    if (want > f) await dlg.say(L.gkCap.replace('{m}', String(want)).replace('{n}', String(f)));
+    if (first) await dlg.say(L.gkStart);
+    await dlg.say(L.gkAsk);
+  }
+  // 묻고 답하기 (물러날 때까지)
+  for (let n = 0; ; n++) {
+    if (n > 0) await dlg.say(L.gkMore);
+    const c = await dlg.choose(L.gkQ);
+    if (c < 0 || c >= L.gkA.length) break;
+    for (const l of L.gkA[c]) await dlg.say(l);
+  }
+  for (const l of L.gkBye) await dlg.say(l);
+  endTalk();
+  if (reason !== 'wander') world?.goatKingLeave(); // 상담이 끝나면 어둠 속으로 (어느 층으로 갈지는 본인도 모른다)
+}
+/** 떨어진 자 바로 앞에 염소대왕이 몸을 일으키고, 잠시 뒤 말을 건다 */
+function meetGoatKing(reason: 'death' | 'chose' | 'returned', want: number) {
+  if (!inHell() || !world) return;
+  world.spawnGoatKing(true);
+  gkPending = { reason, want };
+  const tryMeet = (n: number) => {
+    if (!inHell() || !gkPending) return;
+    if (busy || dlg.isOpen) { if (n < 30) setTimeout(() => tryMeet(n + 1), 1000); return; }
+    talkToGoatKing(reason, want);
+  };
+  setTimeout(() => tryMeet(0), 1400);
+}
+/** 오늘 염소대왕이 놀러 와 있는 층 (하루에 하나 · 열 날에 셋쯤만 열린 층에 온다, 나머지는 142층에) */
+function goatKingFloor() {
+  let h = 7;
+  for (const ch of today()) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return h % 10 < 3 ? 1 + (h >>> 4) % OPEN_FLOORS : 142;
+}
+/** 살지 않기로 결정 · 며칠 비운 사이 죽음: 죽을 때처럼 돈은 흩어지고 가방은 봉인된다. 지옥(적어도 3층)에서 염소대왕을 만난다 */
+function fallToGoat(reason: 'chose' | 'returned') {
+  closeMenus();
+  document.querySelector('.bag-panel')?.remove();
+  document.querySelector('.store-panel')?.remove();
+  const d = state.deeds ?? { good: 0, evil: 0 };
+  const j = judge(d);
+  const want = Math.max(HELL_START, j.world === 'hell' ? j.floor : HELL_START);
+  seal('real');
+  state.wallet = 0;
+  state.played = Math.max(state.played ?? 0, RETURN_PLAYED);
+  dropInterior();
+  save(state);
+  world?.revive(bodyLook());
+  enterHell(want, 'fall').then(() => meetGoatKing(reason, want));
+}
+const RETURN_AWAY = 3 * 864e5, RETURN_PLAYED = 30 * 60;
+/** 살기로 결정하지 않은(가입하지 않은) 채 거의 하지 않고 나갔다가 며칠 뒤 돌아왔다 */
+function returnedGhost() {
+  if (net.account() || realm() !== 'real') return false;
+  if (state.seen === undefined || state.played === undefined) return false;
+  return Date.now() - state.seen > RETURN_AWAY && state.played < RETURN_PLAYED;
+}
+
 function pickItem(hell: boolean, start: ShopTab): Promise<{ it: ItemDef; sell: boolean; tab: ShopTab; steal?: boolean; ask?: 'dir' | 'work' } | null> {
   const L = t();
   const cats: ShopTab[] = hell ? ['goods', 'weapon', 'armor', 'sell'] : ['goods', 'weapon', 'armor', 'sell', 'ask']; // 무기와 방어구도 처음부터 · 팔기 · 21차 묻기(현실)
@@ -1769,7 +1936,7 @@ function pickItem(hell: boolean, start: ShopTab): Promise<{ it: ItemDef; sell: b
         }
         return;
       }
-      const shelf = ITEMS.filter((x) => x.cat === cat && !x.store && !!x.hell === hell);
+      const shelf = ITEMS.filter((x) => x.cat === cat && !x.store && !!x.hell === hell && onSale(x)); // 31차: 층 장비는 그 층에서만
       for (const it of shelf) list.appendChild(withSteal(itemRow(it, priceText(it.price, hell), () => done({ it, sell: false, tab: cat }), money < it.price), it, it.price, shelf.map((x) => ({ it: x, price: x.price })), () => done({ it, sell: false, tab: cat, steal: true })));
     };
     render();
@@ -1824,10 +1991,7 @@ function askQty(it: ItemDef, unit: number, max: number, verb: 'buy' | 'sell' | '
     draw();
     if (wrap) {
       wrap.className = 'qty-overlay';
-      const ask = document.createElement('p');
-      ask.className = 'qty-ask';
-      ask.textContent = (verb === 'buy' ? L.qtyAsk : verb === 'sell' ? L.qtyAskSell : verb === 'store' ? L.qtyAskStore : L.qtyAskTake).replace('{item}', it.name[lang()]);
-      el.querySelector('.qty-body')!.prepend(ask);
+      // 31차: 작은 창에서는 묻는 말을 빼다 — 제목('몇 개 살까요')과 물건 줄이 이미 같은 말을 한다
       wrap.appendChild(el);
       wrap.onpointerdown = (e) => { if (e.target === wrap) finish(0); };
       document.body.appendChild(wrap);
@@ -1840,21 +2004,22 @@ function askQty(it: ItemDef, unit: number, max: number, verb: 'buy' | 'sell' | '
 /** 29차: 장비(무기·방어구·탄약)는 눌러도 바로 사지지 않는다 — 몇 개 살지 한 번 더 */
 const needsConfirm = (it: ItemDef) => !it.now;
 /** 29차: 모든 가게의 '사기 · 팔기' 탭 (가게 이름 줄 아래) */
-function storeTabs(el: HTMLElement, mode: () => 'buy' | 'sell', set: (m: 'buy' | 'sell') => void) {
+function storeTabs(el: HTMLElement, mode: () => 'buy' | 'sell' | 'repair', set: (m: 'buy' | 'sell' | 'repair') => void, repair = false) {
   const L = t();
   const tabs = document.createElement('div');
   tabs.className = 'menu-tabs store-tabs';
-  const mk = (m: 'buy' | 'sell', label: string) => {
+  const mk = (m: 'buy' | 'sell' | 'repair', label: string) => {
     const b = document.createElement('button');
     b.textContent = label;
     b.className = m === 'sell' ? 'sell' : '';
     b.onclick = () => set(m);
     return b;
   };
-  const bBuy = mk('buy', L.tabBuy), bSell = mk('sell', L.tabSell);
+  const bBuy = mk('buy', L.tabBuy), bSell = mk('sell', L.tabSell), bFix = mk('repair', L.tabRepair);
   tabs.append(bBuy, bSell);
+  if (repair) tabs.appendChild(bFix); // 30차: 철물점은 고쳐 준다
   el.querySelector('.store-line')!.after(tabs);
-  return () => { bBuy.classList.toggle('on', mode() === 'buy'); bSell.classList.toggle('on', mode() === 'sell'); };
+  return () => { bBuy.classList.toggle('on', mode() === 'buy'); bSell.classList.toggle('on', mode() === 'sell'); bFix.classList.toggle('on', mode() === 'repair'); };
 }
 /** 29차: 가게 창의 '팔기' 목록 — 이 세계의 물건만 (현실 가게는 현실 물건 · 지옥 장사꾼은 지옥 물건), 값은 4할 */
 function sellList(list: Element, hell: boolean, redraw: () => void) {
@@ -1965,13 +2130,12 @@ function chooseBody(title: string, confirm: string, initial: Look, extra: { outf
 // 장착 칸은 물건 종류에서 정한다 (목록을 따로 두면 새 무기가 빠진다 — 흑철 대검이 끼워지지 않던 까닭)
 const ARMOR_SLOT: Record<string, Slot> = { helmet: 'head', mask: 'head', jacket: 'body', vest: 'body', gloves: 'hands', workpants: 'legs', shinguard: 'shins', boots: 'feet', shield: 'offhand' };
 function slotOf(k: string): Slot | undefined {
-  const it = ITEMS.find((x) => x.key === k);
+  const it = itemByKey(k);
   if (!it || it.note === 'ammo' || it.note === 'arrows' || it.note === 'rifleammo') return undefined;
   if (it.cat === 'weapon') return 'weapon';
   if (it.cat === 'armor') return ARMOR_SLOT[it.sprite ?? it.key];
   return undefined;
 }
-const itemByKey = (k: string) => ITEMS.find((x) => x.key === k)!;
 
 function addToBag(it: ItemDef) {
   if (it.note === 'ammo' || it.note === 'arrows' || it.note === 'rifleammo') delete state.unloaded; // 새로 사면 다시 끼운다
@@ -1984,19 +2148,137 @@ function addToBag(it: ItemDef) {
 
 /** 20차: 방패는 권총·활·양손 무기와 함께 들 수 없다 */
 const noShieldWith = (k?: string) => { const it = k ? itemByKey(k) : null; return !!it && (!!it.ranged || !!it.two || TWO.has(it.sprite ?? it.key)); };
+// ───────────────────────── 30차: 내구도 · 수리 · 템브라 강화 ─────────────────────────
+/** 장비의 처음 내구도: 칼·연장 140 · 양손 무기 180 · 쏘는 무기 160 · 방어구 160 (지옥 장비도 같다) */
+function duraMax(it: ItemDef) { return it.cat === 'armor' ? 160 : it.two ? 180 : it.ranged ? 160 : 140; }
+function duraOf(k: string) { const it = itemByKey(k); return it ? Math.min(duraMax(it), state.dura?.[k] ?? duraMax(it)) : 0; }
+function broken(k: string) { return (state.dura?.[k] ?? 1) <= 0; }
+/** 싸울 때 닳는다: 내가 때리면 무기 1 · 맞으면 입은 방어구 중 하나가 1 */
+function wear(kind: 'weapon' | 'armor') {
+  const eq = state.equip ?? {};
+  const keys = kind === 'weapon' ? [eq.weapon].filter(Boolean) as string[] : Object.entries(eq).filter(([sl, k]) => sl !== 'weapon' && k).map(([, k]) => k as string);
+  if (!keys.length) return;
+  const k = keys[Math.floor(Math.random() * keys.length)];
+  const it = itemByKey(k);
+  if (!it || it.note === 'fuel') return;
+  const max = duraMax(it), was = duraOf(k);
+  if (was <= 0) return;
+  const now = was - 1;
+  (state.dura ??= {})[k] = now;
+  const L = t();
+  if (now === Math.floor(max * 0.2)) toast(L.duraLow.replace('{item}', it.name[lang()]));
+  if (now === 0) { toast(L.duraBroken.replace('{item}', it.name[lang()]), 'evil'); world?.setGear(gear()); renderAmmo(); }
+}
+/** 수리비: 닳은 만큼 물건 값의 3할 (적어도 ฿20 / 지옥 2닢) */
+function repairCost(k: string) {
+  const it = itemByKey(k);
+  const max = duraMax(it), miss = max - duraOf(k);
+  if (miss <= 0) return 0;
+  return Math.max(it.hell ? 2 : 20, Math.ceil((it.price * 0.3 * miss) / max));
+}
+/** 고칠 것: 입고 있는 것과 가방의 장비 중 닳은 것 (현실 철물점은 현실 물건만 · 지옥 대장간은 지옥 물건만) */
+function repairables(hell: boolean) {
+  const ks = new Set<string>([...Object.values(state.equip ?? {}).filter(Boolean) as string[], ...Object.keys(state.bag ?? {}).filter((k) => (state.bag?.[k] ?? 0) > 0)]);
+  return [...ks].map((k) => itemByKey(k)).filter((it) => it && isGearItem(it) && !!it.hell === hell && it.note !== 'ammo' && it.note !== 'arrows' && it.note !== 'rifleammo' && it.note !== 'fuel' && repairCost(it.key) > 0);
+}
+function repairList(list: Element, hell: boolean, redraw: () => void) {
+  const L = t();
+  const items = repairables(hell);
+  const p0 = document.createElement('p'); p0.className = 'cage-note'; p0.textContent = hell ? L.smithLine : L.repairLine; list.appendChild(p0);
+  if (!items.length) { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = L.repairNothing; list.appendChild(p); return; }
+  for (const it of items) {
+    const cost = repairCost(it.key);
+    const row = itemRow(it, `${L.duraShort.replace('{n}', String(duraOf(it.key))).replace('{m}', String(duraMax(it)))} · ${priceText(cost, hell)}`, () => {
+      const have = hell ? hellState().notes : state.wallet ?? 0;
+      if (have < cost) { toast(hell ? L.hwNoMoney : L.noMoney); return; }
+      if (hell) hellState().notes -= cost; else state.wallet = (state.wallet ?? 0) - cost;
+      delete state.dura![it.key];
+      save(state); updateHud(); world?.setGear(gear()); renderAmmo();
+      toast(L.repaired.replace('{item}', it.name[lang()]), 'good');
+      redraw();
+    }, (hell ? hellState().notes : state.wallet ?? 0) < cost);
+    list.appendChild(row);
+  }
+}
+/** 템브라 강화: +1~+3은 꼭 되고, 그 뒤로는 단계마다 어렵다. 실패해도 장비는 남는다 (템브라만 사라진다). 지옥 장비만, +10까지 */
+const ENH_MAX = 10;
+const ENH_ODDS = [1, 1, 1, 1, 0.7, 0.55, 0.42, 0.32, 0.24, 0.17, 0.12]; // 칸 = 오를 단계
+function enhanceList(list: Element, redraw: () => void) {
+  const L = t();
+  const tem = state.bag?.tembra ?? 0, sh = state.bag?.tshard ?? 0;
+  const p0 = document.createElement('p'); p0.className = 'cage-note'; p0.textContent = L.enhLine.replace('{t}', String(tem)).replace('{s}', String(sh)); list.appendChild(p0);
+  const ks = new Set<string>([...Object.values(state.equip ?? {}).filter(Boolean) as string[], ...Object.keys(state.bag ?? {}).filter((k) => (state.bag?.[k] ?? 0) > 0)]);
+  const items = [...ks].map((k) => itemByKey(k)).filter((it) => it && it.hell && isGearItem(it) && it.note !== 'fuel' && (it.enh ?? 0) < ENH_MAX);
+  if (!items.length) { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = L.enhNothing; list.appendChild(p); return; }
+  for (const it of items) {
+    const next = (it.enh ?? 0) + 1;
+    const odds = ENH_ODDS[next];
+    const row = itemRow(it, L.enhOdds.replace('{n}', String(next)).replace('{p}', String(Math.round(odds * 100))), async () => {
+      if ((state.bag?.tembra ?? 0) < 1) { toast(L.enhNoTembra); return; }
+      if (!(await confirmBox(L.enhAsk.replace('{item}', it.name[lang()]).replace('{n}', String(next)).replace('{p}', String(Math.round(odds * 100))), L.enhGo))) return;
+      if ((state.bag?.tembra ?? 0) < 1) return;
+      state.bag!.tembra -= 1;
+      const base = it.base ?? it.key;
+      if (Math.random() < odds) {
+        const nk = `${base}+${next}`;
+        // 입고 있던 것이면 바꿔 낀다 · 가방에서 하나를 강화한 것으로 바꾼다 · 내구도는 그대로
+        const eq = state.equip ?? {};
+        const slot = Object.entries(eq).find(([, k]) => k === it.key)?.[0] as Slot | undefined;
+        state.bag![it.key] = Math.max(0, (state.bag![it.key] ?? 1) - 1);
+        state.bag![nk] = (state.bag![nk] ?? 0) + 1;
+        if (slot && (state.bag![it.key] ?? 0) < Object.values(eq).filter((x) => x === it.key).length) eq[slot] = nk;
+        if (state.dura?.[it.key] !== undefined) { state.dura[nk] = state.dura[it.key]; if (!(state.bag![it.key] > 0)) delete state.dura[it.key]; }
+        toast(L.enhOk.replace('{item}', itemByKey(nk).name[lang()]), 'good');
+        sfx.chime();
+      } else toast(L.enhFail.replace('{item}', it.name[lang()]), 'evil');
+      save(state); world?.setGear(gear()); renderQuick();
+      redraw();
+    }, (state.bag?.tembra ?? 0) < 1);
+    list.appendChild(row);
+  }
+}
+/** 31차: 유황새가 이 층에서 파는가 (층 장비는 그 층에서만 · 공통 장비는 어디서나) */
+function onSale(it: ItemDef) { return !it.sale || !inHell() || it.sale.includes(hellState().floor); }
+/** 30차: 한 번 더 묻는 작은 창 (예 / 아니오) */
+function confirmBox(text: string, ok: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'qty-overlay';
+    const box = document.createElement('div');
+    box.className = 'shop-menu qty-panel';
+    const p = document.createElement('p'); p.className = 'qty-ask'; p.textContent = text;
+    const row = document.createElement('div'); row.className = 'confirm-row';
+    const no = document.createElement('button'); no.textContent = t().qtyBack;
+    const yes = document.createElement('button'); yes.className = 'q-go'; yes.textContent = ok;
+    const done = (v: boolean) => { wrap.remove(); resolve(v); };
+    no.onclick = () => done(false); yes.onclick = () => done(true);
+    wrap.onpointerdown = (e) => { if (e.target === wrap) done(false); };
+    row.append(no, yes); box.append(p, row); wrap.appendChild(box);
+    document.body.appendChild(wrap);
+  });
+}
+/** 템브라 파편 열세 개가 모이면 저절로 템브라 하나가 된다 */
+function shardsToTembra() {
+  const b = state.bag ?? {};
+  let made = 0;
+  while ((b.tshard ?? 0) >= 13) { b.tshard -= 13; b.tembra = (b.tembra ?? 0) + 1; made++; }
+  if (made) toast(t().tembraMade.replace('{n}', String(made)), 'good');
+}
+
 function gear() {
   const eq0 = state.equip ?? {};
   const eq = eq0.offhand && noShieldWith(eq0.weapon) ? { ...eq0, offhand: undefined } : eq0;
   const w = eq.weapon ? itemByKey(eq.weapon) : null;
+  const wBroken = !!w && broken(w.key); // 30차: 내구도가 바닥난 무기는 맨손 셈 (몸에는 그대로 든다)
   // 쏘는 무기: 권총은 탄약, 활은 화살이 있어야 멀리서 쏜다 (없으면 휘둘러 치는 셈)
   const shots = w?.note === 'needsAmmo' ? state.ammo ?? 0 : w?.note === 'needsArrows' ? state.arrows ?? 0 : w?.note === 'needsRifle' ? state.rifle ?? 0 : w?.note === 'fuel' ? fuelLeft() : 0; // 22차: 지옥의 뼈활·화승총도 · 25차 화염방사기는 오늘 남은 연료
   const ranged = !!w?.ranged && shots > 0 && !(state.unloaded && w.note !== 'fuel'); // 25차: 화살·탄약을 빼 두면 쏘지 않는다
-  const def = Object.entries(eq).reduce((s, [slot, k]) => (slot === 'weapon' || !k ? s : s + (itemByKey(k)?.def ?? 0)), 0);
+  const def = Object.entries(eq).reduce((s, [slot, k]) => (slot === 'weapon' || !k || broken(k) ? s : s + (itemByKey(k)?.def ?? 0)), 0);
   const dr = Object.entries(eq).reduce((s, [, k]) => (!k ? s : s + (itemByKey(k)?.dr ?? 0)), 0);
   const armor = Object.entries(eq).filter(([slot, k]) => slot !== 'weapon' && k && itemByKey(k)).map(([, k]) => itemByKey(k as string).sprite ?? (k as string));
   // 24차: 활과 화살이 공격력을 반씩 나눈다 (활 < 근접 < 총)
   const arrowAtk = w?.note === 'needsArrows' ? itemByKey(state.arrowKey ?? (inHell() ? 'harrows' : 'arrows'))?.atk ?? 3 : 0;
-  return { atk: w?.ranged ? (ranged ? (w.atk ?? 0) + arrowAtk : 1) : w?.atk ?? 0, def, dr, ranged, flame: w?.note === 'fuel', range: w?.range, rate: w?.rate, weapon: w ? w.sprite ?? w.key : null, armor };
+  return { atk: wBroken ? 0 : w?.ranged ? (ranged ? (w.atk ?? 0) + arrowAtk : 1) : w?.atk ?? 0, def, dr, ranged: ranged && !wBroken, flame: w?.note === 'fuel', range: w?.range, rate: w?.rate, weapon: w ? w.sprite ?? w.key : null, armor };
 }
 /** 실시간으로 남에게 보이는 나 */
 function myInfo(): RemoteInfo {
@@ -2028,6 +2310,27 @@ function useItem(k: string) {
   else state.hp = Math.min(maxHp(), (state.hp ?? maxHp()) + it.heal);
   save(state);
   return true;
+}
+/**
+ * 30차 일기장: 읽으면 가장 가까운 우주새로 — 현실은 지금 도시(방콕·서울)의 우주새, 지옥은 그 층의 유황새, 천국은 천국의 우주새.
+ * 이미 우주새 안이거나 경계·귀신이면 쓸 수 없다
+ */
+async function readDiary(k: string) {
+  const L = t();
+  if (busy) return;
+  if (scene === 'shop') { toast(L.diaryHere); return; }
+  if (realm() === 'border' || realm() === 'ghost' || !world || world.isDead) { toast(L.diaryNo); return; }
+  const bag = state.bag ?? {};
+  if (!(bag[k] > 0)) return;
+  bag[k] -= 1;
+  save(state);
+  busy = true;
+  dlg.open({ name: '', monologue: true });
+  await dlg.say(pick(L.diaryRead));
+  dlg.close();
+  busy = false;
+  if (world.zone.interior) dropInterior();
+  enterShop(false);
 }
 let bagDrop: string | null = null; // 버리기를 묻고 있는 물건
 function renderBag() {
@@ -2084,9 +2387,10 @@ function renderBag() {
     const slot = slotOf(k);
     const on = bagTab !== 'gear' && !!slot && state.equip?.[slot] === k; // 장비 탭의 목록은 끼지 않은 여분뿐
     const quick = state.quick === k;
-    const label = it.heal ? (it.key === 'bandage' || it.key === 'hbandage' ? L.use : L.eat) : slot ? (on ? L.unequip : L.equip) : '';
+    const label = it.use ? L.readBook : it.heal ? (it.key === 'bandage' || it.key === 'hbandage' ? L.use : L.eat) : slot ? (on ? L.unequip : L.equip) : '';
     const row = itemRow(it, `${slot ? L.slotNames[slot] + ' · ' : ''}×${bag[k] - (bagTab === 'gear' ? worn(k) : 0)}${on ? ' · ' + L.equipped : ''}`, () => {
       if (bagDrop) { bagDrop = null; renderBag(); return; }
+      if (it.use === 'diary') { el.remove(); void readDiary(k); return; }
       if (it.heal) useItem(k);
       else if (slot) {
         state.equip = state.equip ?? {};
@@ -2188,7 +2492,11 @@ function renderBag() {
         const nm = document.createElement('span'); nm.textContent = it.name[lang()];
         tx.appendChild(nm);
         const st = statOf(it); if (st) tx.appendChild(st);
-        cell.append(ic, tx, offBtn(() => unwear(sl), L.unequip));
+        // 30차 내구도: 칸 아래 가는 막대 (닳으면 주황 · 망가지면 빨강)
+        const dm = duraMax(it), dn = duraOf(it.key);
+        const bar = document.createElement('i'); bar.className = 'dura' + (dn <= 0 ? ' broken' : dn <= dm * 0.2 ? ' low' : '');
+        bar.style.setProperty('--d', `${Math.max(0, Math.round((dn / dm) * 100))}%`);
+        cell.append(ic, tx, offBtn(() => unwear(sl), L.unequip), bar);
         cell.tabIndex = 0; cell.setAttribute('role', 'button');
         cell.onclick = () => pick(sl);
       } else { const nm = document.createElement('span'); nm.className = 'empty'; nm.textContent = '—'; cell.appendChild(nm); }
@@ -2217,7 +2525,8 @@ function renderBag() {
     const selIt = dollSel === 'ammo' ? am[0]?.it : dollSel ? (equip[dollSel] ? itemByKey(equip[dollSel]!) : null) : null;
     if (selIt) {
       const more = effectText(selIt, lang(), true);
-      det.textContent = more || L.dollNoMore;
+      const du = isGearItem(selIt) && dollSel !== 'ammo' && selIt.note !== 'fuel' ? L.duraShort.replace('{n}', String(duraOf(selIt.key))).replace('{m}', String(duraMax(selIt))) : '';
+      det.textContent = [du, more].filter(Boolean).join(' · ') || L.dollNoMore;
     } else {
       const g = gear();
       det.textContent = L.dollTotal.replace('{a}', String(g.atk)).replace('{d}', String(g.def)) + (g.dr ? ' · ' + L.dollDr.replace('{n}', String(g.dr)) : '');
@@ -2451,7 +2760,7 @@ function showDeath(cause: 'car' | 'beaten' | 'hell') {
     // 2단계: 지옥 1~3층이 열렸다. 더 깊은 층으로 떨어질 영혼은 지금 열린 가장 깊은 층으로
     closed.textContent = j.floor > OPEN_FLOORS ? L.hellCap.replaceAll('{m}', String(OPEN_FLOORS)) : '';
     btn.textContent = L.toHell;
-    btn.onclick = () => { el.remove(); world?.revive(bodyLook()); enterHell(j.floor, 'fall'); };
+    btn.onclick = () => { el.remove(); world?.revive(bodyLook()); enterHell(j.floor, 'fall').then(() => meetGoatKing('death', j.floor)); }; // 31차: 떨어지면 염소대왕을 먼저 만난다
   } else if (j.world === 'border') {
     // 24차: 선악이 꼭 같은 영혼 — 귀신 대신 경계의 해변으로
     closed.textContent = L.borderLine;
@@ -2992,8 +3301,8 @@ function openHellStore(kind: HellVendor) {
   const list = el.querySelector('.menu-list')!;
   // 넝마장수의 헌 물건: 날마다 층마다 바뀌는 네 가지 (값 7할)
   const day = Math.floor(Date.now() / 86400000);
-  const used = ITEMS.filter((x) => x.hell && x.cat === 'armor' && !x.store).sort((a, b) => ((a.key.length * 7 + day * 13 + h.floor * 5 + a.price) % 11) - ((b.key.length * 7 + day * 13 + h.floor * 5 + b.price) % 11)).slice(0, 2);
-  let mode: 'buy' | 'sell' = 'buy';
+  const used = ITEMS.filter((x) => x.hell && x.cat === 'armor' && !x.store && onSale(x)).sort((a, b) => ((a.key.length * 7 + day * 13 + h.floor * 5 + a.price) % 11) - ((b.key.length * 7 + day * 13 + h.floor * 5 + b.price) % 11)).slice(0, 2);
+  let mode: 'buy' | 'sell' | 'repair' = 'buy';
   const tabsOn = storeTabs(el, () => mode, (m) => { mode = m; draw(); });
   const draw = () => {
     list.innerHTML = '';
@@ -3013,7 +3322,7 @@ function openHellStore(kind: HellVendor) {
     for (const [it, price] of stock) {
       const row = itemRow(it, priceText(price, true), async () => {
         if (h.notes < price) { toast(L.hwNoMoney); return; }
-        const n = it.cat === 'weapon' || it.cat === 'armor' ? await askQty(it, price, Math.min(9, Math.floor(h.notes / price)), 'buy') : 1; // 29차: 장비는 한 번 더
+        const n = await askQty(it, price, Math.min(it.cat === 'weapon' || it.cat === 'armor' ? 9 : 99, Math.floor(h.notes / price)), 'buy'); // 29차: 장비는 한 번 더 · 31차: 무엇이든 여러 개
         if (n <= 0 || h.notes < price * n) return;
         h.notes -= price * n;
         for (let k = 0; k < n; k++) addToBag(it);
@@ -3023,6 +3332,33 @@ function openHellStore(kind: HellVendor) {
       }, h.notes < price);
       list.appendChild(withSteal(row, it, price, shelf, () => streetSteal(it, price, shelf, el, draw)));
     }
+  };
+  draw();
+  panelAt(el);
+}
+
+/** 30차 지옥 대장간: 지옥 장비를 고치고(노전), 템브라로 강화한다 */
+function openSmith() {
+  closeMenus();
+  document.querySelector('.store-panel')?.remove();
+  const L = t();
+  const el = document.createElement('div');
+  el.className = 'store-panel shop-menu';
+  el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close">✕</button></div><p class="store-line"></p><div class="menu-tabs store-tabs"></div><div class="menu-list"></div>`;
+  el.querySelector('.menu-head b')!.textContent = L.smithName;
+  el.querySelector('.store-line')!.textContent = pick(L.smithHello);
+  (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
+  const list = el.querySelector('.menu-list')!;
+  const tabs = el.querySelector('.store-tabs')!;
+  let mode: 'repair' | 'enh' = 'repair';
+  const bFix = document.createElement('button'), bEnh = document.createElement('button');
+  bFix.textContent = L.tabRepair; bEnh.textContent = L.tabEnhance;
+  bFix.onclick = () => { mode = 'repair'; draw(); }; bEnh.onclick = () => { mode = 'enh'; draw(); };
+  tabs.append(bFix, bEnh);
+  const draw = () => {
+    list.innerHTML = '';
+    bFix.classList.toggle('on', mode === 'repair'); bEnh.classList.toggle('on', mode === 'enh');
+    if (mode === 'repair') repairList(list, true, draw); else enhanceList(list, draw);
   };
   draw();
   panelAt(el);
@@ -3144,7 +3480,7 @@ function renderSettings() {
     <section class="set-sec"><h4 class="h-fight"></h4><div class="set-row"><span class="lbl l-counter"></span><div class="seg s-counter"></div></div><p class="note n-counter"></p></section>
     <section class="set-sec"><h4 class="h-lang"></h4><div class="seg s-lang wide"></div></section>
     <section class="set-sec set-acc"><h4 class="h-acc"></h4><div class="acc"></div></section>
-    ${net.account()?.admin ? `<section class="set-sec set-admin"><h4 class="h-admin"></h4><div class="set-row"><span class="lbl l-inv"></span><div class="seg s-inv"></div></div><div class="set-row"><span class="lbl l-tp"></span><div class="seg s-tp"></div></div><div class="set-row"><span class="lbl l-city"></span><div class="seg s-city"></div></div><div class="set-row"><span class="lbl"></span><button class="tp-heaven"></button></div>${state.adminTrip && state.adminTrip !== realm() ? '<div class="set-row"><span class="lbl"></span><button class="tp-back"></button></div>' : ''}<p class="note n-admin"></p></section>` : ''}`;
+    ${net.account()?.admin ? `<section class="set-sec set-admin"><h4 class="h-admin"></h4><div class="set-row"><span class="lbl l-inv"></span><div class="seg s-inv"></div></div><div class="set-row"><span class="lbl l-tp"></span><div class="seg s-tp"></div></div><div class="set-row"><span class="lbl l-city"></span><div class="seg s-city"></div></div><div class="set-row"><span class="lbl l-dot3"></span><div class="seg s-dot3"></div></div><div class="set-row"><span class="lbl"></span><button class="tp-heaven"></button></div>${state.adminTrip && state.adminTrip !== realm() ? '<div class="set-row"><span class="lbl"></span><button class="tp-back"></button></div>' : ''}<p class="note n-admin"></p></section>` : ''}`;
   el.querySelector('.menu-head b')!.textContent = L.settings;
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
   el.querySelector('.set-sec h4')!.textContent = L.setSound;
@@ -3192,6 +3528,9 @@ function renderSettings() {
     const back = el.querySelector<HTMLButtonElement>('.tp-back');
     if (back) { back.textContent = L.adminBack.replace('{w}', state.adminTrip === 'heaven' ? L.tripHeaven : state.adminTrip === 'ghost' ? L.tripGhost : state.adminTrip === 'hell' ? L.tripHell : L.tripReal); back.onclick = () => adminTeleport('back'); }
     // 25차: 도시 이동 (현실의 우주새 문 앞으로)
+    // 31차: 도트 3배 시험 (주인공·미스 황·황색날개 — 3배로 구운 층이 있는 사람만). 켜고 끄면 다시 연다
+    el.querySelector('.l-dot3')!.textContent = L.adminDot3;
+    seg(el.querySelector('.s-dot3')!, ['off', 'on'], L.adminOpts, () => (DOT3 ? 'on' : 'off'), (v) => { setDot3(v === 'on'); snapPos(); save(state); location.reload(); });
     el.querySelector('.l-city')!.textContent = L.adminCity;
     seg(el.querySelector('.s-city')!, ['bkk', 'seoul'], [L.regions.bkk, L.regions.seoul], () => (realm() === 'real' && !inHell() ? (world?.zone.city === 'seoul' || (world?.zone.interior && street?.zone.city === 'seoul') ? 'seoul' : 'bkk') : ''), (v) => adminTeleport(v === 'seoul' ? 'seoul' : 'bkk'));
     const hv = el.querySelector<HTMLButtonElement>('.tp-heaven')!;
@@ -3475,12 +3814,13 @@ function openStore(kind: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept
   el.querySelector('.store-line')!.textContent = kind === 'tools' ? L.storeTools : kind === 'dept' ? L.storeDept : kind === 'antique' ? L.storeAntique : L.storeLine;
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
   const list = el.querySelector('.menu-list')!;
-  let mode: 'buy' | 'sell' = 'buy';
-  const tabsOn = storeTabs(el, () => mode, (m) => { mode = m; draw(); });
+  let mode: 'buy' | 'sell' | 'repair' = 'buy';
+  const tabsOn = storeTabs(el, () => mode, (m) => { mode = m; draw(); }, kind === 'tools');
   const draw = () => {
     list.innerHTML = '';
     tabsOn();
     if (mode === 'sell') { sellList(list, false, draw); return; }
+    if (mode === 'repair') { repairList(list, false, draw); return; }
     const menu = menuFor(kind, cuisine);
     const shelf = menu.map((m) => ({ it: itemByKey(m.key), price: m.price }));
     for (const { key, price } of menu) {
@@ -3489,7 +3829,8 @@ function openStore(kind: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept
       const row = itemRow(it, priceText(price), async () => {
         if ((state.wallet ?? 0) < price) { toast(L.noMoney); return; }
         // 29차: 무기·방어구 같은 물건은 몇 개 살지 한 번 더 (그 자리에서 먹는 것만 바로)
-        const n = it.cat === 'weapon' || it.cat === 'armor' ? await askQty(it, price, Math.min(9, Math.floor((state.wallet ?? 0) / price)), 'buy') : 1;
+        // 31차: 우주새만이 아니라 모든 가게에서 여러 개 — 그 자리에서 먹는 것만 바로
+        const n = !it.now ? await askQty(it, price, Math.min(it.cat === 'weapon' || it.cat === 'armor' ? 9 : 99, Math.floor((state.wallet ?? 0) / price)), 'buy') : 1;
         if (n <= 0 || (state.wallet ?? 0) < price * n) return;
         state.wallet = (state.wallet ?? 0) - price * n;
         if (it.now) {
@@ -3668,8 +4009,18 @@ function openSignup(tab: 'signup' | 'login' | 'forgot') {
     <label class="pw-row"><span class="l-pw"></span><input class="pw" type="password" autocomplete="new-password" maxlength="72"><small class="r-pw"></small><small class="f-err e-pw"></small></label>
     <label class="pw2-row"><span class="l-pw2"></span><input class="pw2" type="password" autocomplete="new-password" maxlength="72"><small class="f-err e-pw2"></small></label>
     <p class="err"></p><button class="forgot linkish"></button>
-    <div class="row"><button class="go primary"></button><button class="cancel"></button></div></div>`;
+    <div class="row"><button class="go primary"></button><button class="cancel"></button></div>
+    <div class="refuse-row"><button class="refuse"></button><small class="refuse-sub"></small></div></div>`;
   const q = <T extends Element>(s: string) => el.querySelector(s) as T;
+  // 31차: 살기로 결정 ↔ 살지 않기로 결정 (지옥 3층에서 시작 · 염소대왕을 만난다). 현실에서 사는 중일 때만
+  const refuse = q<HTMLButtonElement>('.refuse');
+  refuse.textContent = L.refuseLive; q<HTMLElement>('.refuse-sub').textContent = L.refuseSub;
+  if (realm() !== 'real') q<HTMLElement>('.refuse-row').remove();
+  refuse.onclick = async () => {
+    if (!(await confirmBox(L.refuseAsk, L.refuseGo))) return;
+    el.remove();
+    fallToGoat('chose');
+  };
   const [tSign, tLogin] = el.querySelectorAll('.tabs button') as NodeListOf<HTMLButtonElement>;
   tSign.textContent = L.signupTab; tLogin.textContent = L.loginTab;
   q<HTMLElement>('.l-id').textContent = L.idLabel; q<HTMLElement>('.l-pw').textContent = L.pwLabel; q<HTMLElement>('.l-pw2').textContent = L.pw2Label;

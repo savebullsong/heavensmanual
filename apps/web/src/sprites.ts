@@ -21,7 +21,17 @@ export interface Frame { tex: Texture; ax: number; ay: number; w: number; h: num
 /** 구운 인물 그림의 픽셀 밀도 (sprites/scale.json · 없으면 1) */
 export let PX = 1;
 export const pxReady: Promise<number> = fetch('./sprites/scale.json').then((r) => (r.ok ? r.json() : { px: 1 })).then((j: { px?: number }) => (PX = Math.max(1, Math.min(4, j.px ?? 1)))).catch(() => 1);
+/**
+ * 31차 도트 3배 시험: 켜져 있고(설정 · 주소 ?dot3) 한 사람의 모든 층이 sprites3x/에 3배로 구워져 있으면 그 사람만 3배 그림으로.
+ * 층 하나라도 없으면 그 사람은 원래(2배) 그대로 — 밀도가 다른 층은 섞지 않는다
+ */
+export const DOT3: boolean = (() => { try { return localStorage.getItem('hm.dot3') === '1' || location.search.includes('dot3'); } catch { return false; } })();
+let set3: Set<string> = new Set();
+const set3Ready: Promise<unknown> = DOT3 ? fetch('./sprites3x/index.json').then((r) => (r.ok ? r.json() : [])).then((a: string[]) => (set3 = new Set(a))).catch(() => null) : Promise.resolve();
+export function setDot3(on: boolean) { try { if (on) localStorage.setItem('hm.dot3', '1'); else localStorage.removeItem('hm.dot3'); } catch { /* 무시 */ } }
 export interface CharSet {
+  /** 31차: 이 묶음의 픽셀 밀도 (3배 시험이면 3) */
+  px?: number;
   mode: Mode;
   attack: Anim | null;
   frames: Map<string, Frame>;
@@ -91,14 +101,14 @@ export function dirFromTile(di: number, dj: number, prev: Dir, eight = true): Di
 // ───────────────────────── 층 읽기 ─────────────────────────
 interface Layer { w: number; px: Uint8ClampedArray; meta: Record<string, number[] | null>; /** 이 층의 픽셀 밀도 (_px, 없으면 1) */ lp: number }
 const layers = new Map<string, Promise<Layer | null>>();
-function loadLayer(key: string): Promise<Layer | null> {
-  let p = layers.get(key);
+function loadLayer(key: string, dir = 'sprites'): Promise<Layer | null> {
+  let p = layers.get(dir + '/' + key);
   if (!p) {
     p = (async () => {
       try {
         const [meta, img] = await Promise.all([
-          fetch(`./sprites/${key}.json`).then((r) => (r.ok ? r.json() : null)),
-          new Promise<HTMLImageElement>((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = `./sprites/${key}.png`; }),
+          fetch(`./${dir}/${key}.json`).then((r) => (r.ok ? r.json() : null)),
+          new Promise<HTMLImageElement>((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = `./${dir}/${key}.png`; }),
         ]);
         if (!meta) return null;
         const lp = Math.max(1, (meta._px as number[] | undefined)?.[0] ?? 1);
@@ -112,7 +122,7 @@ function loadLayer(key: string): Promise<Layer | null> {
         return null;
       }
     })();
-    layers.set(key, p);
+    layers.set(dir + '/' + key, p);
   }
   return p;
 }
@@ -216,16 +226,18 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
 
 // ───────────────────────── 합치기 ─────────────────────────
 /** 층을 합칠 때 키우는 배수: 화면 밀도(PX) ÷ 층 밀도 (2배 그림 사이에 1배 층이 섞여도 맞물린다) */
-const up = (L: Layer) => Math.max(1, Math.round(PX / L.lp));
+const up = (L: Layer, P = PX) => Math.max(1, Math.round(P / L.lp));
 const sets = new Map<string, Promise<CharSet>>();
 const MAX_SETS = 32; // 오래 안 쓴 것부터 놓아준다 (거리 사람은 계속 바뀐다 · 2배 그림은 한 벌에 약 3MB)
-export function charSet(look: Look, weapon: string | null = null, armor: string[] = []): Promise<CharSet> {
+/** prio = 주인공·가게 주인처럼 바로 보여야 하는 사람 — 쉬어 가지 않고 한 번에 합친다 (31차: 3배 그림은 거리 사람들 뒤로 밀려 늦게 나타나던 것) */
+export function charSet(look: Look, weapon: string | null = null, armor: string[] = [], prio = false): Promise<CharSet> {
   const keys = layerKeys(look, weapon, armor);
   const id = JSON.stringify([keys, look.skin, look.hairColor, look.top, look.bottom, look.outfit ?? 'casual', look.cols ?? null]);
   let p = sets.get(id);
   if (p) { sets.delete(id); sets.set(id, p); return p; }
-  p = pxReady.then(async () => {
-    const cs = await build(look, keys);
+  p = Promise.all([pxReady, set3Ready]).then(async () => {
+    const all = [keys.base, keys.hair, keys.weapon, ...keys.armor.map((a) => a.key)].filter((k): k is string => !!k);
+    const cs = await build(look, keys, DOT3 && all.every((k) => set3.has(k)) ? 3 : PX, prio);
     // 괴물 몸을 아직 굽지 않았으면 실밥 터진 대식자 몸에 색만 입혀 쓴다
     if (!cs.frames.size && ['ash', 'pret', 'yak', 'ashgal', 'gurma', 'cinder', 'bloat', 'glutton', 'hawker', 'debtor', 'broker', 'forgeknight'].includes(look.outfit ?? '')) return build({ ...look, outfit: 'stitched' }, layerKeys({ ...look, outfit: 'stitched' }, 'needle'));
     return cs;
@@ -235,15 +247,16 @@ export function charSet(look: Look, weapon: string | null = null, armor: string[
   return p;
 }
 
-async function build(look: Look, keys: ReturnType<typeof layerKeys>): Promise<CharSet> {
+async function build(look: Look, keys: ReturnType<typeof layerKeys>, P = PX, prio = false): Promise<CharSet> {
   const t0 = performance.now();
-  const r = await build0(look, keys);
-  const P = ((globalThis as { __perf?: Record<string, [number, number, number]> }).__perf ??= {});
-  const e = (P.charset ??= [0, 0, 0]); e[0]++; const dd = performance.now() - t0; e[1] += dd; e[2] = Math.max(e[2], dd);
+  const r = await build0(look, keys, P, prio);
+  const perf = ((globalThis as { __perf?: Record<string, [number, number, number]> }).__perf ??= {});
+  const e = (perf.charset ??= [0, 0, 0]); e[0]++; const dd = performance.now() - t0; e[1] += dd; e[2] = Math.max(e[2], dd);
   return r;
 }
-async function build0(look: Look, keys: ReturnType<typeof layerKeys>): Promise<CharSet> {
-  const [base, hair, weap, ...arms] = await Promise.all([loadLayer(keys.base), keys.hair ? loadLayer(keys.hair) : null, keys.weapon ? loadLayer(keys.weapon) : null, ...keys.armor.map((a) => loadLayer(a.key))]);
+async function build0(look: Look, keys: ReturnType<typeof layerKeys>, P = PX, prio = false): Promise<CharSet> {
+  const dir = P === 3 && P !== PX ? 'sprites3x' : 'sprites';
+  const [base, hair, weap, ...arms] = await Promise.all([loadLayer(keys.base, dir), keys.hair ? loadLayer(keys.hair, dir) : null, keys.weapon ? loadLayer(keys.weapon, dir) : null, ...keys.armor.map((a) => loadLayer(a.key, dir))]);
   const pal = palette(look);
   // 그리는 순서: 몸 → 옷 방어구 → 머리카락 → 헬멧 → 무기. 방어구는 자기 색을 쓴다
   type Lay = { L: Layer | null; pal: Uint8ClampedArray[] };
@@ -268,16 +281,16 @@ async function build0(look: Look, keys: ReturnType<typeof layerKeys>): Promise<C
     for (const { L } of order) {
       const r = L?.meta[name];
       if (!r) continue;
-      const k = up(L!);
+      const k = up(L!, P);
       x0 = Math.min(x0, r[4] * k); y0 = Math.min(y0, r[5] * k); x1 = Math.max(x1, (r[4] + r[2]) * k); y1 = Math.max(y1, (r[5] + r[3]) * k);
     }
     if (x1 < x0) continue;
     // 외곽선 자리 (2배 그림은 2px). 2배면 상자를 짝수 칸에 맞춰 게임 속 크기·발 기준점이 정수로 떨어지게
-    const al = (v: number, dn: boolean) => (dn ? Math.floor(v / PX) : Math.ceil(v / PX)) * PX;
-    boxes.push({ name, x0: al(x0 - PX, true), y0: al(y0 - PX, true), x1: al(x1 + PX, false), y1: al(y1 + PX, false) });
+    const al = (v: number, dn: boolean) => (dn ? Math.floor(v / P) : Math.ceil(v / P)) * P;
+    boxes.push({ name, x0: al(x0 - P, true), y0: al(y0 - P, true), x1: al(x1 + P, false), y1: al(y1 + P, false) });
   }
   // 선반 쌓기
-  const AW = 512 * PX;
+  const AW = 512 * P;
   let x = 0, y = 0, rowH = 0;
   const place = new Map<string, [number, number]>();
   for (const b of boxes.slice().sort((a, c) => c.y1 - c.y0 - (a.y1 - a.y0))) {
@@ -296,14 +309,14 @@ async function build0(look: Look, keys: ReturnType<typeof layerKeys>): Promise<C
   // 22차: 장면을 합치는 일을 한 프레임에 몰지 않는다 — 4ms마다 한 번 쉬어 가며 (새 사람이 나타날 때 끊기지 않게)
   let slice = performance.now();
   for (const b of boxes) {
-    if (performance.now() - slice > 4) { await new Promise((r) => setTimeout(r, 0)); slice = performance.now(); }
+    if (!prio && performance.now() - slice > 4) { await new Promise((r) => setTimeout(r, 0)); slice = performance.now(); }
     const [px, py] = place.get(b.name)!;
     const w = b.x1 - b.x0, h = b.y1 - b.y0;
     for (const { L, pal } of order) {
       const r = L?.meta[b.name];
       if (!L || !r) continue;
       const [sx, sy, sw, sh, ox, oy] = r;
-      const k = up(L);
+      const k = up(L, P);
       const dx = px + ox * k - b.x0, dy = py + oy * k - b.y0;
       if (k === 1) {
         for (let yy = 0; yy < sh; yy++) {
@@ -333,7 +346,7 @@ async function build0(look: Look, keys: ReturnType<typeof layerKeys>): Promise<C
       }
     }
     // 선택적 외곽선: 바깥 빈칸에 가장 어두운 이웃 색을 더 어둡게 (2배 그림은 두 겹 = 같은 굵기로 보임)
-    for (let pass = 0; pass < PX; pass++) {
+    for (let pass = 0; pass < P; pass++) {
     const add: number[] = [];
     for (let yy = 0; yy < h; yy++)
       for (let xx = 0; xx < w; xx++) {
@@ -363,14 +376,14 @@ async function build0(look: Look, keys: ReturnType<typeof layerKeys>): Promise<C
   g.putImageData(img, 0, 0);
   const src = Texture.from(canvas).source;
   // 2배 그림을 보통 화면(픽셀 밀도 1)에서 반으로 줄이면 '가장 가까운 점'만 골라 깨진다 → 네 점을 섞어 줄인다
-  src.scaleMode = Math.min(2, window.devicePixelRatio || 1) >= PX ? 'nearest' : 'linear';
+  src.scaleMode = Math.min(DOT3 ? 3 : 2, window.devicePixelRatio || 1) >= P ? 'nearest' : 'linear';
   const frames = new Map<string, Frame>();
   const counts: CharSet['counts'] = {};
   for (const b of boxes) {
     const [px, py] = place.get(b.name)!;
     const w = b.x1 - b.x0, h = b.y1 - b.y0;
     const tex = new Texture({ source: src, frame: new Rectangle(px, py, w, h) });
-    frames.set(b.name, { tex, ax: -b.x0 / w, ay: -b.y0 / h, w, h, k: 1 / PX });
+    frames.set(b.name, { tex, ax: -b.x0 / w, ay: -b.y0 / h, w, h, k: 1 / P });
     const [an, , idx] = b.name.split('-');
     const n = Number(idx) + 1;
     if ((counts[an as Anim] ?? 0) < n) counts[an as Anim] = n;
@@ -379,7 +392,7 @@ async function build0(look: Look, keys: ReturnType<typeof layerKeys>): Promise<C
   let attack: Anim | null = keys.two && counts.heavy ? 'heavy' : keys.mode === 'u' ? 'punch' : keys.mode === 'm' ? 'swing' : keys.mode === 'g' ? 'shoot' : null;
   // 그 몸에 그 공격 장면이 없으면 (아직 굽지 않은 차림 등) 있는 공격 장면으로 — 서 있는 그대로 때리지 않게
   if (attack && !counts[attack]) attack = (['punch', 'swing', 'heavy', 'shoot'] as Anim[]).find((a) => counts[a]) ?? attack;
-  return { mode: keys.mode, attack, frames, counts, masks, eight: frames.has('hit-s-0'), hold2: !!keys.two && !!counts.idle2 && !!counts.walk2 };
+  return { px: P, mode: keys.mode, attack, frames, counts, masks, eight: frames.has('hit-s-0'), hold2: !!keys.two && !!counts.idle2 && !!counts.walk2 };
 }
 
 /** 장면 하나 (없으면 서 있는 장면) */
@@ -415,7 +428,7 @@ export function applyFrame(s: { texture: Texture; anchor: { set(x: number, y: nu
 
 /** 미리 불러오기 (첫 장면이 비지 않도록) */
 export function preload(keys: string[]) {
-  return Promise.all(keys.map(loadLayer));
+  return Promise.all(keys.map((k) => loadLayer(k)));
 }
 
 // ───────────────────────── 광채 ─────────────────────────
@@ -430,7 +443,7 @@ export function auraFor(cs: CharSet): Map<Dir, Frame[]> {
     const list = auraFromMask(m.solid, m.w, m.h).map((c) => {
       const tex = Texture.from(c);
       tex.source.scaleMode = 'nearest';
-      return { tex, ax: (-m.ox + AURA_PAD) / W, ay: (-m.oy + AURA_PAD) / H, w: W, h: H, k: 1 / PX };
+      return { tex, ax: (-m.ox + AURA_PAD) / W, ay: (-m.oy + AURA_PAD) / H, w: W, h: H, k: 1 / (cs.px ?? PX) };
     });
     a.set(dir, list);
   }

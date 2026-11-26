@@ -79,6 +79,14 @@ export interface Save {
   debt?: number;
   /** 세계마다 우주새에 봉인된 물건 — 그 세계의 우주새에서 되찾는다 */
   vault?: Partial<Record<'real' | 'hell', Stash>>;
+  /** 30차 내구도: 쓰고 있는 장비(열쇠)마다 남은 내구도 — 없으면 새것 */
+  dura?: Record<string, number>;
+  /** 31차 필드 보스: 나와 있는 자리·체력(alive) · 다시 나올 수 있는 때(due) · 지옥은 그날(day)에 쓰러졌는지(dead) */
+  fb?: Record<string, { alive?: { zone: string; i: number; j: number; hp: number }; due?: number; day?: string; dead?: boolean }>;
+  /** 31차: 염소대왕을 만난 횟수 (영혼) · 마지막으로 머문 때 · 이 기기에서 한 시간(초) */
+  gk?: number;
+  seen?: number;
+  played?: number;
   /** 하루에 한도가 있는 선행 (기도 3 · 읽기 1 · 기부 20) */
   daily?: { d: string; pray: number; read: number; donate: number };
 }

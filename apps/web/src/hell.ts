@@ -18,7 +18,7 @@ export const FLOORS: FloorDef[] = [
  * 25차: 아직 열지 않은 5~13층 계획 (지옥 설정집). 악업 띠 — 1~4층 개인의 죄 · 5~8층 남을 고의로 망가뜨린 죄 · 9~12층 오래 이어진 학대와 조직적 착취 · 13층 절멸.
  * 설정상 지옥은 144층, 지옥의 주인이 사는 어비스까지 이어지지만 지금 계획은 13층까지. 떨어지는 깊이는 packages/shared rules.ts의 hellNeed()
  */
-export const HELL_PLAN: { floor: number; name: string; monsters: string[]; boss: string }[] = [
+export const HELL_PLAN: { floor: number; name: string; monsters: string[]; boss: string; title?: string; karma?: string; land?: string; trial?: string }[] = [
   { floor: 5, name: '가면의 도시', monsters: ['가면귀', '속삭임꾼', '인형병사'], boss: '마르시온' },
   { floor: 6, name: '거울 미궁', monsters: ['유리거미', '모방귀', '파편기사'], boss: '릴미르' },
   { floor: 7, name: '사슬의 감옥해', monsters: ['사슬귀', '익사망령', '검은 간수'], boss: '도르카인' },
@@ -27,7 +27,13 @@ export const HELL_PLAN: { floor: number; name: string; monsters: string[]; boss:
   { floor: 10, name: '부패의 궁정', monsters: ['부패충', '검은 시종', '타락기사'], boss: '모르비아' },
   { floor: 11, name: '무명의 서고', monsters: ['종이망령', '백지귀', '기억수집가'], boss: '에노크라' },
   { floor: 12, name: '왕관 없는 황궁', monsters: ['철면병', '지배귀', '황궁거인'], boss: '타나토르' },
-  { floor: 13, name: '심연의 옥좌', monsters: ['무형귀', '공허거인', '심연의 그림자'], boss: '무형왕' },
+  // 31차: 13층은 예전 설정집대로 — 무형귀(정해진 형태가 없다) · 공허거인(주변의 빛을 삼킨다) · 심연의 그림자(상대의 능력과 모습을 흡수한다)
+  {
+    floor: 13, name: '심연의 옥좌', monsters: ['무형귀', '공허거인', '심연의 그림자'], boss: '무형왕', title: '심연의 지배자',
+    karma: '광범위한 생명과 문명의 의도적인 절멸',
+    land: '빛도 하늘도 없는 무한한 심연. 부서진 대륙의 파편들이 공중에 떠 있고, 중심에 거대한 검은 옥좌',
+    trial: '자신이 파괴한 생명의 무게를 온전히 받아들이고, 처음으로 타인의 생존을 위해 자신을 희생할 것',
+  },
 ];
 export const floorDef = (f: number) => FLOORS[Math.max(1, Math.min(FLOORS.length, f)) - 1];
 
@@ -129,7 +135,14 @@ export const MONSTERS: Record<string, MonsterDef> = Object.fromEntries([
   // 바르칸, 용광로의 장군: 뿔 달린 검은 가시 갑옷, 해골 얼굴에 붉은 눈, 쇠사슬 감긴 철퇴 지팡이, 해진 붉은 망토 (사용자 컨셉 그림)
   M('barkan', 'forgeknight', '바르칸', 'บาร์คาน', 'Barkan', '#2a2422', '#5a0e10', '#ff4a1a', 5400, [34, 48], 0.9, 8, 1.05, 1.6, [520, 640], { boss: true, weapon: 'chainmace', title: { ko: '용광로의 장군', th: 'แม่ทัพแห่งเตาหลอม', en: 'General of the Furnace' }, cols: { 13: '#7a1014', 14: '#5a5250', 15: '#0a0606' } }),
   M('serane', 'serane', '세라네', 'เซราเน', 'Serane', '#5e1a20', '#360a0e', '#e0281e', 4200, [30, 42], 0.8, 6, 1.0, 1.85, [380, 460], { boss: true, weapon: null, title: { ko: '붉은 시장의 주인', th: 'เจ้าตลาดแดง', en: 'Master of the Red Market' } }),
+  // 31차 필드 보스 (사용자 설정집 「지옥 13층 · 필드보스 설정집」): 층주와 다른 희귀 개체 — 하루 한 번, 날마다 다른 자리에. 몸은 있는 것을 빌려 색과 크기로 (전용 모습은 나중에)
+  M('rokk', 'bloat', '로크', 'ร็อก', 'Rokk', '#6e6862', '#3a3430', '#ff8a3a', 6400, [24, 36], 0.95, 8, 1.2, 1.95, [700, 900], { weapon: 'boathook', title: { ko: '재등짐승', th: 'สัตว์หลังเถ้า', en: 'Ashback' }, cols: { 4: '#2a2622', 10: '#5a5450', 14: '#8a8278' } }),
+  M('gulon', 'gurma', '굴론', 'กูลอน', 'Gulon', '#4e5a3a', '#2e3420', '#d8f04a', 7000, [26, 38], 0.9, 8, 1.15, 1.85, [760, 960], { weapon: null, title: { ko: '빈배의 포식자', th: 'ผู้กลืนกินท้องกลวง', en: 'Hollow Maw' } }),
+  M('merk', 'broker', '메르크', 'เมิร์ก', 'Merk', '#6a5a3a', '#2a2018', '#f2c84a', 7600, [28, 40], 0.95, 8, 1.1, 1.8, [820, 1020], { weapon: 'cleaver', title: { ko: '계약포식자', th: 'ผู้กลืนสัญญา', en: 'Contract Eater' }, cols: { 14: '#c9a23e', 13: '#8a1a14' } }),
+  M('ferron', 'forgeknight', '페론', 'เฟอร์รอน', 'Ferron', '#3a3430', '#4a2a1a', '#ff7a1a', 8800, [32, 46], 0.85, 8, 1.15, 2.0, [900, 1150], { weapon: 'greatsword', title: { ko: '용광로의 심장', th: 'หัวใจเตาหลอม', en: 'Furnace Heart' }, cols: { 12: '#ffb04a', 6: '#ff6a1a' } }),
 ].map((m) => [m.key, m]));
+/** 31차: 층마다 하루 한 번 나오는 필드 보스 */
+export const FIELD_BOSS: Record<number, string> = { 1: 'rokk', 2: 'gulon', 3: 'merk', 4: 'ferron' };
 
 // ───────────────────────── 지도 ─────────────────────────
 const TI = Object.fromEntries(TYPES.map((t, k) => [t, k])) as Record<TileType, number>;
@@ -517,6 +530,11 @@ export function hellZone(floor: number): Zone {
     if (vendors.some((v) => v.kind === kind)) continue;
     const at = freeSpot(3, VR - 3);
     if (at) vendors.push({ i: at[0], j: at[1], kind });
+  }
+  // 30차 대장간: 모루와 숯불 화로 옆에 선 대장장이 (지옥 장비 수리 · 템브라 강화)
+  {
+    const at = freeSpot(3, VR - 2, (i, j) => inV(i + 1, j, 1) && !taken(i + 1, j));
+    if (at) { vendors.push({ i: at[0], j: at[1], kind: 'smith' }); props.push({ i: at[0] + 1, j: at[1], kind: 'anvil' }); }
   }
   // 지옥호텔: 매트리스 셋이 한 줄 (사이를 한 칸씩 띄워 밟고 지나갈 수 있다)
   // 좁으면 두 장, 그래도 안 되면 세로로

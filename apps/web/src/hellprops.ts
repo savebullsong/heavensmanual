@@ -219,6 +219,21 @@ export function hellDecor(kind: string, theme: Theme, v: number, o = 0): HPic {
     out = rock(theme, r);
   } else if (kind === 'crack') {
     out = groundMark(theme, r);
+  } else if (kind === 'anvil') {
+    // 30차 대장간: 그루터기 위의 모루 · 달군 쇠 · 숯불 화로 · 기대 놓은 집게
+    const p = pen(30, 34);
+    const cx = 30, by = 56;
+    p.E(cx, by + 3, 26, 6, '#0e0806');
+    p.R(cx - 9, by - 14, 18, 14, '#3a2418'); p.R(cx - 9, by - 14, 4, 14, '#4a3020'); p.E(cx, by - 14, 9, 3, '#5a3a24');
+    p.poly([[cx - 16, by - 24], [cx + 14, by - 24], [cx + 20, by - 21], [cx + 10, by - 18], [cx - 10, by - 18], [cx - 16, by - 21]], '#2a2a2e');
+    p.R(cx - 8, by - 18, 16, 5, '#1e1e22'); p.R(cx - 14, by - 25, 26, 2, '#4a4a52');
+    p.R(cx - 4, by - 27, 9, 3, '#ff7a2a'); p.R(cx - 2, by - 27, 4, 1, '#ffd08a');
+    const fx = cx + 22, fy = by - 2;
+    p.E(fx, fy, 8, 3, '#1a1410'); p.R(fx - 7, fy - 8, 14, 8, '#2a2420'); p.E(fx, fy - 8, 7, 2.5, '#3a1a10');
+    for (let k = 0; k < 8; k++) p.R(fx - 5 + r(k) * 10, fy - 10 - r(k + 9) * 3, 2, 2, k % 2 ? '#ff6a1a' : '#ffb24a');
+    p.L(cx - 20, by - 2, cx - 14, by - 26, 1, '#5a5a62'); p.L(cx - 18, by - 2, cx - 13, by - 25, 1, '#4a4a52');
+    p.finish([22, 12, 8]);
+    out = { canvas: p.c, ax: 0.5, ay: 56 / 70, glow: [22, -10], glowTint: 0xff7a2a };
   } else if (kind === 'mattress') {
     // 22차 지옥호텔: 바깥 공터에 깔아 둔 낡은 매트리스 (얼룩·찢어진 솔기·삐져나온 짚). 층마다 때가 다르다
     const p = pen(64, 42);

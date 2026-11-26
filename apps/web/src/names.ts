@@ -29,7 +29,7 @@ const TYPES: Record<string, [string, string, string]> = {
   tea: ['찻집', 'ร้านชา', 'Tea shop'], cosmetics: ['화장품 가게', 'ร้านเครื่องสำอาง', 'Cosmetics'], bag: ['가방 가게', 'ร้านกระเป๋า', 'Bag shop'],
   watches: ['시계점', 'ร้านนาฬิกา', 'Watch shop'], photo: ['사진관', 'ร้านถ่ายรูป', 'Photo studio'], copyshop: ['복사집', 'ร้านถ่ายเอกสาร', 'Copy shop'],
   second_hand: ['중고품 가게', 'ร้านของมือสอง', 'Second-hand shop'], toys: ['장난감 가게', 'ร้านของเล่น', 'Toy shop'], art: ['화랑', 'แกลเลอรี', 'Art gallery'],
-  shop: ['잡화점', 'ร้านของชำ', 'General store'], // 27차: 간판 없는 가게는 동네 잡화점 (공구·농기구를 판다)
+  shop: ['철물점', 'ร้านวัสดุก่อสร้าง', 'Hardware store'], // 27차: 간판 없는 가게는 공구·농기구를 판다 · 30차: 이름도 철물점 (닳은 장비를 고쳐 준다)
   restaurant: ['식당', 'ร้านอาหาร', 'Restaurant'], fast_food: ['패스트푸드', 'ฟาสต์ฟู้ด', 'Fast food'], food_court: ['푸드코트', 'ศูนย์อาหาร', 'Food court'],
   cafe: ['카페', 'คาเฟ่', 'Café'], bar: ['바', 'บาร์', 'Bar'], pub: ['펍', 'ผับ', 'Pub'], nightclub: ['클럽', 'ไนต์คลับ', 'Nightclub'],
   ice_cream: ['아이스크림 가게', 'ร้านไอศกรีม', 'Ice cream'], internet_cafe: ['PC방', 'ร้านอินเทอร์เน็ต', 'Internet café'],

@@ -58,6 +58,16 @@ button.primary:hover { background: #e0b437; }
 .qty-ask { margin: 0; color: #eadfc8; font-size: 14px; text-align: center; }
 .store-tabs { padding: 0 8px; margin-top: 6px; border-bottom: 1px solid #4f3a28; }
 .store-tabs button.sell { margin-left: 0; }
+.nav-chip { position: fixed; top: 52px; left: 50%; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: 16px; border: 1px solid #8a6a2a; background: rgba(26, 18, 10, 0.88); color: #ffe08a; font: 700 13px system-ui, sans-serif; cursor: pointer; }
+.nav-chip i { font-style: normal; color: #eadfc8; opacity: 0.85; }
+.doll-slot { position: relative; }
+.doll-slot .dura { position: absolute; left: 4px; right: 4px; bottom: 2px; height: 2px; background: rgba(255, 255, 255, 0.12); border-radius: 1px; }
+.doll-slot .dura::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: var(--d); background: #8fcf7a; border-radius: 1px; }
+.doll-slot .dura.low::after { background: #e0a040; }
+.doll-slot .dura.broken::after { background: #d04a3a; width: 100%; opacity: 0.6; }
+.confirm-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+.confirm-row button { padding: 8px 14px; }
+.cage-note { margin: 4px 2px 8px; color: #c9a86a; font-size: 13px; }
 .menu-list { overflow: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
 .menu-item { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; column-gap: 12px; align-items: center; text-align: left; padding: 6px 10px; background: rgba(42, 31, 24, 0.75); border-color: #4f3a28; }
 .menu-item .icon { grid-row: 1 / span 2; width: 32px; height: 32px; image-rendering: pixelated; }
@@ -373,6 +383,11 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 .set-panel .note { margin: 0; font-size: 12.5px; line-height: 1.5; color: #b8a888; }
 .signup .linkish { align-self: flex-start; background: none; border: 0; padding: 0; color: #c9a23e; text-decoration: underline; font-size: 12.5px; display: none; }
 .signup[data-tab="login"] .linkish { display: inline; }
+/* 31차: 살지 않기로 결정 — 가입 탭 맨 아래, 작게 (권하는 길이 아니다) */
+.signup .refuse-row { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; padding-top: 8px; border-top: 1px dashed rgba(201, 162, 62, 0.25); }
+.signup .refuse-row .refuse { align-self: flex-start; background: none; border: 0; padding: 0; color: #b0574a; text-decoration: underline; font-size: 12.5px; cursor: pointer; }
+.signup .refuse-row small { color: #8a8070; font-size: 11.5px; }
+.signup[data-tab="login"] .refuse-row, .signup[data-tab="forgot"] .refuse-row { display: none; }
 .signup[data-tab="forgot"] .pw-row, .signup[data-tab="forgot"] .pw2-row, .signup[data-tab="forgot"] .r-id { display: none; }
 .signup .err.info { color: #d8c8a8; }
 /* 천국으로 떠오르는 장면: 흰 빛과 금빛 줄기가 아래로 스친다 (떠오르는 느낌) */

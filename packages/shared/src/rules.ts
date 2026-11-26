@@ -43,10 +43,12 @@ export function hellNeed(f: number): { e: number; r: number } {
   if (f <= 3) return { e: HELL_EASY[Math.max(0, f - 1)], r: 50 };
   return { e: Math.round(20 * Math.pow(1.42, f - 4)), r: 70 + 2.5 * (f - 4) };
 }
+/** 31차: 지옥은 기본 3층에서 시작한다 (1·2층 시작은 형벌이 너무 가볍다) — 1·2층은 위로 올라가며 지나는 곳 */
+export const HELL_START = 3;
 export function hellDepth(d: Deeds): number {
   const r = evilRatio(d) ?? 0;
-  let floor = 1;
-  for (let f = 2; f <= HELL_FLOORS; f++) { const n = hellNeed(f); if (d.evil >= n.e && r >= n.r) floor = f; else break; }
+  let floor = HELL_START;
+  for (let f = HELL_START + 1; f <= HELL_FLOORS; f++) { const n = hellNeed(f); if (d.evil >= n.e && r >= n.r) floor = f; else break; }
   return floor;
 }
 
@@ -102,6 +104,10 @@ export const DEED_TABLE = {
   robberDown: { kind: 'none', points: 0, exp: 45, note: '강도 처치 (29차: 경험치만)' },
   gangDown: { kind: 'none', points: 0, exp: 60, note: '범죄조직원(마피아) 처치 (29차: 경험치만)' },
   helpNpc: { kind: 'good', points: 3, exp: 40, note: '적대 행인에게 맞서는 사람을 도와 그 적을 쓰러뜨림 (29차)' },
+  // 31차 필드 보스: 경험치만 (설정집: 처치가 카르마 회복이나 상승 시련을 대신하지 않는다)
+  fbossDown: { kind: 'none', points: 0, exp: 300, note: '수쿰빗 필드 보스(마피아 두목) 처치' },
+  fbossFinal: { kind: 'none', points: 0, exp: 900, note: '수쿰빗 최후 보스(방콕의 대식자) 처치' },
+  fbossHell: { kind: 'none', points: 0, exp: 500, note: '지옥 필드 보스 처치' },
   criminalUserDown: { kind: 'good', points: 8, exp: 80, note: '범죄 표시가 된 유저 처치' },
   donate100: { kind: 'good', points: 1, exp: 5, note: '병원·학교 기부 ฿100마다 (하루 20점까지)' },
   pray: { kind: 'good', points: 1, exp: 5, note: '종교시설 기도 (하루 3번)' },
