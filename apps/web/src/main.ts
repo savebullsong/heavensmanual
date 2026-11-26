@@ -252,11 +252,11 @@ async function parrotFee(r: { key: string; it: ItemDef; n: number; ammo?: boolea
     else {
       if (hell) hellState().notes -= fee; else state.wallet = (state.wallet ?? 0) - fee;
       const v = state.vault![w]!;
-      if (r.ammo) { const k = Math.min(v.ammo, n * 12); state.ammo = (state.ammo ?? 0) + k; v.ammo -= k; }
+      if (r.ammo) { const k = Math.min(v.ammo, n * 12); state.ammo = (state.ammo ?? 0) + k; v.ammo -= k; ammoGear(); }
       else {
         v.bag[r.key] = Math.max(0, (v.bag[r.key] ?? 0) - n);
-        if (r.key === 'arrows20') state.arrows = (state.arrows ?? 0) + n * 20;
-        else if (r.key === 'rifleammo') state.rifle = (state.rifle ?? 0) + n * 10;
+        if (r.key === 'arrows20') { state.arrows = (state.arrows ?? 0) + n * 20; ammoGear(); }
+        else if (r.key === 'rifleammo') { state.rifle = (state.rifle ?? 0) + n * 10; ammoGear(); }
         else { state.bag ??= {}; state.bag[r.key] = (state.bag[r.key] ?? 0) + n; }
       }
       if (!vaultOf(w)) delete state.vault![w];
@@ -307,7 +307,7 @@ async function boot() {
   setInterval(updateHud, 1000);
   setInterval(() => { snapPos(); state.played = (state.played ?? 0) + 4; state.seen = Date.now(); save(state); }, 4000);
   addEventListener('pagehide', () => { snapPos(); save(state); });
-  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior(), store: (k: 'tools' | 'antique', n: string) => openStore(k, n), terrace: () => enterTerrace(), officer: () => talkToOfficer(), pasharTalk: () => talkToPashar(), cage: () => openCage(), parrot: () => talkToParrot(), hstore: (k: HellVendor) => openHellStore(k), soul: () => renderSoul() }; // 개발용 확인 창구
+  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior(), store: (k: 'tools' | 'antique', n: string) => openStore(k, n), terrace: () => enterTerrace(), officer: () => talkToOfficer(), pasharTalk: () => talkToPashar(), cage: () => openCage(), parrot: () => talkToParrot(), hstore: (k: HellVendor) => openHellStore(k), soul: () => renderSoul(), give: (k: string) => { addToBag(itemByKey(k)); save(state); }, regear: () => world?.setGear(gear()) }; // 개발용 확인 창구
 }
 
 // ───────────────────────── 장면 전환 ─────────────────────────
@@ -502,7 +502,7 @@ function worldFade(kind: 'hell' | 'heaven', long: boolean) {
   };
 }
 
-async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | 'shop' | 'resume' | 'teleport') {
+async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | 'shop' | 'resume' | 'teleport', goat?: { reason: GkWhy; want: number } | null) {
   const fx = how === 'fall' || how === 'drop' || how === 'down' || how === 'teleport' ? hellFall(how === 'fall' || how === 'drop') : null;
   if (fx) await fx.covered;
   if (how === 'shop') restInShop();
@@ -545,11 +545,12 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
   if (zh.exit === 'ford' && (h.fed ?? 0) >= GURMA_FULL && !h.cleared.includes(f)) w.gurmaSleep(); // 배불러 잠든 구르마
   w.start();
   if (pendingEater) { pendingEater = false; setTimeout(() => world?.sendEater(), 1500); } // 황혼의 가게에서 훔치다 걸렸다
-  // 31차: 오늘 염소대왕이 놀러 온 층이면 휴식 마을 가장자리 어딘가에 (떨어진 자 앞에는 상담하러 따로 나온다)
-  if (how !== 'fall' && f === goatKingFloor() && !w.goatKingHere) { w.spawnGoatKing(false); if (how !== 'shop' && w.goatKingHere) setTimeout(() => toast(t().gkHeard), 2600); }
   renderHud();
   showStance(true);
-  if (how !== 'shop' && how !== 'resume') showPlace(t().hellPlace.replace('{n}', String(f)).replace('{name}', floorDef(f).name[lang()]), floorDef(f).sin[lang()]);
+  // 31차: 떨어진 자는 먼저 142층 염소대왕의 방으로 (상담 중에 창을 닫았으면 다시 열 때도). 방을 나서면 이 층 휴식 마을
+  const gw = goat ?? (how === 'resume' ? state.gkWait ?? null : null);
+  if (gw) openGoatRoom(gw);
+  else if (how !== 'shop' && how !== 'resume') showPlace(t().hellPlace.replace('{n}', String(f)).replace('{name}', floorDef(f).name[lang()]), floorDef(f).sin[lang()]);
   joinNet(w);
   fx?.done();
 }
@@ -558,7 +559,7 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
  * 관리자: 지옥 n층 휴식 마을로 바로 옮겨 간다 (지도 확인용). 지옥 밖(현실·천국·귀신)에서 왔으면 그 세계를 적어 두고
  * '원래 세계로' 단추로 돌아간다 — 환생이 아니라 시찰에서 돌아오는 것이라 몸·돈·업은 그대로다
  */
-function adminTeleport(to: number | 'back' | 'heaven' | 'bkk' | 'seoul') {
+function adminTeleport(to: number | 'back' | 'heaven' | 'bkk' | 'seoul' | 'goat' | 'border') {
   if (!net.account()?.admin || busy || dlg.isOpen) return;
   document.querySelector('.set-panel')?.remove();
   closeMenus();
@@ -568,6 +569,7 @@ function adminTeleport(to: number | 'back' | 'heaven' | 'bkk' | 'seoul') {
     if (!trip || trip === realm()) return;
     delete state.adminTrip;
     if (realm() === 'heaven' && state.heaven?.admin) delete state.heaven;
+    if (realm() === 'border') delete state.border;
     if (trip === 'hell') { enterHell(hellState().floor, 'teleport'); return; }
     state.realm = trip;
     save(state);
@@ -584,6 +586,20 @@ function adminTeleport(to: number | 'back' | 'heaven' | 'bkk' | 'seoul') {
     save(state);
     if (world) { world.destroy(); world = null; net.leaveZone(); }
     enterWorld('door');
+    return;
+  }
+  // 31차: 염소대왕의 방(142층) — 지금 묵는 층(없으면 3층) 휴식 마을 위에 연다. 나서면 그 층으로 떨어진다
+  if (to === 'goat') {
+    if (state.adminTrip === 'hell') delete state.adminTrip;
+    if (inHell() && world) { openGoatRoom(null); return; }
+    void enterHell(hellState().floor || HELL_START, 'teleport').then(() => openGoatRoom(null));
+    return;
+  }
+  // 31차: 경계의 해변 (시찰 중에는 불다가 환생을 재촉하지 않는다)
+  if (to === 'border') {
+    if (realm() === 'border') return;
+    if (world) { world.destroy(); world = null; net.leaveZone(); }
+    void enterBorder('zero');
     return;
   }
   if (to === 'heaven') {
@@ -617,7 +633,12 @@ function leaveShop() {
 
 // ───────────────────────── 거리에서 오는 일 ─────────────────────────
 const hooks: WorldHooks = {
-  goatKing: () => (gkPending ? talkToGoatKing(gkPending.reason, gkPending.want) : talkToGoatKing('wander')),
+  noShots() {
+    const wi = state.equip?.weapon ? itemByKey(state.equip.weapon) : null;
+    const L = t();
+    toast(state.unloaded && wi?.note !== 'fuel' ? L.unloadedToast : wi?.note === 'needsArrows' ? L.noArrows : wi?.note === 'needsRifle' ? L.noRifleAmmo : wi?.note === 'fuel' ? L.fuelOut : L.noAmmo);
+  },
+  goatKing: () => (gkPending ? talkToGoatKing(gkPending.reason, gkPending.want) : talkToGoatKing('visit')),
   notice(text) { toast(text, 'evil'); },
   money(n) {
     state.wallet = (state.wallet ?? 0) + n;
@@ -681,11 +702,11 @@ const hooks: WorldHooks = {
     fb[key] = { ...(fb[key] ?? {}), alive: { zone: world?.zone.id ?? '', i, j, hp }, day: today(), dead: false };
     save(state);
   },
-  fbossDown(key) {
+  fbossDown(key, mine) {
     const fb = (state.fb ??= {});
     fb[key] = { due: Date.now() + (FB_REAL[key]?.every ?? 0), day: today(), dead: true };
     save(state);
-    toast(t().fbDownToast.replace('{name}', (t().fbName as Record<string, string>)[key] ?? key), 'good');
+    if (mine) toast(t().fbDownToast.replace('{name}', (t().fbName as Record<string, string>)[key] ?? key), 'good'); // 31차: 내가 거든 때만 알린다
   },
   over(n) {
     // 21차: 넘치는 체력 — 체력 막대 오른쪽에 금빛 +숫자
@@ -909,12 +930,14 @@ function openRoom(z: Zone, chaser: { monster: boolean; hp: number } | null, work
   renderHud();
   showPlace(z.interior!.name, '');
   if (work) toast(t().workInside);
-  else if (z.interior!.rest && z.interior!.kind !== 'terrace') toast(t().restRoom, 'good');
+  else if (z.interior!.rest && z.interior!.kind !== 'terrace' && z.interior!.kind !== 'goatroom') toast(t().restRoom, 'good');
 }
 
 /** 방의 나가는 매트: 거리의 그 건물 앞으로 (쫓던 대식자는 따라 나온다) */
-function leaveInterior() {
+function leaveInterior(force = false) {
   if (!world?.zone.interior || !street) return;
+  // 31차: 염소대왕의 방은 나가는 매트로 그냥 나가지 않는다 — 상담 전이면 염소대왕이 부르고, 끝났으면 아래로 떨어진다
+  if (!force && world.zone.interior.kind === 'goatroom') { if (gkPending) talkToGoatKing(gkPending.reason, gkPending.want); else leaveGoatRoom(); return; }
   const inner = world;
   const info = inner.zone.interior!;
   const ch = inner.chaserLeft();
@@ -1430,7 +1453,7 @@ function leaveBorder() {
 /** 깨달음 없는 자는 잠깐만: 12분이 지나면 불다가 부른다 */
 const BORDER_STAY = 12 * 60 * 1000;
 setInterval(() => {
-  if (realm() !== 'border' || busy || dlg.isOpen || !state.border) return;
+  if (realm() !== 'border' || busy || dlg.isOpen || !state.border || state.adminTrip) return; // 31차: 관리자 시찰 중에는 재촉하지 않는다
   if (Date.now() - state.border.since > BORDER_STAY) talkToBulda(true);
 }, 5000);
 
@@ -1547,7 +1570,7 @@ async function talkToHwang() {
       const shelf = ITEMS.filter((x) => x.cat === it.cat && !x.store && !!x.hell === hell && onSale(x)).map((x) => ({ it: x, price: x.price }));
       const ok = trySteal(it, it.price, shelf);
       if (ok) await dlg.say(L.stealSlip.replace('{item}', name));
-      for (const line of (hell ? L.hwFury : L.hwangFury)) await dlg.say(line);
+      for (const line of (ok ? (hell ? L.hwFury : L.hwangFury) : (hell ? L.hwCaught : L.hwangCaught))) await dlg.say(line); // 31차: 못 훔쳤으면 '가져가라'는 말 없이
       state.grudge = true;
       if (!ok) pendingEater = true;
       save(state);
@@ -1789,20 +1812,21 @@ async function talkToParrot() {
 
 // ───────────────────────── 31차 염소대왕 ─────────────────────────
 /**
- * 지옥에 떨어진 자가 맨 먼저 만나는 상담자. 142층에 살지만 심심하면 층을 옮긴다. 싸우지 않는다.
+ * 지옥에 떨어진 자가 맨 먼저 오는 곳: 지옥 142층 염소대왕의 방 (판관석 뒤에 앉은 염소대왕). 싸우지 않는다.
  * death = 현실에서 죽어 떨어짐 · chose = 살지 않기로 결정 · returned = 살기로 결정하지 않은 채 며칠 비웠다가 (모르는 사이에 죽었다) ·
- * wander = 오늘 이 층에 놀러 온 염소대왕에게 말을 건다 (꾸중 없이 묻고 답하기만)
+ * visit = 상담이 끝난 뒤나 관리자가 찾아왔을 때 (꾸중 없이 묻고 답하기만). 방을 나서면 카르마에 맞는 층의 휴식 마을로 떨어진다
  */
-let gkPending: { reason: 'death' | 'chose' | 'returned'; want: number } | null = null;
-async function talkToGoatKing(reason: 'death' | 'chose' | 'returned' | 'wander', want = 0) {
+type GkWhy = 'death' | 'chose' | 'returned';
+let gkPending: { reason: GkWhy; want: number } | null = null;
+async function talkToGoatKing(reason: GkWhy | 'visit', want = 0) {
   if (busy || dlg.isOpen) return;
-  if (reason !== 'wander') gkPending = null;
   const L = t();
   busy = true;
   dlg.open({ name: L.gkName, portrait: 'goat-king' });
   const first = !(state.gk ?? 0);
-  if (reason === 'wander') for (const l of L.gkWander) await dlg.say(l);
+  if (reason === 'visit') for (const l of L.gkWander) await dlg.say(l);
   else {
+    gkPending = null;
     await dlg.say(L.gkArrive);
     state.gk = (state.gk ?? 0) + 1;
     save(state);
@@ -1830,25 +1854,36 @@ async function talkToGoatKing(reason: 'death' | 'chose' | 'returned' | 'wander',
   }
   for (const l of L.gkBye) await dlg.say(l);
   endTalk();
-  if (reason !== 'wander') world?.goatKingLeave(); // 상담이 끝나면 어둠 속으로 (어느 층으로 갈지는 본인도 모른다)
+  if (reason !== 'visit') { delete state.gkWait; save(state); leaveGoatRoom(); } // 상담이 끝나면 묵을 층의 휴식 마을로 떨어진다
 }
-/** 떨어진 자 바로 앞에 염소대왕이 몸을 일으키고, 잠시 뒤 말을 건다 */
-function meetGoatKing(reason: 'death' | 'chose' | 'returned', want: number) {
-  if (!inHell() || !world) return;
-  world.spawnGoatKing(true);
-  gkPending = { reason, want };
+/** 142층 염소대왕의 방을 연다 (이 층 휴식 마을 위에 겹쳐 연다 — 나가면 그 휴식 마을). why가 있으면 잠시 뒤 염소대왕이 먼저 말을 건다 */
+function openGoatRoom(g: { reason: GkWhy; want: number } | null) {
+  if (!world || world.zone.interior) return;
+  const zh = world.zone.hell;
+  if (!zh) return;
+  const b: Building = { i0: zh.rest.i, j0: zh.rest.j, w: 1, d: 1, h: 0, cat: 'goatroom', color: '#000000' };
+  openRoom(interiorZone(b, -142, { i: zh.rest.i, j: zh.rest.j }, t().gkRoom), null, false);
+  if (!g) return;
+  gkPending = g;
+  state.gkWait = g; // 상담 중에 창을 닫아도 다시 열면 이 방에서
+  save(state);
   const tryMeet = (n: number) => {
-    if (!inHell() || !gkPending) return;
+    if (!gkPending || world?.zone.interior?.kind !== 'goatroom') return;
     if (busy || dlg.isOpen) { if (n < 30) setTimeout(() => tryMeet(n + 1), 1000); return; }
-    talkToGoatKing(reason, want);
+    talkToGoatKing(gkPending.reason, gkPending.want);
   };
-  setTimeout(() => tryMeet(0), 1400);
+  setTimeout(() => tryMeet(0), 1600);
 }
-/** 오늘 염소대왕이 놀러 와 있는 층 (하루에 하나 · 열 날에 셋쯤만 열린 층에 온다, 나머지는 142층에) */
-function goatKingFloor() {
-  let h = 7;
-  for (const ch of today()) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return h % 10 < 3 ? 1 + (h >>> 4) % OPEN_FLOORS : 142;
+/** 방을 나선다: 아래로 떨어져 묵을 층의 휴식 마을로 */
+function leaveGoatRoom() {
+  if (world?.zone.interior?.kind !== 'goatroom') return;
+  const fx = hellFall(true);
+  fx.covered.then(() => {
+    leaveInterior(true);
+    const f = hellState().floor;
+    showPlace(t().hellPlace.replace('{n}', String(f)).replace('{name}', floorDef(f).name[lang()]), floorDef(f).sin[lang()]);
+    fx.done();
+  });
 }
 /** 살지 않기로 결정 · 며칠 비운 사이 죽음: 죽을 때처럼 돈은 흩어지고 가방은 봉인된다. 지옥(적어도 3층)에서 염소대왕을 만난다 */
 function fallToGoat(reason: 'chose' | 'returned') {
@@ -1864,7 +1899,7 @@ function fallToGoat(reason: 'chose' | 'returned') {
   dropInterior();
   save(state);
   world?.revive(bodyLook());
-  enterHell(want, 'fall').then(() => meetGoatKing(reason, want));
+  enterHell(want, 'fall', { reason, want });
 }
 const RETURN_AWAY = 3 * 864e5, RETURN_PLAYED = 30 * 60;
 /** 살기로 결정하지 않은(가입하지 않은) 채 거의 하지 않고 나갔다가 며칠 뒤 돌아왔다 */
@@ -2138,7 +2173,7 @@ function slotOf(k: string): Slot | undefined {
 }
 
 function addToBag(it: ItemDef) {
-  if (it.note === 'ammo' || it.note === 'arrows' || it.note === 'rifleammo') delete state.unloaded; // 새로 사면 다시 끼운다
+  if (it.note === 'ammo' || it.note === 'arrows' || it.note === 'rifleammo') { delete state.unloaded; ammoGear(); } // 새로 사면 다시 끼운다
   if (it.note === 'rifleammo') { state.rifle = (state.rifle ?? 0) + 10; return; }
   if (it.note === 'ammo') { state.ammo = (state.ammo ?? 0) + 12; return; } // 22차: 지옥 유황 탄환·흑요석 화살도 같은 주머니로
   if (it.note === 'arrows') { state.arrows = (state.arrows ?? 0) + 20; state.arrowKey = it.key; return; } // 24차: 마지막에 산 화살이 시위에 걸린다 (화살 종류마다 공격력이 다르다)
@@ -2146,6 +2181,11 @@ function addToBag(it: ItemDef) {
   state.bag[it.key] = (state.bag[it.key] ?? 0) + 1;
 }
 
+/**
+ * 31차: 화살·탄약이 새로 들어오면 손에 든 무기를 다시 셈한다. 활을 화살 없이 들었다가(휘둘러 치는 셈) 거리 가게·지옥 무기상·보관 우리에서
+ * 화살을 받아도, 다음에 가방을 열기 전까지 계속 붙어서 활로 때리던 것 (싸우다 화살이 떨어진 뒤에도 같았다)
+ */
+function ammoGear() { queueMicrotask(() => { if (world) { world.setGear(gear()); renderAmmo(); } }); }
 /** 20차: 방패는 권총·활·양손 무기와 함께 들 수 없다 */
 const noShieldWith = (k?: string) => { const it = k ? itemByKey(k) : null; return !!it && (!!it.ranged || !!it.two || TWO.has(it.sprite ?? it.key)); };
 // ───────────────────────── 30차: 내구도 · 수리 · 템브라 강화 ─────────────────────────
@@ -2278,7 +2318,7 @@ function gear() {
   const armor = Object.entries(eq).filter(([slot, k]) => slot !== 'weapon' && k && itemByKey(k)).map(([, k]) => itemByKey(k as string).sprite ?? (k as string));
   // 24차: 활과 화살이 공격력을 반씩 나눈다 (활 < 근접 < 총)
   const arrowAtk = w?.note === 'needsArrows' ? itemByKey(state.arrowKey ?? (inHell() ? 'harrows' : 'arrows'))?.atk ?? 3 : 0;
-  return { atk: wBroken ? 0 : w?.ranged ? (ranged ? (w.atk ?? 0) + arrowAtk : 1) : w?.atk ?? 0, def, dr, ranged: ranged && !wBroken, flame: w?.note === 'fuel', range: w?.range, rate: w?.rate, weapon: w ? w.sprite ?? w.key : null, armor };
+  return { atk: wBroken ? 0 : w?.ranged ? (ranged ? (w.atk ?? 0) + arrowAtk : 1) : w?.atk ?? 0, def, dr, ranged: ranged && !wBroken, dry: !!w?.ranged && !wBroken && !ranged, flame: w?.note === 'fuel', range: w?.range, rate: w?.rate, weapon: w ? w.sprite ?? w.key : null, armor };
 }
 /** 실시간으로 남에게 보이는 나 */
 function myInfo(): RemoteInfo {
@@ -2760,7 +2800,7 @@ function showDeath(cause: 'car' | 'beaten' | 'hell') {
     // 2단계: 지옥 1~3층이 열렸다. 더 깊은 층으로 떨어질 영혼은 지금 열린 가장 깊은 층으로
     closed.textContent = j.floor > OPEN_FLOORS ? L.hellCap.replaceAll('{m}', String(OPEN_FLOORS)) : '';
     btn.textContent = L.toHell;
-    btn.onclick = () => { el.remove(); world?.revive(bodyLook()); enterHell(j.floor, 'fall').then(() => meetGoatKing('death', j.floor)); }; // 31차: 떨어지면 염소대왕을 먼저 만난다
+    btn.onclick = () => { el.remove(); world?.revive(bodyLook()); enterHell(j.floor, 'fall', { reason: 'death', want: j.floor }); }; // 31차: 떨어지면 염소대왕을 먼저 만난다
   } else if (j.world === 'border') {
     // 24차: 선악이 꼭 같은 영혼 — 귀신 대신 경계의 해변으로
     closed.textContent = L.borderLine;
@@ -3480,7 +3520,7 @@ function renderSettings() {
     <section class="set-sec"><h4 class="h-fight"></h4><div class="set-row"><span class="lbl l-counter"></span><div class="seg s-counter"></div></div><p class="note n-counter"></p></section>
     <section class="set-sec"><h4 class="h-lang"></h4><div class="seg s-lang wide"></div></section>
     <section class="set-sec set-acc"><h4 class="h-acc"></h4><div class="acc"></div></section>
-    ${net.account()?.admin ? `<section class="set-sec set-admin"><h4 class="h-admin"></h4><div class="set-row"><span class="lbl l-inv"></span><div class="seg s-inv"></div></div><div class="set-row"><span class="lbl l-tp"></span><div class="seg s-tp"></div></div><div class="set-row"><span class="lbl l-city"></span><div class="seg s-city"></div></div><div class="set-row"><span class="lbl l-dot3"></span><div class="seg s-dot3"></div></div><div class="set-row"><span class="lbl"></span><button class="tp-heaven"></button></div>${state.adminTrip && state.adminTrip !== realm() ? '<div class="set-row"><span class="lbl"></span><button class="tp-back"></button></div>' : ''}<p class="note n-admin"></p></section>` : ''}`;
+    ${net.account()?.admin ? `<section class="set-sec set-admin"><h4 class="h-admin"></h4><div class="set-row"><span class="lbl l-inv"></span><div class="seg s-inv"></div></div><div class="set-row"><span class="lbl l-tp"></span><div class="seg s-tp"></div></div><div class="set-row"><span class="lbl l-city"></span><div class="seg s-city"></div></div><div class="set-row"><span class="lbl l-dot3"></span><div class="seg s-dot3"></div></div><div class="set-row"><span class="lbl"></span><button class="tp-heaven"></button></div><div class="set-row"><span class="lbl l-worlds"></span><div class="tp-more"><button class="tp-goat"></button><button class="tp-border"></button></div></div>${state.adminTrip && state.adminTrip !== realm() ? '<div class="set-row"><span class="lbl"></span><button class="tp-back"></button></div>' : ''}<p class="note n-admin"></p></section>` : ''}`;
   el.querySelector('.menu-head b')!.textContent = L.settings;
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
   el.querySelector('.set-sec h4')!.textContent = L.setSound;
@@ -3537,6 +3577,10 @@ function renderSettings() {
     hv.textContent = L.adminHeaven;
     hv.disabled = realm() === 'heaven';
     hv.onclick = () => adminTeleport('heaven');
+    el.querySelector('.l-worlds')!.textContent = L.adminWorlds;
+    const tg = el.querySelector('.tp-goat') as HTMLButtonElement, tb = el.querySelector('.tp-border') as HTMLButtonElement;
+    tg.textContent = L.adminGoat; tg.onclick = () => adminTeleport('goat');
+    tb.textContent = L.adminBorder; tb.onclick = () => adminTeleport('border');
   }
   document.body.appendChild(el);
   const hudBottom = document.getElementById('hud')?.getBoundingClientRect().bottom ?? 56;

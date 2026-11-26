@@ -85,6 +85,8 @@ export interface Save {
   fb?: Record<string, { alive?: { zone: string; i: number; j: number; hp: number }; due?: number; day?: string; dead?: boolean }>;
   /** 31차: 염소대왕을 만난 횟수 (영혼) · 마지막으로 머문 때 · 이 기기에서 한 시간(초) */
   gk?: number;
+  /** 31차: 142층 염소대왕의 방에서 상담을 기다리는 중 (창을 닫았다 열어도 그 방에서) */
+  gkWait?: { reason: 'death' | 'chose' | 'returned'; want: number };
   seen?: number;
   played?: number;
   /** 하루에 한도가 있는 선행 (기도 3 · 읽기 1 · 기부 20) */

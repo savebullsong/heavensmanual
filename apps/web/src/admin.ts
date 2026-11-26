@@ -36,6 +36,7 @@ const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   'sprite-yunae-teen': { name: '유내 · 10대', where: '서울 · 내 집 안 · 밥상 앞에 서 있는 모습 (왼쪽 아래를 봄 · 오른쪽 아래는 좌우 뒤집기 · 걷는 모습은 구운 그림)' },
   'sprite-yunae-20s': { name: '유내 · 20대', where: '서울 · 내 집 대문 앞 · 서 있는 모습 (왼쪽 아래를 봄 · 걸어 나가는 모습은 구운 그림)' },
   'sprite-yunae-30s': { name: '유내 · 30대 후반', where: '서울 · 내 집 안 · 밥상 앞에 서 있는 모습 (왼쪽 아래를 봄 · 걷는 모습은 구운 그림)' },
+  'sprite-goat-king': { name: '염소대왕', where: '지옥 142층 · 판관석 뒤에 앉은 윗몸 (아래쪽은 판관석이 가린다 · 기본 그림과 같은 크기 216×236 · 2배 밀도)' },
   'sprite-talus': { name: '탈루스', where: '지옥 2층 들판 · 산탄총을 든 채 서 있는 모습 (왼쪽 아래를 봄 · 오른쪽 아래는 좌우 뒤집기 · 총을 쏠 때는 구운 그림)' },
   'bld-ujusae': { name: '우주새 건물 · 낮', where: '현실·천국의 우주새 · 바닥 2×2칸' },
   'bld-ujusae-night': { name: '우주새 건물 · 밤', where: '창에 불이 켜진 밤 모습 (비워 두면 낮 그림을 밤에도 씀)' },
@@ -77,7 +78,8 @@ function dotSpec(slot: PortraitSlot): Promise<DotSpec | null> {
         return { canvas: c, w: Math.round(c.width / PX), h: Math.round(c.height / PX), foot: [Math.round((f.ax * f.w) / PX), Math.round((f.ay * f.h) / PX)] };
       }
       const name = slot === 'sprite-parrot' ? 'shop-parrot-0' : 'shop-parrot-1';
-      const im = await new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = `./sprites/${name}.png`; });
+      const im = await new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = slot === 'sprite-goat-king' ? './npc/goat-king.png' : `./sprites/${name}.png`; });
+      if (slot === 'sprite-goat-king') { const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; c.getContext('2d')!.drawImage(im, 0, 0); return { canvas: c, w: Math.round(c.width / 2), h: Math.round(c.height / 2), foot: [Math.round(c.width / 4), Math.round(c.height / 2)] }; }
       const c = document.createElement('canvas');
       c.width = im.width; c.height = im.height;
       c.getContext('2d')!.drawImage(im, 0, 0);

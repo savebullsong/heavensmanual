@@ -416,6 +416,7 @@ export function hellZone(floor: number): Zone {
   for (const b of stalls) {
     const kind: HellVendor | undefined = b.hk === 'butcher' && !vendors.some((v) => v.kind === 'butcher') ? 'butcher' : STALL_KINDS.find((k) => !vendors.some((v) => v.kind === k));
     if (!kind) continue;
+    b.vend = kind;
     vendors.push({ i: b.w >= b.d ? b.i0 + 1 : b.i0 - 1, j: b.w >= b.d ? b.j0 - 1 : b.j0 + 1, kind });
   }
   // 1층 북쪽: 불탄 도시 — 그을린 건물 껍데기가 늘어선 띠, 가운데 골목 끝에 환생 로비 (멀쩡한 현대식 문, 흰 빛)

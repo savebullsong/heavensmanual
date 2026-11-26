@@ -465,7 +465,172 @@ function butcher(b: Building, theme: Theme) {
 }
 
 // ───────── 잡동사니 좌판: 궤짝 위 널판, 기운 천막, 쌓인 해골 잔·녹슨 쇠붙이·누더기·항아리 ─────────
+// ───────── 31차: 장사마다 다른 좌판 — 물장수(나무 가판 · 물통) · 장사꾼(선반 달린 나무 가판 · 줄무늬 차양) · 넝마주이(리어카) · 약장수(보자기 씌운 탁자) · 무기상(나무 거치대) ─────────
+function boxOn(cv: Cv, x0: number, y0: number, x1: number, y1: number, z0: number, z1: number, top: string, left: string, right: string) {
+  const { P, poly } = cv;
+  poly([P(x1, y0, z0), P(x1, y1, z0), P(x1, y1, z1), P(x1, y0, z1)], right);
+  poly([P(x0, y1, z0), P(x1, y1, z0), P(x1, y1, z1), P(x0, y1, z1)], left);
+  poly([P(x0, y0, z1), P(x1, y0, z1), P(x1, y1, z1), P(x0, y1, z1)], top);
+}
+const WOOD = ['#8a6440', '#6a4a2e', '#4e3420'] as const;
+function plank(cv: Cv, x0: number, y0: number, x1: number, y1: number, z0: number, z1: number) {
+  boxOn(cv, x0, y0, x1, y1, z0, z1, WOOD[0], WOOD[1], WOOD[2]);
+  const { P, line } = cv;
+  for (let z = z0 + 3; z < z1 - 1; z += 3) line(P(x0, y1, z), P(x1, y1, z), 1, '#3a2616'); // 널판 결
+}
+/** 물장수: 나무 가판 위 항아리 · 뒤에 쇠테 두른 물통 둘 · 널빤지 지붕 · 물방울 간판 */
+function stallWater(b: Building, cv: Cv) {
+  const { g, P, R, line } = cv;
+  const { i0, j0, w, d } = b, i1 = i0 + w, j1 = j0 + d;
+  for (const [x, y] of [[i0 + 0.35, j0 + 0.35], [i1 - 0.35, j0 + 0.35]] as const) {
+    const [cx, cy] = P(x, y, 0);
+    R(cx - 7, cy - 22, 14, 22, '#6a4a2e'); R(cx - 7, cy - 22, 3, 22, '#4e3420'); R(cx + 4, cy - 22, 3, 22, '#7a5a3a');
+    for (const z of [5, 16]) R(cx - 7, cy - z - 2, 14, 2, '#3a3a40');
+    g.fillStyle = '#4e3420'; g.beginPath(); g.ellipse(cx, cy - 22, 7, 3, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#2a4a4a'; g.beginPath(); g.ellipse(cx, cy - 22, 5.5, 2, 0, 0, Math.PI * 2); g.fill(); // 흐린 물
+  }
+  plank(cv, i0 + 0.05, j0 + 0.55, i1 - 0.05, j1 - 0.02, 0, 14);
+  for (let k = 0; k < w * 2 + d; k++) {
+    const [x, y] = P(i0 + 0.3 + (k / (w * 2 + d)) * (w - 0.5), j0 + 0.55 + (j1 - j0 - 0.6) / 2, 14);
+    g.fillStyle = k % 2 ? '#8a4a2a' : '#7a3a22'; g.beginPath(); g.ellipse(x, y - 4, 3.5, 4.5, 0, 0, Math.PI * 2); g.fill();
+    R(x - 2, y - 9, 4, 2, '#5a2a16'); R(x - 1, y - 6, 1, 2, '#a86a42');
+  }
+  { const [x, y] = P(i1 - 0.25, j1 - 0.3, 14); line([x - 6, y - 1], [x + 2, y - 6], 1.5, '#a8a49c'); g.fillStyle = '#8a8680'; g.beginPath(); g.ellipse(x + 3, y - 6, 2.5, 1.5, 0, 0, Math.PI * 2); g.fill(); } // 국자
+  // 뒤쪽 반만 덮는 널빤지 차양 (앞의 항아리가 보이게)
+  const hb = b.h + 6, hf = b.h, jm = j0 + Math.min(0.55, d * 0.45);
+  for (const [x, y, hh] of [[i0, j0, hb], [i1, j0, hb]] as const) { const [sx, sy] = P(x, y, 0); R(sx - 1, sy - hh, 2, hh, '#3a2616'); }
+  for (let k = 0; k < 5; k++) { const a = i0 - 0.1 + (k / 5) * (w + 0.2), bb = a + (w + 0.2) / 5; cv.poly([P(a, j0 - 0.1, hb + 1), P(bb, j0 - 0.1, hb + 1), P(bb, jm, hf - 1), P(a, jm, hf - 1)], k % 2 ? '#6a4a2e' : '#5a3e26'); }
+  { const [x, y] = P(i0 + w / 2, jm, hf - 1); R(x - 5, y, 1, 4, '#2a1a10'); R(x + 4, y, 1, 4, '#2a1a10'); R(x - 6, y + 4, 12, 9, '#7a5a3a'); R(x - 6, y + 4, 12, 1, '#9a7a52'); g.fillStyle = '#4a8aa8'; g.beginPath(); g.moveTo(x, y + 6); g.quadraticCurveTo(x + 3, y + 10, x, y + 11); g.quadraticCurveTo(x - 3, y + 10, x, y + 6); g.fill(); }
+}
+/** 장사꾼: 나무 진열대(병 · 궤짝 · 천 두루마리) · 한쪽 끝에 선반 달린 높은 나무 가판 · 바랜 줄무늬 차양 (장사꾼은 진열대 뒤에 선다) */
+function stallTrader(b: Building, cv: Cv) {
+  const { P, R } = cv;
+  const { i0, j0, w, d } = b, i1 = i0 + w, j1 = j0 + d;
+  const long = w >= d;
+  const goods = ['#c9a23e', '#3a5a7a', '#8a2a22', '#e8dcc0', '#4a6a3a', '#7a4a8a'];
+  // 끝의 높은 선반 (긴 쪽의 오른쪽 끝 · 세로 좌판은 뒤쪽 끝)
+  const sx0 = long ? i1 - 0.4 : i0, sy0 = j0, sx1 = i1, sy1 = long ? j1 : j0 + 0.4;
+  boxOn(cv, sx0, sy0, sx1, sy1, 0, 34, WOOD[1], WOOD[2], '#3a2616');
+  for (const z of [11, 21, 31]) {
+    for (let k = 0; k < 3; k++) {
+      const t = (k + 0.5) / 3;
+      const [x, y] = long ? P(sx0, sy0 + t * (sy1 - sy0), z) : P(sx0 + t * (sx1 - sx0), sy1, z);
+      const c = goods[(k * 3 + z) % goods.length];
+      if ((k + z) % 3 === 0) { R(x - 1, y - 6, 3, 6, c); R(x, y - 7, 1, 1, '#2a1a10'); } else { R(x - 2, y - 4, 4, 4, c); R(x - 2, y - 4, 4, 1, shade(c, 1.25)); }
+    }
+    cv.poly(long ? [P(sx0, sy0, z), P(sx0, sy1, z), P(sx0, sy1, z - 1.5), P(sx0, sy0, z - 1.5)] : [P(sx0, sy1, z), P(sx1, sy1, z), P(sx1, sy1, z - 1.5), P(sx0, sy1, z - 1.5)], '#a87a4e');
+  }
+  // 진열대
+  const cx1 = long ? sx0 - 0.05 : i1 - 0.05, cy0 = long ? j0 + 0.15 : sy1 + 0.05;
+  plank(cv, i0 + 0.05, cy0, cx1, j1 - 0.05, 0, 12);
+  for (let k = 0; k < 10; k++) {
+    const u = hash(k, 7, i0), v = hash(k, 8, j0);
+    const [x, y] = P(i0 + 0.2 + u * (cx1 - i0 - 0.35), cy0 + 0.15 + v * (j1 - cy0 - 0.3), 12);
+    const c = goods[k % goods.length];
+    if (k % 3 === 0) { R(x - 3, y - 2, 6, 2, c); R(x - 3, y - 3, 6, 1, shade(c, 1.2)); } else if (k % 3 === 1) { R(x - 1, y - 5, 3, 5, c); } else { R(x - 2, y - 3, 4, 3, c); }
+  }
+  const hb = b.h + 4, hf = b.h - 6;
+  for (const [x, y, hh] of [[i0, j1, hf], [i1, j1, hf], [i0, j0, hb]] as const) { const [px, py] = P(x, y, 0); R(px - 1, py - hh, 2, hh, '#3a2616'); }
+  const nS = 6;
+  for (let k = 0; k < nS; k++) { const a = i0 - 0.1 + (k / nS) * (w + 0.2), bb = a + (w + 0.2) / nS; cv.poly([P(a, j0 - 0.05, hb), P(bb, j0 - 0.05, hb), P(bb, j1 + 0.2, hf - 1), P(a, j1 + 0.2, hf - 1)], k % 2 ? '#8a2a22' : '#c8b896'); }
+  for (let k = 0; k <= (w + 0.2) * 6; k++) { const [x, y] = P(i0 - 0.1 + k / 6, j1 + 0.2, hf - 1); R(x, y, 2, 2 + (k % 2), k % 2 ? '#8a2a22' : '#c8b896'); }
+}
+/** 넝마주이: 리어카 — 큰 바퀴 둘 · 앞으로 뻗은 손잡이 · 짐칸에 수북한 고물(녹슨 쇠 · 뼈 · 누더기 · 부러진 우산 · 깡통) */
+function stallCart(b: Building, cv: Cv) {
+  const { g, P, R, line } = cv;
+  const { i0, j0, w, d } = b, i1 = i0 + w, j1 = j0 + d;
+  const long = w >= d;
+  const x0 = i0 + 0.1, y0 = j0 + 0.15, x1 = i1 - (long ? 0.45 : 0.15), y1 = j1 - (long ? 0.15 : 0.45);
+  // 손잡이 (짐칸 끝에서 땅으로)
+  for (const off of [0.15, 0.75]) {
+    if (long) line(P(x1, y0 + off * (y1 - y0) + 0.05, 12), P(i1 + 0.1, y0 + off * (y1 - y0) + 0.05, 3), 2, '#5a4028');
+    else line(P(x0 + off * (x1 - x0) + 0.05, y1, 12), P(x0 + off * (x1 - x0) + 0.05, j1 + 0.1, 3), 2, '#5a4028');
+  }
+  // 고물 더미 (짐칸 위로 봉긋)
+  const junk = ['#6a6660', '#8a4a2a', '#5a5448', '#7a6a4a', '#3a3a40', '#9a8a62', '#a83a22'];
+  for (let k = 0; k < 26; k++) {
+    const u = hash(k, 1, i0), v = hash(k, 2, j0), hgt = 14 + (1 - Math.abs(u - 0.5) * 2) * (1 - Math.abs(v - 0.5) * 2) * 16;
+    const [x, y] = P(x0 + 0.1 + u * (x1 - x0 - 0.2), y0 + 0.1 + v * (y1 - y0 - 0.2), hgt);
+    const c = junk[Math.floor(hash(k, 3, i0 + j0) * junk.length)];
+    const t = k % 6;
+    if (t === 0) skull(cv, x, y - 2, 1);
+    else if (t === 1) line([x - 5, y], [x + 4, y - 4], 1.5, '#7a7670');
+    else if (t === 2) { g.strokeStyle = '#3a3a40'; g.lineWidth = 1; g.beginPath(); g.arc(x, y - 3, 4, 0, Math.PI * 2); g.stroke(); } // 바퀴테
+    else if (t === 3) { R(x - 2, y - 5, 4, 5, '#8a8680'); R(x - 2, y - 5, 4, 1, '#aaa6a0'); } // 깡통
+    else { g.fillStyle = c; g.beginPath(); g.ellipse(x, y - 2, 4 + (k % 3), 2.5, 0, 0, Math.PI * 2); g.fill(); }
+  }
+  { const [x, y] = P(x0 + 0.3, y0 + 0.3, 28); line([x, y], [x + 7, y - 9], 1, '#2a2a2e'); g.fillStyle = '#1e1e24'; g.beginPath(); g.moveTo(x + 7, y - 9); g.lineTo(x + 1, y - 13); g.lineTo(x + 13, y - 11); g.fill(); } // 부러진 우산
+  // 짐칸 옆판 (앞 · 오른쪽)
+  boxOn(cv, x0, y0, x1, y1, 8, 15, '#00000000', WOOD[1], WOOD[2]);
+  cv.poly([P(x0, y1, 15), P(x1, y1, 15), P(x1, y1, 14), P(x0, y1, 14)], WOOD[0]);
+  // 바퀴 (보이는 쪽)
+  const [wx, wy] = long ? P(x0 + (x1 - x0) / 2, y1 + 0.02, 8) : P(x1 + 0.02, y0 + (y1 - y0) / 2, 8);
+  g.fillStyle = '#1e1a16'; g.beginPath(); g.ellipse(wx, wy, 9, 9, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#3a3430'; g.beginPath(); g.ellipse(wx, wy, 6.5, 6.5, 0, 0, Math.PI * 2); g.fill();
+  for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2; line([wx, wy], [wx + Math.cos(a) * 6, wy + Math.sin(a) * 6], 1, '#6a6660'); }
+  R(wx - 1, wy - 1, 3, 3, '#8a8680');
+}
+/** 약장수: 쪽빛 보자기(흰 매듭 무늬 · 붉은 테)를 씌운 탁자 — 약병 · 말린 풀 묶음 · 약사발 · 보자기에 싼 약첩 */
+function stallCloth(b: Building, cv: Cv) {
+  const { g, P, R, line, poly } = cv;
+  const { i0, j0, w, d } = b, i1 = i0 + w, j1 = j0 + d;
+  const tz = 14, x0 = i0 + 0.08, y0 = j0 + 0.2, x1 = i1 - 0.08, y1 = j1 - 0.05;
+  const BLUE = '#26345e', BLUE_D = '#1a2444', BLUE_L = '#34467a';
+  poly([P(x1, y0, 2), P(x1, y1, 2), P(x1, y1, tz), P(x1, y0, tz)], BLUE_D);
+  poly([P(x0, y1, 2), P(x1, y1, 2), P(x1, y1, tz), P(x0, y1, tz)], BLUE);
+  poly([P(x0, y0, tz), P(x1, y0, tz), P(x1, y1, tz), P(x0, y1, tz)], BLUE_L);
+  // 늘어진 단의 붉은 테 · 흰 매듭 무늬 · 모서리 매듭
+  poly([P(x0, y1, 2), P(x1, y1, 2), P(x1, y1, 4), P(x0, y1, 4)], '#a8281e');
+  poly([P(x1, y0, 2), P(x1, y1, 2), P(x1, y1, 4), P(x1, y0, 4)], '#7a1a14');
+  for (let k = 0; k < (x1 - x0) * 4; k++) { const [x, y] = P(x0 + 0.15 + k * 0.25, y1, 9); R(x - 1, y - 1, 3, 1, '#e8e4dc'); R(x, y - 2, 1, 3, '#e8e4dc'); }
+  for (const [x, y] of [[x0, y1], [x1, y1]] as const) { const [cx, cy] = P(x, y, 3); g.fillStyle = BLUE_D; g.beginPath(); g.ellipse(cx, cy + 1, 3, 2, 0, 0, Math.PI * 2); g.fill(); R(cx - 1, cy + 2, 2, 3, BLUE_D); }
+  // 위에 늘어놓은 약
+  const liq = ['#6a9a3a', '#a8281e', '#c9a23e', '#5a7aa8', '#8a4a8a'];
+  for (let k = 0; k < Math.round((x1 - x0) * (y1 - y0) * 7); k++) {
+    const u = hash(k, 5, i0), v = hash(k, 6, j0);
+    const [x, y] = P(x0 + 0.15 + u * (x1 - x0 - 0.3), y0 + 0.15 + v * (y1 - y0 - 0.3), tz);
+    const t = k % 4;
+    if (t === 0) { R(x - 1, y - 6, 3, 6, liq[k % liq.length]); R(x - 1, y - 6, 1, 6, '#ffffff22'); R(x, y - 8, 1, 2, '#6a4a2a'); } // 약병
+    else if (t === 1) { line([x - 4, y], [x + 3, y - 2], 2, '#4a6a2a'); R(x - 1, y - 2, 2, 2, '#8a6a3a'); } // 말린 풀
+    else if (t === 2) { g.fillStyle = '#8a8274'; g.beginPath(); g.ellipse(x, y - 1, 4, 2, 0, 0, Math.PI * 2); g.fill(); line([x + 1, y - 2], [x + 4, y - 6], 1, '#6a6458'); } // 약사발
+    else { R(x - 3, y - 3, 6, 3, '#c8a860'); R(x - 1, y - 5, 2, 2, '#a8281e'); } // 약첩
+  }
+}
+/** 무기상: 낮은 나무 진열대(화살 묶음 · 쇠뇌) · 한쪽 끝에 나무 거치대(걸어 둔 활 · 기대 놓은 창 · 화살통) */
+function stallArms(b: Building, cv: Cv) {
+  const { g, P, R, line } = cv;
+  const { i0, j0, w, d } = b, i1 = i0 + w, j1 = j0 + d;
+  const long = w >= d;
+  // 진열대
+  plank(cv, i0 + 0.05, j0 + 0.15, i1 - 0.05, j1 - 0.05, 0, 9);
+  const L = long ? w : d;
+  for (let k = 0; k < L + 1; k++) { const t = (k + 0.5) / (L + 1); const [x, y] = long ? P(i0 + 0.2 + t * (w - 0.6), j0 + 0.5, 9) : P(i0 + 0.5, j0 + 0.2 + t * (d - 0.6), 9); for (let n = 0; n < 4; n++) line([x - 5, y - n], [x + 5, y - 2 - n], 1, '#c8b48a'); R(x - 1, y - 4, 2, 4, '#3a2616'); } // 화살 묶음
+  { const [x, y] = P(i1 - 0.35, j1 - 0.3, 9); line([x - 6, y - 2], [x + 4, y - 4], 2, '#4e3420'); line([x - 2, y - 7], [x + 1, y + 2], 1.5, '#8a8680'); } // 쇠뇌
+  // 끝의 거치대 (긴 좌판은 왼쪽 끝을 가로질러 · 세로 좌판은 뒤쪽 끝)
+  const A = long ? P(i0 + 0.12, j0 + 0.05, 0) : P(i0 + 0.05, j0 + 0.12, 0), B = long ? P(i0 + 0.12, j1 - 0.05, 0) : P(i1 - 0.05, j0 + 0.12, 0);
+  const up = (p: number[], z: number) => [p[0], p[1] - z] as [number, number];
+  for (const p of [A, B]) line(up(p, 0), up(p, 44), 2, '#4e3420');
+  for (const z of [40, 26]) line(up(A, z), up(B, z), 2, '#6a4a2e');
+  for (let k = 0; k < 4; k++) {
+    const t = 0.15 + k * 0.24, x = A[0] + (B[0] - A[0]) * t, y = A[1] + (B[1] - A[1]) * t;
+    if (k % 2 === 0) { g.strokeStyle = '#7a5a32'; g.lineWidth = 2; g.beginPath(); g.arc(x - 2, y - 30, 9, -Math.PI / 2.2, Math.PI / 2.2); g.stroke(); line([x - 2, y - 38], [x - 2, y - 22], 1, '#d8d0c0'); }
+    else { line([x, y], [x + 3, y - 50], 1.5, '#5a4028'); g.fillStyle = '#a8aeb6'; g.beginPath(); g.moveTo(x + 3, y - 56); g.lineTo(x + 1, y - 49); g.lineTo(x + 5, y - 49); g.fill(); }
+  }
+  { const x = B[0], y = B[1]; R(x - 3, y - 20, 5, 13, '#5a3a22'); for (let k = 0; k < 3; k++) R(x - 2 + k * 1.5, y - 23, 1, 4, k === 1 ? '#c8281e' : '#e8e0d0'); } // 화살통
+}
+
 function stall(b: Building, theme: Theme) {
+  // 31차: 장사꾼이 정해진 좌판은 그 장사의 모양으로
+  if (b.vend === 'water' || b.vend === 'trader' || b.vend === 'junk' || b.vend === 'medic' || b.vend === 'arms') {
+    const cv = canvasFor(b, b.h + 26, 16);
+    if (b.vend === 'water') stallWater(b, cv);
+    else if (b.vend === 'trader') stallTrader(b, cv);
+    else if (b.vend === 'junk') stallCart(b, cv);
+    else if (b.vend === 'medic') stallCloth(b, cv);
+    else stallArms(b, cv);
+    cv.finish();
+    return { canvas: cv.c, x: cv.minX, y: cv.minY };
+  }
   const Hw = b.h;
   const cv = canvasFor(b, Hw + 10, 14);
   const { g, P, poly, R, line, finish } = cv;

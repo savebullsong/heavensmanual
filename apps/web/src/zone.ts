@@ -9,9 +9,12 @@ export type Category =
   | 'hotel' | 'laundry' | 'shop' | 'office' | 'condo' | 'ujusae' | 'loan' | 'generic'
   | 'hbank' | 'atone' | 'rebirth' // 지옥: 지옥 은행 · 속죄의 회당 · (1층 불탄 도시 골목 끝) 환생 로비 입구
   | 'terrace' // 천국: 구름 계단 위 환생의 테라스 (환생관 루엔)
+  | 'goatroom' // 31차 지옥 142층: 염소대왕의 방 (떨어진 자가 맨 먼저 오는 곳)
   | 'home'; // 24차 서울 달동네 골목 끝의 내 집 (유내)
 
 export interface Building {
+  /** 31차: 지옥 좌판에 자리 잡은 장사꾼 (좌판 모양이 장사마다 다르다) */
+  vend?: HellVendor;
   i0: number; j0: number; w: number; d: number; // 바닥 사각형 (타일)
   h: number; // 높이 px
   cat: Category;
