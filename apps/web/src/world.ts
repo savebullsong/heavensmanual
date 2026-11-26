@@ -13,7 +13,7 @@ import { hellDecor } from './hellprops.ts';
 import { smithyChimney } from './hellbuild.ts';
 import { Application, ColorMatrixFilter, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture, TilingSprite } from 'pixi.js';
 import { type Look } from './character.ts';
-import { MISS_HWANG, TALUS_LOOK, MASKGIRL_LOOK, yunaeLook, charSet, frameOf, artDensity, mirrorFrameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, ANIM_FPS, IMPACT, TWO, type CharSet, type Dir, type Anim, type Frame } from './sprites.ts';
+import { MISS_HWANG, TALUS_LOOK, MASKGIRL_LOOK, yunaeLook, charSet, frameOf, artDensity, mirrorFrameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, ANIM_FPS, IMPACT, TWO, type CharSet, type Dir, type Anim, type Frame, BODY_K } from './sprites.ts';
 import { type Zone, type Building, type Lane, type Prop, type HellVendor, type Furn, findPath, walkable, randomWalkTileNear, tileAt, groundAt } from './zone.ts';
 import { iso, TW, TH, drawBuilding, drawGroundChunk, buildingHeight } from './gfx.ts';
 import { beyondOf } from './beyond.ts';
@@ -135,6 +135,7 @@ export type Realm = 'real' | 'ghost' | 'hell' | 'heaven' | 'border'; // 24차: b
 export type Stance = 'talk' | 'hostile' | 'all';
 /** name = 아이디(프로필·신고에 쓰는 열쇠), nick = 게임 속 이름(보이는 이름) */
 export interface RemoteInfo { name: string; nick?: string; look: Look; weapon: string | null; armor: string[]; member: boolean; hidden?: boolean }
+const bk = (w: { size?: number }) => (w.size ?? 1) * BODY_K;
 export interface NetPos { x: number; y: number; d: Dir; m: 0 | 1; a?: Anim; h?: number; c?: 1; k?: 1 }
 interface Walker {
   art?: Texture; // 관리자가 손본 도트 (서 있을 때 남서·남동쪽을 볼 때만 — 남동은 좌우를 뒤집는다)
@@ -2202,7 +2203,7 @@ export class WorldScene {
     w.maxHp = w.hp = 99999;
     w.speed = 0; w.wait = 1e9; w.dir = 'sw';
     const s = new Sprite(batWingTexture(0x4a0c14)); s.anchor.set(0.5, 0.62); s.scale.set(0.5); this.objects.addChild(s); w.wings = s; w.wingK = 1.1;
-    const hn = new Sprite(hornTexture(0xe0d2b4)); hn.anchor.set(0.5, 1); hn.scale.set(0.5); this.objects.addChild(hn); w.horns = hn;
+    const hn = new Sprite(hornTexture(0xe0d2b4)); hn.anchor.set(0.5, 1); hn.scale.set(0.5 * BODY_K); this.objects.addChild(hn); w.horns = hn;
     const tl = new Sprite(devilTailTexture(0xb02a22)); tl.anchor.set(0.08, 0.72); tl.scale.set(0.5); this.objects.addChild(tl); w.devTail = tl;
     this.walkers.push(w);
     return w;
@@ -3126,7 +3127,7 @@ export class WorldScene {
         w.size = 1.5; w.maxHp = w.hp = 99999;
         const arms = (['hammer', 'tongs'] as const).map((tool) => { const a = new Sprite(demonArmTexture(tool)); a.anchor.set(ARM_PIVOT[0] / 84, ARM_PIVOT[1] / 84); this.objects.addChild(a); return a; });
         w.ferum = { arms };
-        const hn = new Sprite(hornTexture(0x6a5a4e)); hn.anchor.set(0.5, 1); hn.scale.set(0.5 * 1.5); this.objects.addChild(hn); w.horns = hn;
+        const hn = new Sprite(hornTexture(0x6a5a4e)); hn.anchor.set(0.5, 1); hn.scale.set(0.5 * 1.5 * BODY_K); this.objects.addChild(hn); w.horns = hn;
       } else if (v.kind === 'succubus') this.dressSuccubus(w, h.floor);
       else if (hasVendorGear(v.kind)) { const under = new Sprite(), over = new Sprite(); this.objects.addChild(under, over); w.pack = { under, over, vend: v.kind }; } // 31차: 장사마다 알아볼 차림
       this.walkers.push(w);
@@ -3344,7 +3345,7 @@ export class WorldScene {
       }
       if (w.sealT && w.sealT > 0) {
         w.sealT -= dt;
-        const [x, y0] = iso(w.x, w.y), y = y0 - 58 * (w.size ?? 1), sp = this.time * 2.2;
+        const [x, y0] = iso(w.x, w.y), y = y0 - 58 * bk(w), sp = this.time * 2.2;
         top.circle(x, y, 8).fill(0x8a1a12).stroke({ color: 0xc9a23e, width: 1.5 });
         top.circle(x, y, 5).stroke({ color: 0xff5a3a, width: 1 });
         for (let k = 0; k < 4; k++) { const an = sp + k * Math.PI / 2; top.moveTo(x, y).lineTo(x + Math.cos(an) * 4.5, y + Math.sin(an) * 4.5).stroke({ color: 0xffb08a, width: 1 }); }
@@ -3757,7 +3758,7 @@ export class WorldScene {
       if (p.t <= 0 || !out(Math.floor(nx), Math.floor(ny)) || (tt !== 'walk' && tt !== 'soi' && tt !== 'cross')) { p.on = false; p.s.visible = false; continue; }
       p.x = nx; p.y = ny; p.ph += dt * 8;
       const dir: Dir = p.dx > 0 ? 'se' : p.dx < 0 ? 'nw' : p.dy > 0 ? 'sw' : 'ne';
-      applyFrame(p.s, frameOf(bl.cs, 'walk', dir, Math.floor(p.ph) % (bl.cs.counts.walk ?? 1)));
+      applyFrame(p.s, frameOf(bl.cs, 'walk', dir, Math.floor(p.ph) % (bl.cs.counts.walk ?? 1)), BODY_K);
       const [sx, sy] = iso(p.x, p.y);
       p.s.position.set(sx, sy); p.s.zIndex = p.x + p.y; p.s.visible = true;
       p.s.alpha = Math.min(0.55, p.t * 0.4);
@@ -4065,7 +4066,7 @@ export class WorldScene {
     for (const q of this.tortures) {
       if (q.free) continue;
       const [sx, sy] = iso(q.tx, q.ty);
-      if (wx < sx - 13 || wx > sx + 13 || wy < sy - 50 || wy > sy + 4) continue;
+      if (wx < sx - 13 || wx > sx + 13 || wy < sy - 50 * BODY_K || wy > sy + 4) continue;
       if (peek) return this.player; // 살펴보기만 (마우스 커서)
       q.free = true;
       q.tor.destroy();
@@ -4091,7 +4092,7 @@ export class WorldScene {
     for (const w of this.walkers) {
       if (w.isPlayer) continue;
       const [sx, sy] = iso(w.x, w.y);
-      const sz = Math.max(1, w.size ?? 1);
+      const sz = Math.max(1, w.size ?? 1) * BODY_K;
       const box = w.down > 0 ? { x0: sx - 22 * k, x1: sx + 22 * k, y0: sy - 14 * k, y1: sy + 8 * k } : { x0: sx - 11 * k * sz, x1: sx + 11 * k * sz, y0: sy - 44 * sz - 6 * k, y1: sy + 6 * k };
       if (wx >= box.x0 && wx <= box.x1 && wy >= box.y0 && wy <= box.y1 && w.x + w.y > bz) { best = w; bz = w.x + w.y; }
     }
@@ -4101,7 +4102,7 @@ export class WorldScene {
     for (const w of this.walkers) {
       if (w.isPlayer || w.down > 0 || !this.isFoe(w)) continue;
       const [sx, sy] = iso(w.x, w.y);
-      const d = Math.hypot(wx - sx, wy - (sy - 20)) - (this.isFoe(w) ? 14 : 0);
+      const d = Math.hypot(wx - sx, wy - (sy - 20 * BODY_K)) - (this.isFoe(w) ? 14 : 0);
       if (d < bd) { bd = d; best = w; }
     }
     return best;
@@ -4168,7 +4169,7 @@ export class WorldScene {
     if (!w.mdef) opts.push({ label: L.act.talk, act: () => this.approach(w, 'talk') });
     opts.push({ label: L.act.look, act: () => this.approach(w, 'look') });
     if (w.kind === 'passer' || w.kind === 'angel' || w.kind === 'yellowwing' || w.kind === 'officer' || w.kind === 'soul' || w.kind === 'vendor' || w.kind === 'fighter') opts.push({ label: L.act.force, danger: true, act: () => (this.realm === 'heaven' ? this.hooks.heavenAct('assault') : this.attack(w)) });
-    this.hooks.menu(this.npcName(w), this.npcSub(w), opts, sx * this.zoom + this.camera.x, (sy - 44) * this.zoom + this.camera.y);
+    this.hooks.menu(this.npcName(w), this.npcSub(w), opts, sx * this.zoom + this.camera.x, (sy - 44 * BODY_K) * this.zoom + this.camera.y);
   }
   /** 36차: 말을 걸 수 있는 사람 (적·쓰러진 이·다른 유저·차는 아니다) */
   private talkable(w: Walker) {
@@ -4278,7 +4279,7 @@ export class WorldScene {
       if (w.down <= 0 && (force || this.stance === 'all' || (this.stance === 'hostile' && hostile))) { this.attack(w); return; }
       if (sword) { this.groundMove(gx, gy); return; }
       const [sx, sy] = iso(w.x, w.y);
-      this.hooks.person(w.rid, w.rinfo, sx * this.zoom + this.camera.x, (sy - 44) * this.zoom + this.camera.y, () => this.attack(w));
+      this.hooks.person(w.rid, w.rinfo, sx * this.zoom + this.camera.x, (sy - 44 * BODY_K) * this.zoom + this.camera.y, () => this.attack(w));
       return;
     }
     if (w && w.down <= 0 && w.kind === 'clerk' && !force) { this.showLabel({ kind: 'w', w }, 2); this.approachClerk(); return; }
@@ -5378,7 +5379,7 @@ export class WorldScene {
       if (q.style !== 'beat') { this.tortureFx(q, dt, sx, sy); }
       if (q.free) { // 고문하던 괴물이 싸우러 나섰다: 망자만 남는다
         if (q.style === 'dunk' || q.style === 'furnace') q.sink = Math.max(0, q.sink - dt * 0.8);
-        if (q.vcs) applyFrame(q.vic, q.lying ? frameOf(q.vcs, 'fall', q.vdir, (q.vcs.counts.fall ?? 1) - 1) : frameOf(q.vcs, 'idle', q.vdir, 0));
+        if (q.vcs) applyFrame(q.vic, q.lying ? frameOf(q.vcs, 'fall', q.vdir, (q.vcs.counts.fall ?? 1) - 1) : frameOf(q.vcs, 'idle', q.vdir, 0), BODY_K);
         if (q.style === 'dunk' || q.style === 'furnace') q.vic.y = sy - 8 + q.sink * 46;
         if (q.spark.alpha > 0) q.spark.alpha = Math.max(0, q.spark.alpha - dt * 5);
         continue;
@@ -5389,8 +5390,8 @@ export class WorldScene {
       const a = (q.t - q.t0) / SW;
       if (q.tcs) {
         const n = q.tcs.counts.swing ?? 0;
-        if (a >= 0 && a < 1 && n) applyFrame(q.tor, frameOf(q.tcs, 'swing', q.tdir, Math.min(n - 1, Math.floor(a * n))), 1.12);
-        else applyFrame(q.tor, frameOf(q.tcs, 'idle', q.tdir, 0), 1.12);
+        if (a >= 0 && a < 1 && n) applyFrame(q.tor, frameOf(q.tcs, 'swing', q.tdir, Math.min(n - 1, Math.floor(a * n))), 1.12 * BODY_K);
+        else applyFrame(q.tor, frameOf(q.tcs, 'idle', q.tdir, 0), 1.12 * BODY_K);
       }
       if (!q.struck && a >= 0.62) {
         q.struck = true;
@@ -5417,16 +5418,16 @@ export class WorldScene {
           q.sink += (target - q.sink) * Math.min(1, dt * 10);
           q.vic.y = sy - 8 + q.sink * 46;
           const writhe = (u > 3.2 && u < 3.9) || (q.style === 'furnace' && q.sink > 0.2);
-          if (writhe && nh) applyFrame(q.vic, frameOf(q.vcs, 'hit', q.vdir, Math.floor(q.t * 8) % nh));
-          else applyFrame(q.vic, frameOf(q.vcs, 'idle', q.vdir, 0));
+          if (writhe && nh) applyFrame(q.vic, frameOf(q.vcs, 'hit', q.vdir, Math.floor(q.t * 8) % nh), BODY_K);
+          else applyFrame(q.vic, frameOf(q.vcs, 'idle', q.vdir, 0), BODY_K);
         } else if (q.lying) {
           const nf = q.vcs.counts.fall ?? 1;
-          applyFrame(q.vic, frameOf(q.vcs, 'fall', q.vdir, nf - 1));
+          applyFrame(q.vic, frameOf(q.vcs, 'fall', q.vdir, nf - 1), BODY_K);
           q.vic.y = sy - (since < 0.12 ? 2 : 0);
         } else {
           const burning = q.style === 'burn' && q.flare > 0.25;
-          if ((since < 0.35 || burning) && nh) applyFrame(q.vic, frameOf(q.vcs, 'hit', q.vdir, burning ? Math.floor(q.t * 7) % nh : Math.min(nh - 1, Math.floor((since / 0.35) * nh))));
-          else applyFrame(q.vic, frameOf(q.vcs, 'idle', q.vdir, 0));
+          if ((since < 0.35 || burning) && nh) applyFrame(q.vic, frameOf(q.vcs, 'hit', q.vdir, burning ? Math.floor(q.t * 7) % nh : Math.min(nh - 1, Math.floor((since / 0.35) * nh))), BODY_K);
+          else applyFrame(q.vic, frameOf(q.vcs, 'idle', q.vdir, 0), BODY_K);
         }
       }
     }
@@ -5451,7 +5452,7 @@ export class WorldScene {
     } else if (q.style === 'dunk') {
       if (q.sink > 0.4 && Math.random() < dt * 8) q.parts.push({ x: sx + (Math.random() - 0.5) * 16, y: sy, vx: 0, vy: -3, t: 0.5, c: 0x5a5236, r: 1.6, ring: true });
       if (q.sink < 0.2 && q.t - q.t0 > 3 && q.t - q.t0 < 4.5 && Math.random() < dt * 10) q.parts.push({ x: sx + (Math.random() - 0.5) * 8, y: q.vic.y - 20 - Math.random() * 20, vx: 0, vy: 40, t: 0.4, c: 0x3a3220, r: 1.2 });
-      const ropeTop = sy - 94, head = q.vic.y - 46;
+      const ropeTop = sy - 94, head = q.vic.y - 46 * BODY_K;
       g.moveTo(sx, ropeTop).lineTo(sx, head).stroke({ color: 0x8a7a5a, width: 1.5 });
       g.ellipse(sx, sy + 1, 25 * (0.9 + 0.1 * Math.sin(T * 2)), 9).stroke({ color: 0x4a4228, width: 1, alpha: 0.6 });
     } else if (q.style === 'furnace') {
@@ -5459,7 +5460,7 @@ export class WorldScene {
       g.ellipse(sx, sy - 6, 34, 18).fill({ color: 0xff6a1a, alpha: 0.08 + glow * 0.12 });
       if (Math.random() < dt * (5 + q.sink * 40)) q.parts.push({ x: sx + (Math.random() - 0.5) * 30, y: sy, vx: (Math.random() - 0.5) * 50, vy: -40 - Math.random() * 60, t: 0.9, c: Math.random() < 0.6 ? 0xffd060 : 0xff6a1a, r: 1.2 });
       if (q.sink > 0.3 && Math.random() < dt * 6) q.parts.push({ x: sx + (Math.random() - 0.5) * 12, y: sy - 20, vx: (Math.random() - 0.5) * 8, vy: -22, t: 1.6, c: 0x4a4444, r: 3, smoke: true });
-      const top = sy - 94, head = q.vic.y - 46;
+      const top = sy - 94, head = q.vic.y - 46 * BODY_K;
       for (let y = top; y < head; y += 4) g.ellipse(sx + (Math.floor((y - top) / 4) % 2 ? 1 : -1), y, 1.6, 2.2).stroke({ color: 0x6a6660, width: 1 });
     } else if (q.style === 'whip') {
       // 채찍: 휘두르는 동안 고문자 손에서 망자 등으로 휘어 들어가는 줄
@@ -5615,7 +5616,7 @@ export class WorldScene {
     const tx = new Text({ text, style: { fontFamily: 'system-ui, sans-serif', fontSize: 12, fontWeight: '800', fill: color, stroke: { color: '#140e0a', width: 3 } } });
     tx.anchor.set(0.5, 1);
     const [sx, sy] = iso(w.x, w.y);
-    tx.position.set(sx + (Math.random() * 10 - 5), sy - 44);
+    tx.position.set(sx + (Math.random() * 10 - 5), sy - 44 * bk(w));
     tx.zIndex = 1e6 - 3;
     this.objects.addChild(tx);
     this.floaters.push({ obj: tx, t: 0.9, vy: -26 });
@@ -5729,7 +5730,7 @@ export class WorldScene {
           g.moveTo(p0[0], p0[1]).lineTo(p1[0], p1[1]).stroke({ color: 0xffffff, width: w, alpha: 0.95 });
         }
       }
-      g.position.set(ax, ay - 26);
+      g.position.set(ax, ay - 26 * BODY_K); g.scale.set(BODY_K);
       g.zIndex = 1e6 - 4;
       this.objects.addChild(g);
       this.floaters.push({ obj: g, t: 0.18, vy: 0 });
@@ -5738,7 +5739,7 @@ export class WorldScene {
     }
     g.moveTo(-7, -3).lineTo(7, 3).stroke({ color: 0xfff6d8, width: 2, alpha: 0.9 });
     g.moveTo(-5, 2).lineTo(4, -2).stroke({ color: 0xffffff, width: 1, alpha: 0.6 });
-    g.position.set(ax, ay - 28);
+    g.position.set(ax, ay - 28 * BODY_K); g.scale.set(BODY_K);
     g.zIndex = 1e6 - 4;
     this.objects.addChild(g);
     this.floaters.push({ obj: g, t: 0.14, vy: 0 });
@@ -5787,15 +5788,15 @@ export class WorldScene {
     if (w.art && anim === 'idle' && (w.dir === 'sw' || w.dir === 'se') && this.poseArt(w, cs, w.art)) return;
     if (anim === 'punch' && w.act?.alt) {
       const f = mirrorFrameOf(cs, 'punch', w.dir, i);
-      if (f) { applyFrame(w.sprite, f, w.size ?? 1); w.sprite.scale.x = -Math.abs(w.sprite.scale.x); return; }
+      if (f) { applyFrame(w.sprite, f, bk(w)); w.sprite.scale.x = -Math.abs(w.sprite.scale.x); return; }
     }
-    applyFrame(w.sprite, frameOf(cs, anim, w.dir, i), w.size ?? 1);
+    applyFrame(w.sprite, frameOf(cs, anim, w.dir, i), bk(w));
   }
   /** 관리자 도트로 서 있기: 같은 크기면 1배, 2배 크기면 반으로 (더 섬세한 그림), 크기가 다르면 게임 속 키에 맞춘다 */
   private poseArt(w: Walker, cs: CharSet, tx: Texture): boolean {
     const f = frameOf(cs, 'idle', 'sw', 0);
     if (!f) return false;
-    const s = w.sprite, size = w.size ?? 1, flip = w.dir === 'se' ? -1 : 1;
+    const s = w.sprite, size = bk(w), flip = w.dir === 'se' ? -1 : 1;
     const lw = Math.round(f.w * f.k), lh = Math.round(f.h * f.k);
     const k = artDensity(tx, lw, lh); // 32차: 1·2·3배
     if (cs.px === 3 && k !== 3) return false; // 도트 3배 시험 중에는 3배로 그린 관리자 도트만 (아니면 3배로 구운 그림)
@@ -6054,7 +6055,7 @@ export class WorldScene {
           if (!tx) continue;
           if (sp.texture !== tx) sp.texture = tx;
           sp.anchor.set(VGEAR_FOOT[0], VGEAR_FOOT[1]);
-          sp.scale.set(0.5 * (w.size ?? 1) * (flip ? -1 : 1), 0.5 * (w.size ?? 1));
+          sp.scale.set(0.5 * bk(w) * (flip ? -1 : 1), 0.5 * bk(w));
           sp.position.set(sx, sy);
           sp.zIndex = w.x + w.y + dz;
         }
@@ -6066,14 +6067,14 @@ export class WorldScene {
           sp.visible = on;
           if (sp.texture !== tx) sp.texture = tx;
           sp.anchor.set(PACK_FOOT[0], PACK_FOOT[1]);
-          sp.scale.set(0.5 * (w.size ?? 1) * (pk.flip ? -1 : 1), 0.5 * (w.size ?? 1));
+          sp.scale.set(0.5 * bk(w) * (pk.flip ? -1 : 1), 0.5 * bk(w));
           sp.position.set(sx, sy + bob);
           sp.zIndex = w.x + w.y + dz;
         }
       }
-      if (w.horns) { w.horns.visible = w.down <= 0 && w.sprite.visible; w.horns.position.set(sx, sy - 47 * (w.size ?? 1)); w.horns.zIndex = w.x + w.y + 0.003; }
+      if (w.horns) { w.horns.visible = w.down <= 0 && w.sprite.visible; w.horns.position.set(sx, sy - 47 * bk(w)); w.horns.zIndex = w.x + w.y + 0.003; }
       if (w.ferum) { // 34차: 어깨 뒤 두 팔 — 오른쪽은 망치를 내리치고, 왼쪽은 집게를 든 채 살짝 흔들린다
-        const k = w.size ?? 1, strike = Math.max(0, Math.sin(this.time * 2.6));
+        const k = bk(w), strike = Math.max(0, Math.sin(this.time * 2.6));
         w.ferum.arms.forEach((a, n) => {
           const side = n ? -1 : 1;
           a.visible = w.down <= 0 && w.sprite.visible;
@@ -6087,8 +6088,8 @@ export class WorldScene {
         const back = w.dir === 'ne' || w.dir === 'nw' || w.dir === 'n';
         const flip = w.dir === 'se' || w.dir === 'e' || w.dir === 'ne' ? -1 : 1;
         w.devTail.visible = w.down <= 0 && w.sprite.visible;
-        w.devTail.position.set(sx + flip * 5, sy - (w.tailY ?? 17) * (w.size ?? 1));
-        w.devTail.scale.set(0.5 * flip, 0.5);
+        w.devTail.position.set(sx + flip * 5 * BODY_K, sy - (w.tailY ?? 17) * bk(w));
+        w.devTail.scale.set(0.5 * BODY_K * flip, 0.5 * BODY_K);
         w.devTail.rotation = Math.sin(this.time * 2.1 + w.home[0]) * 0.22 * flip;
         w.devTail.zIndex = w.x + w.y + (back ? 0.004 : -0.004);
       }
@@ -6096,9 +6097,9 @@ export class WorldScene {
         const up = w.dir === 'ne' || w.dir === 'nw' || w.dir === 'n';
         w.wings.visible = w.down <= 0 && w.sprite.visible;
         const seat = w.still === 'lotus' || w.still === 'sit' ? 14 : 0; // 34차: 앉은 천사는 어깨가 낮다 (날개가 머리 위에 떠 있던 것)
-        w.wings.position.set(sx, sy - (27 - seat) * (w.size ?? 1) - (w.wingK ? (w.wingK - 1) * 6 : 0));
+        w.wings.position.set(sx, sy - (27 - seat) * bk(w) - (w.wingK ? (w.wingK - 1) * 6 * BODY_K : 0));
         w.wings.zIndex = w.x + w.y + (up ? 0.002 : -0.002);
-        const wk = 0.5 * (w.wingK ?? 1) * (seat ? 0.86 : 1);
+        const wk = 0.5 * BODY_K * (w.wingK ?? 1) * (seat ? 0.86 : 1);
         w.wings.scale.set(wk * (w.dir === 'e' || w.dir === 'w' ? 0.55 : 1), wk * (1 + Math.sin(this.time * (moving ? 6 : 2.2) + w.home[1]) * 0.07));
       }
       if (w.flashT && w.flashT > 0) { w.flashT -= dt; w.sprite.tint = 0xffffff; if (w.sprite.blendMode !== 'add') w.sprite.blendMode = 'add'; }
@@ -6202,16 +6203,16 @@ export class WorldScene {
       const show = w.isPlayer ? !this.dead && (this.combatT < 6 || isDanger(w.hp, w.maxHp)) : w.barT > 0 && w.down <= 0;
       if (!show) continue;
       const [sx, sy] = iso(w.x, w.y);
-      const r = Math.max(0, w.hp / w.maxHp);
-      this.bars.rect(sx - 11, sy - 49, 22, 4).fill({ color: 0x140e0a, alpha: 0.85 });
-      this.bars.rect(sx - 10, sy - 48, 20 * r, 2).fill(r > 0.25 ? (w.isPlayer ? 0x6fd06a : 0xd9534f) : 0xff3b30);
+      const r = Math.max(0, w.hp / w.maxHp), hy = Math.round(sy - 49 * bk(w));
+      this.bars.rect(sx - 11, hy, 22, 4).fill({ color: 0x140e0a, alpha: 0.85 });
+      this.bars.rect(sx - 10, hy + 1, 20 * r, 2).fill(r > 0.25 ? (w.isPlayer ? 0x6fd06a : 0xd9534f) : 0xff3b30);
     }
     // 다른 사람 중 먼저 공격한(범죄 표시) 사람: 머리 위 붉은 표시
     for (const w of this.walkers) {
       if (w.kind !== 'remote' || w.down > 0 || !(w.rpos?.c || w.lingerT)) continue;
       const [sx, sy] = iso(w.x, w.y);
       const col = w.lingerT ? 0x9a9a9a : 0xe0463a;
-      this.bars.poly([sx - 4, sy - 56, sx + 4, sy - 56, sx, sy - 51]).fill(col).stroke({ color: 0x140e0a, width: 1 });
+      this.bars.poly([sx - 4, sy - 56 * BODY_K, sx + 4, sy - 56 * BODY_K, sx, sy - 56 * BODY_K + 5]).fill(col).stroke({ color: 0x140e0a, width: 1 });
     }
     // 플레이어 표시: 발밑 고리와 머리 위 화살 (먼저 공격했으면 붉게)
     const [px, py] = iso(p.x, p.y);
@@ -6221,7 +6222,7 @@ export class WorldScene {
     this.ring.zIndex = p.x + p.y - 0.01;
     const bob = Math.sin(this.time * 4) * 1.5;
     this.arrow.clear().poly([-4, 0, 4, 0, 0, 5]).fill(col).stroke({ color: 0x140e0a, width: 1 });
-    this.arrow.position.set(px, py - (this.combatT < 6 || isDanger(p.hp, p.maxHp) ? 60 : 52) + bob);
+    this.arrow.position.set(px, py - (this.combatT < 6 || isDanger(p.hp, p.maxHp) ? 60 : 52) * bk(p) + bob);
     this.arrow.zIndex = 1e6 - 5;
     const inside = !!this.working?.on || (!!this.shipGo && this.shipGo.phase !== 'walk'); // 26차: 우주선에 오르면 표시도 함께 사라진다
     this.arrow.visible = !this.dead && !inside;
@@ -6250,7 +6251,7 @@ export class WorldScene {
       }
     }
     if (this.auraTex) {
-      applyFrame(this.aura, this.auraTex.get(p.dir)?.[Math.floor(this.time * 9) % 4]);
+      applyFrame(this.aura, this.auraTex.get(p.dir)?.[Math.floor(this.time * 9) % 4], bk(p));
       this.aura.position.set(px, py);
       this.aura.zIndex = p.x + p.y - 0.005;
       this.aura.alpha = 0.75 + Math.sin(this.time * 5.3) * 0.2;
@@ -6809,7 +6810,7 @@ export class WorldScene {
         .poly([-2, 4, 3, 4, -3, 8]).fill(0xfff6d8)
         .circle(-4, -1.5, 1).circle(0, -1.5, 1).circle(4, -1.5, 1).fill(0x140e0a);
       this.talkIcon.scale.set(this.touchTap ? 1.35 : 1.1);
-      this.talkIcon.position.set(Math.round(x), Math.round(y - (who.kind === 'goatking' ? GK_FACE + 30 : (who.size ?? 1) > 1 ? 44 * (who.size ?? 1) + 14 : 58) + Math.sin(this.time * 4)));
+      this.talkIcon.position.set(Math.round(x), Math.round(y - (who.kind === 'goatking' ? GK_FACE + 30 : Math.max(58 * BODY_K, 44 * bk(who) + 14)) + Math.sin(this.time * 4)));
     }
   }
 

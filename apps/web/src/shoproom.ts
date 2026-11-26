@@ -5,7 +5,7 @@ import { parrotPixels, type Look } from './character.ts';
 import { goatIdleCanvas } from './goat.ts';
 import { toCanvas } from './raster.ts';
 import { iso } from './gfx.ts';
-import { MISS_HWANG, HWANGHON, charSet, frameOf, applyFrame, artDensity, dirFromTile, turnedDir, auraFor, makeAuraSprite, type CharSet, type Dir, type Frame } from './sprites.ts';
+import { MISS_HWANG, HWANGHON, charSet, frameOf, applyFrame, BODY_K, artDensity, dirFromTile, turnedDir, auraFor, makeAuraSprite, type CharSet, type Dir, type Frame } from './sprites.ts';
 import { RW, RD, COUNTER, ROOM_BOUNDS, PARROT_PERCH, CAGE, drawCage, drawRoomBackground, drawCounterPieces, drawLamp, nightFactor } from './shopgfx.ts';
 import { bangkokClock } from './clock.ts';
 import { shopKitReady, counterStrips, type ShopKit } from './shopkit.ts';
@@ -318,7 +318,7 @@ export class ShopRoom {
     Promise.all([charSet(hell ? HWANGHON : MISS_HWANG, null, [], true), portraitUrl(hell ? 'sprite-hwanghon' : 'sprite-miss-hwang')]).then(async ([cs, u]) => {
       if (id !== this.keeperId) return;
       const f = frameOf(cs, 'idle', 'sw', 0);
-      applyFrame(this.hwang, f);
+      applyFrame(this.hwang, f, BODY_K);
       if (!u || !f) return;
       const tx = await loadPixel(u);
       if (!tx || id !== this.keeperId) return;
@@ -328,8 +328,8 @@ export class ShopRoom {
       // 32차: 도트 3배 시험 중에는 관리자가 3배로 그려 올린 그림만 쓴다 (1·2배 그림이면 3배로 구운 그림)
       if (cs.px === 3 && k !== 3) return;
       this.hwang.texture = tx;
-      if (k) { this.hwang.scale.set(1 / k); this.hwang.anchor.set(f.ax, f.ay); }
-      else { this.hwang.scale.set(lh / tx.height); this.hwang.anchor.set(0.5, 1); }
+      if (k) { this.hwang.scale.set(BODY_K / k); this.hwang.anchor.set(f.ax, f.ay); }
+      else { this.hwang.scale.set((lh / tx.height) * BODY_K); this.hwang.anchor.set(0.5, 1); }
     });
   }
 
@@ -543,7 +543,7 @@ export class ShopRoom {
       if (!this.bpath.length && Math.random() < 0.5) this.bdir = dirFromTile(this.px - this.bx, this.py - this.by, this.bdir);
     }
     this.banim = moving ? this.banim + dt * BIRD_SPEED * 7.5 : 0;
-    if (this.birdCS) applyFrame(this.bird, frameOf(this.birdCS, moving ? 'walk' : 'idle', this.bdir, moving ? Math.floor(this.banim) % (this.birdCS.counts.walk ?? 8) : 0));
+    if (this.birdCS) applyFrame(this.bird, frameOf(this.birdCS, moving ? 'walk' : 'idle', this.bdir, moving ? Math.floor(this.banim) % (this.birdCS.counts.walk ?? 8) : 0), BODY_K);
     const [x, y] = iso(this.bx, this.by);
     this.bird.position.set(Math.round(x), Math.round(y));
     this.birdShadow.position.set(Math.round(x), Math.round(y));
@@ -574,13 +574,13 @@ export class ShopRoom {
     }
     this.anim = moving ? this.anim + dt * SPEED * 8.5 : 0;
     this.player.visible = !!this.cs;
-    if (this.cs) applyFrame(this.player, frameOf(this.cs, moving ? 'walk' : 'idle', this.dir, moving ? Math.floor(this.anim) % (this.cs.counts.walk ?? 8) : 0));
+    if (this.cs) applyFrame(this.player, frameOf(this.cs, moving ? 'walk' : 'idle', this.dir, moving ? Math.floor(this.anim) % (this.cs.counts.walk ?? 8) : 0), BODY_K);
     const [sx, sy] = iso(this.px, this.py);
     const float = this.ghost ? -3 + Math.sin(this.time * 2.2) : 0;
     this.player.position.set(sx, sy + float);
     this.player.zIndex = this.px + this.py + 0.01;
     if (this.auraTex) {
-      applyFrame(this.aura, this.auraTex.get(this.dir)?.[Math.floor(this.time * 9) % 4]);
+      applyFrame(this.aura, this.auraTex.get(this.dir)?.[Math.floor(this.time * 9) % 4], BODY_K);
       this.aura.position.set(sx, sy + float);
       this.aura.zIndex = this.px + this.py + 0.005;
       this.aura.alpha = 0.75 + Math.sin(this.time * 5.3) * 0.2;

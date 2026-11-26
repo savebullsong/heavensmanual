@@ -444,6 +444,9 @@ export function turnedDir(d: Dir): Dir {
 }
 
 /** 스프라이트에 장면을 건다 (장면마다 발 위치가 달라 기준점도 바꾼다). size = 괴물·층주처럼 크게 그릴 때 */
+/** 39차: 사람·몹 그림 배율 — 건물·차·땅은 그대로 두고 인물만 키운다 */
+export const BODY_K = 1.2;
+
 export function applyFrame(s: { texture: Texture; anchor: { set(x: number, y: number): void }; scale: { set(x: number, y?: number): void } }, f: Frame | undefined, size = 1) {
   if (!f) return;
   if (s.texture !== f.tex) s.texture = f.tex;
