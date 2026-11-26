@@ -4322,7 +4322,7 @@ function renderSettings() {
     </section>
     <section class="set-sec"><h4 class="h-fight"></h4><div class="set-row"><span class="lbl l-counter"></span><div class="seg s-counter"></div></div><p class="note n-counter"></p>
       <div class="set-row"><span class="lbl l-heal"></span><div class="seg s-heal"></div></div><div class="set-row"><span class="lbl l-healpct"></span><div class="seg s-healpct"></div></div><p class="note n-heal"></p></section>
-    <section class="set-sec"><h4 class="h-screen"></h4><div class="set-row"><span class="lbl l-ping"></span><div class="seg s-ping"></div></div><div class="set-row"><span class="lbl l-low"></span><div class="seg s-low"></div></div></section>
+    <section class="set-sec"><h4 class="h-screen"></h4><div class="set-row"><span class="lbl l-zoom"></span><div class="seg s-zoom"></div></div><div class="set-row"><span class="lbl l-ping"></span><div class="seg s-ping"></div></div><div class="set-row"><span class="lbl l-low"></span><div class="seg s-low"></div></div></section>
     ${matchMedia('(pointer: coarse)').matches ? '' : '<section class="set-sec set-keys"><h4 class="h-keys"></h4><div class="keys"></div><p class="note n-keys"></p></section>'}
     <section class="set-sec"><h4 class="h-lang"></h4><div class="seg s-lang wide"></div></section>
     <section class="set-sec set-acc"><h4 class="h-acc"></h4><div class="acc"></div></section>
@@ -4366,6 +4366,10 @@ function renderSettings() {
   // 38차: 화면 — 상점 알림 화살표 · 건물 1층으로 줄이기 (오른쪽 아래 단추에서 옮겨 왔다)
   el.querySelector('.h-screen')!.textContent = L.setScreen;
   el.querySelector('.l-ping')!.textContent = L.setShopPing;
+  // 39차 시야: 자동(휴대폰 1.6배 · 태블릿 1.3배 · PC 1배) 또는 직접
+  el.querySelector('.l-zoom')!.textContent = L.setZoom;
+  const zooms = ['auto', '1', '1.3', '1.6', '2'];
+  seg(el.querySelector('.s-zoom')!, zooms, [L.zoomAuto, '1×', '1.3×', '1.6×', '2×'], () => lsGet('heavensmanual.zoom') ?? 'auto', (v) => { lsSet('heavensmanual.zoom', v); world?.setZoomPref(v); street?.setZoomPref(v); });
   el.querySelector('.l-low')!.textContent = L.lowLabel;
   seg(el.querySelector('.s-ping')!, ['on', 'off'], L.onOff, () => (lsGet(PING_KEY) === '0' ? 'off' : 'on'), (v) => { lsSet(PING_KEY, v === 'on' ? '1' : '0'); world?.setShopPing(v === 'on'); });
   seg(el.querySelector('.s-low')!, ['on', 'off'], L.onOff, () => (world?.low ? 'on' : 'off'), (v) => { if (!world) return; world.setLowBuildings(v === 'on'); street?.setLowBuildings(v === 'on'); });

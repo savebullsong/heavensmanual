@@ -33,18 +33,34 @@ STANCE = {'thigh.L': [('X', -16)], 'shin.L': [('X', 14)], 'thigh.R': [('X', 10)]
 def _st(**kw):
     P = dict(STANCE); P.update({k.replace('__', '.'): v for k, v in kw.items()}); return P
 
-SWING = [  # 준비 · 치켜듦 · 정점 · 내려침(맞힘) · 휘두름 끝 · 돌아옴
-    _st(spine=[('X', -8), ('Z', -12)], hips=[('Z', -6)], upper_arm__R=[('X', -40), ('Y', 12)], forearm__R=[('X', -60)], hand__R=[('X', -20)], upper_arm__L=[('X', -42), ('Y', 18)], forearm__L=[('X', -72)]),
-    _st(spine=[('X', 6), ('Z', -40)], hips=[('Z', -16)], thigh__L=[('X', -10)], shin__L=[('X', 10)], thigh__R=[('X', 16)], shin__R=[('X', 16)],
-        upper_arm__R=[('X', -165), ('Y', 25)], forearm__R=[('X', -95)], upper_arm__L=[('X', -135), ('Y', 22)], forearm__L=[('X', -90)]),
-    _st(spine=[('X', -6), ('Z', -18)], hips=[('Z', -4)], thigh__L=[('X', -28)], shin__L=[('X', 16)], thigh__R=[('X', 18)], shin__R=[('X', 12)],
-        upper_arm__R=[('X', -150), ('Y', 8)], forearm__R=[('X', -40)], hand__R=[('X', 30)], upper_arm__L=[('X', -138), ('Y', 16)], forearm__L=[('X', -40)]),
-    _st(spine=[('X', -24), ('Z', 10)], hips=[('Z', 8)], thigh__L=[('X', -36)], shin__L=[('X', 22)], thigh__R=[('X', 24)], shin__R=[('X', 16)],
-        upper_arm__R=[('X', -88), ('Y', -4)], forearm__R=[('X', -6)], hand__R=[('X', 62)], upper_arm__L=[('X', -84), ('Y', 20)], forearm__L=[('X', -12)]),
-    _st(spine=[('X', -26), ('Z', 26)], hips=[('Z', 14)], thigh__L=[('X', -36)], shin__L=[('X', 22)], thigh__R=[('X', 24)], shin__R=[('X', 16)],
-        upper_arm__R=[('X', -40), ('Y', -18)], forearm__R=[('X', -10)], hand__R=[('X', 70)], upper_arm__L=[('X', -36), ('Y', 14)], forearm__L=[('X', -24)]),
-    _st(spine=[('X', -12), ('Z', 6)], hips=[('Z', 2)], thigh__L=[('X', -22)], shin__L=[('X', 16)], thigh__R=[('X', 14)], shin__R=[('X', 12)],
-        upper_arm__R=[('X', -34), ('Y', 8)], forearm__R=[('X', -50)], hand__R=[('X', 10)], upper_arm__L=[('X', -36), ('Y', 14)], forearm__L=[('X', -60)]),
+# 39차: 한손 무기 — 더 크게 들어 올려 몸을 비틀며 아래 끝까지 베어 내린다 (반경이 넓고 무게가 실린다).
+# 왼팔은 방패를 든 채 함께 휘두르지 않는다: 가슴 앞에서 막고 있다가, 베고 난 뒤 앞으로 밀어낸다
+SWING = [  # 겨눔 · 크게 치켜듦 · 내리기 시작 · 베어 내림(맞힘) · 아래 끝까지 · 방패 밀며 돌아옴
+    _st(spine=[('X', -6), ('Z', -16)], hips=[('Z', -6)], upper_arm__R=[('X', -62), ('Y', 22)], forearm__R=[('X', -72)], hand__R=[('X', -10)],
+        upper_arm__L=[('X', -58), ('Y', 12)], forearm__L=[('X', -78)]),
+    _st(spine=[('X', 10), ('Z', -46)], hips=[('Z', -18)], thigh__L=[('X', -6)], shin__L=[('X', 8)], thigh__R=[('X', 18)], shin__R=[('X', 18)],
+        upper_arm__R=[('X', -178), ('Y', 42)], forearm__R=[('X', -105)], hand__R=[('X', -20)], upper_arm__L=[('X', -72), ('Y', 14)], forearm__L=[('X', -50)]),
+    _st(spine=[('X', -4), ('Z', -30)], hips=[('Z', -10)], thigh__L=[('X', -30)], shin__L=[('X', 18)], thigh__R=[('X', 20)], shin__R=[('X', 14)],
+        upper_arm__R=[('X', -168), ('Y', 18)], forearm__R=[('X', -38)], hand__R=[('X', 24)], upper_arm__L=[('X', -66), ('Y', 12)], forearm__L=[('X', -62)]),
+    _st(spine=[('X', -28), ('Z', 14)], hips=[('Z', 8)], thigh__L=[('X', -44)], shin__L=[('X', 28)], thigh__R=[('X', 28)], shin__R=[('X', 18)],
+        upper_arm__R=[('X', -96), ('Y', -6)], forearm__R=[('X', -4)], hand__R=[('X', 58)], upper_arm__L=[('X', -38), ('Y', 26)], forearm__L=[('X', -84)]),
+    _st(spine=[('X', -38), ('Z', 40)], hips=[('Z', 18)], thigh__L=[('X', -46)], shin__L=[('X', 30)], thigh__R=[('X', 30)], shin__R=[('X', 18)],
+        upper_arm__R=[('X', -14), ('Y', -34)], forearm__R=[('X', -8)], hand__R=[('X', 72)], upper_arm__L=[('X', -70), ('Y', 10)], forearm__L=[('X', -14)]),
+    _st(spine=[('X', -14), ('Z', 10)], hips=[('Z', 4)], thigh__L=[('X', -24)], shin__L=[('X', 16)], thigh__R=[('X', 14)], shin__R=[('X', 12)],
+        upper_arm__R=[('X', -40), ('Y', 12)], forearm__R=[('X', -58)], hand__R=[('X', 6)], upper_arm__L=[('X', -78), ('Y', 10)], forearm__L=[('X', -40)]),
+]
+# 39차: 단검·식칼·레이피어는 찌른다 — 허리춤으로 당겼다가 앞발을 내디디며 곧게 뻗는다 (왼팔은 뒤로 빼 균형)
+STAB = [  # 겨눔 · 당김 · 찌름(맞힘) · 끝까지 · 돌아옴  (손목 각도 45° = 칼끝이 앞으로 곧게)
+    _st(spine=[('X', -6), ('Z', -18)], hips=[('Z', -6)], upper_arm__R=[('X', -34), ('Y', -6)], forearm__R=[('X', -96)], hand__R=[('X', 20)],
+        upper_arm__L=[('X', -60), ('Y', 18)], forearm__L=[('X', -60)]),
+    _st(spine=[('X', 0), ('Z', -34)], hips=[('Z', -12)], thigh__R=[('X', 16)], shin__R=[('X', 16)],
+        upper_arm__R=[('X', -8), ('Y', -12)], forearm__R=[('X', -120)], hand__R=[('X', 34)], upper_arm__L=[('X', -76), ('Y', 16)], forearm__L=[('X', -36)]),
+    _st(spine=[('X', -20), ('Z', 22)], hips=[('Z', 10)], thigh__L=[('X', -46)], shin__L=[('X', 28)], thigh__R=[('X', 30)], shin__R=[('X', 18)],
+        upper_arm__R=[('X', -92), ('Y', 2)], forearm__R=[('X', -2)], hand__R=[('X', 46)], upper_arm__L=[('X', -12), ('Y', 30)], forearm__L=[('X', -60)]),
+    _st(spine=[('X', -26), ('Z', 26)], hips=[('Z', 12)], thigh__L=[('X', -48)], shin__L=[('X', 30)], thigh__R=[('X', 30)], shin__R=[('X', 18)],
+        upper_arm__R=[('X', -96), ('Y', 0)], forearm__R=[('X', 0)], hand__R=[('X', 48)], upper_arm__L=[('X', -6), ('Y', 32)], forearm__L=[('X', -56)]),
+    _st(spine=[('X', -10), ('Z', -6)], hips=[('Z', -2)], thigh__L=[('X', -20)], shin__L=[('X', 14)],
+        upper_arm__R=[('X', -40), ('Y', -6)], forearm__R=[('X', -88)], hand__R=[('X', 28)], upper_arm__L=[('X', -56), ('Y', 18)], forearm__L=[('X', -60)]),
 ]
 PUNCH = [  # 막기 · 당김 · 뻗음 · 돌아옴
     _st(spine=[('X', -6), ('Z', -10)], upper_arm__L=[('X', -45), ('Y', 14)], forearm__L=[('X', -110)], upper_arm__R=[('X', -38), ('Y', -6)], forearm__R=[('X', -118)]),
@@ -127,7 +143,7 @@ def walk2(t):
     P['upper_arm.R'] = [('X', -28 - 3 * s), ('Y', -14)]; P['upper_arm.L'] = [('X', -36 - 3 * s), ('Y', 24)]
     return P
 
-EXTRA = {'heavy': HEAVY, 'sit': [sit()], 'lotus': [lotus()], 'idle2': [idle2()], 'walk2': [walk2(f / 8) for f in range(8)]}
+EXTRA = {'stab': STAB, 'heavy': HEAVY, 'sit': [sit()], 'lotus': [lotus()], 'idle2': [idle2()], 'walk2': [walk2(f / 8) for f in range(8)]}
 
 def anims(mode):
     A = {'idle': [idle(mode)], 'walk': [walk(f / 8, mode) for f in range(8)], 'hit': hit(mode), 'fall': fall(mode)}

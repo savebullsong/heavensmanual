@@ -418,6 +418,16 @@ const SWORD_CURSOR = `url("data:image/svg+xml;utf8,${encodeURIComponent('<svg xm
 export class WorldScene {
   readonly root = new Container();
   private camera = new Container();
+  /** 39차 시야 배율 (카메라 · 불빛 층을 함께 키운다). 'auto' = 손가락 기기의 작은 화면 1.6 · 큰 화면 1.3 · PC 1 */
+  private zoom = 1;
+  private zoomPref = (() => { try { return localStorage.getItem('heavensmanual.zoom') ?? 'auto'; } catch { return 'auto'; } })();
+  setZoomPref(v: string) { this.zoomPref = v; }
+  private wantZoom(): number {
+    if (this.zoomPref !== 'auto') return Math.max(1, Math.min(2.2, Number(this.zoomPref) || 1));
+    const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    if (!coarse) return 1;
+    return Math.min(this.app.screen.width, this.app.screen.height) < 600 ? 1.6 : 1.3;
+  }
   private ground = new Container();
   private objects = new Container();
   private overlay = new Graphics();
@@ -909,7 +919,7 @@ export class WorldScene {
   private visibleRange(margin = true) {
     const sw = this.app.screen.width, sh = this.app.screen.height;
     const pts = [[0, 0], [sw, 0], [0, sh], [sw, sh]].map(([sx, sy]) => {
-      const wx = sx - this.camera.x, wy = sy - this.camera.y;
+      const wx = (sx - this.camera.x) / this.zoom, wy = (sy - this.camera.y) / this.zoom;
       return [(wx / (TW / 2) + wy / (TH / 2)) / 2, (wy / (TH / 2) - wx / (TW / 2)) / 2];
     });
     const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
@@ -1162,6 +1172,8 @@ export class WorldScene {
     void npcArt(slot).then((tx) => { if (tx && !w.sprite.destroyed) w.art = tx; });
   }
   private makeWalker(look: Look, i: number, j: number, kind: Walker['kind'], weapon: string | null = null, armor: string[] = []): Walker {
+    // 39차: 서울 거리의 사람은 누구든 계절옷 (관광객 · 장사꾼 · 따라오는 이 · 맞서는 행인까지 — 반팔이 섞여 나오던 것)
+    if (kind !== 'player' && kind !== 'remote' && kind !== 'clerk' && (look.outfit ?? 'casual') === 'casual' && this.season()) look = this.dressForSeason(look, kind === 'thug' ? 'thug' : 'passer');
     const sprite = new Sprite();
     sprite.visible = false;
     this.objects.addChild(sprite);
@@ -1227,23 +1239,35 @@ export class WorldScene {
     if (m === 12 || m <= 2 || (m === 11 && d >= 15) || (m === 3 && d <= 10)) return 'winter';
     return m <= 5 ? 'spring' : m <= 8 ? 'summer' : 'autumn';
   }
-  /** 35차 서울 겨울옷: 거의 다 무릎까지 오는 롱패딩(검정·남색·회색·베이지·흰색·카키), 몇은 두툼한 점퍼에 짙은 바지 — 강도는 후드, 마피아는 검은 긴 코트 */
+  /**
+   * 39차 서울 계절옷 (방콕은 늘 여름 그대로):
+   *  겨울 — 거의 다 무릎까지 오는 롱패딩(검정·남색·회색·베이지·흰색·카키·버건디, 누빈 줄은 한 톤 어둡게) · 몇은 두툼한 긴소매 점퍼. 반팔은 없다
+   *  봄 — 긴소매(밝은 셔츠·카디건·얇은 재킷) 여덟에 반팔 둘 · 가을 — 긴소매(갈색·카키·버건디·남색 재킷) 아홉
+   *  여름 — 반팔 그대로. 강도는 후드 차림 그대로, 마피아·행동대장은 겨울에 검은 롱패딩
+   *  (35차엔 겨울 코트가 우비 몸이라 얼굴이 두건 속에 가려지고, 점퍼 차림은 반팔 몸이었다)
+   */
   private dressForSeason(l: Look, kind: NpcKind, weak?: Walker['weak'], gang?: Walker['gang']): Look {
     const se = this.season();
-    if (!se || weak === 'shade' || gang === 'robber') return l;
+    if (!se || weak === 'shade' || gang === 'robber' || l.child) return l;
+    const o = l.outfit ?? 'casual';
+    if (o !== 'casual' && o !== 'mafia') return l; // 앞치마·수영복 같은 특별한 차림은 그대로
     const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)];
+    const dark = (h: string) => { const n = parseInt(h.slice(1), 16); const f = (v: number) => Math.round(v * 0.62).toString(16).padStart(2, '0'); return `#${f(n >> 16)}${f((n >> 8) & 255)}${f(n & 255)}`; };
     if (se === 'winter') {
-      if (gang === 'mafia' || gang === 'enforcer') return { ...l, outfit: 'raincoat', cols: { ...l.cols, 8: '#121214', 3: '#16161a', 9: '#16161a', 4: '#121216', 5: '#0a0a0a' } };
       const pants = pick(['#1e1e22', '#2a2c34', '#3a3a40', '#2e3a52']);
-      if (Math.random() < (kind === 'thug' ? 0.5 : 0.78)) {
+      if (gang === 'mafia' || gang === 'enforcer') return { ...l, outfit: 'padding', cols: { ...l.cols, 3: '#121214', 9: '#060608', 4: '#121216', 5: '#0a0a0a' } };
+      if (Math.random() < (kind === 'thug' ? 0.55 : 0.8)) {
         const coat = pick(['#16161a', '#16161a', '#1e2436', '#3a3c42', '#c8b89a', '#e8e6e0', '#4a4a38', '#5a2a2a']);
-        return { ...l, outfit: 'raincoat', cols: { ...l.cols, 8: coat, 3: coat, 9: coat, 4: pants, 5: '#1a1816' } };
+        return { ...l, outfit: 'padding', cols: { ...l.cols, 3: coat, 9: dark(coat), 4: pants, 5: '#1a1816' } };
       }
       const jk = pick(['#2a2c34', '#3a2a22', '#1e2a3a', '#4a3a2a', '#6a1e22']);
-      return { ...l, outfit: l.outfit === 'mafia' ? l.outfit : 'casual', cols: { ...l.cols, 3: jk, 9: jk, 4: pants, 5: '#1a1816' } };
+      return { ...l, outfit: 'casualL', cols: { ...l.cols, 3: jk, 9: jk, 4: pants, 5: '#1a1816' } };
     }
-    if (se === 'autumn' && Math.random() < 0.5) { const jk = pick(['#7a5a3a', '#4a5a3a', '#5a4a6a', '#3a4a5a']); return { ...l, cols: { ...l.cols, 3: jk, 9: jk } }; }
-    return l;
+    if (se === 'summer' || o === 'mafia') return l;
+    const longP = se === 'autumn' ? 0.9 : 0.8;
+    if (Math.random() > longP) return l;
+    const jk = se === 'autumn' ? pick(['#7a5a3a', '#4a5a3a', '#5a2a2e', '#3a4a5a', '#8a7a5a', '#2a2c34']) : pick(['#e8e2d0', '#a8c0d8', '#d8b8b0', '#c8d0a8', '#f2efe6', '#7a8aa0']);
+    return { ...l, outfit: 'casualL', cols: { ...l.cols, 3: jk, 9: jk } };
   }
   private npcLookNew(kind: NpcKind, weak?: Walker['weak'], gang?: Walker['gang']): Look {
     const r = (n: number) => Math.floor(Math.random() * n);
@@ -1255,7 +1279,8 @@ export class WorldScene {
     if (this.realm === 'heaven') {
       // 천국의 영혼: 흰빛·연한 빛깔 옷. 천사는 흰 겉옷과 금빛 머리
       if (kind !== 'angel' && Math.random() < 0.25) return this.swimLook(Math.random() < 0.5 ? 'f' : 'm'); // 21차: 천국은 늘 여름 — 수영복 차림
-      if (kind === 'angel') return { sex: Math.random() < 0.5 ? 'f' : 'm', build: 1, skin: r(3), hair: pick([3, 4, 1]), hairColor: 0, top: 0, bottom: 0, outfit: 'raincoat', cols: { 2: pick(['#e8c870', '#f2e6c8', '#d8b060']), 8: '#f8f4ea', 3: '#f8f4ea', 4: '#efe8d8', 5: '#d8ccb0' } };
+      // 39차: 천사는 전용 몸 — 흰 튜닉 · 금빛 가슴받이·어깨 갑·팔목 보호대 · 금발 (예전엔 두건 달린 우비 몸이라 얼굴이 어둠에 가려졌다)
+      if (kind === 'angel') return { sex: Math.random() < 0.5 ? 'f' : 'm', build: 1, skin: r(3), hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'angelk', cols: { 2: pick(['#e8c870', '#f2e6c8', '#d8b060']), 3: '#f8f4ea', 4: '#efe8d8', 5: '#b89a6a', 14: pick(['#e0b450', '#d8a83a']), 12: '#7ad8ff' } };
       return { sex: Math.random() < 0.5 ? 'f' : 'm', build: r(3), skin: r(3), hair: r(6), hairColor: r(3), top: 0, bottom: 0, cols: { 3: pick(['#f4f0e6', '#eae4f2', '#e6f0ea', '#f2ead8']), 4: pick(['#e8e2d4', '#dcd6c8', '#ece6da']), 5: '#c8bca8' } };
     }
 
@@ -1738,7 +1763,7 @@ export class WorldScene {
         for (let dj = 8; dj < 30 && !at; dj++) { const j = e.c + (k ? -dj : dj); if (walkable(this.zone, i0, j)) at = [i0, j]; }
         if (!at) continue;
         const al = this.npcLook('angel');
-        const tw = this.makeWalker({ ...al, sex, hair: sex === 'f' ? 4 : 0, cols: { ...al.cols, 8: '#34445e', 3: '#f8f4ea', 4: '#2a3448', 5: '#1a1e28', 2: sex === 'f' ? '#e8d8a8' : '#3a2a1e' } }, at[0], at[1], 'angel'); // 남색 기사 코트
+        const tw = this.makeWalker({ ...al, sex, cols: { ...al.cols, 3: '#34445e', 4: '#2a3448', 5: '#1a1e28', 14: '#c8ccd2', 2: sex === 'f' ? '#e8d8a8' : '#3a2a1e' } }, at[0], at[1], 'angel'); // 남색 튜닉 · 은빛 갑 (택시 기사)
         this.giveWings(tw, 0xfffaf0);
         tw.wingK = 2.6;
         tw.size = 1.16;
@@ -3935,7 +3960,7 @@ export class WorldScene {
   private cullStatic(dt: number) {
     if (!this.cullList.length || (this.cullT -= dt) > 0) return;
     this.cullT = 0.2;
-    const M = 96, x0 = -this.camera.x - M, y0 = -this.camera.y - M, x1 = x0 + this.app.screen.width + 2 * M, y1 = y0 + this.app.screen.height + 2 * M;
+    const z = this.zoom, M = 96, x0 = -this.camera.x / z - M, y0 = -this.camera.y / z - M, x1 = x0 + this.app.screen.width / z + 2 * M, y1 = y0 + this.app.screen.height / z + 2 * M;
     for (const c of this.cullList) c.o.visible = c.x1 > x0 && c.x0 < x1 && c.y1 > y0 && c.y0 < y1;
   }
   /** 먹거나 붕대를 감아 체력을 채운다 */
@@ -4030,7 +4055,7 @@ export class WorldScene {
 
   // ───────────────────────── 누르기 ─────────────────────────
   private toWorld(gx: number, gy: number) {
-    return { wx: gx - this.camera.x, wy: gy - this.camera.y };
+    return { wx: (gx - this.camera.x) / this.zoom, wy: (gy - this.camera.y) / this.zoom };
   }
 
   /** 고문하는 야크를 누르면: 고문을 멈추고 진짜 괴물이 되어 덤빈다 (누른 그 자리에서) */
@@ -4143,7 +4168,7 @@ export class WorldScene {
     if (!w.mdef) opts.push({ label: L.act.talk, act: () => this.approach(w, 'talk') });
     opts.push({ label: L.act.look, act: () => this.approach(w, 'look') });
     if (w.kind === 'passer' || w.kind === 'angel' || w.kind === 'yellowwing' || w.kind === 'officer' || w.kind === 'soul' || w.kind === 'vendor' || w.kind === 'fighter') opts.push({ label: L.act.force, danger: true, act: () => (this.realm === 'heaven' ? this.hooks.heavenAct('assault') : this.attack(w)) });
-    this.hooks.menu(this.npcName(w), this.npcSub(w), opts, sx + this.camera.x, sy - 44 + this.camera.y);
+    this.hooks.menu(this.npcName(w), this.npcSub(w), opts, sx * this.zoom + this.camera.x, (sy - 44) * this.zoom + this.camera.y);
   }
   /** 36차: 말을 걸 수 있는 사람 (적·쓰러진 이·다른 유저·차는 아니다) */
   private talkable(w: Walker) {
@@ -4239,7 +4264,7 @@ export class WorldScene {
     const w = this.walkerAt(gx, gy, sword) ?? (sword || force ? this.torturerAt(gx, gy) : null);
     // 21차: 천국의 구름 계단을 누르면 그 앞까지 걸어가 테라스로 올라간다
     if (!w && this.stairBox && this.heavenStair && this.realm === 'heaven' && !this.zone.interior) {
-      const wx = gx - this.camera.x, wy = gy - this.camera.y, b = this.stairBox;
+      const wx = (gx - this.camera.x) / this.zoom, wy = (gy - this.camera.y) / this.zoom, b = this.stairBox;
       if (wx >= b[0] && wx <= b[2] && wy >= b[1] && wy <= b[3]) {
         const st = this.heavenStair;
         this.cancelActs();
@@ -4253,7 +4278,7 @@ export class WorldScene {
       if (w.down <= 0 && (force || this.stance === 'all' || (this.stance === 'hostile' && hostile))) { this.attack(w); return; }
       if (sword) { this.groundMove(gx, gy); return; }
       const [sx, sy] = iso(w.x, w.y);
-      this.hooks.person(w.rid, w.rinfo, sx + this.camera.x, sy - 44 + this.camera.y, () => this.attack(w));
+      this.hooks.person(w.rid, w.rinfo, sx * this.zoom + this.camera.x, (sy - 44) * this.zoom + this.camera.y, () => this.attack(w));
       return;
     }
     if (w && w.down <= 0 && w.kind === 'clerk' && !force) { this.showLabel({ kind: 'w', w }, 2); this.approachClerk(); return; }
@@ -4628,7 +4653,7 @@ export class WorldScene {
     if (opts.length === 1) { opts[0].act(); return; }
     if (!opts.length) return;
     opts.push({ label: L.act.close, act: () => undefined });
-    this.hooks.menu(this.nameOf(b), buildingSub(b, lang()), opts, this.doorAt.x + this.camera.x, this.doorAt.y + this.camera.y - 14);
+    this.hooks.menu(this.nameOf(b), buildingSub(b, lang()), opts, this.doorAt.x * this.zoom + this.camera.x, (this.doorAt.y - 14) * this.zoom + this.camera.y);
   }
 
   private rippleAt(i: number, j: number) {
@@ -5679,6 +5704,38 @@ export class WorldScene {
       return;
     }
     const [ax, ay] = iso(to.x, to.y);
+    const anim = from.act?.anim;
+    // 39차 타격감: 휘두르기는 상대 몸을 가로지르는 초승달 궤적(위에서 아래로), 찌르기는 곧게 꿰뚫는 줄, 주먹은 예전처럼 작은 엇갈린 줄
+    if (anim === 'swing' || anim === 'heavy' || anim === 'stab') {
+      const [fx, fy] = iso(from.x, from.y);
+      const dir = Math.atan2(ay - fy, ax - fx); // 화면에서 상대 쪽
+      const big = anim === 'heavy' ? 1.3 : 1;
+      if (anim === 'stab') {
+        const ux = Math.cos(dir), uy = Math.sin(dir) * 0.6;
+        g.moveTo(-ux * 16, -uy * 16).lineTo(ux * 12, uy * 12).stroke({ color: 0xfff6d8, width: 2.4, alpha: 0.95 });
+        g.moveTo(-ux * 10, -uy * 10 - 2).lineTo(ux * 8, uy * 8 - 2).stroke({ color: 0xffffff, width: 1, alpha: 0.7 });
+        g.circle(ux * 12, uy * 12, 3).fill({ color: 0xffffff, alpha: 0.85 });
+      } else {
+        // 공격하는 쪽에서 보아 오른쪽 위 → 왼쪽 아래로 크게 베인 호 (두께가 가운데서 굵다)
+        const side = Math.cos(dir) >= 0 ? 1 : -1;
+        const R = 17 * big;
+        const a0 = -Math.PI / 2 - 0.9 * side, a1 = Math.PI / 2 + 0.35 * side;
+        const N = 10;
+        for (let k = 0; k < N; k++) {
+          const t0 = k / N, t1 = (k + 1) / N;
+          const w = (0.6 + Math.sin(t0 * Math.PI) * 2.6) * big;
+          const p0 = [Math.cos(a0 + (a1 - a0) * t0) * R * side, Math.sin(a0 + (a1 - a0) * t0) * R * 0.75], p1 = [Math.cos(a0 + (a1 - a0) * t1) * R * side, Math.sin(a0 + (a1 - a0) * t1) * R * 0.75];
+          g.moveTo(p0[0], p0[1]).lineTo(p1[0], p1[1]).stroke({ color: 0xfff6d8, width: w + 1.6, alpha: 0.35 });
+          g.moveTo(p0[0], p0[1]).lineTo(p1[0], p1[1]).stroke({ color: 0xffffff, width: w, alpha: 0.95 });
+        }
+      }
+      g.position.set(ax, ay - 26);
+      g.zIndex = 1e6 - 4;
+      this.objects.addChild(g);
+      this.floaters.push({ obj: g, t: 0.18, vy: 0 });
+      if (from.isPlayer) { this.shakeT = Math.max(this.shakeT, 0.09); this.shakeA = Math.max(this.shakeA, anim === 'heavy' ? 3 : 1.8); } // 내 칼이 들어갈 때 화면이 살짝 울린다
+      return;
+    }
     g.moveTo(-7, -3).lineTo(7, 3).stroke({ color: 0xfff6d8, width: 2, alpha: 0.9 });
     g.moveTo(-5, 2).lineTo(4, -2).stroke({ color: 0xffffff, width: 1, alpha: 0.6 });
     g.position.set(ax, ay - 28);
@@ -6208,7 +6265,11 @@ export class WorldScene {
       if (this.shakeT <= 0) this.shakeA = 0;
     }
     const lift = this.zone.interior?.kind === 'goatroom' ? Math.min(150, vh * 0.2) : 0; // 32차: 거인의 방은 위를 더 보이게
-    this.camera.position.set(Math.round(vw / 2 - px + shx), Math.round(vh / 2 - py + 20 + shy + lift));
+    // 39차 시야: 휴대폰은 가까이(1.6배) · 태블릿 1.3배 · PC 1배 (영혼 설정에서 바꾼다)
+    const zw = this.wantZoom();
+    if (zw !== this.zoom) { this.zoom = zw; this.camera.scale.set(zw); this.lights.scale.set(zw); this.cullT = 0; }
+    const z = this.zoom;
+    this.camera.position.set(Math.round(vw / 2 - px * z + shx), Math.round(vh / 2 - py * z + 20 + shy + lift));
     this.lights.position.copyFrom(this.camera.position);
     // 이름표: 사람만 (건물 이름은 화면 위쪽에 잠깐)
     if (this.labelT > 0) this.labelT -= dt;
@@ -6508,7 +6569,7 @@ export class WorldScene {
     const p = this.player;
     const [sx, sy] = iso(p.x, p.y);
     const n = Math.hypot(k.x, k.y) || 1;
-    const tx = sx + this.camera.x + (k.x / n) * 110, ty = sy + this.camera.y + (k.y / n) * 62;
+    const tx = sx * this.zoom + this.camera.x + (k.x / n) * 110 * this.zoom, ty = sy * this.zoom + this.camera.y + (k.y / n) * 62 * this.zoom;
     const keep = this.keepKite();
     p.path = p.path.slice(0, 1);
     if (keep) { p.target = keep; this.kite = true; } else p.target = null;
@@ -6548,7 +6609,7 @@ export class WorldScene {
     const z = this.zone, theme = floorDef(z.hell!.floor).theme;
     const Wd = this.app.screen.width, Hd = this.app.screen.height;
     // 화면 네 모서리 → 칸 범위
-    const toTile = (sx: number, sy: number) => { const X = sx - this.camera.x, Y = sy - this.camera.y; return [(X / (TW / 2) + Y / (TH / 2)) / 2, (Y / (TH / 2) - X / (TW / 2)) / 2]; };
+    const toTile = (sx: number, sy: number) => { const X = (sx - this.camera.x) / this.zoom, Y = (sy - this.camera.y) / this.zoom; return [(X / (TW / 2) + Y / (TH / 2)) / 2, (Y / (TH / 2) - X / (TW / 2)) / 2]; };
     const cs = [toTile(0, 0), toTile(Wd, 0), toTile(0, Hd), toTile(Wd, Hd)];
     const sea = !!this.sea, lo = sea ? -60 : 1;
     const ia = Math.max(lo, Math.floor(Math.min(...cs.map((q) => q[0]))) - 1), ib = Math.min(sea ? z.W + 60 : z.W - 2, Math.ceil(Math.max(...cs.map((q) => q[0]))) + 1);

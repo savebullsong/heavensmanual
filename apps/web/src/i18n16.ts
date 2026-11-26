@@ -751,6 +751,8 @@ export const more16 = {
     pickLabel: "줍기",
     pickNone: "가까이에 주울 것이 없다.",
     healNone: "먹을 회복품이 없다.",
+    setZoom: "시야",
+    zoomAuto: "자동",
   },
   th: {
     rankUpTitle: 'ระดับวิญญาณเพิ่มขึ้น',
@@ -1503,6 +1505,8 @@ export const more16 = {
     pickLabel: "เก็บ",
     pickNone: "แถวนี้ไม่มีอะไรให้เก็บ",
     healNone: "ไม่มีของฟื้นฟูให้ใช้",
+    setZoom: "ระยะมอง",
+    zoomAuto: "อัตโนมัติ",
   },
   en: {
     rankUpTitle: 'SOUL RANK UP',
@@ -2255,5 +2259,7 @@ export const more16 = {
     pickLabel: "Pick up",
     pickNone: "Nothing to pick up nearby.",
     healNone: "No healing item to use.",
+    setZoom: "View",
+    zoomAuto: "Auto",
   },
 };

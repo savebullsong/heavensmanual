@@ -78,11 +78,15 @@ BODY = {'x': dict(h=1.28, shoulder=.22, hipw=.105, arm=1.4, leg=1.12),   # 변�
         # 37차: 서큐버스(q) · 아큐버스 여자(j) · 남자(i) — 사람과 같은 뼈, 옷과 머리·뿔·고리를 몸에 함께 굽는다
         'q': dict(h=.95, shoulder=.16, hipw=.09, arm=.98, leg=.95, stance=.03, legmass=1.15),
         'j': dict(h=.95, shoulder=.16, hipw=.09, arm=.98, leg=.95, stance=.03, legmass=1.15),
-        'i': dict(h=1.0, shoulder=.19, hipw=.095, arm=1.15, leg=1.0, stance=.05, legmass=1.3)}
+        'i': dict(h=1.0, shoulder=.19, hipw=.095, arm=1.15, leg=1.0, stance=.05, legmass=1.3),
+        # 39차: 미스 황(hw) · 천사 남(an) · 여(af) — 사람과 같은 뼈, 옷·머리를 몸에 함께
+        'hw': dict(h=.94, shoulder=.165, hipw=.092, arm=1.0, leg=.94, stance=.04, legmass=1.15),
+        'an': dict(h=1.04, shoulder=.2, hipw=.095, arm=1.15, leg=1.02, stance=.05, legmass=1.25),
+        'af': dict(h=.97, shoulder=.17, hipw=.092, arm=1.02, leg=.96, stance=.04, legmass=1.15)}
 MONSTER_BW = {'x': None, 'a': .8, 'p': .68, 'y': 1.32, 's': .42, 'k': 1.7, 'b': 1.0, 'g': .42, 'o': 1.08, 'w': .95, 't': .5, 'r': 1.0,
-              'h': 1.45, 'u': .62, 'n': .8, 'l': 1.05, 'e': 1.3, 'v': .85, 'd': .42, 'z': 1.25, 'q': .9, 'j': .9, 'i': 1.0}
+              'h': 1.45, 'u': .62, 'n': .8, 'l': 1.05, 'e': 1.3, 'v': .85, 'd': .42, 'z': 1.25, 'q': .9, 'j': .9, 'i': 1.0, 'hw': .95, 'an': 1.05, 'af': .95}
 MONSTER_HK = {'x': 1.0, 'a': 1.05, 'p': .86, 'y': 1.12, 's': 1.0, 'k': 1.2, 'b': 1.0, 'g': 1.0, 'o': .9, 'w': 1.0, 't': 1.0, 'r': 1.0,
-              'h': 1.2, 'u': .9, 'n': 1.05, 'l': 1.0, 'e': 1.0, 'v': 1.0, 'd': 1.0, 'z': 1.1, 'q': 1.12, 'j': 1.12, 'i': 1.12}
+              'h': 1.2, 'u': .9, 'n': 1.05, 'l': 1.0, 'e': 1.0, 'v': 1.0, 'd': 1.0, 'z': 1.1, 'q': 1.12, 'j': 1.12, 'i': 1.12, 'hw': 1.12, 'an': 1.1, 'af': 1.12}
 BUILD = [.9, 1.0, 1.14]   # 마름 · 보통 · 건장 (뼈 위치는 같고 굵기만 다르다 → 머리·무기 층을 함께 쓴다)
 
 class Doll:
@@ -202,6 +206,42 @@ class Doll:
                 rings = [ring(1.30, .12, .03, -.118), ring(1.16, .128, .03, -.11), ring(1.06, .16, .035, -.112), ring(.90, .19, .04, -.125), ring(.62, .2, .04, -.13)]
                 loft(P, rings, ap, None, segs=12)
                 ob = finish(P); bind(ob, self.arm, lambda co: {'spine': smooth(co.z, .98 * s, 1.12 * s), 'hips': 1 - smooth(co.z, .98 * s, 1.12 * s)}); self.add(g, ob)
+        elif name == 'casualL':
+            # 39차 서울 봄·가을: 긴소매 윗옷(손목까지) · 긴 바지 · 운동화
+            top = rmat('top', .85, .15); bot = rmat('bottom', .8, .15); shoe = rmat('shoe', .5, .4)
+            self.torso(g, top, bot, hem=1.0)
+            self.head(g); self.arms(g, top, 1.93); self.hands(g); self.legs(g, bot, shoe)
+            # 목둘레 깃 (긴소매 티 · 셔츠 깃)
+            P = Part(g + '.collar')
+            limb(P, self.V(0, .0, 1.405), self.V(0, .0, 1.445), [(0, .07 * self.s * self.bw, .062 * self.s), (1, .062 * self.s * self.bw, .056 * self.s)], top, None, segs=14, caps=(False, False))
+            ob = finish(P); bind(ob, self.arm, lambda co: {'spine': 1.0}); self.add(g, ob)
+        elif name == 'padding':
+            # 39차 서울 겨울: 무릎까지 오는 롱패딩 — 가로로 누빈 줄(안감 색 9), 세운 깃, 두툼한 긴 소매, 겨울 신발. 모자는 없다 (머리가 보인다)
+            coat = rmat('top', .7, .2); seam = rmat('gown', .85, .1); bot = rmat('bottom', .8, .15); shoe = rmat('shoe', .5, .4)
+            s = self.s
+            def puff(rings):
+                return [(c, u, v, rs * 1.2 + .022, rf * 1.24 + .026) for c, u, v, rs, rf in rings]
+            self.torso(g, coat, coat, hem=0, extra=puff)
+            self.head(g); self.arms(g, coat, 1.96, cuff=True, wide=1.38); self.hands(g); self.legs(g, bot, shoe, boot=True)
+            # 엉덩이에서 무릎까지의 자락 (걸을 때 다리를 따라 밀린다)
+            def skirt_w(co):
+                h = (1 - smooth(co.z, .55 * s, 1.0 * s)) * .55
+                wl = smooth(co.x, -.07 * s, .07 * s)
+                return {'hips': 1 - h, 'thigh.L': h * wl, 'thigh.R': h * (1 - wl)}
+            P = Part(g + '.skirt')
+            tab = [(1.0, .19, .15), (.86, .205, .16), (.7, .215, .168), (.52, .222, .172)]
+            rings = [(self.V(0, .005, z), Vector((0, -1, 0)), Vector((1, 0, 0)), rx * s * self.bw + .02, ry * s + .024) for z, rx, ry in tab]
+            loft(P, rings, coat, None, segs=18, caps=(False, False))
+            for z, rx, ry in ((.88, .207, .162), (.72, .216, .169), (.56, .222, .172)):   # 자락의 누빈 줄
+                loft(P, [(self.V(0, .005, z), Vector((0, -1, 0)), Vector((1, 0, 0)), rx * s * self.bw + .024, ry * s + .028), (self.V(0, .005, z + .012), Vector((0, -1, 0)), Vector((1, 0, 0)), rx * s * self.bw + .024, ry * s + .028)], seam, None, segs=18, caps=(False, False))
+            ob = finish(P); bind(ob, self.arm, skirt_w); self.add(g, ob)
+            # 몸통의 누빈 줄 · 앞 지퍼 · 세운 깃
+            P = Part(g + '.quilt')
+            for z, k in ((1.08, 1.0), (1.2, 1.04), (1.32, 1.06)):
+                loft(P, [(self.V(0, -.003, z), Vector((0, -1, 0)), Vector((1, 0, 0)), .17 * s * self.bw * k * 1.2 + .026, .112 * s * 1.24 + .03), (self.V(0, -.003, z + .012), Vector((0, -1, 0)), Vector((1, 0, 0)), .17 * s * self.bw * k * 1.2 + .026, .112 * s * 1.24 + .03)], seam, None, segs=18, caps=(False, False))
+            limb(P, self.V(0, -.17, 1.4), self.V(0, -.19, .55), [(0, .006, .004), (1, .006, .004)], seam, None, segs=4)
+            limb(P, self.V(0, .0, 1.4), self.V(0, .0, 1.5), [(0, .09 * s * self.bw, .085 * s), (1, .078 * s * self.bw, .074 * s)], coat, None, segs=14, caps=(False, False))
+            ob = finish(P); bind(ob, self.arm, lambda co: {'neck': smooth(co.z, 1.42 * s, 1.48 * s), 'spine': 1 - smooth(co.z, 1.42 * s, 1.48 * s)} if co.z > 1.0 * s else {'hips': 1.0}); self.add(g, ob)
         elif name == 'raincoat':
             rc = rmat('raincoat', .35, .55); dark = rmat('dark', .9, .05); bot = rmat('bottom', .8, .15); boot = rmat('shoe', .4, .5)
             s = self.s

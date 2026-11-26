@@ -101,6 +101,31 @@ for sex in 'mf':
 # ── 37차: 서큐버스(여) · 아큐버스(여·남) — 서기·걷기만, 8방향 (사용자 컨셉 그림 두 장) ──
 for mk, sex, outfit in (('q', 'f', 'succubus'), ('j', 'f', 'accubus'), ('i', 'm', 'accubus')):
     jobs.append({'sex': sex, 'build': 1, 'monster': mk, 'occluder': outfit, 'sets': [{'kind': 'base', 'outfit': outfit, 'mode': 'w'}], 'stride': .55, 'tag': 'dream37'})
+# ── 39차: 한손 무기 휘두르기를 새로(크게 · 아래 끝까지 · 방패는 따로) + 단검·식칼·레이피어 찌르기 — 사람의 무기 자세(m) 층에 덧붙인다
+STABBERS = ('dagger', 'knife', 'rapier')
+ONE_HAND = [w for w in WEAPONS if w not in ('needle', 'pistol') and w not in TWO] + ['cleaver', 'femur', 'pickaxe', 'hook']
+for sex in 'mf':
+    for b in (0, 1, 2):
+        sets = [{'kind': 'base', 'outfit': 'casual', 'mode': 'm', 'extra': ['stab']}]
+        sets += [{'kind': 'armor', 'piece': pc, 'mode': 'm', 'extra': ['stab']} for pc in (['jacket', 'vest', 'workpants'] + (['helmet', 'gloves', 'shinguard', 'boots', 'mask', 'shield'] if b == 1 else []))]
+        if b == 1:
+            sets += [{'kind': 'base', 'outfit': o, 'mode': 'm', 'extra': ['stab']} for o in ('raincoat', 'patient', 'parrot', 'robber', 'mafia')]
+            sets += [{'kind': 'hair', 'style': h, 'extra': ['stab']} for h in HAIRS]
+            sets += [{'kind': 'weapon', 'weapon': w, 'extra': ['stab'] if w in STABBERS else []} for w in ONE_HAND]
+        jobs.append({'sex': sex, 'build': b, 'sets': sets, 'only': ['swing', 'stab'], 'merge': True, 'dirs': ['se', 'sw', 'ne', 'nw'], 'tag': 'swing39'})
+# ── 39차: 서울 계절옷 — 봄·가을 긴소매(casualL) · 겨울 롱패딩(padding). 맨손·무기·총 자세, 대각선은 모든 동작 · 상하좌우는 서기·걷기
+for sex in 'mf':
+    for b in (0, 1, 2):
+        for o in ('casualL', 'padding'):
+            sets = [{'kind': 'base', 'outfit': o, 'mode': m, 'extra': ['stab'] if m == 'm' else []} for m in MODES]
+            jobs.append({'sex': sex, 'build': b, 'sets': sets, 'dirs': ['se', 'sw', 'ne', 'nw'], 'tag': 'season39'})
+            jobs.append({'sex': sex, 'build': b, 'sets': [{'kind': 'base', 'outfit': o, 'mode': m} for m in MODES], 'only': ['idle', 'walk'], 'merge': True, 'dirs': ['s', 'e', 'n', 'w'], 'tag': 'season39'})
+# ── 39차: 주요 인물 전용 몸 — 미스 황(황혼 · 황색날개도 같은 몸에 색만) · 천사(지옥문을 지키는 전사, 남녀, 맨손·칼 자세 + 칼)
+jobs.append({'sex': 'f', 'build': 1, 'monster': 'hw', 'occluder': 'misshwang', 'sets': [{'kind': 'base', 'outfit': 'misshwang', 'mode': 'w'}], 'stride': .8, 'tag': 'main39'})
+for mk, sex in (('an', 'm'), ('af', 'f')):
+    sets = [{'kind': 'base', 'outfit': 'angelk', 'mode': 'u'}, {'kind': 'base', 'outfit': 'angelk', 'mode': 'm'}, {'kind': 'weapon', 'weapon': 'sword'}]
+    jobs.append({'sex': sex, 'build': 1, 'monster': mk, 'occluder': 'angelk', 'sets': sets, 'dirs': ['se', 'sw', 'ne', 'nw'], 'stride': .85, 'tag': 'main39'})
+    jobs.append({'sex': sex, 'build': 1, 'monster': mk, 'occluder': 'angelk', 'sets': sets, 'only': ['idle', 'walk'], 'merge': True, 'dirs': ['s', 'e', 'n', 'w'], 'stride': .85, 'tag': 'main39'})
 args = sys.argv[2:]
 # --scale2: 같은 크기의 인물을 픽셀 두 배로 (게임에서는 반으로 줄여 같은 크기, 더 섬세)
 if '--scale2' in args:

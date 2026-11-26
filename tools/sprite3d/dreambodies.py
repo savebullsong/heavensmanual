@@ -330,3 +330,114 @@ def accubus(self, g):
 
 
 NEW = {'succubus': succubus, 'accubus': accubus}
+
+
+# ─────────────────────────── 39차: 미스 황 (우주새 점원) ───────────────────────────
+def misshwang(self, g):
+    """웨이브 진 긴 머리와 옆으로 넘긴 앞머리에 노란 깃털 핀, 흰 블라우스(팔꿈치까지 걷은 소매 · 둥근 깃 · 목 리본),
+    가슴까지 오는 짙은 앞치마(주머니 · 노란 볏의 유황앵무 자수 · 이름표), 종아리까지 오는 치마, 발목 부츠.
+    구역: 블라우스 3 · 치마 4 · 부츠 5 · 앞치마 7 · 리본·핀·자수 12 · 이름표 14 · 머리 2 (황혼·황색날개는 같은 몸에 색만 바꾼다)"""
+    s, V = self.s, self.V
+    blouse = rmat('top', .8, .2); skirt = rmat('bottom', .8, .15); apron = rmat('apron', .85, .1)
+    crest = rmat('crest', .4, .5); badge = rmat('metal', .3, .6, .7); hm = rmat('hair', .45, .5)
+    sw = _spine_w(s)
+    self.legs(g, rmat('dark', .6, .3), rmat('shoe', .4, .5), foot=.85, boot=True)
+    self.torso(g, blouse, blouse, hem=0)
+    self.head(g)
+    self.arms(g, blouse, 1.05, cuff=True)   # 팔꿈치 조금 아래까지 걷은 소매
+    self.hands(g)
+    # 둥근 깃 + 목 리본
+    P = Part(g + '.collar')
+    for sx in (1, -1):
+        blob(P, V(sx * .045, -.075, 1.43), (.05 * s, .03 * s, .02 * s), blouse, None, segs=8, rings=5)
+    blob(P, V(0, -.1, 1.41), (.022 * s, .012 * s, .016 * s), crest, None, segs=8, rings=5)
+    for sx in (1, -1):
+        limb(P, V(sx * .006, -.1, 1.405), V(sx * .03, -.11, 1.36), [(0, .012, .005), (1, .016, .004)], crest, None, segs=4)
+    ob = finish(P); bind(ob, self.arm, sw); self.add(g, ob)
+    # 치마: 종아리까지 (걸으면 다리를 따라 밀린다)
+    table = [(1.02, .13, .1), (.9, .17, .13), (.7, .195, .15), (.5, .215, .165), (.32, .23, .175)]
+    _skirt(self, g, table, skirt)
+    # 앞치마: 가슴받이 + 허리 아래 넓은 자락 + 주머니 + 어깨끈 + 허리끈 매듭(뒤)
+    P = Part(g + '.apron')
+    bib = [(1.36, .1, .118), (1.24, .108, .135), (1.1, .1, .104), (1.03, .1, .1)]
+    for (z0, w0, y0), (z1, w1, y1) in zip(bib, bib[1:]):
+        poly4 = [V(-w0, -y0 - .006, z0), V(w0, -y0 - .006, z0), V(w1, -y1 - .006, z1), V(-w1, -y1 - .006, z1)]
+        limb(P, (poly4[0] + poly4[1]) / 2, (poly4[2] + poly4[3]) / 2, [(0, w0 * s, .004), (1, w1 * s, .004)], apron, None, segs=4)
+    front = [(1.02, .135, .104), (.9, .175, .134), (.7, .2, .154), (.5, .215, .168), (.36, .222, .174)]
+    pts = [(V(0, .01, z), rx * s + .01, ry * s + .012) for z, rx, ry in front]
+    arcloft(P, pts, apron, math.radians(25), math.radians(155), segs=10)
+    blob(P, V(.06, -.19, .78), (.05 * s, .01 * s, .045 * s), apron, None, segs=8, rings=5)          # 주머니
+    blob(P, V(-.02, -.123, 1.27), (.026 * s, .006 * s, .02 * s), crest, None, segs=8, rings=5)      # 볏 자수 (노란 깃)
+    for k in range(3):
+        limb(P, V(-.03 + k * .008, -.124, 1.285), V(-.045 + k * .012, -.124, 1.32), [(0, .004, .002), (1, .002, .002)], crest, None, segs=3)
+    blob(P, V(.06, -.13, 1.25), (.016 * s, .006 * s, .01 * s), badge, None, segs=6, rings=4)        # 이름표
+    for sx in (1, -1):
+        limb(P, V(sx * .1, -.118, 1.36), V(sx * .11, .06, 1.43), [(0, .012, .004), (1, .012, .004)], apron, None, segs=4)   # 어깨끈
+    limb(P, V(-.15, .0, 1.03), V(.15, .0, 1.03), [(0, .012, .012), (1, .012, .012)], apron, None, segs=4)
+    blob(P, V(0, .12, 1.03), (.04 * s, .02 * s, .025 * s), apron, None, segs=8, rings=5)            # 뒤 매듭
+    ob = finish(P); bind(ob, self.arm, lambda co: gown_w(self)(co) if co.z < 1.02 * s else sw(co)); self.add(g, ob)
+    # 머리: 웨이브 진 긴 머리 (어깨 아래 등까지) · 옆으로 넘긴 앞머리 · 노란 깃털 핀
+    _long_hair(self, g, hm, 1.08, front=True, width=1.06)
+    hc0, hs = _head_tools(self)
+    P = Part(g + '.wave')
+    for sx in (1, -1):   # 귀밑의 웨이브 덩이
+        for k, z in enumerate((1.5, 1.42, 1.34)):
+            blob(P, hs(V(sx * (.1 + k * .008), .02, z)) if z > 1.45 else V(sx * (.11 + k * .006), .03, z), (.032 * s, .03 * s, .04 * s), hm, None, segs=8, rings=5)
+    ob = finish(P); bind(ob, self.arm, lambda co: {'head': smooth(co.z, 1.4 * s, 1.5 * s), 'spine': 1 - smooth(co.z, 1.4 * s, 1.5 * s)}); self.add(g, ob)
+    P = Part(g + '.pin')
+    base = hs(V(.07, -.04, 1.72))
+    for k in range(3):
+        limb(P, base, base + Vector(((.03 + k * .012) * s, (.02 - k * .02) * s, (.05 + k * .01) * s)), [(0, .01 * s, .006 * s), (1, .003 * s, .002 * s)], crest, None, segs=5)
+    ob = finish(P); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
+
+
+# ─────────────────────────── 39차: 천사 (지옥문을 지키는 전사) ───────────────────────────
+def angelk(self, g):
+    """무릎까지 오는 흰 튜닉(금 밑단) · 금빛 가슴받이와 어깨 갑 · 금 허리띠 · 팔목 보호대 · 끈 샌들.
+    남자는 짧게 쓸어 넘긴 금발, 여자는 높이 묶은 금발 말총머리. 날개는 게임이 붙인다 (구역: 튜닉 3 · 속옷 4 · 금 14 · 머리 2)"""
+    s, V = self.s, self.V
+    f = self.sex == 'f'
+    tunic = rmat('top', .75, .2); under = rmat('bottom', .75, .2); gold = rmat('metal', .22, .75, .9); hm = rmat('hair', .4, .55)
+    skin = rmat('skin', .55, .35)
+    sw = _spine_w(s)
+    self.legs(g, skin, rmat('shoe', .5, .3), foot=.85)
+    self.torso(g, tunic, tunic, hem=0, extra=lambda rings: [(c, u, v, rs * 1.04 + .006, rf * 1.06 + .008) for c, u, v, rs, rf in rings])
+    self.head(g)
+    self.arms(g, tunic, .5, wide=1.1); self.hands(g)
+    # 튜닉 자락: 무릎까지 (금 밑단) · 다리를 따라 밀린다
+    table = [(1.0, .18, .132), (.85, .205, .152), (.68, .222, .164), (.5, .232, .172)]
+    _skirt(self, g, table, tunic, trim=gold, trim_z=.54)
+    P = Part(g + '.armor')
+    # 가슴받이 (앞·뒤 판) · 어깨 갑 · 허리띠 · 가운데 보석
+    bw = self.bw
+    loft(P, [(V(0, -.008, 1.08), Vector((0, -1, 0)), Vector((1, 0, 0)), .14 * s * bw + .014, .1 * s + .016),
+             (V(0, -.012, 1.24), Vector((0, -1, 0)), Vector((1, 0, 0)), (.162 if f else .172) * s * bw + .016, .125 * s + .018),
+             (V(0, -.01, 1.38), Vector((0, -1, 0)), Vector((1, 0, 0)), .15 * s * bw + .014, .1 * s + .014)], gold, None, segs=18, caps=(False, False))
+    for sx in (1, -1):
+        sh = self.bones['upper_arm.' + ('L' if sx > 0 else 'R')][0]
+        blob(P, sh + Vector((sx * .015, 0, .02)), (.075 * s, .07 * s, .045 * s), gold, None, segs=10, rings=6, cut=lambda co: co.z < sh.z - .005)
+    loft(P, [(V(0, .0, .99), Vector((0, -1, 0)), Vector((1, 0, 0)), .165 * s * bw + .016, .125 * s + .016), (V(0, .0, 1.03), Vector((0, -1, 0)), Vector((1, 0, 0)), .16 * s * bw + .016, .12 * s + .016)], gold, None, segs=18, caps=(False, False))
+    blob(P, V(0, -.15, 1.25), (.018 * s, .008 * s, .022 * s), rmat('crest', .2, .85), None, segs=8, rings=5)
+    ob = finish(P); bind(ob, self.arm, sw); self.add(g, ob)
+    for k in 'LR':   # 팔목 보호대
+        el, wr = self.bones[f'forearm.{k}'][0], self.bones[f'forearm.{k}'][1]
+        P = Part(f'{g}.bracer.{k}')
+        am = self.p['arm'] * self.bw
+        limb(P, el + (wr - el) * .45, el + (wr - el) * .92, [(0, .05 * am, .05 * am), (1, .046 * am, .046 * am)], gold, None, segs=10)
+        ob = finish(P); bind(ob, self.arm, rigid(f'forearm.{k}')); self.add(g, ob)
+    # 머리
+    R = (.101 * s, .114 * s, .128 * s)
+    P = Part(g + '.hair')
+    if f:
+        blob(P, V(0, .006, 1.632), (R[0] * 1.03, R[1] * 1.02, R[2] * 1.01), hm, None, segs=16, rings=12,
+             cut=lambda co: (co.y < -.025 * s and co.z < 1.675 * s) or co.z < 1.55 * s or (co.z < 1.61 * s and co.y < .02 * s))
+        blob(P, V(0, .1, 1.7), (.04 * s, .035 * s, .04 * s), hm, None, segs=8, rings=6)
+        limb(P, V(0, .12, 1.7), V(0, .17, 1.4), [(0, .045 * s, .04 * s), (.4, .055 * s, .045 * s), (1, .018 * s, .016 * s)], hm, None, segs=10)
+    else:
+        blob(P, V(0, .006, 1.632), (R[0] * 1.03, R[1] * 1.02, R[2] * 1.01), hm, None, segs=16, rings=12,
+             cut=lambda co: (co.y < -.028 * s and co.z < 1.665 * s) or co.z < 1.53 * s or (co.z < 1.59 * s and co.y < .03 * s))
+        blob(P, V(.02, -.06, 1.72), (.07 * s, .05 * s, .035 * s), hm, None, segs=10, rings=7)
+    ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
+
+
+NEW.update({'misshwang': misshwang, 'angelk': angelk})

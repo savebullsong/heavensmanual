@@ -5,7 +5,7 @@ import { SKIN_COLORS, HAIR_COLORS, TOP_COLORS, BOTTOM_COLORS, HAIR_STYLES, AURA_
 
 /** 화면 기준 8방향. 대각선 넷은 모든 동작, 상하좌우 넷(s·e·n·w)은 서기·걷기만 구워져 있다 */
 export type Dir = 'se' | 'sw' | 'ne' | 'nw' | 's' | 'e' | 'n' | 'w';
-export type Anim = 'idle' | 'walk' | 'hit' | 'fall' | 'punch' | 'swing' | 'shoot' | 'heavy' | 'sit' | 'lotus' | 'idle2' | 'walk2';
+export type Anim = 'idle' | 'walk' | 'hit' | 'fall' | 'punch' | 'swing' | 'shoot' | 'heavy' | 'sit' | 'lotus' | 'idle2' | 'walk2' | 'stab';
 export type Mode = 'u' | 'm' | 'g' | 'w';
 export const DIRS: Dir[] = ['se', 'sw', 'ne', 'nw', 's', 'e', 'n', 'w'];
 /** 상하좌우로 굽지 않은 동작(공격·맞음·쓰러짐)을 보여 줄 때 쓸 가까운 대각선 */
@@ -60,7 +60,8 @@ export interface CharSet {
 }
 
 /** 미스 황의 겉모습 (우주새 카운터 뒤, 관리자 페이지 도트 칸에서도 쓴다) */
-export const MISS_HWANG: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 3, top: 0, bottom: 0, outfit: 'apron' };
+/** 39차: 미스 황 전용 몸 — 웨이브 긴 머리와 노란 깃털 핀 · 흰 블라우스와 목 리본 · 짙은 앞치마(유황앵무 볏 자수 · 이름표) · 종아리 치마 · 발목 부츠 */
+export const MISS_HWANG: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 3, top: 0, bottom: 0, outfit: 'misshwang', cols: { 2: '#b9a07a', 3: '#f4f0e6', 4: '#3a2f28', 5: '#4a2e1e', 7: '#5a4636', 12: '#f2c42a', 14: '#d8c070', 15: '#2a2420' } };
 /** 유황새(지옥)의 황혼: 미스 황과는 다른 사람이라고 스스로 믿는다. 검붉은 긴 머리, 핏빛 옷, 창백한 피부 */
 /** 지옥 3층 대부업자 베스크 · 2층 들판의 노름꾼 탈루스 (관리자 도트 칸이 같은 모습을 밑그림으로 쓴다) */
 export const BESK_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'besk', cols: { 1: '#b8382a', 3: '#3a1410', 4: '#2a100c', 5: '#140a08', 6: '#e8c050', 9: '#3a1410', 10: '#e8dcc0', 12: '#f2d27a', 13: '#4a2a1a', 14: '#e0b437', 15: '#140e0c' } };
@@ -76,7 +77,7 @@ export function yunaeLook(age: 0 | 1 | 2): Look {
   return { sex: 'f', build: 0, skin: 0, hair: 2, hairColor: 0, top: 0, bottom: 0, cols: { 2: '#241a16', 3: '#7e4e4a', 9: '#7e4e4a', 4: '#34343e', 5: '#8a8e96' } };
 }
 export const TALUS_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'talus', cols: { 1: '#d8ccb0', 3: '#5a4430', 4: '#3a2e22', 5: '#1a1410', 6: '#ffd08a', 10: '#d8ccb0', 12: '#a8281e', 13: '#2e2420', 14: '#c9a23e', 15: '#140e0c' } };
-export const HWANGHON: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'apron', cols: { 1: '#ead2c4', 2: '#3a0e12', 3: '#5a0e18', 4: '#2a0a10', 5: '#0c0808', 6: '#1a1210', 7: '#140a0c', 9: '#5a0e18', 10: '#ead2c4' } };
+export const HWANGHON: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'misshwang', cols: { 1: '#ead2c4', 2: '#3a0e12', 3: '#5a0e18', 4: '#2a0a10', 5: '#0c0808', 6: '#1a1210', 7: '#140a0c', 10: '#ead2c4', 12: '#b8862a', 14: '#8a6a2a', 15: '#0c0808' } }; // 39차: 미스 황과 같은 몸 · 핏빛 블라우스 · 검은 앞치마 · 바랜 금빛
 
 export const MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle', 'arming', 'umbrella', 'sickle', 'crowbar', 'wrench', 'machete', 'metalbat', 'saber', 'rapier', 'katana', 'whip', 'spear']; // 26차 현실 무기 더 · 35차 채찍·창
 /** 양손 무기 (16차): 두 손으로 크게 들어 내려찍는다 (heavy 동작) — 느리지만 묵직하다 */
@@ -92,8 +93,10 @@ const COSTUMES = new Set(['raincoat', 'patient', 'parrot', 'robber']); // 강도
 const COSTUME_BARE = new Set(['raincoat', 'patient', 'parrot']);
 
 /** 동작 속도 (초당 장면 수)와 맞히는 장면 */
-export const ANIM_FPS: Record<Anim, number> = { idle: 1, walk: 9, hit: 16, fall: 11, punch: 22, swing: 21, shoot: 16, heavy: 15, sit: 1, lotus: 1, idle2: 1, walk2: 9 };
-export const IMPACT: Partial<Record<Anim, number>> = { punch: 2, swing: 3, shoot: 1, heavy: 3 };
+export const ANIM_FPS: Record<Anim, number> = { idle: 1, walk: 9, hit: 16, fall: 11, punch: 22, swing: 19, shoot: 16, heavy: 15, sit: 1, lotus: 1, idle2: 1, walk2: 9, stab: 20 };
+export const IMPACT: Partial<Record<Anim, number>> = { punch: 2, swing: 3, shoot: 1, heavy: 3, stab: 2 };
+/** 39차: 찌르는 무기 (단검 · 식칼 · 레이피어) — 휘두르지 않고 찌른다 */
+export const STABBERS = new Set(['dagger', 'knife', 'rapier']);
 
 /** 칸 좌표로 움직이는 방향(di, dj) → 바라보는 쪽.
  *  +i = 화면 오른쪽 아래(se), +i+j = 아래(s), +j = 왼쪽 아래(sw), -i+j = 왼쪽(w) … (칸 각도 45°마다 한 방향)
@@ -183,7 +186,7 @@ function palette(look: Look): Uint8ClampedArray[] {
 }
 
 // ───────────────────────── 어떤 층을 쓰나 ─────────────────────────
-export function layerKeys(look: Look, weapon: string | null, armor: string[] = []): { base: string; hair: string | null; weapon: string | null; armor: { key: string; piece: string }[]; mode: Mode; two?: boolean } {
+export function layerKeys(look: Look, weapon: string | null, armor: string[] = []): { base: string; hair: string | null; weapon: string | null; armor: { key: string; piece: string }[]; mode: Mode; two?: boolean; stab?: boolean } {
   const o = look.outfit ?? 'casual';
   // 대식자: 사람 모습 / 변신한 모습 (머리카락·방어구 없음, 늘 큰 바늘)
   if ((o as string) === 'suturer') return { base: 'b-m1-suturer-m', hair: null, weapon: 'w-m-needle', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
@@ -203,6 +206,9 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
   if (o === 'talus') return { base: 'b-t-talus-g', hair: null, weapon: 'w-t-shotgun', armor: [] as { key: string; piece: string }[], mode: 'g' as Mode };
   if (o === 'besk') return { base: 'b-k-besk-m', hair: null, weapon: 'w-k-ledger', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   // 37차 서큐버스(검은 레이스 · 진홍 치마 · 감긴 뿔) · 아큐버스(흰 드레스 · 금실 · 머리 위 고리): 서기·걷기만, 8방향 (박쥐/깃털 날개 · 꼬리는 게임이 붙인다)
+  // 39차 주요 인물 전용 몸: 미스 황(황혼 · 황색날개도) · 천사(칼은 천사 몸에 맞춰 구운 것, 다른 무기는 들지 않는다)
+  if (o === 'misshwang') return { base: 'b-hw-misshwang-w', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
+  if (o === 'angelk') { const mk = look.sex === 'f' ? 'af' : 'an', wp = weapon === 'sword' ? 'sword' : null; return { base: `b-${mk}-angelk-${wp ? 'm' : 'u'}`, hair: null, weapon: wp ? `w-${mk}-${wp}` : null, armor: [] as { key: string; piece: string }[], mode: (wp ? 'm' : 'u') as Mode }; }
   if (o === 'succubus') return { base: 'b-q-succubus-w', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
   if (o === 'accubus') return { base: `b-${look.sex === 'm' ? 'i' : 'j'}-accubus-w`, hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
   if (o === 'cockatoo') return { base: 'b-b-cockatoo-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
@@ -225,6 +231,7 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
   else if (o === 'mafia') { if (mode === 'u') mode = 'm'; base = `b-${sex}1-mafia-${mode}`; } // 마피아 정장 (머리카락은 보인다)
   // 맨손이면 맨손 몸을 써야 주먹질 장면이 있다 (무기 자세 몸에는 휘두르기만 있어 공격 동작이 비었다)
   else if (costume) base = `b-${sex}1-${o}-${mode === 'u' && !COSTUME_BARE.has(o) ? 'm' : mode}`;
+  else if (o === 'casualL' || o === 'padding') base = `b-${sex}${build}-${o}-${mode}`; // 39차 서울 봄·가을 긴소매 · 겨울 롱패딩 (머리카락은 보인다)
   else base = `b-${sex}${build}-casual-${mode}`;
   const style = HAIR_STYLES[look.hair] ?? 'short';
   const hair = costume ? null : child ? `h-c-${style}` : `h-${sex}-${style}`;
@@ -239,7 +246,7 @@ export function layerKeys(look: Look, weapon: string | null, armor: string[] = [
       arm.push({ key: `a-${sex}${PER_BUILD.has(piece) ? ab : 1}-${piece}-${mode}`, piece });
     }
   }
-  return { base, hair, weapon: w ? `w-${sex}-${w}` : null, armor: arm, mode, two: !!w && TWO.has(w) };
+  return { base, hair, weapon: w ? `w-${sex}-${w}` : null, armor: arm, mode, two: !!w && TWO.has(w), stab: !!w && STABBERS.has(w) };
 }
 
 // ───────────────────────── 합치기 ─────────────────────────
@@ -407,7 +414,7 @@ async function build0(look: Look, keys: ReturnType<typeof layerKeys>, P = PX, pr
     if ((counts[an as Anim] ?? 0) < n) counts[an as Anim] = n;
   }
   // 양손 무기는 내려찍기 (아직 굽지 않은 그림이면 휘두르기로)
-  let attack: Anim | null = keys.two && counts.heavy ? 'heavy' : keys.mode === 'u' ? 'punch' : keys.mode === 'm' ? 'swing' : keys.mode === 'g' ? 'shoot' : null;
+  let attack: Anim | null = keys.two && counts.heavy ? 'heavy' : keys.stab && counts.stab ? 'stab' : keys.mode === 'u' ? 'punch' : keys.mode === 'm' ? 'swing' : keys.mode === 'g' ? 'shoot' : null; // 39차: 단검류는 찌르기
   // 그 몸에 그 공격 장면이 없으면 (아직 굽지 않은 차림 등) 있는 공격 장면으로 — 서 있는 그대로 때리지 않게
   if (attack && !counts[attack]) attack = (['punch', 'swing', 'heavy', 'shoot'] as Anim[]).find((a) => counts[a]) ?? attack;
   return { px: P, mode: keys.mode, attack, frames, counts, masks, eight: frames.has('hit-s-0'), hold2: !!keys.two && !!counts.idle2 && !!counts.walk2 };
