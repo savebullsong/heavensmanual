@@ -17,7 +17,7 @@ import { t, lang, setLang, LANGS, type Lang } from './i18n.ts';
 import { load, save, type Slot, type Stash } from './state.ts';
 import { hellZone, OPEN_FLOORS, floorDef, MONSTERS, GUARDS, TOLL, ATONE_GOAL, GURMA_FULL, setRaidForce, FLOORS, FIELD_BOSS } from './hell.ts';
 import type { HellVendor } from './zone.ts';
-import { interiorZone, roomKind as roomKindOf, canEnter } from './interior.ts';
+import { interiorZone, roomKind as roomKindOf, canEnter, voidZone } from './interior.ts';
 import { borderZone } from './border.ts';
 import { TWO, DOT3, setDot3 } from './sprites.ts';
 import { buildingName, hasBank } from './names.ts';
@@ -184,6 +184,11 @@ function refreshCage() {
   shop.setCage(icons);
 }
 /** 우리 창: 꺼내기(수수료) · 맡기기(공짜). 맡기는 것은 무엇이든 — 끼고 있는 하나뿐인 장비만 빼고 */
+/** 34차 보관 우리 칸: 물건 종류 하나가 한 칸 (탄약 주머니도 한 칸). 처음 6칸, 돈을 내고 2칸씩 늘린다 (최대 30칸). 죽어서 봉인된 물건은 칸을 넘어도 들어간다 */
+const CAGE_BASE = 6, CAGE_STEP = 2, CAGE_MAX = 30;
+function cageCap(w: 'real' | 'hell') { return Math.min(CAGE_MAX, CAGE_BASE + (state.cageExtra?.[w] ?? 0)); }
+function cageUsed(w: 'real' | 'hell') { const v = state.vault?.[w]; return v ? Object.values(v.bag).filter((n) => n > 0).length + (v.ammo > 0 ? 1 : 0) : 0; }
+function cageExpandCost(w: 'real' | 'hell') { const k = (state.cageExtra?.[w] ?? 0) / CAGE_STEP + 1; return w === 'hell' ? 60 * k : 5000 * k; }
 function openCage() {
   closeMenus();
   document.querySelector('.store-panel')?.remove();
@@ -210,6 +215,28 @@ function openCage() {
     list.innerHTML = '';
     bStore.classList.toggle('on', mode === 'store'); bReal.classList.toggle('on', mode === 'real'); bHell.classList.toggle('on', mode === 'hell');
     if (mode === 'store') {
+      // 34차: 칸 수와 늘리기
+      {
+        const used = cageUsed(w), cap = cageCap(w), cost = cageExpandCost(w);
+        const head = document.createElement('div'); head.className = 'cage-slots';
+        const sp = document.createElement('span'); sp.textContent = L.cageSlots.replace('{u}', String(used)).replace('{m}', String(cap)); if (used >= cap) sp.className = 'full';
+        const bx = document.createElement('button');
+        bx.textContent = cap >= CAGE_MAX ? L.cageMaxed : L.cageExpand.replace('{n}', String(CAGE_STEP)).replace('{p}', priceText(cost, hell));
+        bx.disabled = cap >= CAGE_MAX;
+        bx.onclick = async () => {
+          if (!(await confirmBox(L.cageExpandAsk.replace('{n}', String(CAGE_STEP)).replace('{p}', priceText(cost, hell)), L.cageExpandGo))) return;
+          const have = hell ? hellState().notes : state.wallet ?? 0;
+          if (have < cost) { toast(hell ? L.hwNoMoney : L.noMoney); return; }
+          if (hell) hellState().notes -= cost; else state.wallet = (state.wallet ?? 0) - cost;
+          ecoLog('spend', 'cage', cost, hell);
+          state.cageExtra = { ...(state.cageExtra ?? {}), [w]: (state.cageExtra?.[w] ?? 0) + CAGE_STEP };
+          save(state); renderHud();
+          toast(L.cageExpanded.replace('{m}', String(cageCap(w))), 'good');
+          draw();
+        };
+        head.append(sp, bx);
+        list.appendChild(head);
+      }
       const bag = state.bag ?? {};
       const worn = new Set(Object.values(state.equip ?? {}));
       const mine = Object.keys(bag).filter((k) => bag[k] > 0 && !(worn.has(k) && bag[k] <= 1)).map(itemByKey).filter(Boolean);
@@ -217,6 +244,7 @@ function openCage() {
       for (const it of mine) {
         const row = itemRow(it, `×${(bag[it.key] ?? 0) - (worn.has(it.key) ? 1 : 0)}`, async () => {
           const room = (state.bag?.[it.key] ?? 0) - (worn.has(it.key) ? 1 : 0);
+          if (!((state.vault?.[w]?.bag[it.key] ?? 0) > 0) && cageUsed(w) >= cageCap(w)) { toast(L.cageFull, 'evil'); return; } // 34차: 새 종류는 빈 칸이 있어야
           const n = room > 1 ? await askQty(it, 0, room, 'store') : 1;
           if (n <= 0 || (state.bag?.[it.key] ?? 0) < n) return;
           state.bag![it.key] -= n;
@@ -297,6 +325,7 @@ async function parrotFee(sel: { r: { key: string; it: ItemDef; n: number; ammo?:
     if (have < fee) { await dlg.say(pick(L.parrotBroke)); }
     else {
       if (hell) hellState().notes -= fee; else state.wallet = (state.wallet ?? 0) - fee;
+      ecoLog('spend', 'fee', fee, hell);
       const v = state.vault![w]!;
       for (const { r, n } of sel) {
         if (r.ammo) { const k = Math.min(v.ammo, n * 12); state.ammo = (state.ammo ?? 0) + k; v.ammo -= k; ammoGear(); }
@@ -353,9 +382,10 @@ async function boot() {
   else if (realm() === 'ghost' || realm() === 'heaven') enterWorld(realm() === 'heaven' ? 'door' : undefined);
   else enterShop(false);
   setInterval(updateHud, 1000);
-  setInterval(() => { snapPos(); state.played = (state.played ?? 0) + 4; state.seen = Date.now(); save(state); }, 4000);
+  setInterval(() => { snapPos(); state.played = (state.played ?? 0) + 4; state.seen = Date.now(); if (scene === 'world' && !document.hidden) ecoDay().t += 4; save(state); }, 4000);
   addEventListener('pagehide', () => { snapPos(); save(state); });
-  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior(), store: (k: 'tools' | 'antique', n: string) => openStore(k, n), terrace: () => enterTerrace(), officer: () => talkToOfficer(), pasharTalk: () => talkToPashar(), cage: () => openCage(), parrot: () => talkToParrot(), hstore: (k: HellVendor) => openHellStore(k), smith: () => openSmith(), soul: () => renderSoul(), give: (k: string) => { addToBag(itemByKey(k)); save(state); }, regear: () => world?.setGear(gear()) }; // 개발용 확인 창구
+  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior(), store: (k: 'tools' | 'antique', n: string) => openStore(k, n), terrace: () => enterTerrace(), officer: () => talkToOfficer(), pasharTalk: () => talkToPashar(), cage: () => openCage(), parrot: () => talkToParrot(), hstore: (k: HellVendor) => openHellStore(k), smith: () => openSmith(), soul: () => renderSoul(), give: (k: string) => { addToBag(itemByKey(k)); save(state); }, regear: () => world?.setGear(gear()), eco: () => openEcoStats(), perf: (v: boolean) => setPerf(v), xchTalk: () => talkToChanger(), shopIn: () => enterShop(true), ferum: () => talkToFerum(), parrotFeed: (n: number) => { state.parrotFed = n; save(state); } }; // 개발용 확인 창구
+  if (perfOn()) setPerf(true); // 34차: 관리자가 켜 둔 성능 표시
 }
 
 // ───────────────────────── 장면 전환 ─────────────────────────
@@ -723,8 +753,16 @@ const hooks: WorldHooks = {
   goatKing: () => (gkPending ? talkToGoatKing(gkPending.reason, gkPending.want) : talkToGoatKing('visit')),
   changer: () => void talkToChanger(),
   notice(text) { toast(text, 'evil'); },
+  thanks(n) {
+    // 34차: 도움받은 행인이 쥐여 준 사례
+    state.wallet = (state.wallet ?? 0) + n;
+    ecoLog('earn', 'thanks', n);
+    save(state); updateHud();
+    toast(t().thanksGot.replace('{n}', priceText(n)), 'good');
+  },
   money(n) {
     state.wallet = (state.wallet ?? 0) + n;
+    ecoLog('earn', 'drop', n);
     updateHud();
   },
   elder(name) {
@@ -741,6 +779,7 @@ const hooks: WorldHooks = {
     }
     if (n <= 0) return;
     state.wallet = (state.wallet ?? 0) + n;
+    ecoLog('earn', 'work', n);
     updateHud();
     toast(L.wagePaid.replace('{n}', amt), 'good');
   },
@@ -910,6 +949,7 @@ const hooks: WorldHooks = {
   },
   notes(n) {
     hellState().notes += n;
+    ecoLog('earn', 'drop', n, true);
     updateHud();
   },
   loot(key) {
@@ -924,7 +964,8 @@ const hooks: WorldHooks = {
     renderQuick();
   },
   vendor(kind) {
-    if (kind === 'smith') openSmith();
+    if (kind === 'smith' && inHell() && hellState().floor === 4) void talkToFerum(); // 34차: 4층은 페룸
+    else if (kind === 'smith') openSmith();
     else openHellStore(kind);
   },
   homeAlley() {
@@ -970,9 +1011,10 @@ function enterInterior(k: number, out: { i: number; j: number }, chaser: { monst
   if (!world || world.zone.interior || busy) return;
   const b = world.zone.buildings[k];
   const L0 = t();
-  openRoom(interiorZone(b, k, out, b.cat === 'loan' ? L0.beskHouse : b.cat === 'hbank' ? L0.hbankName : b.cat === 'atone' ? L0.atoneName : b.cat === 'rebirth' ? L0.rebirthName : buildingName(b, lang()), b.cat === 'home' ? world.yunaeAge : undefined), chaser, work);
-  // 28차: 20대 유내의 날에는 방이 비어 있다 — 들어서면 짧은 혼잣말
-  if (b.cat === 'home' && street?.yunaeAge === 1 && !busy) void (async () => { busy = true; dlg.open({ name: '', monologue: true }); await dlg.say(pick(L0.yunaeEmpty)); dlg.close(); busy = false; })();
+  const age = world.yunaeAge;
+  openRoom(interiorZone(b, k, out, b.cat === 'loan' ? L0.beskHouse : b.cat === 'hbank' ? L0.hbankName : b.cat === 'atone' ? L0.atoneName : b.cat === 'rebirth' ? L0.rebirthName : b.cat === 'home' ? L0.yunaePlace[age] : buildingName(b, lang()), b.cat === 'home' ? age : undefined), chaser, work);
+  // 34차: 대문을 열면 집이 아니라 그날의 유내가 있는 곳 — 들어서면 짧은 혼잣말
+  if (b.cat === 'home' && !busy) { yunaeLooked = false; void (async () => { busy = true; dlg.open({ name: '', monologue: true }); await dlg.say(pick(L0.yunaeIn[age])); dlg.close(); busy = false; })(); }
 }
 /** 19차: 천국의 구름 계단 → 환생의 테라스. 거리의 건물이 아니라 구름 위에 따로 떠 있는 단 (환생관 루엔은 여기에만 있다) */
 function enterTerrace() {
@@ -1057,6 +1099,7 @@ function daily() {
 function pay(n: number) {
   if ((state.wallet ?? 0) < n) { toast(t().payShort); return false; }
   state.wallet = (state.wallet ?? 0) - n;
+  ecoLog('spend', 'service', n);
   updateHud();
   return true;
 }
@@ -1158,6 +1201,7 @@ async function talkToElder(name: string) {
     else if ((state.wallet ?? 0) < RESET_COST) await dlg.say(L.elderPoor);
     else {
       state.wallet = (state.wallet ?? 0) - RESET_COST;
+      ecoLog('spend', 'service', RESET_COST);
       state.soul = { ...state.soul!, stats: { str: 1, agi: 1, vit: 1, fai: s.fai } };
       state.hp = Math.min(state.hp ?? maxHp(), maxHp());
       world?.setStats(stats());
@@ -1218,6 +1262,7 @@ async function passUp() {
   if (c === 0 && h.notes < fare) await dlg.say(L.tollPoor.replace('{n}', fare.toLocaleString('en-US')));
   else if (c === 0) {
     h.notes -= fare;
+    ecoLog('spend', 'fee', fare, true);
     h.paid = [...(h.paid ?? []), f];
     save(state); renderHud();
     await dlg.say(L.tollPaid);
@@ -1270,6 +1315,7 @@ async function talkToMaskGirl() {
     if (ok !== 0) continue;
     if (h.notes < it.price) { await dlg.say(L.maskPoor); continue; }
     h.notes -= it.price;
+    ecoLog('spend', 'shop', it.price, true);
     addToBag(it);
     save(state); renderHud(); renderQuick();
     await dlg.say(c === 0 ? L.maskSold : L.flamerSold);
@@ -1307,8 +1353,8 @@ async function talkToTalus() {
     const d1 = 1 + Math.floor(Math.random() * 6), d2 = 1 + Math.floor(Math.random() * 6), sum = d1 + d2, odd = sum % 2 === 1;
     sfx.dice();
     await dlg.say(L.talusRoll.replace('{a}', String(d1)).replace('{b}', String(d2)).replace('{s}', String(sum)).replace('{r}', odd ? L.talusOddW : L.talusEvenW));
-    if (odd === (c === 0)) { h.notes += bet; await dlg.say(L.talusWin.replace('{n}', String(bet))); }
-    else { h.notes -= bet; await dlg.say(L.talusLose.replace('{n}', String(bet))); }
+    if (odd === (c === 0)) { h.notes += bet; ecoLog('earn', 'gamble', bet, true); await dlg.say(L.talusWin.replace('{n}', String(bet))); }
+    else { h.notes -= bet; ecoLog('spend', 'gamble', bet, true); await dlg.say(L.talusLose.replace('{n}', String(bet))); }
     save(state); renderHud();
   }
   endTalk();
@@ -1325,12 +1371,12 @@ async function talkToPashar() {
   const L = t();
   const h = hellState();
   busy = true;
-  dlg.open({ name: L.pashar, portrait: 'pashar' });
+  dlg.open({ name: L.pashar, portrait: 'pashar', exit: true });
   await dlg.say(L.lobbyGreet);
   const ratio = Math.round(evilRatio(state.deeds ?? { good: 0, evil: 0 }) ?? 100);
   await dlg.say(L.lobbyRatio.replace('{r}', String(ratio)));
   // 19차 환생 혜택 둘: 가진 노전(손에 든 것 + 은행)으로 산다. 은행 돈은 저절로 빠진다
-  const spend = (n: number) => { const a = Math.min(n, Math.floor(h.notes)); h.notes -= a; h.bank = Math.max(0, (h.bank ?? 0) - (n - a)); save(state); renderHud(); };
+  const spend = (n: number) => { ecoLog('spend', 'perk', n, true); const a = Math.min(n, Math.floor(h.notes)); h.notes -= a; h.bank = Math.max(0, (h.bank ?? 0) - (n - a)); save(state); renderHud(); };
   await dlg.say(L.perkIntro);
   for (;;) {
     const obol = Math.floor(h.notes + (h.bank ?? 0));
@@ -1339,6 +1385,7 @@ async function talkToPashar() {
       L.perkInd.replace('{n}', String(INDULGENCE)).replace('{h}', String(ind)),
       L.perkKerb.replace('{n}', String(KERBEROS)).replace('{h}', String(state.kerberos ?? 0)),
       L.perkDone.replace('{o}', obol.toLocaleString('en-US')),
+      L.lobbyLeave,
     ]);
     if (c === 0) {
       if (ind >= 10) await dlg.say(L.perkIndMax);
@@ -1347,20 +1394,23 @@ async function talkToPashar() {
     } else if (c === 1) {
       if (obol < KERBEROS) await dlg.say(L.perkPoor);
       else { spend(KERBEROS); state.kerberos = (state.kerberos ?? 0) + 1; save(state); await dlg.say(L.perkKerbGot); }
-    } else break;
+    } else if (c === 2) break;
+    else { if (c === 3) await dlg.say(L.lobbyLater); dropped() || endTalk(); return; } // 34차: 그만두고 나간다 (✕도 같다)
   }
   let region = 'bkk';
   if (ratio >= 100) { await dlg.say(L.lobbyNoCity); await dlg.say(L.lobbyCityRandom); }
   // 33차: 노전 → 현생의 돈은 업(시작할 층 ÷ 13)만큼만, 값은 형편없이 · 수수료는 따로
   const x = await rebirthExchange();
+  if (dropped() || !x) return;
   await dlg.say(L.lobbyAsk);
   const go = await dlg.choose([L.lobbyGo, L.lobbyWait]);
-  if (go === 1) { dlg.close(); busy = false; return; }
+  if (go !== 0) { if (!dropped()) endTalk(); return; }
   // 26차: 다음 생의 몸·도시·가져갈 물건을 여기서 정한다 (악행 100%면 도시는 고를 수 없다)
   if (ratio < 100) await dlg.say(L.lobbyCity);
-  await prepareNextLife({ name: L.pashar, portrait: 'pashar' }, ratio >= 100 ? (Math.random() < 0.5 ? 'seoul' : 'bkk') : null);
+  if (!(await prepareNextLife({ name: L.pashar, portrait: 'pashar', exit: true }, ratio >= 100 ? (Math.random() < 0.5 ? 'seoul' : 'bkk') : null))) return;
   region = state.nextLife?.region ?? region;
   await dlg.say(L.lobbyBye);
+  if (dropped()) { delete state.nextLife; save(state); return; }
   dlg.close();
   busy = false;
   state.region = region;
@@ -1370,7 +1420,7 @@ async function talkToPashar() {
  * 33차 환생할 때의 환전 (파샤르 · 지옥의 할아버지): 가진 노전(손 + 지옥 은행) 중 업만큼(시작할 층 ÷ 13)만 현생의 돈으로.
  * 노전은 저 위에선 쇳조각 — 1닢 = ฿1, 수수료는 바꾸는 노전의 3할 + 20닢 따로 (치를 노전이 있어야 바꾼다)
  */
-async function rebirthExchange(): Promise<{ n: number; fee: number }> {
+async function rebirthExchange(): Promise<{ n: number; fee: number } | null> {
   const L = t();
   const h = hellState();
   const own = Math.floor(h.notes + (h.bank ?? 0));
@@ -1381,10 +1431,12 @@ async function rebirthExchange(): Promise<{ n: number; fee: number }> {
   while (max > 0 && max + fee(max) > own) max--;
   const sc = seoulCash();
   await dlg.say(L.lobbyXRule.replace('{o}', own.toLocaleString('en-US')).replace(/\{f\}/g, String(F)).replace('{p}', (Math.floor(share * 1000) / 10).toFixed(1)).replace('{r}', cashText(XCH_BAHT_PER_OBOL, sc)).replace('{c}', String(XCH_OBOL_FEE_BASE)));
-  if (max < 1) { await dlg.say(L.lobbyXPoor); return { n: 0, fee: 0 }; }
+  if (dlg.cancelled) return null;
+  if (max < 1) { await dlg.say(L.lobbyXPoor); return dlg.cancelled ? null : { n: 0, fee: 0 }; }
   const opts = [...new Set([max, ...(max >= 4 ? [Math.ceil(max / 2)] : [])])];
   const c = await dlg.choose([...opts.map((n) => L.lobbyXOpt.replace('{n}', n.toLocaleString('en-US')).replace('{a}', cashText(n * XCH_BAHT_PER_OBOL, sc)).replace('{f}', fee(n).toLocaleString('en-US'))), L.lobbyXNone]);
-  if (c < 0 || c >= opts.length) return { n: 0, fee: 0 };
+  if (c < 0) return null;
+  if (c >= opts.length) return { n: 0, fee: 0 };
   return { n: opts[c], fee: fee(opts[c]) };
 }
 /** 고른 환전을 치르고 현실로 (노전은 손에 든 것부터, 모자라면 지옥 은행에서) */
@@ -1395,6 +1447,7 @@ function payRebirthExchange(x: { n: number; fee: number }) {
   h.notes -= fromHand;
   h.bank = Math.max(0, (h.bank ?? 0) - (total - fromHand));
   const cash = x.n * XCH_BAHT_PER_OBOL;
+  ecoLog('spend', 'exchange', total, true); ecoLog('earn', 'exchange', cash);
   rebirthFrom('hell', cash);
   if (x.n > 0) setTimeout(() => toast(t().lobbyCarry2.replace('{n}', x.n.toLocaleString('en-US')).replace('{a}', cashText(cash, seoulCash())), 'good'), 600);
 }
@@ -1403,7 +1456,7 @@ async function talkToChanger() {
   if (busy || dlg.isOpen) return;
   const L = t();
   busy = true;
-  dlg.open({ name: L.xchName, portrait: 'changer' });
+  dlg.open({ name: L.xchName, portrait: 'changer', exit: true });
   await dlg.say(pick(L.xchGreet));
   const F = inHell() ? hellState().floor : karmaFloor();
   const share = xchShare(F);
@@ -1418,14 +1471,20 @@ async function talkToChanger() {
   let n = Math.floor(Math.min(cap, (bank - XCH_CASH_FEE_BASE) / (1 + XCH_CASH_FEE_RATE)) / R);
   while (n > 0 && n * R + fee(n * R) > bank) n--;
   await dlg.say(L.xchRule.replace('{b}', cashText(bank, sc)).replace(/\{f\}/g, String(F)).replace('{p}', (Math.floor(share * 1000) / 10).toFixed(1)).replace('{r}', cashText(R, sc)).replace('{c}', cashText(XCH_CASH_FEE_BASE, sc)));
-  if (n < 1) await dlg.say(xs.used > 0 && cap < R ? L.xchUsedUp : L.xchPoor);
-  else {
+  if (n < 1) {
+    // 34차: 바꿀 수 없어도 선택지는 보인다 — 1닢을 바꾸려면 통장에 얼마가 있어야 하는지 (흐리게) · 물러난다
+    const used = xs.used > 0 && cap < R;
+    const need = Math.max(R + fee(R), Math.ceil((xs.used + R) / share));
+    await dlg.say(used ? L.xchUsedUp : L.xchPoor);
+    await dlg.choose([used ? L.xchOptUsed : L.xchOptNeed.replace('{a}', cashText(need, sc)), L.xchQuit], [0]);
+  } else {
     const opts = [...new Set([n, ...(n >= 4 ? [Math.ceil(n / 2)] : []), ...(n >= 2 ? [1] : [])])];
     const c = await dlg.choose([...opts.map((k) => L.xchOpt.replace('{a}', cashText(k * R, sc)).replace('{n}', String(k)).replace('{f}', cashText(fee(k * R), sc))), L.xchQuit]);
     if (c >= 0 && c < opts.length) {
       const k = opts[c], a = k * R, f = fee(a);
       state.bank = Math.max(0, (state.bank ?? 0) - a - f);
       hellState().notes += k;
+      ecoLog('spend', 'exchange', a + f); ecoLog('earn', 'exchange', k, true);
       xs.used += a;
       save(state); renderHud();
       sfx.dice();
@@ -1540,7 +1599,7 @@ async function talkToBulda(force = false) {
     else if (c === 3) {
       await dlg.say(L.buldaRebirthAsk);
       const y = await dlg.choose([L.buldaRebirthYes, L.buldaRebirthNo]);
-      if (y === 0) { await prepareNextLife({ name: L.bulda, portrait: 'bulda' }, null); await dlg.say(L.buldaRebirthGo); dlg.close(); busy = false; leaveBorder(); return; }
+      if (y === 0) { if (!(await prepareNextLife({ name: L.bulda, portrait: 'bulda' }, null))) return; await dlg.say(L.buldaRebirthGo); dlg.close(); busy = false; leaveBorder(); return; }
       await dlg.say(L.buldaStay);
     } else break;
   }
@@ -1557,14 +1616,17 @@ function yunaePick<T>(slot: number, a: readonly T[]): T {
   yunaeLast[slot] = k;
   return a[k];
 }
+/** 34차: 놀이터(10대) · 미용실(20대, 손님 머리를 자르며 말한다) · 진료실(30대 후반, 걱정스레 본다). 들어와 처음 말을 걸면 그 모습부터 */
+let yunaeLooked = false;
 async function talkToYunae() {
   const L = t();
   if (busy) return;
-  const age = world?.zone.interior?.age ?? 0;
-  if (age === 1) return; // 20대의 유내는 집 안에 없다 (대문 앞 · talkToYunaeOut)
+  const age = (world?.zone.interior?.age ?? 0) as 0 | 1 | 2;
   busy = true;
-  dlg.open({ name: L.yunae, portrait: age === 0 ? 'yunae-teen' : 'yunae-30s' }); // 시절마다 다른 그림 (비면 공통 그림)
-  for (const line of yunaePick(age, age === 0 ? L.yunaeTeen : L.yunae30)) await dlg.say(line);
+  if (!yunaeLooked) { yunaeLooked = true; dlg.open({ name: '', monologue: true }); await dlg.say(L.yunaeLook[age]); }
+  dlg.open({ name: L.yunae, portrait: age === 0 ? 'yunae-teen' : age === 1 ? 'yunae-20s' : 'yunae-30s' }); // 시절마다 다른 그림 (비면 공통 그림)
+  for (const line of yunaePick(age, age === 0 ? L.yunaeTeen : age === 1 ? L.yunae20 : L.yunae30)) await dlg.say(line);
+  if (age === 1) await dlg.say(yunaePick(3, L.yunae20Go));
   dlg.close();
   busy = false;
 }
@@ -1723,6 +1785,7 @@ async function talkToHwang() {
       if (n <= 0) continue;
       state.bag![it.key] = have - n;
       if (hell) hellState().notes += unit * n; else state.wallet = (state.wallet ?? 0) + unit * n;
+      ecoLog('earn', 'sell', unit * n, hell);
       save(state);
       renderHud();
       await dlg.say(L.sold.replace('{item}', name).replace('{n}', String(n)).replace('{p}', priceText(unit * n, hell)));
@@ -1740,6 +1803,7 @@ async function talkToHwang() {
     }
     if (hell) hellState().notes -= it.price * n;
     else state.wallet = (state.wallet ?? 0) - it.price * n;
+    ecoLog('spend', 'shop', it.price * n, hell);
     for (let k = 0; k < n; k++) addToBag(it);
     save(state);
     renderHud();
@@ -1768,6 +1832,7 @@ async function talkToBesk() {
   if (c < amounts.length) {
     const n = amounts[c];
     h.notes += n;
+    ecoLog('earn', 'loan', n, true);
     state.debt = debt() + n * 2;
     save(state);
     renderHud();
@@ -1777,6 +1842,7 @@ async function talkToBesk() {
     else {
       const pay = Math.min(h.notes, debt());
       h.notes -= pay;
+      ecoLog('spend', 'loan', pay, true);
       state.debt = debt() - pay;
       save(state);
       renderHud();
@@ -1805,6 +1871,107 @@ function endTalk() {
   dlg.close();
   shop.lock(false);
   busy = false;
+}
+/** 34차 관리자 경제 통계: 돈이 들고 나는 곳마다 적는다 (날짜별 · 갈래별 · 현실 돈과 노전 따로). 최근 14일만 남긴다 */
+function ecoDay() {
+  const d = new Date(), key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  state.eco = state.eco ?? {};
+  if (!state.eco[key]) {
+    state.eco[key] = { e: {}, s: {}, he: {}, hs: {}, t: 0 };
+    const keys = Object.keys(state.eco).sort();
+    while (keys.length > 14) delete state.eco[keys.shift()!];
+  }
+  return state.eco[key];
+}
+function ecoLog(dir: 'earn' | 'spend', cat: string, n: number, hell = false) {
+  if (!(n > 0)) return;
+  const d = ecoDay();
+  const b = hell ? (dir === 'earn' ? d.he : d.hs) : dir === 'earn' ? d.e : d.s;
+  b[cat] = (b[cat] ?? 0) + Math.round(n);
+}
+/** 34차 관리자 경제 통계 창: 오늘 · 최근 7일 — 갈래별로 들어온 돈·나간 돈 (현실 돈 / 노전), 지금 가진 것, 논 시간과 시간당 수입 */
+function openEcoStats() {
+  closeMenus();
+  document.querySelector('.store-panel')?.remove();
+  const L = t();
+  const el = document.createElement('div');
+  el.className = 'store-panel shop-menu eco-panel';
+  el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close">✕</button></div><p class="store-line"></p><div class="menu-list"></div>`;
+  el.querySelector('.menu-head b')!.textContent = L.ecoTitle;
+  el.querySelector('.store-line')!.textContent = L.ecoLine;
+  (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
+  const list = el.querySelector('.menu-list')!;
+  const days = Object.keys(state.eco ?? {}).sort();
+  const last = (n: number) => days.slice(-n).map((k) => state.eco![k]);
+  const sum = (ds: { e: Record<string, number>; s: Record<string, number>; he: Record<string, number>; hs: Record<string, number> }[], f: 'e' | 's' | 'he' | 'hs') => { const o: Record<string, number> = {}; for (const d of ds) for (const [k, v] of Object.entries(d[f])) o[k] = (o[k] ?? 0) + v; return o; };
+  const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
+  const cat = (k: string) => (L.ecoCats as Record<string, string>)[k] ?? k;
+  const h = state.hell;
+  const hold = document.createElement('p'); hold.className = 'eco-hold';
+  hold.textContent = L.ecoHold.replace('{w}', priceText(Math.floor(state.wallet ?? 0))).replace('{b}', priceText(Math.floor(state.bank ?? 0))).replace('{n}', fmt(h?.notes ?? 0)).replace('{hb}', fmt(h?.bank ?? 0));
+  list.appendChild(hold);
+  const today = last(1), week = last(7);
+  const secs = (ds: { t: number }[]) => ds.reduce((a, d) => a + (d.t ?? 0), 0);
+  for (const [title, ds] of (days.length > 1 ? [[L.ecoToday, today], [L.ecoWeek, week]] : [[L.ecoToday, today]]) as [string, typeof today][]) { // 하루치뿐이면 같은 표를 두 번 보이지 않는다
+    const box = document.createElement('div'); box.className = 'eco-box';
+    const hrs = secs(ds) / 3600;
+    const e = sum(ds, 'e'), sp = sum(ds, 's'), he = sum(ds, 'he'), hs = sum(ds, 'hs');
+    const tot = (o: Record<string, number>) => Object.values(o).reduce((a, b) => a + b, 0);
+    const head = document.createElement('b'); head.textContent = `${title} · ${L.ecoPlay.replace('{h}', hrs.toFixed(1))}`; box.appendChild(head);
+    const table = document.createElement('table'); table.className = 'eco-table';
+    const row = (a: string, b: string, c: string, cls = '') => { const tr = document.createElement('tr'); if (cls) tr.className = cls; for (const x of [a, b, c]) { const td = document.createElement('td'); td.textContent = x; tr.appendChild(td); } table.appendChild(tr); };
+    row('', L.ecoReal, L.ecoObol, 'eco-th');
+    const keysIn = [...new Set([...Object.keys(e), ...Object.keys(he)])];
+    const keysOut = [...new Set([...Object.keys(sp), ...Object.keys(hs)])];
+    row(L.ecoIn, '', '', 'eco-sec');
+    for (const k of keysIn.sort((a, b) => (e[b] ?? 0) + (he[b] ?? 0) - (e[a] ?? 0) - (he[a] ?? 0))) row(cat(k), e[k] ? fmt(e[k]) : '·', he[k] ? fmt(he[k]) : '·');
+    row(L.ecoOut, '', '', 'eco-sec');
+    for (const k of keysOut.sort((a, b) => (sp[b] ?? 0) + (hs[b] ?? 0) - (sp[a] ?? 0) - (hs[a] ?? 0))) row(cat(k), sp[k] ? fmt(sp[k]) : '·', hs[k] ? fmt(hs[k]) : '·');
+    row(L.ecoNet, fmt(tot(e) - tot(sp)), fmt(tot(he) - tot(hs)), 'eco-net');
+    if (hrs > 0.05) row(L.ecoPerHour, fmt(tot(e) / hrs), fmt(tot(he) / hrs), 'eco-net');
+    box.appendChild(table);
+    if (!keysIn.length && !keysOut.length) { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = L.ecoEmpty; box.appendChild(p); }
+    list.appendChild(box);
+  }
+  panelAt(el);
+}
+/** 34차 관리자 성능 표시: 초당 장면 수 · 한 장면 시간(평균/최대) · 해상도 · 메모리 · 장면 위 물체 수 · 구역 (실기기 확인용, 이 기기에만 저장) */
+const PERF_KEY = 'heavensmanual.perf';
+const perfOn = () => { try { return localStorage.getItem(PERF_KEY) === '1' && !!net.account()?.admin; } catch { return false; } };
+let perfEl: HTMLElement | null = null;
+let perfTick: (() => void) | null = null;
+function setPerf(on: boolean) {
+  try { if (on) localStorage.setItem(PERF_KEY, '1'); else localStorage.removeItem(PERF_KEY); } catch { /* 저장 안 되면 이번만 */ }
+  if (perfTick) { app.ticker.remove(perfTick); perfTick = null; }
+  perfEl?.remove(); perfEl = null;
+  if (!on) return;
+  perfEl = document.createElement('div');
+  perfEl.className = 'perf-hud';
+  document.body.appendChild(perfEl);
+  let n = 0, acc = 0, worst = 0, t0 = performance.now();
+  perfTick = () => {
+    const dt = app.ticker.deltaMS;
+    n++; acc += dt; worst = Math.max(worst, dt);
+    const now = performance.now();
+    if (now - t0 < 500 || !perfEl) return;
+    const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
+    const pi = world?.perfInfo();
+    const r = app.renderer;
+    perfEl.textContent = [
+      `FPS ${(1000 / (acc / n)).toFixed(0)}  ·  ${(acc / n).toFixed(1)}ms / max ${worst.toFixed(0)}ms`,
+      `${r.name ?? 'renderer'} · res ${r.resolution} · ${r.width}×${r.height}${mem ? ` · JS ${(mem.usedJSHeapSize / 1048576).toFixed(0)}MB` : ''}`,
+      pi ? `${pi.zone}${pi.room ? ` (${pi.room})` : ''} ${pi.W}×${pi.H} · walkers ${pi.walkers} · objects ${pi.objects} · nodes ${pi.sprites}` : scene,
+    ].join('\n');
+    n = 0; acc = 0; worst = 0; t0 = now;
+  };
+  app.ticker.add(perfTick);
+}
+/** 34차: ✕로 그만둔 대화면 정리하고 true (환전상·환생관 상담 곳곳에서 묻는다) */
+function dropped(): boolean {
+  if (!dlg.cancelled) return false;
+  world?.setLook(bodyLook());
+  endTalk();
+  return true;
 }
 
 /** 되팔 때 값: 산 값의 4할 (적어도 1) */
@@ -1937,13 +2104,56 @@ async function talkToParrot() {
     if (have < price) await dlg.say(hell ? L.hwNoMoney : L.noMoney);
     else {
       if (hell) hellState().notes -= price; else state.wallet = (state.wallet ?? 0) - price;
+      ecoLog('spend', 'parrot', price, hell);
+      // 34차: 먹이 준 횟수 (1~144를 돈다) — 108번째엔 경계의 해변, 144번째엔 우주 어딘가의 유리 바닥 방이 잠깐 보인다
+      const fed = (state.parrotFed ?? 0) % 144 + 1;
+      state.parrotFed = fed;
       save(state); renderHud();
       shop.crest(true);
       await dlg.say(pick(L.parrotEat));
-      if (Math.random() < 0.25) { await dlg.say(L.parrotVoice); await dlg.say(pick(L.parrotAfter)); }
+      if (fed !== 108 && fed !== 144 && Math.random() < 0.25) { await dlg.say(L.parrotVoice); await dlg.say(pick(L.parrotAfter)); }
       shop.crest(false);
+      if (fed === 108 || fed === 144) { await parrotVision(fed === 108 ? 'shore' : 'void'); return; }
     }
   }
+  endTalk();
+}
+/**
+ * 34차 앵무새가 보여 주는 곳: 하얗게 바래며 잠깐 다른 곳에 서 있다 — 혼잣말 한마디 뒤 다시 우주새.
+ * 저장(세계·자리)은 건드리지 않는다. 그동안 다른 것은 누를 수 없다 (busy)
+ */
+async function parrotVision(kind: 'shore' | 'void') {
+  const L = t();
+  dlg.close();
+  const fx = worldFade('heaven', false);
+  await fx.covered;
+  shop.stop();
+  shop.root.visible = false;
+  hud.hidden = true;
+  const z = kind === 'shore' ? borderZone(L.borderName) : voidZone(L.voidName);
+  const v = new WorldScene(app, z, bodyLook(), () => undefined, hooks, maxHp(), { realm: 'border' });
+  app.stage.addChild(v.root);
+  v.setLook(bodyLook());
+  v.setGear(gear());
+  v.placeNear(z.spawn.i, z.spawn.j, maxHp());
+  v.setStance('talk');
+  v.start();
+  if (kind === 'shore') showPlace(L.borderName, L.borderSub);
+  fx.done();
+  await new Promise((r) => setTimeout(r, 2600));
+  dlg.open({ name: '', monologue: true });
+  for (const line of kind === 'shore' ? L.parrotSee108 : L.parrotSee144) await dlg.say(line);
+  dlg.close();
+  await new Promise((r) => setTimeout(r, 900));
+  const fx2 = worldFade('heaven', false);
+  await fx2.covered;
+  v.stop();
+  v.destroy();
+  shop.root.visible = true;
+  shop.start();
+  hud.hidden = false;
+  renderHud();
+  fx2.done();
   endTalk();
 }
 
@@ -2179,22 +2389,23 @@ function askQty(it: ItemDef, unit: number, max: number, verb: 'buy' | 'sell' | '
 /** 29차: 장비(무기·방어구·탄약)는 눌러도 바로 사지지 않는다 — 몇 개 살지 한 번 더 */
 const needsConfirm = (it: ItemDef) => !it.now;
 /** 29차: 모든 가게의 '사기 · 팔기' 탭 (가게 이름 줄 아래) */
-function storeTabs(el: HTMLElement, mode: () => 'buy' | 'sell' | 'repair', set: (m: 'buy' | 'sell' | 'repair') => void, repair = false) {
+type StoreMode = 'buy' | 'sell' | 'repair' | 'enh';
+function storeTabs(el: HTMLElement, mode: () => StoreMode, set: (m: StoreMode) => void, repair = false) {
   const L = t();
   const tabs = document.createElement('div');
   tabs.className = 'menu-tabs store-tabs';
-  const mk = (m: 'buy' | 'sell' | 'repair', label: string) => {
+  const mk = (m: StoreMode, label: string) => {
     const b = document.createElement('button');
     b.textContent = label;
     b.className = m === 'sell' ? 'sell' : '';
     b.onclick = () => set(m);
     return b;
   };
-  const bBuy = mk('buy', L.tabBuy), bSell = mk('sell', L.tabSell), bFix = mk('repair', L.tabRepair);
+  const bBuy = mk('buy', L.tabBuy), bSell = mk('sell', L.tabSell), bFix = mk('repair', L.tabRepair), bEnh = mk('enh', L.tabEnhance);
   tabs.append(bBuy, bSell);
-  if (repair) tabs.appendChild(bFix); // 30차: 철물점은 고쳐 준다
+  if (repair) tabs.append(bFix, bEnh); // 30차: 철물점은 고쳐 준다 · 34차: 현실 무기 강화도
   el.querySelector('.store-line')!.after(tabs);
-  return () => { bBuy.classList.toggle('on', mode() === 'buy'); bSell.classList.toggle('on', mode() === 'sell'); bFix.classList.toggle('on', mode() === 'repair'); };
+  return () => { bBuy.classList.toggle('on', mode() === 'buy'); bSell.classList.toggle('on', mode() === 'sell'); bFix.classList.toggle('on', mode() === 'repair'); bEnh.classList.toggle('on', mode() === 'enh'); };
 }
 /** 29차: 가게 창의 '팔기' 목록 — 이 세계의 물건만 (현실 가게는 현실 물건 · 지옥 장사꾼은 지옥 물건), 값은 4할 */
 function sellList(list: Element, hell: boolean, redraw: () => void) {
@@ -2209,6 +2420,7 @@ function sellList(list: Element, hell: boolean, redraw: () => void) {
       if (n <= 0 || (state.bag?.[it.key] ?? 0) < n) return;
       state.bag![it.key] -= n;
       if (hell) hellState().notes += p * n; else state.wallet = (state.wallet ?? 0) + p * n;
+      ecoLog('earn', 'sell', p * n, hell);
       save(state); updateHud(); renderQuick();
       toast(L.sold.replace('{item}', it.name[lang()]).replace('{n}', String(n)).replace('{p}', priceText(p * n, hell)));
       redraw();
@@ -2280,7 +2492,7 @@ async function goOut() {
 }
 
 /** 외형 창: 지금 장면의 캐릭터가 바로 바뀐다 */
-function chooseBody(title: string, confirm: string, initial: Look, extra: { outfits?: Outfit[]; regions?: { id: string; label: string; ready: boolean }[] } = {}): Promise<{ look: Look; region?: string }> {
+function chooseBody(title: string, confirm: string, initial: Look, extra: { outfits?: Outfit[]; regions?: { id: string; label: string; ready: boolean }[]; cancel?: string } = {}): Promise<{ look: Look; region?: string; cancelled?: boolean }> {
   return new Promise((resolve) => {
     const ins = lookPanelInsets();
     const target = scene === 'shop' ? shop : world!;
@@ -2297,6 +2509,7 @@ function chooseBody(title: string, confirm: string, initial: Look, extra: { outf
         hud.hidden = false;
         resolve({ look, region });
       },
+      onCancel: extra.cancel ? () => { target.setInsets(0, 0); hud.hidden = false; resolve({ look: initial, cancelled: true }); } : undefined,
     });
   });
 }
@@ -2378,6 +2591,7 @@ function repairList(list: Element, hell: boolean, redraw: () => void) {
       const have = hell ? hellState().notes : state.wallet ?? 0;
       if (have < total) { toast(hell ? L.hwNoMoney : L.noMoney); return; }
       if (hell) hellState().notes -= total; else state.wallet = (state.wallet ?? 0) - total;
+      ecoLog('spend', 'repair', total, hell);
       for (const it of items) delete state.dura![it.key];
       save(state); updateHud(); world?.setGear(gear()); renderAmmo();
       toast(L.repairAllDone.replace('{n}', String(items.length)), 'good');
@@ -2391,6 +2605,7 @@ function repairList(list: Element, hell: boolean, redraw: () => void) {
       const have = hell ? hellState().notes : state.wallet ?? 0;
       if (have < cost) { toast(hell ? L.hwNoMoney : L.noMoney); return; }
       if (hell) hellState().notes -= cost; else state.wallet = (state.wallet ?? 0) - cost;
+      ecoLog('spend', 'repair', cost, hell);
       delete state.dura![it.key];
       save(state); updateHud(); world?.setGear(gear()); renderAmmo();
       toast(L.repaired.replace('{item}', it.name[lang()]), 'good');
@@ -2455,6 +2670,53 @@ function enhanceList(list: Element, redraw: () => void) {
       save(state); world?.setGear(gear()); renderQuick();
       redraw();
     }, (state.bag?.tembra ?? 0) < 1);
+    list.appendChild(row);
+  }
+}
+/**
+ * 34차 현실 무기 강화 (철물점): 템브라 대신 돈과 손질 — 날을 세우고, 손잡이를 감고, 무게를 맞춘다.
+ * 한계는 무기 값으로 정해진다 (싼 연장은 +1, 진검·저격총은 +5). 값 = 무기 값의 2할 × 오를 단계 (적어도 ฿200).
+ * 실패하면 돈만 날리고 날이 상한다(내구도 −25). 지옥 물건은 손대지 않는다
+ */
+const REAL_ENH_ODDS = [1, 0.9, 0.75, 0.6, 0.45, 0.3];
+function realEnhCap(it: ItemDef) { const p = it.price; return p < 1000 ? 1 : p < 5000 ? 2 : p < 20000 ? 3 : p < 100000 ? 4 : 5; }
+function realEnhCost(it: ItemDef, next: number) { return Math.max(200, Math.round((it.price * 0.2 * next) / 10) * 10); }
+function realEnhList(list: Element, redraw: () => void) {
+  const L = t();
+  const p0 = document.createElement('p'); p0.className = 'cage-note'; p0.textContent = L.renhLine; list.appendChild(p0);
+  const ks = new Set<string>([...Object.values(state.equip ?? {}).filter(Boolean) as string[], ...Object.keys(state.bag ?? {}).filter((k) => (state.bag?.[k] ?? 0) > 0)]);
+  const items = [...ks].map((k) => itemByKey(k)).filter((it) => it && !it.hell && it.cat === 'weapon' && isGearItem(it) && it.note !== 'ammo' && it.note !== 'arrows' && it.note !== 'rifleammo' && it.note !== 'fuel');
+  if (!items.length) { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = L.renhNothing; list.appendChild(p); return; }
+  for (const it of items) {
+    const base = itemByKey(it.base ?? it.key);
+    const cap = realEnhCap(base), now = it.enh ?? 0, next = now + 1;
+    if (now >= cap) { list.appendChild(itemRow(it, L.renhMax.replace('{n}', String(cap)), () => toast(L.renhMaxToast.replace('{item}', it.name[lang()])), true)); continue; }
+    const cost = realEnhCost(base, next), odds = REAL_ENH_ODDS[next] ?? 0.3;
+    const row = itemRow(it, `${L.renhOdds.replace('{n}', String(next)).replace('{m}', String(cap)).replace('{p}', String(Math.round(odds * 100)))} · ${priceText(cost)}`, async () => {
+      if ((state.wallet ?? 0) < cost) { toast(L.noMoney); return; }
+      if (!(await confirmBox(L.renhAsk.replace('{item}', it.name[lang()]).replace('{n}', String(next)).replace('{p}', String(Math.round(odds * 100))).replace('{c}', priceText(cost)), L.enhGo))) return;
+      if ((state.wallet ?? 0) < cost) return;
+      state.wallet = (state.wallet ?? 0) - cost;
+      ecoLog('spend', 'enhance', cost);
+      if (Math.random() < odds) {
+        const nk = `${base.key}+${next}`;
+        const eq = state.equip ?? {};
+        const slot = Object.entries(eq).find(([, k]) => k === it.key)?.[0] as Slot | undefined;
+        state.bag = state.bag ?? {};
+        state.bag[it.key] = Math.max(0, (state.bag[it.key] ?? 1) - 1);
+        state.bag[nk] = (state.bag[nk] ?? 0) + 1;
+        if (slot && (state.bag[it.key] ?? 0) < Object.values(eq).filter((x) => x === it.key).length) eq[slot] = nk;
+        if (state.dura?.[it.key] !== undefined) { state.dura[nk] = state.dura[it.key]; if (!(state.bag[it.key] > 0)) delete state.dura[it.key]; }
+        toast(L.renhOk.replace('{item}', itemByKey(nk).name[lang()]), 'good');
+        sfx.chime();
+      } else {
+        state.dura = state.dura ?? {};
+        state.dura[it.key] = Math.max(1, duraOf(it.key) - 25);
+        toast(L.renhFail.replace('{item}', it.name[lang()]), 'evil');
+      }
+      save(state); updateHud(); world?.setGear(gear()); renderQuick();
+      redraw();
+    }, (state.wallet ?? 0) < cost);
     list.appendChild(row);
   }
 }
@@ -2957,6 +3219,7 @@ function showDeath(cause: 'car' | 'beaten' | 'hell') {
   el.className = 'death';
   el.innerHTML = `<div class="death-box"><h1></h1><p class="cause"></p><p class="karma"></p><p class="money"></p><p class="verdict"></p><p class="closed"></p><button class="primary"></button></div>`;
   const lost = Math.floor(state.wallet ?? 0), kept = Math.floor(state.bank ?? 0);
+  ecoLog('spend', 'death', lost);
   // 들고 있던 돈은 길에 흩어지고, 가방은 우주새에 봉인된다 (다음 생에 되찾는다)
   const sealed = seal('real');
   state.wallet = 0;
@@ -3023,10 +3286,10 @@ function heavenAct(what: 'officer' | 'yellowwing' | 'shop' | 'assault' | 'terrac
 async function talkToOfficer() {
   const L = t();
   busy = true;
-  dlg.open({ name: L.officer, portrait: 'luen' });
+  dlg.open({ name: L.officer, portrait: 'luen', exit: true });
   await dlg.say(L.offGreet);
   const c0 = await dlg.choose([L.offAskRebirth, L.offJustLook]);
-  if (c0 !== 0) { await dlg.say(L.offStay); dlg.close(); busy = false; return; }
+  if (c0 !== 0) { await dlg.say(L.offStay); dropped() || endTalk(); return; }
   // 의아함
   await dlg.say(L.offPuzzled);
   // 설득 세 번: 천국에 있는 것 → 아래에 기다리는 것 → 영혼의 강등. 한 번이라도 '다시 생각해 보겠다'면 멈춘다
@@ -3034,17 +3297,19 @@ async function talkToOfficer() {
     await dlg.say(plea);
     if (more) await dlg.say(more);
     const c = await dlg.choose([L.offInsist, L.offReconsider]);
-    if (c !== 0) { await dlg.say(L.offRelief); dlg.close(); busy = false; return; }
+    if (c !== 0) { await dlg.say(L.offRelief); dropped() || endTalk(); return; }
   }
   await dlg.say(L.offLast);
   const fin = await dlg.choose([L.offFinalGo, L.offReconsider]);
-  if (fin !== 0) { await dlg.say(L.offRelief); dlg.close(); busy = false; return; }
+  if (fin !== 0) { await dlg.say(L.offRelief); dropped() || endTalk(); return; }
   await dlg.say(L.offSigh);
-  await prepareNextLife({ name: L.officer, portrait: 'luen' }, null);
+  if (dropped()) return;
+  if (!(await prepareNextLife({ name: L.officer, portrait: 'luen', exit: true }, null))) return;
   // 33차: 선업의 값 — ฿300 × 선업^0.8 (10 단위 · 최대 ฿30,000)
   const bonus = heavenBonus();
   await dlg.say(bonus > 0 ? L.offBonus.replace('{g}', fmtKarma(state.deeds?.good ?? 0)).replace('{a}', cashText(bonus, seoulCash())) : L.offBonusNone);
   await dlg.say(L.offSend);
+  if (dropped()) { delete state.nextLife; save(state); return; }
   dlg.close();
   busy = false;
   shipThenRebirth(() => heavenRebirth(bonus));
@@ -3059,17 +3324,19 @@ const GOOD_SHOP: [string, number][] = [
  * 환생하기로 한 영혼과 상담하는 이(루엔·파샤르·할아버지·불다)가 다음 생을 미리 정한다:
  * 처음 모습의 운(우비·환자복·아이·앵무새 옷·광채)을 뽑고 그 위에서 몸과 도시를 고른 뒤, 선업으로 가져갈 물건을 산다
  */
-async function prepareNextLife(who: { name: string; portrait: PortraitSlot }, fixedRegion: string | null) {
+async function prepareNextLife(who: { name: string; portrait: PortraitSlot; exit?: boolean }, fixedRegion: string | null): Promise<boolean> {
   const L = t();
   const kind = rollArrival();
   const arr = arrivalLook(kind);
   await dlg.say(L.nlLook);
+  if (dropped()) return false;
   dlg.close();
   const start: Look = { ...arr, child: false, outfit: arr.outfit ?? 'casual' };
   const outfits: Outfit[] = ['casual', ...(arr.outfit && arr.outfit !== 'casual' ? [arr.outfit] : [])];
   world?.setLook(start); // 고르는 동안은 다음 생의 몸으로 보인다
-  const res = await chooseBody(L.nlLookTitle, L.nlLookConfirm, start, fixedRegion ? { outfits } : { outfits, regions: [{ id: 'bkk', label: L.regions.bkk, ready: true }, { id: 'seoul', label: L.regions.seoul, ready: true }] });
+  const res = await chooseBody(L.nlLookTitle, L.nlLookConfirm, start, fixedRegion ? { outfits, cancel: L.nlCancel } : { outfits, cancel: L.nlCancel, regions: [{ id: 'bkk', label: L.regions.bkk, ready: true }, { id: 'seoul', label: L.regions.seoul, ready: true }] });
   world?.setLook(bodyLook()); // 지금의 몸은 떠나기 전까지 그대로
+  if (res.cancelled) { endTalk(); toast(L.nlCancelled); return false; } // 34차: 몸 고르기에서 그만두면 상담도 끝 (아무것도 정하지 않는다)
   dlg.open(who);
   const region = fixedRegion ?? res.region ?? state.region ?? 'bkk';
   let bag: Record<string, number> = {};
@@ -3082,6 +3349,7 @@ async function prepareNextLife(who: { name: string; portrait: PortraitSlot }, fi
   } else await dlg.say(L.nlShopNone);
   state.nextLife = { kind, look: res.look, region, bag };
   save(state);
+  return true;
 }
 function goodDeedShop(): Promise<Record<string, number>> {
   return new Promise((resolve) => {
@@ -3134,20 +3402,22 @@ async function talkToGrandpa(hell: boolean) {
   const L = t();
   if (busy) return;
   busy = true;
-  dlg.open({ name: L.grandpaName, portrait: 'grandpa' });
+  dlg.open({ name: L.grandpaName, portrait: 'grandpa', exit: true });
   for (const line of hell ? L.grandpaGreetHell : L.grandpaGreet) await dlg.say(line);
   await dlg.say(L.grandpaAsk);
   const c = await dlg.choose([L.grandpaGo, L.grandpaWait]);
-  if (c !== 0) { await dlg.say(L.grandpaStay); dlg.close(); busy = false; return; }
+  if (c !== 0) { await dlg.say(L.grandpaStay); dropped() || endTalk(); return; }
   {
     const ratio0 = Math.round(evilRatio(state.deeds ?? { good: 0, evil: 0 }) ?? 100);
-    await prepareNextLife({ name: L.grandpaName, portrait: 'grandpa' }, hell && ratio0 >= 100 ? (Math.random() < 0.5 ? 'seoul' : 'bkk') : null);
+    if (!(await prepareNextLife({ name: L.grandpaName, portrait: 'grandpa', exit: true }, hell && ratio0 >= 100 ? (Math.random() < 0.5 ? 'seoul' : 'bkk') : null))) return;
   }
   // 33차: 지옥에선 파샤르와 같은 환전 (업만큼 · 형편없는 값), 천국에선 선업의 값
   const x = hell ? await rebirthExchange() : null;
+  if (dropped() || (hell && !x)) { delete state.nextLife; save(state); return; }
   const bonus = hell ? 0 : heavenBonus();
   if (!hell && bonus > 0) await dlg.say(L.grandpaBonus.replace('{a}', cashText(bonus, seoulCash())));
   await dlg.say(L.grandpaBye);
+  if (dropped()) { delete state.nextLife; save(state); return; }
   dlg.close();
   busy = false;
   if (!hell) { shipThenRebirth(() => heavenRebirth(bonus)); return; }
@@ -3155,6 +3425,7 @@ async function talkToGrandpa(hell: boolean) {
 }
 /** 33차: 천국에서 환생 — 선업의 값을 쥐고 태어난다 */
 function heavenRebirth(bonus: number) {
+  ecoLog('earn', 'bonus', bonus);
   rebirthFrom('heaven', bonus);
   if (bonus > 0) setTimeout(() => toast(t().heavenBonusToast.replace('{a}', cashText(bonus, seoulCash())), 'good'), 600);
 }
@@ -3343,6 +3614,7 @@ function showHellDeath() {
   const deeper = sink > h.floor ? sink : 0;
   const dropped = Math.floor(h.notes);
   h.notes -= dropped;
+  ecoLog('spend', 'death', dropped, true);
   // 운이 없으면 장비 하나: 끼고 있던 것 중 하나 (없으면 가방의 장비 중 하나)
   let lost: string | null = null;
   if (Math.random() < 0.35) {
@@ -3455,6 +3727,7 @@ function openAtone() {
     if (n <= 0) { toast(L.hwNoMoney); return; }
     const before = Math.floor((h.atone![f] ?? 0) / 1000);
     h.notes -= n;
+    ecoLog('spend', 'atone', n, true);
     h.atone![f] = (h.atone![f] ?? 0) + n;
     const deeds = Math.floor(h.atone![f] / 1000) - before;
     save(state); updateHud();
@@ -3520,7 +3793,7 @@ function openHellStore(kind: HellVendor) {
   // 넝마장수의 헌 물건: 날마다 층마다 바뀌는 네 가지 (값 7할)
   const day = Math.floor(Date.now() / 86400000);
   const used = ITEMS.filter((x) => x.hell && x.cat === 'armor' && !x.store && onSale(x)).sort((a, b) => ((a.key.length * 7 + day * 13 + h.floor * 5 + a.price) % 11) - ((b.key.length * 7 + day * 13 + h.floor * 5 + b.price) % 11)).slice(0, 2);
-  let mode: 'buy' | 'sell' | 'repair' = 'buy';
+  let mode: StoreMode = 'buy';
   const tabsOn = storeTabs(el, () => mode, (m) => { mode = m; draw(); });
   const draw = () => {
     list.innerHTML = '';
@@ -3543,6 +3816,7 @@ function openHellStore(kind: HellVendor) {
         const n = await askQty(it, price, Math.min(it.cat === 'weapon' || it.cat === 'armor' ? 9 : 99, Math.floor(h.notes / price)), 'buy'); // 29차: 장비는 한 번 더 · 31차: 무엇이든 여러 개
         if (n <= 0 || h.notes < price * n) return;
         h.notes -= price * n;
+        ecoLog('spend', 'shop', price * n, true);
         for (let k = 0; k < n; k++) addToBag(it);
         save(state); updateHud(); renderQuick();
         toast(n > 1 ? L.boughtN.replace('{item}', it.name[lang()]).replace('{n}', String(n)) : L.bought.replace('{item}', it.name[lang()]));
@@ -3556,15 +3830,15 @@ function openHellStore(kind: HellVendor) {
 }
 
 /** 30차 지옥 대장간: 지옥 장비를 고치고(노전), 템브라로 강화한다 */
-function openSmith() {
+function openSmith(title?: string, hello?: string) {
   closeMenus();
   document.querySelector('.store-panel')?.remove();
   const L = t();
   const el = document.createElement('div');
   el.className = 'store-panel shop-menu';
   el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close">✕</button></div><p class="store-line"></p><div class="menu-tabs store-tabs"></div><div class="menu-list"></div>`;
-  el.querySelector('.menu-head b')!.textContent = L.smithName;
-  el.querySelector('.store-line')!.textContent = pick(L.smithHello);
+  el.querySelector('.menu-head b')!.textContent = title ?? L.smithName;
+  el.querySelector('.store-line')!.textContent = hello ?? pick(L.smithHello);
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
   const list = el.querySelector('.menu-list')!;
   const tabs = el.querySelector('.store-tabs')!;
@@ -3582,6 +3856,42 @@ function openSmith() {
   panelAt(el);
 }
 
+/**
+ * 34차 4층 대장장이 페룸 (팔이 넷인 검게 그을린 거대한 악마, 붉은 불꽃이 솟는 낡은 대장간): 4층의 유일한 대장장이.
+ * 고치고 두드리는 것(수리 · 템브라 강화)은 여느 대장간과 같고, 완성된 템브라를 하루에 하나만 판다 — 4,444닢
+ */
+const FERUM_TEMBRA = 4444;
+async function talkToFerum() {
+  if (busy || dlg.isOpen) return;
+  const L = t();
+  const h = hellState();
+  busy = true;
+  dlg.open({ name: L.ferumName, portrait: 'ferum', exit: true });
+  const first = !state.ferumMet;
+  if (first) { state.ferumMet = true; save(state); }
+  await dlg.say(first ? L.ferumFirst : pick(L.ferumAgain));
+  for (;;) {
+    const day = Math.floor(Date.now() / 86400000);
+    const sold = state.ferumDay === day;
+    const c = await dlg.choose([L.ferumFix, sold ? L.ferumTemSold : L.ferumTemBuy.replace('{p}', FERUM_TEMBRA.toLocaleString('en-US')), L.ferumAsk, L.ferumLeave], sold ? [1] : []);
+    if (c === 0) { endTalk(); openSmith(L.ferumSmithy, pick(L.ferumHello)); return; }
+    if (c === 1) {
+      if (h.notes < FERUM_TEMBRA) { await dlg.say(L.ferumPoor.replace('{p}', FERUM_TEMBRA.toLocaleString('en-US'))); continue; }
+      h.notes -= FERUM_TEMBRA;
+      ecoLog('spend', 'shop', FERUM_TEMBRA, true);
+      addToBag(itemByKey('tembra'));
+      state.ferumDay = day;
+      save(state); renderHud(); renderQuick();
+      sfx.chime();
+      await dlg.say(L.ferumSold);
+      continue;
+    }
+    if (c === 2) { for (const line of L.ferumTembra) await dlg.say(line); continue; }
+    if (c === 3) await dlg.say(pick(L.ferumBye));
+    break;
+  }
+  dropped() || endTalk();
+}
 /** 22차 지옥호텔: 바깥 공터의 매트리스 한 장 — 층×10 노전에 한숨 자면 체력이 다 찬다 */
 async function talkToHotel() {
   const L = t();
@@ -3594,6 +3904,7 @@ async function talkToHotel() {
   if (c !== 0) { await dlg.say(L.hotelBye); dlg.close(); busy = false; return; }
   if (h.notes < price) { await dlg.say(L.hotelPoor); dlg.close(); busy = false; return; }
   h.notes -= price;
+  ecoLog('spend', 'service', price, true);
   dlg.close();
   const fx = worldFade('hell', false);
   await fx.covered;
@@ -3621,6 +3932,7 @@ async function talkToSuccubus() {
     if (c !== 0) { await dlg.say(S.bye[Math.floor(Math.random() * S.bye.length)]); break; }
     if (h.notes < price) { await dlg.say(S.poor); break; }
     h.notes -= price;
+    ecoLog('spend', 'service', price, true);
     dlg.close();
     const fx = worldFade('hell', false);
     await fx.covered;
@@ -3701,7 +4013,7 @@ function renderSettings() {
     <section class="set-sec"><h4 class="h-fight"></h4><div class="set-row"><span class="lbl l-counter"></span><div class="seg s-counter"></div></div><p class="note n-counter"></p></section>
     <section class="set-sec"><h4 class="h-lang"></h4><div class="seg s-lang wide"></div></section>
     <section class="set-sec set-acc"><h4 class="h-acc"></h4><div class="acc"></div></section>
-    ${net.account()?.admin ? `<section class="set-sec set-admin"><h4 class="h-admin"></h4><div class="set-row"><span class="lbl l-inv"></span><div class="seg s-inv"></div></div><div class="set-row"><span class="lbl l-tp"></span><div class="seg s-tp"></div></div><div class="set-row"><span class="lbl l-city"></span><div class="seg s-city"></div></div><div class="set-row"><span class="lbl l-dot3"></span><div class="seg s-dot3"></div></div><div class="set-row"><span class="lbl"></span><button class="tp-heaven"></button></div><div class="set-row"><span class="lbl l-worlds"></span><div class="tp-more"><button class="tp-home"></button><button class="tp-terrace"></button><button class="tp-hlobby"></button><button class="tp-goat"></button><button class="tp-border"></button></div></div>${state.adminTrip && state.adminTrip !== realm() ? '<div class="set-row"><span class="lbl"></span><button class="tp-back"></button></div>' : ''}<p class="note n-admin"></p></section>` : ''}`;
+    ${net.account()?.admin ? `<section class="set-sec set-admin"><h4 class="h-admin"></h4><div class="set-row"><span class="lbl l-inv"></span><div class="seg s-inv"></div></div><div class="set-row"><span class="lbl l-tp"></span><div class="seg s-tp"></div></div><div class="set-row"><span class="lbl l-city"></span><div class="seg s-city"></div></div><div class="set-row"><span class="lbl l-dot3"></span><div class="seg s-dot3"></div></div><div class="set-row"><span class="lbl"></span><button class="tp-heaven"></button></div><div class="set-row"><span class="lbl l-worlds"></span><div class="tp-more"><button class="tp-home"></button><button class="tp-terrace"></button><button class="tp-hlobby"></button><button class="tp-goat"></button><button class="tp-border"></button></div></div><div class="set-row"><span class="lbl l-tools"></span><div class="tp-more"><button class="ad-eco"></button><button class="ad-perf"></button></div></div>${state.adminTrip && state.adminTrip !== realm() ? '<div class="set-row"><span class="lbl"></span><button class="tp-back"></button></div>' : ''}<p class="note n-admin"></p></section>` : ''}`;
   el.querySelector('.menu-head b')!.textContent = L.settings;
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
   el.querySelector('.set-sec h4')!.textContent = L.setSound;
@@ -3765,6 +4077,10 @@ function renderSettings() {
     const tt = el.querySelector('.tp-terrace') as HTMLButtonElement, tl = el.querySelector('.tp-hlobby') as HTMLButtonElement;
     tt.textContent = L.adminTerrace; tt.onclick = () => adminTeleport('terrace');
     tl.textContent = L.adminHellLobby; tl.onclick = () => adminTeleport('hlobby');
+    // 34차: 관리자 도구 — 경제 통계 창 · 성능 표시 (켜고 끄기)
+    el.querySelector('.l-tools')!.textContent = L.adminTools;
+    const be = el.querySelector('.ad-eco') as HTMLButtonElement; be.textContent = L.ecoTitle; be.onclick = () => { el.remove(); openEcoStats(); };
+    const bp = el.querySelector('.ad-perf') as HTMLButtonElement; bp.textContent = perfOn() ? L.perfOff : L.perfOn; bp.onclick = () => { setPerf(!perfOn()); bp.textContent = perfOn() ? L.perfOff : L.perfOn; };
     const th = el.querySelector('.tp-home') as HTMLButtonElement;
     th.textContent = L.adminHome; th.onclick = () => adminTeleport('home');
   }
@@ -4048,13 +4364,14 @@ function openStore(kind: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept
   el.querySelector('.store-line')!.textContent = kind === 'tools' ? L.storeTools : kind === 'dept' ? L.storeDept : kind === 'antique' ? L.storeAntique : L.storeLine;
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
   const list = el.querySelector('.menu-list')!;
-  let mode: 'buy' | 'sell' | 'repair' = 'buy';
+  let mode: StoreMode = 'buy';
   const tabsOn = storeTabs(el, () => mode, (m) => { mode = m; draw(); }, kind === 'tools');
   const draw = () => {
     list.innerHTML = '';
     tabsOn();
     if (mode === 'sell') { sellList(list, false, draw); return; }
     if (mode === 'repair') { repairList(list, false, draw); return; }
+    if (mode === 'enh') { realEnhList(list, draw); return; }
     // 32차: 강남이면 한국 메뉴 (분식·국밥·중식·고깃집…) — 같은 가게는 늘 같은 메뉴
     const seoul = (world?.zone.city ?? street?.zone.city) === 'seoul';
     const menu = menuFor(kind, cuisine, seoul, name);
@@ -4069,6 +4386,7 @@ function openStore(kind: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept
         const n = !it.now ? await askQty(it, price, Math.min(it.cat === 'weapon' || it.cat === 'armor' ? 9 : 99, Math.floor((state.wallet ?? 0) / price)), 'buy') : 1;
         if (n <= 0 || (state.wallet ?? 0) < price * n) return;
         state.wallet = (state.wallet ?? 0) - price * n;
+        ecoLog('spend', it.now ? 'food' : 'shop', price * n);
         if (it.now) {
           world?.heal(it.heal ?? 0);
           toast(L.ate.replace('{item}', it.name[lang()]));

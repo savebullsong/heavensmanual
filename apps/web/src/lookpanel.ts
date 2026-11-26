@@ -15,6 +15,8 @@ export interface LookPanelOpts {
   onChange: (look: Look) => void;
   onTurn: () => void;
   onDone: (look: Look, region?: string) => void;
+  cancel?: string; // 34차: 환생 상담에서 그만두기
+  onCancel?: () => void;
 }
 
 export function openLookPanel(host: HTMLElement, initial: Look, o: LookPanelOpts): () => void {
@@ -84,7 +86,9 @@ export function openLookPanel(host: HTMLElement, initial: Look, o: LookPanelOpts
   ok.className = 'primary';
   ok.textContent = o.confirm;
   ok.onclick = () => { el.remove(); o.onDone({ ...look }, regs[regionIdx]?.id); };
-  actions.append(turn, ok);
+  actions.append(turn);
+  if (o.cancel && o.onCancel) { const no = document.createElement('button'); no.textContent = o.cancel; no.onclick = () => { el.remove(); o.onCancel!(); }; actions.append(no); }
+  actions.append(ok);
   el.appendChild(actions);
   host.appendChild(el);
   o.onChange({ ...look });

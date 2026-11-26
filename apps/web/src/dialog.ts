@@ -6,6 +6,7 @@ export interface Speaker {
   name: string;
   portrait?: PortraitSlot; // 주요 인물만
   monologue?: boolean; // 혼잣말 (이름표 없이 기울인 글씨)
+  exit?: boolean; // 34차: 오른쪽 위 ✕로 언제든 대화를 그만둘 수 있다 (환전상·환생관)
 }
 
 const seg = typeof Intl !== 'undefined' && 'Segmenter' in Intl ? new Intl.Segmenter() : null;
@@ -24,6 +25,9 @@ export class Dialog {
   private speakerKey = '';
   private typing: ReturnType<typeof setInterval> | undefined;
   private release: (() => void) | null = null;
+  private exitBtn = document.createElement('button');
+  private chooseRes: ((k: number) => void) | null = null;
+  private dropped = false;
 
   constructor(host: HTMLElement) {
     this.el.className = 'dlg';
@@ -41,7 +45,11 @@ export class Dialog {
     this.nextEl.className = 'dlg-next';
     this.nextEl.textContent = '▼';
     this.choicesEl.className = 'dlg-choices';
-    box.append(this.nameEl, this.textEl, this.nextEl, this.choicesEl);
+    this.exitBtn.className = 'dlg-exit';
+    this.exitBtn.textContent = '✕';
+    this.exitBtn.hidden = true;
+    this.exitBtn.onclick = (e) => { e.stopPropagation(); this.cancel(); };
+    box.append(this.nameEl, this.textEl, this.nextEl, this.choicesEl, this.exitBtn);
     this.el.append(this.portraitBox, this.panelEl, box);
     host.appendChild(this.el);
     // 화면 어디를 눌러도 다음 줄로 (버튼과 상품 창은 제외)
@@ -61,9 +69,26 @@ export class Dialog {
   get isOpen() {
     return !this.el.hidden;
   }
+  /** 34차: ✕로 그만둔 대화 — 남은 줄은 건너뛰고(보이지 않게) 선택은 −1, 대화를 연 쪽이 닫을 때(close) 풀린다 */
+  get cancelled() {
+    return this.dropped;
+  }
+  cancel() {
+    if (this.el.hidden) return;
+    this.dropped = true;
+    this.el.hidden = true;
+    this.setPanel(null);
+    this.choicesEl.innerHTML = '';
+    const c = this.chooseRes;
+    this.chooseRes = null;
+    c?.(-1);
+    this.stopLine();
+  }
 
   /** 말하는 사람을 정한다. 주요 인물이면 그림을 세운다 */
   open(speaker: Speaker) {
+    this.exitBtn.hidden = !speaker.exit;
+    if (this.dropped) return; // 그만둔 대화를 이어 가던 쪽이 다시 열려 해도 감춘 채로
     this.el.hidden = false;
     this.nameEl.textContent = speaker.name;
     this.el.classList.toggle('monologue', !!speaker.monologue);
@@ -89,6 +114,7 @@ export class Dialog {
   /** 한 줄을 타자 치듯 보여 준다. 누르면 끝까지, 한 번 더 누르면 다음으로 */
   say(text: string): Promise<void> {
     text = wonify(text); // 32차: 서울이면 원화로
+    if (this.dropped) return Promise.resolve();
     this.stopLine();
     this.choicesEl.innerHTML = '';
     this.nextEl.hidden = true;
@@ -129,7 +155,8 @@ export class Dialog {
   }
 
   /** 마지막 줄 아래에 선택지를 띄운다 */
-  choose(options: string[]): Promise<number> {
+  choose(options: string[], disabled: number[] = []): Promise<number> {
+    if (this.dropped) return Promise.resolve(-1);
     options = options.map(wonify);
     this.nextEl.hidden = true;
     if (this.typing) { clearInterval(this.typing); this.typing = undefined; }
@@ -137,12 +164,15 @@ export class Dialog {
     this.release = null;
     this.choicesEl.innerHTML = '';
     return new Promise((resolve) => {
+      this.chooseRes = resolve;
       options.forEach((label, k) => {
         const b = document.createElement('button');
         b.textContent = label;
         if (k === 0) b.className = 'primary';
+        if (disabled.includes(k)) { b.disabled = true; b.className = 'off'; } // 34차: 고를 수 없는 선택지도 보여 준다 (조건이 모자람)
         b.onclick = () => {
           this.choicesEl.innerHTML = '';
+          this.chooseRes = null;
           resolve(k);
         };
         this.choicesEl.appendChild(b);
@@ -175,6 +205,11 @@ export class Dialog {
   }
 
   close() {
+    this.dropped = false;
+    this.exitBtn.hidden = true;
+    const c = this.chooseRes;
+    this.chooseRes = null;
+    c?.(-1);
     this.stopLine();
     this.el.hidden = true;
     this.speakerKey = '';

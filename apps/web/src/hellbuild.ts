@@ -766,7 +766,77 @@ function greatAnvil(b: Building) {
   return { canvas: cv.c, x: cv.minX, y: cv.minY };
 }
 
+/** 굴뚝 꼭대기 (불꽃을 올릴 자리): 건물 바닥 칸 좌표와 높이 */
+export function smithyChimney(b: Building): [number, number, number] { return [b.i0 + b.w * 0.78, b.j0 + 0.32, b.h + 50]; }
+/**
+ * 34차 4층 페룸의 대장간: 낡고 그을린 대장간 — 아래는 검게 탄 돌, 위는 숯이 된 널빤지, 내려앉은 슬레이트 지붕(구멍 숭숭).
+ * 왼쪽 앞면에 크게 벌어진 화덕 아가리(안에서 숯불이 붉다), 오른쪽 면엔 붉은 빛이 새는 덧문과 걸린 집게·망치,
+ * 뒤 모서리엔 벽돌 굴뚝(꼭대기에서 붉은 불꽃이 솟는다 — 불꽃은 장면이 따로 움직인다), 앞엔 담금질 통·쇠막대 더미·숫돌, 망치 간판
+ */
+function smithy(b: Building) {
+  const Hw = b.h;
+  const top = Hw + 64;
+  const cv = canvasFor(b, top, 14);
+  const { g, P, poly, R, line, finish } = cv;
+  const { i0, j0, w, d } = b, i1 = i0 + w, j1 = j0 + d;
+  const seed = i0 * 37 + j0 * 11;
+  const LW = w * (TW / 2), RWd = d * (TW / 2);
+  const stoneH = 18;
+  const mouth = (u: number, z: number) => u > LW * 0.28 && u < LW * 0.74 && z < 30 - Math.pow((u - LW * 0.51) / (LW * 0.23), 2) * 8;
+  const shutter = (u: number, z: number) => u > RWd * 0.3 && u < RWd * 0.66 && z > 24 && z < 40;
+  walls(cv, b, Hw - 8, (face, u, z) => {
+    if (face === 0 && mouth(u, z)) {
+      // 화덕 아가리 안: 아래는 숯불, 위로 갈수록 검다
+      if (z < 5) return hash(u, z, seed) < 0.4 ? '#ffd26a' : '#ff6a1a';
+      if (z < 10) return hash(u >> 1, z, seed) < 0.5 ? '#c8320e' : '#7a1a0a';
+      return shade('#1a0c08', 0.8 + hash(u, z >> 2, seed) * 0.3);
+    }
+    if (face === 1 && shutter(u, z)) return (u % 4 === 0 || z % 5 === 0) ? '#1a0e0a' : (hash(u, z, seed) < 0.5 ? '#c8401a' : '#8a2410');
+    if (z < stoneH) {
+      const row = Math.floor(z / 6), off = row % 2 ? 5 : 0;
+      if (z % 6 === 0 || (u + off) % 10 === 0) return '#120e0c';
+      return shade(face ? '#2e2a28' : '#3a3532', 0.7 + hash((u + off) >> 3, row, seed + face) * 0.4);
+    }
+    if (u % 6 === 0) return '#120c08'; // 널빤지 틈
+    let c = shade(face ? '#241a12' : '#2e2216', 0.65 + hash(u >> 1, z >> 3, seed + 9 + face) * 0.45);
+    if (hash(u, z >> 1, seed + 4) < 0.012) c = '#ff5a1a'; // 숯이 된 나무 속 불씨
+    return c;
+  });
+  // 화덕 아가리 위 돌 아치 테두리와 그을음
+  for (let k = 0; k < LW; k++) { const z = 30 - Math.pow((k - LW * 0.51) / (LW * 0.23), 2) * 8; if (k > LW * 0.26 && k < LW * 0.76) { const [sx, sy] = P(i0 + k / (TW / 2), j1, z); R(sx, sy - 3, 1, 3, '#5a524c'); R(sx, sy - 9, 1, 6, 'rgba(10,6,4,0.55)'); } }
+  // 내려앉은 슬레이트 외쪽 지붕 (앞이 낮고 뒤가 높다, 구멍 몇)
+  const zf = Hw - 8, zb = Hw + 10;
+  poly([P(i0 - 0.15, j1 + 0.15, zf), P(i1 + 0.15, j1 + 0.15, zf - 3), P(i1 + 0.15, j0 - 0.1, zb - 2), P(i0 - 0.15, j0 - 0.1, zb)], '#2a2624');
+  poly([P(i1 + 0.15, j1 + 0.15, zf - 3), P(i1 + 0.15, j0 - 0.1, zb - 2), P(i1 + 0.15, j0 - 0.1, zb - 6), P(i1 + 0.15, j1 + 0.15, zf - 7)], '#1a1716');
+  poly([P(i0 - 0.15, j1 + 0.15, zf), P(i1 + 0.15, j1 + 0.15, zf - 3), P(i1 + 0.15, j1 + 0.15, zf - 7), P(i0 - 0.15, j1 + 0.15, zf - 4)], '#141211');
+  for (let r = 1; r < 6; r++) { const t2 = r / 6; line(P(i0 - 0.15, j1 + 0.15 - (d + 0.25) * t2, zf + (zb - zf) * t2), P(i1 + 0.15, j1 + 0.15 - (d + 0.25) * t2, zf - 3 + (zb - 2 - zf + 3) * t2), 1, '#3a3532'); }
+  for (let k = 0; k < 4; k++) { const [hx, hy] = P(i0 + 0.3 + hash(k, 1, seed) * (w - 0.6), j0 + 0.3 + hash(k, 2, seed) * (d - 0.6), zf + (zb - zf) * 0.5); R(hx - 2, hy - 1, 4 + (k % 2) * 2, 2, '#0a0706'); }
+  // 벽돌 굴뚝 (뒤 모서리) — 위로 갈수록 그을린다
+  const [cxw, cyw, czt] = smithyChimney(b);
+  const c0 = cxw - 0.18, c1 = cxw + 0.18, e0 = cyw - 0.18, e1 = cyw + 0.18;
+  for (let z = zb - 8; z < czt; z += 1) {
+    const soot = (z - zb) / (czt - zb);
+    const brick = (u: number) => (Math.floor(z / 4) % 2 ? u % 6 === 0 : (u + 3) % 6 === 0) || z % 4 === 0;
+    for (let u = 0; u < 12; u++) { const [sx, sy] = P(c0 + (u / 12) * 0.36, e1, z); R(sx, sy, 1, 1, brick(u) ? '#1a0c0a' : shade('#6a2a1e', 1 - soot * 0.65 + hash(u >> 1, z >> 2, seed) * 0.15)); }
+    for (let u = 0; u < 12; u++) { const [sx, sy] = P(c1, e1 - (u / 12) * 0.36, z); R(sx, sy, 1, 1, brick(u) ? '#120806' : shade('#4a1e16', 1 - soot * 0.65 + hash(u >> 1, z >> 2, seed + 5) * 0.15)); }
+  }
+  poly([P(c0 - 0.05, e0 - 0.05, czt), P(c1 + 0.05, e0 - 0.05, czt), P(c1 + 0.05, e1 + 0.05, czt), P(c0 - 0.05, e1 + 0.05, czt)], '#2a2422');
+  poly([P(c0 + 0.05, e0 + 0.05, czt + 0.5), P(c1 - 0.05, e0 + 0.05, czt + 0.5), P(c1 - 0.05, e1 - 0.05, czt + 0.5), P(c0 + 0.05, e1 - 0.05, czt + 0.5)], '#ff4a1a');
+  // 오른쪽 면: 걸린 집게 · 망치 둘
+  for (let k = 0; k < 3; k++) { const [tx, ty] = P(i1, j1 - 0.25 - k * 0.22, 40); line([tx, ty], [tx + (k - 1) * 0.5, ty + 14], 1.5, k === 1 ? '#7a6e64' : '#4a3a2a'); R(tx - 2 + (k - 1) * 0.5, ty + 12, 5, 3, '#5a524c'); }
+  // 망치 간판 (지붕 앞 모서리에 쇠사슬로)
+  { const [ax, ay] = P(i0 + 0.15, j1 + 0.15, zf - 2); line([ax, ay], [ax - 2, ay + 8], 1, '#5a5652'); line([ax + 12, ay - 2], [ax + 12, ay + 7], 1, '#5a5652'); R(ax - 6, ay + 8, 22, 12, '#4a3020'); R(ax - 5, ay + 9, 20, 10, '#3a2416'); R(ax - 1, ay + 11, 9, 3, '#8a8078'); R(ax + 3, ay + 14, 2, 4, '#6a4a2a'); }
+  // 앞: 담금질 통 · 쇠막대 더미 · 숫돌 바퀴 · 바닥의 재와 불티
+  { const [bx, by] = P(i0 + 0.2, j1 + 0.45, 0); g.fillStyle = '#2a1a10'; g.fillRect(Math.round(bx) - 7, Math.round(by) - 12, 14, 12); g.fillStyle = '#4a3020'; g.fillRect(Math.round(bx) - 7, Math.round(by) - 12, 14, 2); g.fillStyle = '#1a2a2a'; g.fillRect(Math.round(bx) - 6, Math.round(by) - 12, 12, 2); g.fillStyle = '#7a6e64'; g.fillRect(Math.round(bx) - 7, Math.round(by) - 7, 14, 1); }
+  for (let k = 0; k < 6; k++) { const [sx, sy] = P(i1 - 0.2, j1 + 0.15 + k * 0.05, 1 + k); line([sx - 8, sy], [sx + 6, sy - 3], 1.5, k % 2 ? '#5a524c' : '#3a3634'); }
+  { const [gx, gy] = P(i1 + 0.35, j1 - 0.6, 10); g.fillStyle = '#6a625a'; g.beginPath(); g.ellipse(gx, gy, 4, 8, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#3a3634'; g.fillRect(Math.round(gx) - 1, Math.round(gy) - 1, 2, 2); g.fillStyle = '#2a1a10'; g.fillRect(Math.round(gx) - 1, Math.round(gy) + 6, 2, 6); }
+  for (let k = 0; k < 16; k++) { const [x, y] = P(i0 + hash(k, 21, seed) * w, j1 + 0.05 + hash(k, 22, seed) * 0.5, 0); R(x, y - 1, 1, 1, hash(k, 23) < 0.35 ? '#ff7a2a' : '#3a3634'); }
+  finish();
+  return { canvas: cv.c, x: cv.minX, y: cv.minY };
+}
+
 export function drawHellBuild(b: Building, kind: HellBuildKind, theme: Theme): { canvas: HTMLCanvasElement; x: number; y: number } {
+  if (kind === 'smithy') return smithy(b);
   if (kind === 'idol') return theme === 'ash' ? demonIdol(b) : theme === 'swamp' ? hungryMaw(b) : theme === 'forge' ? greatAnvil(b) : bloodScale(b);
   if (kind === 'thatch') return thatch(b, theme);
   if (kind === 'prison') return prison(b, theme);

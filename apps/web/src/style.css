@@ -30,6 +30,10 @@ button.primary:hover { background: #e0b437; }
 @keyframes dlg-blink { 50% { opacity: 0; } }
 .dlg-choices { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-top: 8px; }
 .dlg-choices:empty { display: none; }
+.dlg-choices button.off { opacity: 0.5; cursor: default; border-style: dashed; }
+.dlg-exit { position: absolute; top: -15px; right: 14px; width: 30px; height: 30px; padding: 0; border-radius: 50%; background: #2a1d12; color: #e0b437; border: 2px solid #8a6a3a; font-size: 15px; line-height: 1; cursor: pointer; }
+.dlg-exit:hover { background: #4a3218; }
+.dlg-exit[hidden] { display: none; }
 .dlg-panel { position: absolute; right: max(10px, calc(50% - 490px)); bottom: 168px; width: min(430px, calc(100vw - 20px)); max-height: calc(100vh - 240px); display: flex; }
 
 /* 상품 창 */
@@ -495,3 +499,18 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 .asm-ring { position: relative; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, #3a1a10 0 30%, #1a0c08 31% 100%); box-shadow: inset 0 0 0 2px #6a4a2a; }
 .asm-ring i { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; transform: rotate(45deg); background: #1a1210; border: 1px solid #6a4a2a; }
 .asm-ring i.on { background: linear-gradient(135deg, #ffd08a, #c84a1a); border-color: #ffb04a; box-shadow: 0 0 6px rgba(255, 140, 60, 0.8); }
+/* 34차 관리자: 경제 통계 · 성능 표시 */
+.eco-panel .eco-hold { margin: 4px 0 8px; font-size: 13px; color: #e8dcc0; }
+.eco-box { margin: 8px 0 12px; }
+.eco-box > b { display: block; color: #e0b437; font-size: 13px; margin-bottom: 4px; }
+.eco-table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.eco-table td { padding: 2px 6px; border-bottom: 1px solid rgba(138, 106, 58, 0.25); }
+.eco-table td:nth-child(2), .eco-table td:nth-child(3) { text-align: right; }
+.eco-table tr.eco-th td { color: #c9a23e; font-weight: 700; }
+.eco-table tr.eco-sec td { color: #a89878; padding-top: 6px; font-weight: 700; }
+.eco-table tr.eco-net td { color: #f2e6c8; font-weight: 700; border-top: 1px solid #8a6a3a; }
+.perf-hud { position: fixed; left: 10px; top: 52px; z-index: 40; pointer-events: none; white-space: pre; font: 11px/1.45 ui-monospace, Menlo, Consolas, monospace; color: #b8f0b0; background: rgba(0, 0, 0, 0.62); padding: 5px 8px; border-radius: 4px; }
+/* 34차 보관 우리 칸 */
+.cage-slots { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0 8px; font-size: 13px; color: #e8dcc0; }
+.cage-slots .full { color: #f08a6a; font-weight: 700; }
+.cage-slots button { font-size: 12px; padding: 4px 10px; }

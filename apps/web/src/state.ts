@@ -47,6 +47,14 @@ export interface Save {
   xch?: { gk: number; base: number; used: number };
   /** 33차: 대장간 틀에 끼워 둔 템브라 파편 수 (13이면 템브라 하나) */
   tasm?: number;
+  /** 34차 관리자 경제 통계: 날짜별(YYYY-MM-DD) 들어온 돈·나간 돈 (현실 e·s, 지옥 he·hs, 갈래별) · 논 시간(초) — 최근 14일 */
+  eco?: Record<string, { e: Record<string, number>; s: Record<string, number>; he: Record<string, number>; hs: Record<string, number>; t: number }>;
+  /** 34차 앵무새 먹이: 준 횟수 (108·144번째에 짧은 장면, 144 다음은 다시 1부터) · 34차 페룸의 완성 템브라: 마지막으로 산 날 */
+  parrotFed?: number;
+  ferumDay?: number;
+  ferumMet?: boolean;
+  /** 34차 보관 우리: 늘린 칸 수 (기본 칸 + 늘린 칸) */
+  cageExtra?: Partial<Record<'real' | 'hell', number>>;
   /** 20차 훔치기: 처음 한 번은 가장 싼 무기를 반드시 훔친다 (그 뒤로는 값에 따라) */
   stoleOnce?: boolean;
   /** 20차: 우주새에서 훔친 일 — 다음에 들르면 미스 황(황혼)이 차갑게 맞는다 */

@@ -2,32 +2,54 @@
 import { Texture } from 'pixi.js';
 
 const wingCache = new Map<number, Texture>();
-/** 펼친 두 날개 한 쌍: 가운데(등)에서 양옆 위로 펼쳐지고, 깃이 세 겹으로 겹친다 */
+/** 34차: 펼친 두 날개 한 쌍 — 어깨에서 위로 솟은 날개뼈(손목)를 지나 바깥으로 뻗고, 깃은 아래로 드리운다.
+ *  뒤 칼깃(첫째 깃, 가장 길고 어둡게) → 둘째 깃 → 덮깃(짧은 비늘) → 날개뼈 띠 순서로 겹친다. 깃 끝은 뾰족하게 */
 export function wingTexture(color: number): Texture {
   const hit = wingCache.get(color);
   if (hit) return hit;
-  const W = 112, H = 64, cx = W / 2, cy = 38;
+  const W = 124, H = 96, cx = W / 2, ay = Math.round(H * 0.62); // 기준점(어깨) = (cx, ay)
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   const g = c.getContext('2d')!;
   const rgb = [(color >> 16) & 255, (color >> 8) & 255, color & 255];
-  const col = (k: number) => `rgb(${Math.round(rgb[0] * k)},${Math.round(rgb[1] * k)},${Math.round(rgb[2] * k)})`;
+  const col = (k: number) => `rgb(${Math.min(255, Math.round(rgb[0] * k))},${Math.min(255, Math.round(rgb[1] * k))},${Math.min(255, Math.round(rgb[2] * k))})`;
+  const lerp = (a: [number, number], b: [number, number], t: number): [number, number] => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  /** 깃 하나: 밑동 b에서 각도 th(아래가 0, 바깥이 +) 쪽으로 길이 L, 폭 w — 끝이 뾰족한 잎 모양 */
+  const feather = (b: [number, number], sd: number, th: number, L: number, w: number, k: number) => {
+    const dx = Math.sin(th) * sd, dy = Math.cos(th);
+    const px = -dy * sd, py = dx * sd; // 깃의 옆 방향
+    const tip: [number, number] = [b[0] + dx * L, b[1] + dy * L];
+    const m = (f: number, s: number): [number, number] => [b[0] + dx * L * f + px * w * s, b[1] + dy * L * f + py * w * s];
+    g.beginPath();
+    g.moveTo(...m(0, -0.5));
+    g.quadraticCurveTo(...m(0.55, -0.62), ...m(0.86, -0.32));
+    g.lineTo(...tip);
+    g.lineTo(...m(0.86, 0.36));
+    g.quadraticCurveTo(...m(0.5, 0.6), ...m(0, 0.5));
+    g.closePath();
+    g.fillStyle = col(k); g.fill();
+    g.strokeStyle = col(k * 0.68); g.lineWidth = 1.4; g.stroke();
+    // 깃대 (밝은 가는 줄)
+    g.strokeStyle = col(k * 1.08); g.lineWidth = 0.9;
+    g.beginPath(); g.moveTo(...m(0.08, 0)); g.lineTo(...m(0.78, 0)); g.stroke();
+  };
   for (const sd of [-1, 1]) {
-    // 깃 세 겹: 뒤(긴 첫째 깃, 어둡게) → 가운데 → 앞(짧고 밝게). 등 가운데는 비워 머리가 보이게
-    const root = cx + sd * 11;
-    for (const [len, k, n, dy] of [[36, 0.78, 7, 4], [27, 0.9, 6, 1], [16, 1.0, 5, -2]] as [number, number, number, number][]) {
-      for (let f = 0; f < n; f++) {
-        const a = (-0.7 + (f / (n - 1)) * 1.0) * Math.PI / 2; // 바깥 위에서 바깥 아래로 부채꼴
-        const L = len * (0.75 + 0.25 * Math.cos((f / (n - 1) - 0.3) * 2));
-        const ex = root + sd * Math.cos(a) * L, ey = cy + dy + Math.sin(a) * L * 0.7;
-        g.strokeStyle = col(k * 0.82); g.lineWidth = 7; g.lineCap = 'round';
-        g.beginPath(); g.moveTo(root, cy + dy - 4); g.lineTo(ex, ey); g.stroke();
-        g.strokeStyle = col(k); g.lineWidth = 5;
-        g.beginPath(); g.moveTo(root, cy + dy - 4); g.lineTo(ex, ey); g.stroke();
-      }
-    }
-    // 날개 어깨 (둥근 덩어리)
-    g.fillStyle = col(1.0); g.beginPath(); g.ellipse(root + sd * 3, cy - 6, 8, 7, 0, 0, Math.PI * 2); g.fill();
+    const S: [number, number] = [cx + sd * 7, ay - 4]; // 어깨 (등에 붙는 곳)
+    const Wr: [number, number] = [cx + sd * 33, ay - 46]; // 날개뼈 손목 (가장 높은 곳)
+    const T: [number, number] = [cx + sd * 56, ay - 30]; // 첫째 깃이 붙는 바깥 끝
+    // 1) 첫째 깃 (칼깃): 손목에서 바깥 끝까지, 바깥으로 갈수록 길고 바깥으로 눕는다
+    for (let f = 0; f < 6; f++) { const t = f / 5; feather(lerp(Wr, T, t), sd, 0.18 + t * 0.5, 44 + t * 14, 9, 0.8); }
+    // 2) 둘째 깃: 어깨에서 손목까지, 아래로 곧게 (어깨 쪽은 짧게)
+    for (let f = 0; f < 6; f++) { const t = 0.12 + (f / 5) * 0.88; feather(lerp(S, Wr, t), sd, 0.04 + t * 0.16, 16 + t * 30, 10, 0.9); }
+    // 3) 덮깃: 날개뼈 바로 밑의 짧은 비늘 깃 두 줄
+    for (let f = 0; f < 7; f++) { const t = f / 6; const b = t < 0.6 ? lerp(S, Wr, 0.25 + t / 0.6 * 0.75) : lerp(Wr, T, (t - 0.6) / 0.4 * 0.7); feather([b[0], b[1] + 3], sd, 0.1 + t * 0.35, 18, 9, 0.97); }
+    for (let f = 0; f < 6; f++) { const t = f / 5; const b = lerp(S, Wr, 0.35 + t * 0.65); feather([b[0] + sd * 1, b[1] + 1], sd, 0.12 + t * 0.2, 10, 8, 1.04); }
+    // 4) 날개뼈 띠: 어깨 → 손목 → 바깥 끝 (둥글고 굵게)
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    g.strokeStyle = col(0.7); g.lineWidth = 8;
+    g.beginPath(); g.moveTo(...S); g.quadraticCurveTo(cx + sd * 12, ay - 40, ...Wr); g.quadraticCurveTo(cx + sd * 46, ay - 46, ...T); g.stroke();
+    g.strokeStyle = col(1.06); g.lineWidth = 5.5;
+    g.beginPath(); g.moveTo(...S); g.quadraticCurveTo(cx + sd * 12, ay - 40, ...Wr); g.quadraticCurveTo(cx + sd * 46, ay - 46, ...T); g.stroke();
   }
   // 점 그림처럼: 반투명 가장자리 정리 + 어두운 외곽선
   const im = g.getImageData(0, 0, W, H), D = im.data;
@@ -378,4 +400,58 @@ export function heavenTowerTexture(): Texture {
   g.globalCompositeOperation = 'source-over';
   towerTex = Texture.from(c);
   return towerTex;
+}
+
+/**
+ * 34차 페룸의 위쪽 두 팔 (어깨 뒤에서 하나 더 돋은 팔): 검게 그을린 살갗에 불씨가 갈라진 틈. 오른팔은 큰 망치, 왼팔은 달군 쇠를 문 집게.
+ * 2배 크기로 그려 반으로 줄여 쓴다 · 기준점 = 어깨 (돌려서 망치질)
+ */
+const armTex = new Map<string, Texture>();
+export const ARM_PIVOT: [number, number] = [10, 70]; // 캔버스 안의 어깨 자리 (오른팔 기준)
+export function demonArmTexture(tool: 'hammer' | 'tongs'): Texture {
+  const hit = armTex.get(tool);
+  if (hit) return hit;
+  const W = 84, H = 84;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d')!;
+  const [sx, sy] = ARM_PIVOT, ex = 36, ey = 58, fx = 48, fy = 28;
+  const limb = (ax: number, ay: number, bx: number, by: number, w0: number, w1: number, col: string) => {
+    const dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy), nx = -dy / L, ny = dx / L;
+    g.fillStyle = col; g.beginPath();
+    g.moveTo(ax + nx * w0, ay + ny * w0); g.lineTo(bx + nx * w1, by + ny * w1); g.lineTo(bx - nx * w1, by - ny * w1); g.lineTo(ax - nx * w0, ay - ny * w0); g.closePath(); g.fill();
+    g.beginPath(); g.ellipse(bx, by, w1, w1, 0, 0, Math.PI * 2); g.fill();
+  };
+  const OUT = '#0a0706', SKIN = '#221a17', LIT = '#3e322c';
+  // 외곽선 먼저 (두껍게) → 살 → 빛
+  limb(sx, sy, ex, ey, 8, 7, OUT); limb(ex, ey, fx, fy, 7, 6.5, OUT);
+  limb(sx, sy, ex, ey, 6.5, 5.5, SKIN); limb(ex, ey, fx, fy, 5.5, 5, SKIN);
+  limb(sx + 1, sy - 3, ex, ey - 3, 2, 1.6, LIT); limb(ex + 1, ey - 2, fx + 1, fy + 2, 1.6, 1.4, LIT);
+  // 불씨 갈라진 틈
+  g.strokeStyle = '#ff5a1a'; g.lineWidth = 1.2;
+  for (const [a, b, c2, d] of [[16, 66, 22, 63], [27, 60, 31, 57], [40, 48, 42, 43], [45, 38, 47, 33]]) { g.beginPath(); g.moveTo(a, b); g.lineTo(c2, d); g.stroke(); }
+  // 주먹
+  g.fillStyle = OUT; g.beginPath(); g.ellipse(fx, fy, 8, 7.5, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = SKIN; g.beginPath(); g.ellipse(fx, fy, 6.5, 6, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = LIT; g.fillRect(fx - 4, fy - 4, 5, 2);
+  if (tool === 'hammer') {
+    // 자루는 주먹에서 위로, 머리는 가로로 크게
+    g.strokeStyle = OUT; g.lineWidth = 5; g.beginPath(); g.moveTo(fx - 2, fy + 4); g.lineTo(fx - 10, fy - 26); g.stroke();
+    g.strokeStyle = '#5a3a22'; g.lineWidth = 3; g.beginPath(); g.moveTo(fx - 2, fy + 4); g.lineTo(fx - 10, fy - 26); g.stroke();
+    g.fillStyle = OUT; g.fillRect(fx - 24, fy - 34, 30, 14);
+    g.fillStyle = '#4a4440'; g.fillRect(fx - 23, fy - 33, 28, 12);
+    g.fillStyle = '#7a726a'; g.fillRect(fx - 23, fy - 33, 28, 3);
+    g.fillStyle = '#2a2624'; g.fillRect(fx - 23, fy - 24, 28, 3);
+  } else {
+    // 집게: 두 갈래가 앞으로 뻗고 끝에 달군 쇠
+    g.strokeStyle = OUT; g.lineWidth = 4;
+    for (const dy of [-3, 3]) { g.beginPath(); g.moveTo(fx + 2, fy); g.lineTo(fx + 26, fy - 12 + dy); g.stroke(); }
+    g.strokeStyle = '#6a625a'; g.lineWidth = 2;
+    for (const dy of [-3, 3]) { g.beginPath(); g.moveTo(fx + 2, fy); g.lineTo(fx + 26, fy - 12 + dy); g.stroke(); }
+    g.fillStyle = '#ff6a1a'; g.fillRect(fx + 24, fy - 20, 10, 9);
+    g.fillStyle = '#ffd26a'; g.fillRect(fx + 26, fy - 18, 6, 4);
+  }
+  const t = Texture.from(c);
+  armTex.set(tool, t);
+  return t;
 }

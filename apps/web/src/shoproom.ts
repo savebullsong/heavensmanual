@@ -50,7 +50,7 @@ function blocked(i: number, j: number) {
   if (hellRoom && i === 1 && j === 3) return true;
   if (i === 0 && (j === 4 || j === 5 || j === 7)) return true;
   if (i === 8 && j === 7) return true; // 30차: 화분을 앞 오른쪽 구석으로
-  if (j === 3 && (i === 7 || i === 8)) return true; // 29차: 앵무새 데스크 앞의 보관 우리
+  if (j === 3 && (i === 6 || i === 7 || i === 8)) return true; // 29차: 앵무새 데스크 앞의 보관 우리 (34차: 바닥 안쪽으로 들이며 한 칸 왼쪽까지)
   return false;
 }
 
