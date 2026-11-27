@@ -257,7 +257,7 @@ interface Walker {
   /** 42차: 죽은 뒤 건너가는 장면에 나오는 이 (세상이 멈춘 동안에도 움직인다) · 미끄러지듯 가는 곳 · 일어서는 중 · 땅속으로 가라앉은 깊이 */
   actor?: boolean; glide?: { tx: number; ty: number; v: number }; riseT?: number; sink?: number;
   /** 43차: 마지막 일격에 날아가는 중 (포물선 높이 · 회전) */
-  fly?: { t: number; dur: number; h: number; spin: number };
+  fly?: { t: number; dur: number; h: number; spin: number; mine?: boolean };
   gestT?: number; // 42차: 고유 동작까지 남은 시간
   watchT?: number; // 43차: 노을이 다시 멀찍이 따라붙기까지
   marion?: { left: number; dmg: [number, number]; said?: number }; // 43차 마리오네트: 남은 초 · 한 대 피해
@@ -3907,7 +3907,7 @@ export class WorldScene {
           if (w.sprite.destroyed || tg.down > 0 || tg.sprite.destroyed) return;
           sfx.gunshot(this.spotOf(w)); sfx.gunshot(this.spotOf(w));
           this.swing(w, tg, true);
-          this.shakeT = Math.max(this.shakeT, Math.hypot(p.x - w.x, p.y - w.y) < 10 ? 0.12 : 0); this.shakeA = Math.max(this.shakeA, 2.5);
+          if (tg.isPlayer) { this.shakeT = Math.max(this.shakeT, 0.12); this.shakeA = Math.max(this.shakeA, 2.5); } // 45차 후속: 탈루스가 남을 쏠 때는 내 화면을 흔들지 않는다
           const [bx, by] = iso(tg.x, tg.y);
           for (let k = 0; k < 14; k++) { const a = Math.random() * Math.PI * 2, v = 60 + Math.random() * 90; this.sparks.push({ x: bx, y: by - 26, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.7 - 20, t: 0.2 + Math.random() * 0.12, col: k % 3 ? 0x9a1a10 : 0xffd27a }); }
           this.impactFx(w, tg, true, 'gun');
@@ -6481,13 +6481,16 @@ export class WorldScene {
       // 24차 손맛 → 43차: 어떤 공격이든(주먹·칼·총·활·불길) 마지막 일격은 화끈하게 — 길게 멈칫, 하얗게 번쩍, 크게 흔들리고,
       // 몸이 포물선을 그리며 두어 칸 날아가 굴러떨어진다 (땅에 닿을 때 한 번 더 쿵 · 먼지). 큰 몸(층주·필드 보스·염소)은 덜 날아간다
       const mine = by.isPlayer, heavy = !!(w.mdef?.boss || w.fb || w.kind === 'goat' || w.kind === 'goatking');
-      this.hitStop = Math.max(this.hitStop, mine ? 0.24 : 0.12);
-      this.shakeT = Math.max(this.shakeT, mine ? 0.42 : 0.2); this.shakeA = Math.max(this.shakeA, mine ? (heavy ? 12 : 9) : 4);
+      // 45차 후속: 남의 싸움(경비병·다른 영혼·노을·마리오네트)으로 내 화면이 흔들리고 멈칫하던 것 — 내가 치거나 내가 쓰러질 때만
+      if (mine || w.isPlayer) {
+        this.hitStop = Math.max(this.hitStop, mine ? 0.24 : 0.12);
+        this.shakeT = Math.max(this.shakeT, mine ? 0.42 : 0.2); this.shakeA = Math.max(this.shakeA, mine ? (heavy ? 12 : 9) : 4);
+      }
       const dx = w.x - by.x, dy = w.y - by.y, d = Math.hypot(dx, dy) || 1;
       // 45차: 너무 멀리 날아갔다 — 24차(0.9칸)와 43차(2.2칸)의 가운데로
       const far = heavy ? 0.6 : mine ? 1.55 : 0.8;
       w.kb = { dx: (dx / d) * far, dy: (dy / d) * far, t: 0.33 };
-      w.fly = { t: 0, dur: 0.38, h: heavy ? 4 : mine ? 12 : 8, spin: (dx - dy >= 0 ? 1 : -1) * (heavy ? 0.1 : 0.4) };
+      w.fly = { t: 0, dur: 0.38, h: heavy ? 4 : mine ? 12 : 8, spin: (dx - dy >= 0 ? 1 : -1) * (heavy ? 0.1 : 0.4), mine: mine || w.isPlayer };
       w.flashT = Math.max(w.flashT ?? 0, 0.07);
       this.splat(w, mine ? 16 : 9);
       const [sx, sy] = iso(w.x, w.y);
@@ -7394,7 +7397,7 @@ export class WorldScene {
         if (q >= 1) {
           sfx.thud(this.spotOf(w));
           for (let k = 0; k < 10; k++) { const a = Math.PI + Math.random() * Math.PI, v = 30 + Math.random() * 50; this.sparks.push({ x: sx, y: sy, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.3, t: 0.25 + Math.random() * 0.15, col: this.realm === 'heaven' ? 0xf4eedc : 0x8a7e6e }); }
-          if (Math.hypot(w.x - this.player.x, w.y - this.player.y) < 10) { this.shakeT = Math.max(this.shakeT, 0.12); this.shakeA = Math.max(this.shakeA, 3); }
+          if (w.fly.mine) { this.shakeT = Math.max(this.shakeT, 0.12); this.shakeA = Math.max(this.shakeA, 3); } // 45차 후속: 내가 쓰러뜨린 몸이 떨어질 때만
           w.fly = undefined;
         }
       } else if (w.sprite.rotation && w.down <= 0) w.sprite.rotation = 0;
