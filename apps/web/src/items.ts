@@ -223,7 +223,7 @@ export const ITEMS: ItemDef[] = [
   { key: 'warhammer', cat: 'weapon', price: 500, atk: 9, two: true, hell: true, sale: [4], sprite: 'sledge', icon: 'sledge', name: { ko: '망치병의 쇠망치', th: 'ค้อนเหล็กทหารค้อน', en: "Hammerman's war hammer" } },
   { key: 'slagpants', cat: 'armor', price: 230, def: 5, hell: true, sale: [4], sprite: 'workpants', icon: 'workpants', name: { ko: '쇳물 가죽 바지', th: 'กางเกงหนังน้ำเหล็ก', en: 'Slag-leather trousers' } },
   { key: 'ironhelm', cat: 'armor', price: 190, def: 5, hell: true, sale: [4], sprite: 'greathelm', icon: 'greathelm', tint: '#c83a1e', name: { ko: '철갑 투구', th: 'หมวกเกราะเหล็ก', en: 'Ironclad helm' } },
-  { key: 'ashmask', cat: 'armor', price: 70, def: 4, hell: true, floor: 1, store: 'drop', sprite: 'skullhelm', icon: 'skullhelm', tint: '#bcb4a4', name: { ko: '재의 가면 투구', th: 'หมวกหน้ากากเถ้า', en: 'Ash-mask helm' } },
+  { key: 'ashmask', cat: 'armor', price: 70, def: 4, hell: true, floor: 1, store: 'drop', sprite: 'skullhelm', icon: 'skullhelm', tint: '#bcb4a4', name: { ko: '재 해골 투구', th: 'หมวกกะโหลกเถ้า', en: 'Ash skull helm' } },
   { key: 'cinderaxe', cat: 'weapon', price: 300, atk: 8, two: true, hell: true, floor: 1, store: 'drop', sprite: 'fireaxe', icon: 'fireaxe', name: { ko: '불씨 도끼', th: 'ขวานถ่านเพลิง', en: 'Ember axe' } },
   { key: 'bogroot', cat: 'goods', price: 14, heal: 260, hell: true, floor: 2, store: 'drop', icon: 'water', name: { ko: '늪 뿌리즙', th: 'น้ำรากหนองบึง', en: 'Bog-root sap' } },
   { key: 'mossboots', cat: 'armor', price: 90, def: 4, hell: true, floor: 2, store: 'drop', sprite: 'boots', icon: 'boots', name: { ko: '이끼 장화', th: 'รองเท้าบูทตะไคร่', en: 'Moss boots' } },
