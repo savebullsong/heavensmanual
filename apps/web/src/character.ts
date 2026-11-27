@@ -9,7 +9,7 @@ export const FOOT_Y = 46;
 
 export type Sex = 'f' | 'm';
 export type Facing = 'front' | 'back';
-export type Outfit = 'casual' | 'apron' | 'raincoat' | 'patient' | 'parrot' | 'suturer' | 'stitched' | 'ash' | 'pret' | 'yak' | 'bones' | 'besk' | 'cockatoo' | 'warden1' | 'warden2' | 'warden3' | 'talus' | 'serane' | 'robber' | 'mafia' | 'ashgal' | 'gurma' | 'cinder' | 'bloat' | 'glutton' | 'hawker' | 'debtor' | 'broker' | 'forgeknight' | 'succubus' | 'accubus' | 'casualL' | 'padding' | 'misshwang' | 'angelk' | 'ponchod' | 'reaper' | 'yunae1' | 'yunae2' | 'yunae3' | 'pashar' | 'luen' | 'grandpa' | 'bulda'; // 42차 // 39차 서울 계절옷: 긴소매 · 롱패딩 // 37차: 서큐버스 · 아큐버스 (드레스 · 머리 · 뿔/고리를 몸에 함께 구운 3D 몸)
+export type Outfit = 'casual' | 'apron' | 'raincoat' | 'patient' | 'parrot' | 'suturer' | 'stitched' | 'ash' | 'pret' | 'yak' | 'bones' | 'besk' | 'cockatoo' | 'warden1' | 'warden2' | 'warden3' | 'talus' | 'serane' | 'robber' | 'mafia' | 'ashgal' | 'gurma' | 'cinder' | 'bloat' | 'glutton' | 'hawker' | 'debtor' | 'broker' | 'forgeknight' | 'succubus' | 'accubus' | 'casualL' | 'padding' | 'misshwang' | 'angelk' | 'ponchod' | 'reaper' | 'yunae1' | 'yunae2' | 'yunae3' | 'pashar' | 'luen' | 'grandpa' | 'bulda' | 'yellowwing' | 'maskgirl' | 'kaldrek' | 'obolo' | 'noeul' | 'mari' | 'maskfiend' | 'whisperer' | 'puppet' | 'marcion' | 'manette'; // 42차 // 39차 서울 계절옷: 긴소매 · 롱패딩 // 37차: 서큐버스 · 아큐버스 (드레스 · 머리 · 뿔/고리를 몸에 함께 구운 3D 몸)
 export interface Look {
   sex: Sex;
   build: number; // 0 마름 · 1 보통 · 2 건장

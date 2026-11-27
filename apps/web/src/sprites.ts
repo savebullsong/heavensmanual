@@ -67,16 +67,28 @@ export const MISS_HWANG: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColo
 /** 지옥 3층 대부업자 베스크 · 2층 들판의 노름꾼 탈루스 (관리자 도트 칸이 같은 모습을 밑그림으로 쓴다) */
 export const BESK_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'besk', cols: { 1: '#b8382a', 3: '#3a1410', 4: '#2a100c', 5: '#140a08', 6: '#e8c050', 9: '#3a1410', 10: '#e8dcc0', 12: '#f2d27a', 13: '#4a2a1a', 14: '#e0b437', 15: '#140e0c' } };
 /** 25차 지옥 1층 마스크 팔이 소녀: 헝클어진 갈색 단발, 해진 갈색 숄, 검붉은 원피스 (사용자 컨셉 그림) */
-export const MASKGIRL_LOOK: Look = { sex: 'f', build: 0, skin: 0, hair: 2, hairColor: 0, top: 0, bottom: 0, child: true, cols: { 2: '#4a2e1c', 3: '#7a6a56', 4: '#5e2a2e', 5: '#2a1e18' } };
+/** 43차: 마스크 팔이 소녀 전용 3D 몸 — 헝클어진 갈색 단발 · 등과 어깨를 덮은 해진 숄 · 검붉은 원피스 · 왼팔의 검은 마스크 바구니 · 등의 화염방사기 */
+export const MASKGIRL_LOOK: Look = { sex: 'f', build: 0, skin: 0, hair: 2, hairColor: 0, top: 0, bottom: 0, outfit: 'maskgirl', cols: { 2: '#4a2e1c', 3: '#7a6a56', 4: '#5e2a2e', 5: '#2a1e18', 13: '#8a6a3a', 15: '#1a1616', 14: '#6a6e72', 12: '#d8a02a' } };
+/** 43차: 황색날개 전용 몸 (웨이브 금발 · 흰 드레이프 드레스 · 금 밑단 · 이마의 가는 금관) — 노란 날개는 게임이 붙인다 */
+export const YELLOW_WING_LOOK: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'yellowwing', cols: { 2: '#e8c870', 3: '#f8f4ea', 4: '#f6f1e6', 5: '#d8c49a', 12: '#f2c42a', 14: '#e0b844' } };
+/** 43차: 4층 대장장이 칼드렉 (팔 넷 · 그을린 거구 · 가죽 앞치마 · 망치와 집게) */
+export const KALDREK_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'kaldrek', cols: { 1: '#2a2624', 2: '#141010', 4: '#2a2220', 7: '#4a3424', 12: '#ff7a2a', 13: '#3a2a22', 14: '#6a6460' } };
+/** 43차: 환전상 오볼로 (붉은 살 · 검은 로브 금 테두리 · 외알 안경 · 접힌 박쥐 날개 · 가는 꼬리) */
+export const OBOLO_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'obolo', cols: { 1: '#b8382a', 3: '#1e1416', 4: '#1a1012', 5: '#140a08', 7: '#5a3a1e', 9: '#5a1a1a', 13: '#2a1a14', 14: '#e0b437' } };
+/** 43차: 천국의 신앙 감시자 노을 — 유내와 똑같은 얼굴 · 흰 튜닉 · 은 갑 · 노을빛 띠 · 긴 장검 */
+export const NOEUL_LOOK: Look = { sex: 'f', build: 1, skin: 0, hair: 2, hairColor: 0, top: 0, bottom: 0, outfit: 'noeul', cols: { 2: '#24180f', 3: '#f4f0ea', 4: '#e8e2d8', 5: '#8a8a92', 10: '#e8eef2', 12: '#e0703a', 13: '#5a3a22', 14: '#c8ccd4' } };
+/** 43차: 5층 인형술사 마리 (검은 드레스 · 손가락의 흰 실 · 실에 매달린 작은 인형) */
+export const MARI_LOOK: Look = { sex: 'f', build: 1, skin: 0, hair: 2, hairColor: 0, top: 0, bottom: 0, outfit: 'mari', cols: { 1: '#e6dcd2', 2: '#3a3634', 3: '#141214', 4: '#141214', 5: '#0e0c0c', 9: '#d8d2c8', 10: '#ece8e0', 12: '#8a1a24', 13: '#a87a4a' } };
 /** 28차 유내: 내 집의 동양인 여성. 올 때마다 10대 · 20대 · 30대 후반 중 한 시절로 나온다
  *  10대 — 질끈 묶은 말총머리, 노란 후드 집업, 청바지 (아이 몸이 아니라 키가 다 자란 열몇 살)
  *  20대 — 갈색으로 물들인 긴 머리, 검은 앞치마 같은 윗옷, 밝은 통바지, 붉은 구두 (동네 미용실 원장)
  *  30대 후반 — 단발, 팥죽색 카디건, 짙은 바지, 회색 슬리퍼 (밥상을 차려 놓고 기다리는 사람) */
 /** 42차: 유내 세 시절 전용 3D 몸 (10대 말총머리·노란 반팔 / 20대 갈색 긴 머리·검은 셔츠·허리 앞치마 / 30대 후반 단발·카디건·긴 치마) */
 export function yunaeLook(age: 0 | 1 | 2): Look {
-  if (age === 0) return { sex: 'f', build: 0, skin: 0, hair: 4, hairColor: 0, top: 0, bottom: 0, outfit: 'yunae1', cols: { 2: '#17110e', 3: '#e2b84e', 4: '#3e4e74', 5: '#ecebe6', 10: '#f2f0ea', 12: '#c0303e' } };
-  if (age === 1) return { sex: 'f', build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'yunae2', cols: { 2: '#6a3a24', 3: '#24212a', 4: '#d6c8b4', 5: '#9a2a36', 7: '#5a4c44', 14: '#b8bcc2' } };
-  return { sex: 'f', build: 0, skin: 0, hair: 2, hairColor: 0, top: 0, bottom: 0, outfit: 'yunae3', cols: { 2: '#241a16', 3: '#7e4e4a', 4: '#30303a', 5: '#8a8e96', 9: '#e6ddd0', 14: '#c8b89a' } };
+  // 43차: 사용자가 올린 도트 세 장에 맞춘 차림 (10대 긴 생머리·짙은 갈색 맨투맨·회청 청바지 / 20대 올림머리·검은 반팔·남색 청바지 / 30대 후반 낮게 묶은 머리·갈색 긴소매·연청바지)
+  if (age === 0) return { sex: 'f', build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'yunae1', cols: { 2: '#2a1c16', 3: '#3a2620', 4: '#4a5468', 5: '#1e1a18' } };
+  if (age === 1) return { sex: 'f', build: 0, skin: 0, hair: 4, hairColor: 0, top: 0, bottom: 0, outfit: 'yunae2', cols: { 2: '#1e140e', 3: '#1c1a1c', 4: '#2a3048', 5: '#1a1616' } };
+  return { sex: 'f', build: 0, skin: 0, hair: 4, hairColor: 0, top: 0, bottom: 0, outfit: 'yunae3', cols: { 2: '#2a1c14', 3: '#5a3a2a', 4: '#7a90b0', 5: '#2a2220' } };
 }
 /** 42차: 지옥으로 데려가는 판초 악마 (검은 판초 · 잿빛 살 · 붉은 눈 · 성게머리) */
 export const PONCHO_DEMON: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'ponchod', cols: { 1: '#a8a49c', 2: '#141416', 3: '#1c1c20', 5: '#141414', 6: '#e02a20', 9: '#3a3434', 10: '#a8a49c', 15: '#0e0e10' } };
@@ -89,10 +101,10 @@ export const MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'da
 /** 양손 무기 (16차): 두 손으로 크게 들어 내려찍는다 (heavy 동작) — 느리지만 묵직하다 */
 export const TWO = new Set(['sledge', 'fireaxe', 'greatsword', 'maul', 'boltcutter', 'spear']);
 /** 16차 괴물 몸: 차림 → [굽기 키, 자세] (무기를 들면 m) */
-const MON16: Record<string, [string, string, Mode]> = { ashgal: ['h', 'ashgal', 'm'], gurma: ['u', 'gurma', 'u'], cinder: ['n', 'cinder', 'm'], bloat: ['l', 'bloat', 'm'], glutton: ['e', 'glutton', 'm'], hawker: ['v', 'hawker', 'm'], debtor: ['d', 'debtor', 'm'], broker: ['k', 'besk', 'm'], forgeknight: ['z', 'forgeknight', 'm'] }; // 24차: 4층 층주 바르칸 · 25차 철갑마
+const MON16: Record<string, [string, string, Mode]> = { ashgal: ['h', 'ashgal', 'm'], gurma: ['u', 'gurma', 'u'], cinder: ['n', 'cinder', 'm'], bloat: ['l', 'bloat', 'm'], glutton: ['e', 'glutton', 'm'], hawker: ['v', 'hawker', 'm'], debtor: ['d', 'debtor', 'm'], broker: ['k', 'besk', 'm'], forgeknight: ['z', 'forgeknight', 'm'], maskfiend: ['gm', 'maskfiend', 'm'], whisperer: ['ws', 'whisperer', 'u'], puppet: ['ip', 'puppet', 'm'], marcion: ['mc', 'marcion', 'm'], manette: ['mn', 'manette', 'u'] }; // 24차: 4층 층주 바르칸 · 25차 철갑마
 /** 방어구 겉모습: 그리는 순서와 색 (구역 3 = 본색, 구역 5 = 신발) */
 const ARMOR_ORDER = ['workpants', 'shinguard', 'boots', 'jacket', 'vest', 'trench', 'firesuit', 'combatcoat', 'hauberk', 'platecoat', 'gloves', 'shield']; // 40차: 긴 겉옷은 바지·신 위에, 장갑 아래에
-const ARMOR_COLOR: Record<string, string> = { mask: '#262322', helmet: '#b0302a', jacket: '#4a5236', vest: '#3a3f46', gloves: '#d8cfb4', workpants: '#4a4536', shinguard: '#2b2f36', boots: '#3a2a1a', shield: '#7a4a2a', trench: '#8a6a44', firesuit: '#b8954a', combatcoat: '#4e5638', hauberk: '#5a1a16', platecoat: '#3a2a5a' };
+const ARMOR_COLOR: Record<string, string> = { cap: '#2a3a5a', visor: '#f2f0ea', ngob: '#c8a868', mask: '#262322', helmet: '#b0302a', jacket: '#4a5236', vest: '#3a3f46', gloves: '#d8cfb4', workpants: '#4a4536', shinguard: '#2b2f36', boots: '#3a2a1a', shield: '#7a4a2a', trench: '#8a6a44', firesuit: '#b8954a', combatcoat: '#4e5638', hauberk: '#5a1a16', platecoat: '#3a2a5a' };
 const LONG_COATS = new Set(['trench', 'firesuit', 'combatcoat', 'hauberk', 'platecoat']);
 const PER_BUILD = new Set(['jacket', 'vest', 'workpants', 'trench', 'firesuit', 'combatcoat', 'hauberk', 'platecoat']);
 const COSTUMES = new Set(['raincoat', 'patient', 'parrot', 'robber']); // 강도: 복면이 머리를 덮는다
@@ -221,7 +233,8 @@ export function layerKeys(look: Look, weapon: string | null, armorIn: string[] =
   if (o === 'misshwang') return { base: 'b-hw-misshwang-w', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
   if (o === 'angelk') { const mk = look.sex === 'f' ? 'af' : 'an', wp = weapon === 'sword' ? 'sword' : null; return { base: `b-${mk}-angelk-${wp ? 'm' : 'u'}`, hair: null, weapon: wp ? `w-${mk}-${wp}` : null, armor: [] as { key: string; piece: string }[], mode: (wp ? 'm' : 'u') as Mode }; }
   // 42차: 지옥으로 데려가는 이들(판초 악마 · 저승사자) · 유내 세 시절 (서기·걷기 · 유내는 앉기도)
-  const D42: Record<string, string> = { ponchod: 'b-pd-ponchod-w', reaper: 'b-jr-reaper-w', yunae1: 'b-y1-yunae1-w', yunae2: 'b-y2-yunae2-w', yunae3: 'b-y3-yunae3-w', pashar: 'b-ps-pashar-w', luen: 'b-lu-luen-w', grandpa: 'b-gp-grandpa-w', bulda: 'b-bd-bulda-w' };
+  const D42: Record<string, string> = { ponchod: 'b-pd-ponchod-w', reaper: 'b-jr-reaper-w', yunae1: 'b-y1-yunae1-w', yunae2: 'b-y2-yunae2-w', yunae3: 'b-y3-yunae3-w', pashar: 'b-ps-pashar-w', luen: 'b-lu-luen-w', grandpa: 'b-gp-grandpa-w', bulda: 'b-bd-bulda-w',
+    yellowwing: 'b-yw-yellowwing-w', maskgirl: 'b-mg-maskgirl-w', kaldrek: 'b-kd-kaldrek-w', obolo: 'b-ob-obolo-w', noeul: 'b-no-noeul-w', mari: 'b-mr-mari-w' }; // 43차
   if (D42[o as string]) return { base: D42[o as string], hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
   if (o === 'succubus') return { base: 'b-q-succubus-w', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
   if (o === 'accubus') return { base: `b-${look.sex === 'm' ? 'i' : 'j'}-accubus-w`, hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
@@ -252,9 +265,10 @@ export function layerKeys(look: Look, weapon: string | null, armorIn: string[] =
   const arm: { key: string; piece: string; tint?: string }[] = [];
   if (mode !== 'w') {
     const ab = costume ? 1 : build;
-    for (const piece of [...ARMOR_ORDER, 'mask', 'helmet']) { // 25차: 검은 마스크 (헬멧 자리)
+    for (const piece of [...ARMOR_ORDER, 'mask', 'helmet', 'cap', 'visor', 'ngob']) { // 25차: 검은 마스크 (헬멧 자리) · 43차 시민 모자 (서울 야구모자·아주머니 선캡 · 방콕 농 모자)
       if (!armor.includes(piece)) continue;
       if (piece === 'mask' && o === 'parrot') continue;
+      if ((piece === 'cap' || piece === 'visor' || piece === 'ngob') && (costume || armor.includes('helmet') || armor.includes('mask'))) continue; // 43차: 모자는 맨머리에만
       if (piece === 'helmet' && costume && o !== 'patient') continue; // 우비 모자·앵무새 머리 위에는 헬멧을 씌우지 않는다
       if (piece === 'shield' && (mode === 'g' || (!!w && TWO.has(w)))) continue; // 20차: 권총·활·양손 무기와는 방패를 들지 않는다
       arm.push({ key: `a-${sex}${PER_BUILD.has(piece) ? ab : 1}-${piece}-${mode}`, piece, ...(tints.has(piece) ? { tint: tints.get(piece) } : {}) });
@@ -309,7 +323,7 @@ async function build0(look: Look, keys: ReturnType<typeof layerKeys>, P = PX, pr
     return { L: arms[k], pal: p2 };
   };
   const order: Lay[] = [{ L: base, pal }];
-  const overHair = (p: string) => p === 'helmet' || p === 'mask'; // 25차: 마스크도 머리카락 위에
+  const overHair = (p: string) => p === 'helmet' || p === 'mask' || p === 'cap' || p === 'visor' || p === 'ngob'; // 25차: 마스크도 머리카락 위에 · 43차 모자도
   keys.armor.forEach((a, k) => { if (!overHair(a.piece)) order.push(armorLay(k)); });
   order.push({ L: hair, pal });
   keys.armor.forEach((a, k) => { if (overHair(a.piece)) order.push(armorLay(k)); });

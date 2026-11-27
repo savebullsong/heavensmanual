@@ -17,7 +17,7 @@ export interface ItemDef {
   /** 25차: 쓴 세계(현실·지옥)에서 훔치기 확률이 오른다 (0.02 = 2%) */
   steal?: number;
   name: Record<Lang, string>;
-  store?: 'antique' | 'maskgirl' | 'mart' | 'pharmacy' | 'food' | 'cafe' | 'talus' | 'hmeat' | 'tools' | 'dept' | 'hjunk' | 'drop' | 'hwater' | 'hmed' | 'harms'; // 22차: 지옥 물장수 · 약장수 · 무기상 // drop = 어디서도 팔지 않는다 (괴물이 떨어뜨릴 뿐) // 우주새가 아니라 거리 가게(철물점·백화점) · 지옥 탈루스·고깃간·넝마장수에서 파는 것
+  store?: 'puppet' | 'antique' | 'maskgirl' | 'mart' | 'pharmacy' | 'food' | 'cafe' | 'talus' | 'hmeat' | 'tools' | 'dept' | 'hjunk' | 'drop' | 'hwater' | 'hmed' | 'harms'; // 22차: 지옥 물장수 · 약장수 · 무기상 // drop = 어디서도 팔지 않는다 (괴물이 떨어뜨릴 뿐) // 우주새가 아니라 거리 가게(철물점·백화점) · 지옥 탈루스·고깃간·넝마장수에서 파는 것
   now?: boolean; // 가게에서 바로 먹는다 (가방에 넣지 않음)
   hell?: boolean; // 지옥의 우주새(황혼)에서만, 노전으로 판다
   sprite?: string; // 몸에 그릴 때 쓰는 그림 (지옥 무기·방어구는 현실 그림을 빌려 쓴다)
@@ -25,7 +25,7 @@ export interface ItemDef {
   two?: boolean; // 양손 무기: 두 손으로 내려찍는다 (느리지만 묵직하다)
   ranged?: boolean; // 멀리서 쏜다 (권총·활) — 민첩이 공격력에 더해진다
   /** 30차: 가방에서 '읽기' — diary = 가장 가까운 우주새로 (현실은 그 도시의 우주새 · 지옥은 그 층의 유황새) */
-  use?: 'diary';
+  use?: 'diary' | 'marionette'; // 43차: 마리오네트 — 줄을 당기면 3분 동안 곁에서 함께 싸운다 (한 번에 하나)
   /** 30차 템브라 강화: '+n' 단계와 바탕 물건 (강화한 것은 'hsword+4' 같은 열쇠로 따로 쌓인다) */
   enh?: number; base?: string;
   dr?: number; // 피해 감소 (17차: 방어력은 회피만 올린다. 피해를 줄이는 건 이 값이 있는 물건뿐)
@@ -168,6 +168,15 @@ export const ITEMS: ItemDef[] = [
   { key: 'tembra', cat: 'goods', price: 400, hell: true, store: 'drop', name: { ko: '템브라', th: 'เท็มบรา', en: 'Tembra' } },
   // 31차 필드 보스의 희귀 전리품 (설정집) — 지금은 귀한 재료로 비싸게 팔 수 있다 (제작은 나중에 대장간에서)
   { key: 'ashhide', cat: 'goods', price: 900, hell: true, store: 'drop', name: { ko: '재등의 가죽', th: 'หนังหลังเถ้า', en: 'Ashback hide' } },
+  // 43차 5층 가면의 도시: 고유 물건 (그 층 괴물만) · 레이피어 '맨얼굴' (5층 무기상도 판다) · 필드 보스 마네트의 실
+  { key: 'maskcandy', cat: 'goods', price: 30, heal: 620, hell: true, floor: 5, store: 'drop', icon: 'choco', name: { ko: '웃는 가면 사탕', th: 'ลูกอมหน้ากากยิ้ม', en: 'Smiling-mask candy' } },
+  { key: 'porcelainmask', cat: 'armor', price: 300, def: 10, hell: true, floor: 5, store: 'drop', sprite: 'mask', icon: 'blackmask', tint: '#efe8dc', name: { ko: '도자기 가면', th: 'หน้ากากกระเบื้อง', en: 'Porcelain mask' } },
+  { key: 'bareface', cat: 'weapon', price: 680, atk: 11, hell: true, floor: 5, sale: [5], sprite: 'rapier', icon: 'rapier', name: { ko: '맨얼굴', th: 'ใบหน้าเปลือย', en: 'Bare Face' } },
+  { key: 'manettethread', cat: 'goods', price: 1100, hell: true, store: 'drop', name: { ko: '마네트의 실', th: 'ด้ายของมาเนตต์', en: "Manette's thread" } },
+  // 43차 5층 인형술사 마리의 마리오네트: 줄을 당기면 곁에서 3분 동안 함께 싸운다 (한 번에 하나 · 지옥에서만)
+  { key: 'marionette1', cat: 'goods', price: 600, hell: true, store: 'puppet', use: 'marionette', icon: 'doll', name: { ko: '나무 병정 마리오네트', th: 'หุ่นเชิดทหารไม้', en: 'Wooden soldier marionette' } },
+  { key: 'marionette2', cat: 'goods', price: 1800, hell: true, store: 'puppet', use: 'marionette', icon: 'doll', name: { ko: '가면 무희 마리오네트', th: 'หุ่นเชิดนางรำสวมหน้ากาก', en: 'Masked dancer marionette' } },
+  { key: 'marionette3', cat: 'goods', price: 4800, hell: true, store: 'puppet', use: 'marionette', icon: 'doll', name: { ko: '검은 실 기사 마리오네트', th: 'หุ่นเชิดอัศวินด้ายดำ', en: 'Black-thread knight marionette' } },
   { key: 'gulonstone', cat: 'goods', price: 1000, hell: true, store: 'drop', name: { ko: '굴론의 위석', th: 'นิ่วในกระเพาะกูลอน', en: "Gulon's gastrolith" } },
   { key: 'redseal', cat: 'goods', price: 1100, hell: true, store: 'drop', name: { ko: '붉은 봉랍', th: 'ครั่งแดง', en: 'Red sealing wax' } },
   { key: 'heartstone', cat: 'goods', price: 1300, hell: true, store: 'drop', name: { ko: '페론의 심장석', th: 'หินหัวใจเฟอร์รอน', en: "Ferron's heartstone" } },
@@ -370,24 +379,31 @@ export function effectText(it: ItemDef, l: Lang, skipStats = false): string {
   return parts.join(' · ');
 }
 
-/** 24차: 서울에서는 원화로 보인다 (속은 바트 그대로, ฿1 ≈ ₩40) */
-let WON = false;
-export function setWon(on: boolean) { WON = on; }
-/** 32차: 지금 원화로 보이는가 (입력칸도 원 단위) */
-export function wonRate() { return WON ? WON_RATE : 1; }
+/** 24차: 서울에서는 원화로 보인다 (속은 바트 그대로, ฿1 ≈ ₩40)
+ *  43차: 천국 돈은 쓰는 사람의 언어를 따른다 — 한국어 ₩ · 태국어 ฿ · 영어 $ (฿35 ≈ $1) */
+export type Currency = 'baht' | 'won' | 'usd';
+let CUR: Currency = 'baht';
+export function setCurrency(c: Currency) { CUR = c; }
+export function setWon(on: boolean) { CUR = on ? 'won' : 'baht'; }
 export const WON_RATE = 40;
-/** 32차: 서울에서는 글 속의 바트 금액(฿1,234)을 원화로 (알림 · 대화 · 은행 · 메뉴 글이 모두 이것을 거친다) */
+export const USD_RATE = 1 / 35;
+/** 32차: 지금 보이는 돈의 단위 (입력칸도 그 단위) */
+export function wonRate() { return CUR === 'won' ? WON_RATE : CUR === 'usd' ? USD_RATE : 1; }
+function fmtCur(n: number): string {
+  if (CUR === 'won') return `₩${Math.round(n * WON_RATE).toLocaleString('en-US')}`;
+  if (CUR === 'usd') { const d = n * USD_RATE; return d >= 100 ? `$${Math.round(d).toLocaleString('en-US')}` : `$${d.toFixed(2)}`; }
+  return `฿${Math.round(n).toLocaleString('en-US')}`;
+}
+/** 32차: 서울(과 43차 천국)에서는 글 속의 바트 금액(฿1,234)을 보이는 단위로 (알림 · 대화 · 은행 · 메뉴 글이 모두 이것을 거친다) */
 export function wonify(text: string): string {
-  if (!WON || !text.includes('฿')) return text;
-  return text.replace(/฿([\d,]+(?:\.\d+)?)/g, (_, num: string) => `₩${Math.round(parseFloat(num.replace(/,/g, '')) * WON_RATE).toLocaleString('en-US')}`);
+  if (CUR === 'baht' || !text.includes('฿')) return text;
+  return text.replace(/฿([\d,]+(?:\.\d+)?)/g, (_, num: string) => fmtCur(parseFloat(num.replace(/,/g, ''))));
 }
 /** 33차: 지역을 정해 이승 돈을 적는다 (지옥·천국에서도 서울 사람이면 ₩) */
 export function cashText(n: number, seoul: boolean): string {
   return seoul ? `₩${Math.round(n * WON_RATE).toLocaleString('en-US')}` : `฿${Math.round(n).toLocaleString('en-US')}`;
 }
-export function moneyText(n: number): string {
-  return WON ? `₩${Math.round(n * WON_RATE).toLocaleString('en-US')}` : `฿${Math.round(n).toLocaleString('en-US')}`;
-}
+export function moneyText(n: number): string { return fmtCur(n); }
 export function priceText(n: number, hell = false): string {
   return hell ? t().obolFmt.replace('{n}', n.toLocaleString('en-US')) : moneyText(n);
 }
@@ -508,6 +524,17 @@ export function itemIcon(key: string, tint?: string): HTMLCanvasElement {
     case 'ashhide':
       P([[5, 9], [14, 5], [26, 7], [28, 18], [22, 27], [9, 26], [4, 18]], '#5a5450'); P([[8, 11], [15, 8], [24, 10], [25, 18], [20, 24], [10, 23], [7, 17]], '#7a7268');
       for (let k = 0; k < 6; k++) R(9 + k * 3, 12 + (k % 3) * 3, 2, 2, '#3a3430'); R(14, 15, 5, 3, '#ff8a3a');
+      break;
+    case 'doll': // 43차 마리오네트: 십자 손잡이에 실로 매달린 작은 목각 인형 (흰 얼굴 · 빨간 옷)
+      R(7, 4, 18, 2, '#5a3a22'); R(15, 2, 2, 7, '#5a3a22');
+      for (const x of [8, 16, 24]) R(x, 6, 1, 7, '#e8e2d6');
+      E(16, 15, 4, 4, '#f2eee6'); R(14, 14, 1, 1, '#141014'); R(17, 14, 1, 1, '#141014'); R(13, 16, 1, 1, '#e88a8a'); R(18, 16, 1, 1, '#e88a8a');
+      R(13, 19, 7, 7, '#a82a3a'); R(9, 13, 4, 2, '#b88a5a'); R(20, 13, 4, 2, '#b88a5a'); R(9, 13, 2, 8, '#b88a5a'); R(22, 13, 2, 8, '#b88a5a');
+      R(14, 26, 2, 4, '#b88a5a'); R(18, 26, 2, 4, '#b88a5a');
+      break;
+    case 'manettethread': // 43차 마네트의 실: 검은 실타래와 끝에 매달린 도자기 조각
+      E(14, 15, 8, 7, '#1a1418'); for (let k = 0; k < 5; k++) R(7 + k * 3, 10 + (k % 2) * 3, 1, 10, '#3a3440');
+      Ln(20, 18, 27, 26, 1, '#1a1418'); E(27, 27, 3, 3, '#f2eee6'); R(26, 26, 1, 1, '#141014');
       break;
     case 'gulonstone':
       E(16, 17, 11, 10, '#3a4226'); E(15, 16, 9, 8, '#6a7a3a'); E(13, 13, 3, 2, '#c8e05a'); R(18, 19, 4, 1, '#2a3018'); R(10, 20, 3, 1, '#2a3018');
@@ -899,13 +926,14 @@ export const FLOOR_LOOT: Record<number, [string, number][]> = {
   2: [['bogroot', 16], ['mossboots', 4], ['leechhook', 2]],
   3: [['bloodfruit', 18], ['lanternwine', 12], ['bloodvest', 3], ['scalecleaver', 2]],
   4: [['slagbread', 18], ['forgegloves', 4], ['slagmaul', 2.4], ['ironblade', 1.2]], // 25차: 4층 고유 물건이 빠져 있던 것을 채움
+  5: [['maskcandy', 18], ['porcelainmask', 4], ['bareface', 1.4]], // 43차 5층 가면의 도시
 };
 /** 25차: 깊을수록 무기·방어구가 잘 나온다 (층마다 장비 무게 +35%) */
 const gearW = (k: string, w: number, f: number) => { const it = ITEMS.find((x) => x.key === k); return it && (it.atk || it.def) ? w * (1 + 0.35 * (f - 1)) : w; };
 /** 31차: 그 층에서 파는 층 장비도 그 층 괴물이 가끔 떨어뜨린다 · 다른 층 전용 장비(예전 공통이던 흑철 검 등)는 그 층에서만 */
 const saleLoot = (f: number): [string, number][] => ITEMS.filter((x) => x.hell && x.sale?.includes(f) && (x.cat === 'weapon' || x.cat === 'armor')).map((x) => [x.key, 2]);
 const commonFor = (f: number) => COMMON_LOOT.filter(([k]) => { const it = ITEMS.find((x) => x.key === k); return !it?.sale || it.sale.includes(f); });
-export const HELL_LOOT: Record<number, [string, number][]> = Object.fromEntries([1, 2, 3, 4].map((f) => [f, [...FLOOR_LOOT[f], ...saleLoot(f), ...commonFor(f)].map(([k, w]) => [k, gearW(k, w, f)] as [string, number])]));
+export const HELL_LOOT: Record<number, [string, number][]> = Object.fromEntries([1, 2, 3, 4, 5].map((f) => [f, [...FLOOR_LOOT[f], ...saleLoot(f), ...commonFor(f)].map(([k, w]) => [k, gearW(k, w, f)] as [string, number])]));
 export function rollLoot(floor: number, rnd = Math.random): string {
   const t = HELL_LOOT[floor] ?? COMMON_LOOT;
   let s = t.reduce((a, [, w]) => a + w, 0) * rnd();

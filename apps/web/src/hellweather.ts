@@ -59,6 +59,13 @@ export function weatherHell(src: HTMLCanvasElement, floor: number, seed: number,
       const near = toBase < 18 ? 1 : upOpen <= 1 ? 0.9 : 0.35;
       if (n * near > 0.48) mix(o, n > 0.7 ? [86, 112, 46] : [58, 82, 34], Math.min(0.85, (n * near - 0.48) * 3));
       if (n * near > 0.6 && hash(x, y, seed + 5) < 0.2) mix(o, [120, 146, 60], 0.6); // 이끼 끝의 밝은 점
+    } else if (floor === 5) {
+      // 43차 가면의 도시: 핏기 없이 하얗게 분칠한 벽 — 색을 빼고 흰 가루를 덮는다. 밑동엔 먹물이 번진다
+      mix(o, [lum * 1.02 + 18, lum + 16, lum * 0.98 + 20], 0.42);
+      if (upOpen <= 1) mix(o, [236, 230, 220], upOpen === 0 ? 0.7 : 0.4);
+      const n = blobNoise(x, y, 9, seed + 23);
+      if (n > 0.68) mix(o, [222, 214, 204], Math.min(0.5, (n - 0.68) * 2.2));
+      if (toBase < 5) mix(o, [34, 30, 40], 0.5 - toBase * 0.08);
     } else {
       // 핏빛: 벽 전체를 붉게 물들인다
       mix(o, [Math.min(255, D[o] * 1.05 + 12), D[o + 1] * 0.72, D[o + 2] * 0.68], 0.5);
@@ -76,7 +83,7 @@ export function weatherHell(src: HTMLCanvasElement, floor: number, seed: number,
       if (top[x] < 0) continue;
       let y = top[x] + 2 + Math.floor(r() * Math.max(1, (bot[x] - top[x]) * 0.5));
       const len = 5 + Math.floor(r() * (floor === 3 ? 22 : 16));
-      const col: [number, number, number] = floor === 3 ? [120 + Math.floor(r() * 30), 8, 6] : [30, 44, 26];
+      const col: [number, number, number] = floor === 3 ? [120 + Math.floor(r() * 30), 8, 6] : floor === 5 ? [28, 24, 34] : [30, 44, 26]; // 43차: 5층은 먹물 자국
       for (let s = 0; s < len && y < bot[x] - 1; s++, y++) {
         if (!A(x, y)) break;
         const o = (y * W + x) * 4;

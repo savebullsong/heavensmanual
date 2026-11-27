@@ -10,7 +10,7 @@ HAIRS = ['short', 'swept', 'bob', 'long', 'ponytail', 'buzz']
 OUTFITS = ['casual', 'apron', 'raincoat', 'patient', 'parrot']
 MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle', 'arming', 'umbrella', 'sickle', 'crowbar', 'wrench', 'machete', 'metalbat', 'saber', 'rapier', 'katana', 'whip']   # 35차 채찍 · 20차: arming = 한손검 · 26차 현실 무기
 TWO = ['sledge', 'fireaxe', 'greatsword', 'maul', 'boltcutter', 'spear']   # 35차 장창   # 16차 양손 무기 (heavy 동작) · 26차 볼트 커터
-ARMOR = ['helmet', 'jacket', 'vest', 'gloves', 'workpants', 'shinguard', 'boots', 'shield', 'mask', 'trench', 'firesuit', 'combatcoat', 'hauberk', 'platecoat']   # 40차: 긴 겉옷(무릎까지 덮는 큰 갑옷)   # 25차: 검은 마스크 (헬멧 자리)   # 20차: 왼팔의 둥근 방패
+ARMOR = ['helmet', 'cap', 'visor', 'ngob', 'jacket', 'vest', 'gloves', 'workpants', 'shinguard', 'boots', 'shield', 'mask', 'trench', 'firesuit', 'combatcoat', 'hauberk', 'platecoat']   # 40차: 긴 겉옷(무릎까지 덮는 큰 갑옷)   # 25차: 검은 마스크 (헬멧 자리)   # 20차: 왼팔의 둥근 방패
 WEAPONS = MELEE + ['pistol']
 RANGED_G = ['pistol', 'shotgun', 'bow', 'flamer', 'rifle']   # 25차: 화염방사기   # 쏘는 자세(g)로 드는 것
 
@@ -87,18 +87,30 @@ BODY = {'x': dict(h=1.28, shoulder=.22, hipw=.105, arm=1.4, leg=1.12),   # 변�
         # 42차: 판초 악마(pd) · 저승사자(jr) · 유내 10대(y1) · 20대(y2) · 30대 후반(y3)
         'pd': dict(h=1.07, shoulder=.18, hipw=.09, arm=1.1, leg=1.04, stance=.05, legmass=1.0),
         'jr': dict(h=1.05, shoulder=.19, hipw=.094, arm=1.12, leg=1.02, stance=.05, legmass=1.15),
-        'y1': dict(h=.84, shoulder=.15, hipw=.085, arm=.95, leg=.92, stance=.035, legmass=1.05),
-        'y2': dict(h=.95, shoulder=.163, hipw=.09, arm=.99, leg=.95, stance=.04, legmass=1.12),
-        'y3': dict(h=.94, shoulder=.165, hipw=.094, arm=1.0, leg=.94, stance=.04, legmass=1.15),
+        'y1': dict(h=.9, shoulder=.15, hipw=.085, arm=.97, leg=.96, stance=.035, legmass=1.0),
+        'y2': dict(h=.96, shoulder=.163, hipw=.09, arm=.99, leg=.97, stance=.04, legmass=1.0),
+        'y3': dict(h=.95, shoulder=.165, hipw=.094, arm=1.0, leg=.95, stance=.04, legmass=1.05),
         # 42차 주요 인물: 파샤르(ps) · 루엔(lu) · 환생관 할아버지(gp) · 불다(bd)
         'ps': dict(h=1.06, shoulder=.18, hipw=.09, arm=1.1, leg=1.04, stance=.05, legmass=1.05),
         'lu': dict(h=.98, shoulder=.165, hipw=.09, arm=1.0, leg=.96, stance=.035, legmass=1.1),
         'gp': dict(h=.93, shoulder=.17, hipw=.088, arm=1.0, leg=.92, stance=.05, legmass=.95),
-        'bd': dict(h=1.05, shoulder=.21, hipw=.1, arm=1.2, leg=1.02, stance=.06, legmass=1.3)}
+        'bd': dict(h=1.05, shoulder=.21, hipw=.1, arm=1.2, leg=1.02, stance=.06, legmass=1.3),
+        # 43차: 황색날개(yw) · 마스크 소녀(mg) · 칼드렉(kd) · 오볼로(ob) · 노을(no) · 마리(mr) / 5층 가면귀(gm) · 속삭임꾼(ws) · 인형병사(ip) · 마르시온(mc) · 마네트(mn)
+        'yw': dict(h=.95, shoulder=.165, hipw=.092, arm=1.0, leg=.95, stance=.04, legmass=1.15),
+        'mg': dict(h=.8, shoulder=.14, hipw=.08, arm=.92, leg=.9, stance=.035, legmass=1.0),
+        'kd': dict(h=1.3, shoulder=.3, hipw=.14, arm=1.7, leg=1.4, stance=.08, legmass=1.4),
+        'ob': dict(h=.92, shoulder=.16, hipw=.088, arm=1.0, leg=.92, stance=.04, legmass=1.0),
+        'no': dict(h=.98, shoulder=.17, hipw=.092, arm=1.02, leg=.96, stance=.04, legmass=1.15),
+        'mr': dict(h=1.02, shoulder=.155, hipw=.085, arm=1.05, leg=1.0, stance=.03, legmass=.9),
+        'gm': dict(h=1.1, shoulder=.17, hipw=.088, arm=1.1, leg=1.08, stance=.05, legmass=.9),
+        'ws': dict(h=1.02, shoulder=.18, hipw=.09, arm=1.35, leg=.95, stance=.07, legmass=.9),
+        'ip': dict(h=1.0, shoulder=.19, hipw=.09, arm=1.0, leg=1.0, stance=.05),
+        'mc': dict(h=1.28, shoulder=.26, hipw=.12, arm=1.5, leg=1.35, stance=.07, legmass=1.1),
+        'mn': dict(h=1.35, shoulder=.28, hipw=.13, arm=1.6, leg=1.4, stance=.08)}
 MONSTER_BW = {'x': None, 'a': .8, 'p': .68, 'y': 1.32, 's': .42, 'k': 1.7, 'b': 1.0, 'g': .42, 'o': 1.08, 'w': .95, 't': .5, 'r': 1.0,
-              'h': 1.45, 'u': .62, 'n': .8, 'l': 1.05, 'e': 1.3, 'v': .85, 'd': .42, 'z': 1.25, 'q': .9, 'j': .9, 'i': 1.0, 'hw': .95, 'an': 1.05, 'af': .95, 'pd': .82, 'jr': .95, 'y1': .86, 'y2': .92, 'y3': 1.0, 'ps': .88, 'lu': .9, 'gp': .85, 'bd': 1.18}
+              'h': 1.45, 'u': .62, 'n': .8, 'l': 1.05, 'e': 1.3, 'v': .85, 'd': .42, 'z': 1.25, 'q': .9, 'j': .9, 'i': 1.0, 'hw': .95, 'an': 1.05, 'af': .95, 'pd': .82, 'jr': .95, 'y1': .86, 'y2': .92, 'y3': 1.0, 'ps': .88, 'lu': .9, 'gp': .85, 'bd': 1.18, 'yw': .95, 'mg': .82, 'kd': 1.5, 'ob': .9, 'no': .95, 'mr': .78, 'gm': .82, 'ws': .8, 'ip': 1.0, 'mc': 1.3, 'mn': 1.45}
 MONSTER_HK = {'x': 1.0, 'a': 1.05, 'p': .86, 'y': 1.12, 's': 1.0, 'k': 1.2, 'b': 1.0, 'g': 1.0, 'o': .9, 'w': 1.0, 't': 1.0, 'r': 1.0,
-              'h': 1.2, 'u': .9, 'n': 1.05, 'l': 1.0, 'e': 1.0, 'v': 1.0, 'd': 1.0, 'z': 1.1, 'q': 1.12, 'j': 1.12, 'i': 1.12, 'hw': 1.12, 'an': 1.1, 'af': 1.12, 'pd': 1.06, 'jr': 1.08, 'y1': 1.2, 'y2': 1.12, 'y3': 1.1, 'ps': 1.08, 'lu': 1.1, 'gp': 1.1, 'bd': 1.08}
+              'h': 1.2, 'u': .9, 'n': 1.05, 'l': 1.0, 'e': 1.0, 'v': 1.0, 'd': 1.0, 'z': 1.1, 'q': 1.12, 'j': 1.12, 'i': 1.12, 'hw': 1.12, 'an': 1.1, 'af': 1.12, 'pd': 1.06, 'jr': 1.08, 'y1': 1.08, 'y2': 1.05, 'y3': 1.05, 'ps': 1.08, 'lu': 1.1, 'gp': 1.1, 'bd': 1.08, 'yw': 1.12, 'mg': 1.22, 'kd': .95, 'ob': 1.18, 'no': 1.12, 'mr': 1.08, 'gm': 1.0, 'ws': 1.0, 'ip': 1.05, 'mc': 1.05, 'mn': 1.1}
 BUILD = [.9, 1.0, 1.14]   # 마름 · 보통 · 건장 (뼈 위치는 같고 굵기만 다르다 → 머리·무기 층을 함께 쓴다)
 
 class Doll:
@@ -1136,6 +1148,24 @@ class Doll:
             blob(P, hc + Vector((0, .005, .02)), (.118 * s, .13 * s, .13 * s), main, None, segs=16, rings=12, cut=lambda co: co.z < 1.53 * s or (co.y < -.03 * s and co.z < 1.64 * s))
             blob(P, hc + Vector((0, -.1, .025)), (.085 * s, .03 * s, .045 * s), metal, None, segs=10, rings=6)
             ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
+            return
+        if piece in ('cap', 'visor', 'ngob'):   # 43차: 서울·방콕 시민을 가르는 모자 — 야구 모자 · 선캡 · 응옵(밀짚 삿갓)
+            P = Part(g)
+            hc = V(0, -.005, 1.615)
+            if piece == 'cap':
+                blob(P, hc + Vector((0, .004, .03 * s)), (.106 * s, .118 * s, .1 * s), main, None, segs=16, rings=12, cut=lambda co: co.z < 1.6 * s)
+                blob(P, hc + Vector((0, -.125 * s, .035 * s)), (.078 * s, .065 * s, .01 * s), main, None, segs=12, rings=6)
+                blob(P, hc + Vector((0, .0, .13 * s)), (.012 * s, .012 * s, .008 * s), dark, None, segs=6, rings=4)
+            elif piece == 'visor':
+                loft(P, [(hc + Vector((0, .0, .045 * s)), Vector((0, -1, 0)), Vector((1, 0, 0)), .102 * s, .116 * s),
+                         (hc + Vector((0, .0, .075 * s)), Vector((0, -1, 0)), Vector((1, 0, 0)), .1 * s, .114 * s)], dark, None, segs=18, caps=(False, False))
+                blob(P, hc + Vector((0, -.15 * s, .06 * s)), (.1 * s, .085 * s, .01 * s), main, None, segs=14, rings=6)
+            else:
+                c = hc + Vector((0, .0, .085 * s))
+                loft(P, [(c, Vector((0, -1, 0)), Vector((1, 0, 0)), .24 * s, .24 * s), (c + Vector((0, 0, .04 * s)), Vector((0, -1, 0)), Vector((1, 0, 0)), .16 * s, .16 * s),
+                         (c + Vector((0, 0, .1 * s)), Vector((0, -1, 0)), Vector((1, 0, 0)), .06 * s, .06 * s), (c + Vector((0, 0, .13 * s)), Vector((0, -1, 0)), Vector((1, 0, 0)), .012 * s, .012 * s)], main, None, segs=20, caps=(False, True))
+                loft(P, [(c + Vector((0, 0, -.012 * s)), Vector((0, -1, 0)), Vector((1, 0, 0)), .1 * s, .11 * s), (c, Vector((0, -1, 0)), Vector((1, 0, 0)), .1 * s, .11 * s)], dark, None, segs=16, caps=(False, False))
+            ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': 1.0}, subsurf=0); self.add(g, ob)
             return
         if piece == 'mask':   # 25차 마스크 팔이 소녀의 검은 마스크: 코와 입을 덮는 천, 귀에 거는 끈
             P = Part(g)

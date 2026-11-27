@@ -842,3 +842,8 @@ def bulda(self, g):
 
 
 NEW.update({'pashar': pashar, 'luen': luen, 'grandpa': grandpa, 'bulda': bulda})
+
+
+# 43차: 황색날개 · 마스크 소녀 · 칼드렉 · 오볼로 · 노을 · 마리 · 5층 가면의 도시 · 유내 다시 (bodies43.py)
+from bodies43 import NEW43  # noqa: E402
+NEW.update(NEW43)

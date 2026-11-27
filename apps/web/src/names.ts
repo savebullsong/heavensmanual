@@ -85,6 +85,8 @@ export function buildingSub(b: Building, l: Lang): string {
 /** 일할 수 있는 업종 (시급은 방콕 최저임금) */
 const NO_WORK = new Set(['place_of_worship', 'school', 'kindergarten', 'library', 'post_office']);
 export function canWork(b: Building) {
+  // 43차: 내 집(서울 옛집 · 산 집)과 유내 미용실에서는 일하지 않는다
+  if (b.cat === 'home' || b.cat === 'estate' || (b as { yunae?: boolean }).yunae) return false;
   const p = mainPoi(b);
   return !!p && !NO_WORK.has(p.t) && !!b.sign;
 }

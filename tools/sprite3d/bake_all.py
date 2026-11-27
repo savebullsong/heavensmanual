@@ -153,6 +153,20 @@ for mk, o, st in (('y1', 'yunae1', 1.0), ('y2', 'yunae2', .9), ('y3', 'yunae3', 
 # ── 42차: 주요 인물 전용 몸 + 고유 동작(gest) — 파샤르(장부에 적기) · 루엔(등불 들기) · 할아버지(안경 고쳐 쓰기) · 불다(랩 한 소절)
 for mk, sex, o, ge, st in (('ps', 'm', 'pashar', 'write', .8), ('lu', 'f', 'luen', 'lantern', .55), ('gp', 'm', 'grandpa', 'glasses', .85), ('bd', 'm', 'bulda', 'rap', 1.0)):
     jobs.append({'sex': sex, 'build': 1, 'monster': mk, 'occluder': o, 'gest': ge, 'sets': [{'kind': 'base', 'outfit': o, 'mode': 'w', 'extra': ['gest']}], 'stride': st, 'tag': 'main42'})
+# ── 43차: 주요 인물 전용 몸 더 (서기·걷기 + 고유 동작) — 황색날개(맞이하기) · 마스크 소녀(바구니 내밀기) · 칼드렉(망치질) · 오볼로(동전 세기) · 노을(장검 경례) · 마리(실 당기기)
+for mk, sex, o, ge, st in (('yw', 'f', 'yellowwing', 'welcome', .55), ('mg', 'f', 'maskgirl', 'offer', 1.0), ('kd', 'm', 'kaldrek', 'hammer', 1.0),
+                           ('ob', 'm', 'obolo', 'count', .7), ('no', 'f', 'noeul', 'blade', .95), ('mr', 'f', 'mari', 'strings', .55)):
+    jobs.append({'sex': sex, 'build': 1, 'monster': mk, 'occluder': o, 'gest': ge, 'sets': [{'kind': 'base', 'outfit': o, 'mode': 'w', 'extra': ['gest']}], 'stride': st, 'crisp': mk == 'no', 'tag': 'dream43'})
+# 43차: 유내 세 시절을 사용자 도트에 맞춰 다시 (손으로 찍은 듯 음영을 끊고 눈을 또렷하게)
+for mk, o in (('y1', 'yunae1'), ('y2', 'yunae2'), ('y3', 'yunae3')):
+    jobs.append({'sex': 'f', 'build': 1, 'monster': mk, 'occluder': o, 'sets': [{'kind': 'base', 'outfit': o, 'mode': 'w', 'extra': ['sit']}], 'crisp': True, 'tag': 'yunae43'})
+# 43차: 지옥 5층 가면의 도시 — 가면귀(레이피어 · 경비병은 세이버) · 속삭임꾼(맨손) · 인형병사(세이버 · 마리오네트도 같은 몸) · 층주 마르시온(인장 지팡이) · 필드 보스 마네트(맨손)
+for mk, o, mode, weapons in (('gm', 'maskfiend', 'm', ['rapier', 'saber']), ('ws', 'whisperer', 'u', []), ('ip', 'puppet', 'm', ['saber']),
+                             ('mc', 'marcion', 'm', ['sealstaff']), ('mn', 'manette', 'u', [])):
+    jobs.append({'sex': 'm', 'build': 1, 'monster': mk, 'occluder': o, 'sets': [{'kind': 'base', 'outfit': o, 'mode': mode}] + [{'kind': 'weapon', 'weapon': w} for w in weapons], 'tag': 'hell43'})
+# 43차: 서울·방콕 시민 모자 (보통 체형 하나로 모든 체형에, 머리카락 위)
+for sex in 'mf':
+    jobs.append({'sex': sex, 'build': 1, 'sets': [{'kind': 'armor', 'piece': pc, 'mode': m, 'extra': ['stab'] if m == 'm' else []} for pc in ('cap', 'visor', 'ngob') for m in MODES], 'tag': 'hat43' + sex})
 args = sys.argv[2:]
 # --scale2: 같은 크기의 인물을 픽셀 두 배로 (게임에서는 반으로 줄여 같은 크기, 더 섬세)
 if '--scale2' in args:
@@ -183,6 +197,23 @@ if '--body42' in args:
         keep.append(jj)
     jobs = keep[fr:]
     print(f'body42: {len(jobs)} jobs, {sum(len(j["sets"]) for j in jobs)} sets', flush=True)
+# 43차 --pass43: 행인만 입는 옷(서울 긴소매·패딩 · 강도 · 마피아)을 새 몸으로 다시 굽는다 (--sex=m|f)
+if '--pass43' in args:
+    args.remove('--pass43')
+    sx = next((a.split('=')[1] for a in args if a.startswith('--sex=')), None)
+    args = [a for a in args if not a.startswith('--sex=')]
+    keep = []
+    for j in jobs:
+        if j.get('monster') or (sx and j['sex'] != sx): continue
+        t = j.get('tag')
+        if t == 'season39': keep.append(dict(j, tag='pass43')); continue
+        sets = [x for x in j['sets'] if x['kind'] == 'base' and x['outfit'] in ('robber', 'mafia')]
+        if not sets: continue
+        if t == 'g17': keep.append(dict(j, sets=sets, tag='pass43'))
+        elif t in ('hold19', 'swing39'): keep.append(dict(j, sets=sets, tag='pass43', only=['idle2', 'walk2'] if t == 'hold19' else ['stab']))
+    # 먼저 통째로 굽는 것(g17), 그다음 덧붙이는 것
+    jobs = sorted(keep, key=lambda j: 1 if j.get('merge') else 0)
+    print(f'pass43: {len(jobs)} jobs, {sum(len(j["sets"]) for j in jobs)} sets', flush=True)
 only = args  # 번호나 태그로 일부만
 t0 = time.time()
 for k, j in enumerate(jobs):

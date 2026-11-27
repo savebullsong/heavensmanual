@@ -19,6 +19,15 @@ let mode: BgmMode = (() => {
   return installed() ? 'music' : 'nature';
 })();
 let indoor = false;
+/** 43차: 배경 소리 음량 (0~1, 영혼 설정의 막대) */
+const VKEY = 'heavensmanual.bgmvol';
+let vol = (() => { try { const v = parseFloat(localStorage.getItem(VKEY) ?? ''); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1; } catch { return 1; } })();
+export function bgmVolume() { return vol; }
+export function setBgmVolume(v: number) {
+  vol = Math.max(0, Math.min(1, v));
+  try { localStorage.setItem(VKEY, String(vol)); } catch { /* 그만 */ }
+  void apply();
+}
 
 export function bgmMode() { return mode; }
 export function setBgmMode(m: BgmMode) {
@@ -36,7 +45,7 @@ export function setIndoor(v: boolean) {
   const c = audioContext();
   if (c && natureOut) {
     natureFilter!.frequency.setTargetAtTime(v ? 700 : 16000, c.currentTime, 0.4);
-    natureOut.gain.setTargetAtTime(mode === 'nature' ? (v ? 0.45 : 1) : 0, c.currentTime, 0.4);
+    natureOut.gain.setTargetAtTime(mode === 'nature' ? (v ? 0.45 : 1) * vol : 0, c.currentTime, 0.4);
   }
 }
 
@@ -218,7 +227,7 @@ async function apply() {
   // 자연음
   if (mode === 'nature') {
     buildNature(c);
-    natureOut!.gain.setTargetAtTime(indoor ? 0.45 : 1, t, 0.6);
+    natureOut!.gain.setTargetAtTime((indoor ? 0.45 : 1) * vol, t, 0.6);
     if (!timer) { schedule(); timer = window.setInterval(schedule, 400); }
   } else if (natureOut) {
     natureOut.gain.setTargetAtTime(0, t, 0.3);
@@ -233,7 +242,7 @@ async function apply() {
     }
     if (mode !== 'music' || !audioEl || !musicGain) return;
     if (audioEl.paused) await audioEl.play().catch(() => undefined);
-    musicGain.gain.setTargetAtTime(0.42, c.currentTime, 0.8);
+    musicGain.gain.setTargetAtTime(0.42 * vol, c.currentTime, 0.8);
   } else if (audioEl && musicGain) {
     musicGain.gain.setTargetAtTime(0, t, 0.25);
     const el = audioEl;

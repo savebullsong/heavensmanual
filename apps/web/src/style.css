@@ -116,6 +116,8 @@ button.primary:hover { background: #e0b437; }
 #hud { position: fixed; left: 0; right: 0; top: 0; z-index: 10; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 10px 12px; pointer-events: none; flex-wrap: wrap; }
 #hud > div { pointer-events: auto; background: rgba(20, 15, 11, 0.78); border: 1px solid #4a3424; border-radius: 6px; padding: 6px 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 14px; }
 #hud .hud-left { flex-direction: column; align-items: flex-start; gap: 2px; }
+/* 43차: 화면이 좁아져 두 줄이 되면 위치(지역 이름)는 상태창 아래로 — 줄을 아래에서 위로 쌓는다 (한 줄일 때는 그대로) */
+@media (min-width: 641px) { #hud { flex-wrap: wrap-reverse; align-items: flex-end; } }
 #hud .hint { font-size: 12px; color: #b8a888; }
 #hud button, #hud select { padding: 3px 8px; font-size: 13px; }
 #hud .clock { color: #e0b437; font-variant-numeric: tabular-nums; }
@@ -375,6 +377,8 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 .set-panel .set-sec:first-of-type { border-top: 0; }
 .set-panel h4 { margin: 0 0 8px; font-size: 13px; color: #e0b437; font-weight: 700; }
 .set-panel .set-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 0; }
+.set-panel .set-row input.vol { flex: 1; min-width: 90px; max-width: 220px; accent-color: #e0b437; }
+.set-panel .set-row .vol-n { min-width: 3.2em; text-align: right; font-size: 12px; color: #d8ccb0; font-weight: normal; font-variant-numeric: tabular-nums; }
 .set-panel .lbl { font-size: 13px; color: #d8ccb4; }
 .set-panel .val { font-size: 13px; color: #f2e8d2; font-family: ui-monospace, Menlo, monospace; }
 .set-panel .seg { display: inline-flex; border: 1px solid #5a4424; border-radius: 6px; overflow: hidden; }
@@ -597,3 +601,8 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 }
 /* 건너가는 동안은 화면의 단추·표시를 모두 감춘다 (장면만) */
 body.passing #hud, body.passing .stance, body.passing .quick-slot, body.passing .toast, body.passing .ammo { visibility: hidden !important; }
+
+/* 43차: 빈집 문턱의 어둠 (뱃속) — 붉게 비치는 따뜻한 어둠이 천천히 숨 쉰다 */
+.womb { position: fixed; inset: 0; z-index: 60; pointer-events: none; opacity: 0; transition: opacity .9s ease; background: radial-gradient(ellipse at 50% 55%, #3a0c0c 0%, #1a0404 45%, #050101 100%); }
+.womb.on { opacity: 1; animation: wombBreath 1.8s ease-in-out infinite; }
+@keyframes wombBreath { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }

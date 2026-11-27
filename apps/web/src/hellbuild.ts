@@ -837,7 +837,9 @@ function smithy(b: Building) {
 
 export function drawHellBuild(b: Building, kind: HellBuildKind, theme: Theme): { canvas: HTMLCanvasElement; x: number; y: number } {
   if (kind === 'smithy') return smithy(b);
-  if (kind === 'idol') return theme === 'ash' ? demonIdol(b) : theme === 'swamp' ? hungryMaw(b) : theme === 'forge' ? greatAnvil(b) : bloodScale(b);
+  if (kind === 'maskhouse') return maskHouse(b);
+  if (kind === 'puppetshop') return puppetShop(b);
+  if (kind === 'idol') return theme === 'ash' ? demonIdol(b) : theme === 'swamp' ? hungryMaw(b) : theme === 'forge' ? greatAnvil(b) : theme === 'mask' ? maskIdol(b) : bloodScale(b);
   if (kind === 'thatch') return thatch(b, theme);
   if (kind === 'prison') return prison(b, theme);
   if (kind === 'bonehouse') return bonehouse(b, theme);
@@ -984,6 +986,128 @@ function bloodScale(b: Building) {
   // 받침을 타고 흐르는 피와 바닥에 흩어진 동전
   for (let k = 0; k < 5; k++) { const [x, y] = P(i0 + 0.3 + k * (w - 0.6) / 4, j1 - 0.1, 18); R(x, y, 1, 8 + (k * 5) % 9, '#7a0a08'); }
   for (let k = 0; k < 10; k++) { const [x, y] = P(i0 + hash(k, 1, i0) * w, j1 + 0.1 + hash(k, 2, j0) * 0.4, 0); R(x, y - 1, 2, 1, hash(k, 3) < 0.5 ? '#d9b44a' : '#a8823a'); }
+  finish();
+  return { canvas: cv.c, x: cv.minX, y: cv.minY };
+}
+
+
+// ───────── 43차 5층 가면의 도시 ─────────
+/** 안과 밖이 다른 집: 길 쪽(왼쪽 앞면)은 흰 회벽에 꽃 상자와 웃는 가면을 단 말끔한 얼굴, 옆면(오른쪽)은 썩어 갈라진 돌과 핏물 얼룩·뜯긴 판자 */
+function maskHouse(b: Building) {
+  const Hw = b.h;
+  const top = Hw + 34;
+  const cv = canvasFor(b, top, 12);
+  const { P, poly, R, line, finish } = cv;
+  const { i0, j0, w, d } = b, i1 = i0 + w, j1 = j0 + d;
+  const seed = i0 * 41 + j0 * 13;
+  const LW = w * (TW / 2), RWd = d * (TW / 2);
+  const win = (u: number, z: number, L: number) => { const n = Math.max(1, Math.round(L / 22)); const cell = L / n; const uu = u % cell; return uu > cell * 0.3 && uu < cell * 0.7 && ((z > 14 && z < 28) || (z > Hw * 0.55 && z < Hw * 0.55 + 14)); };
+  walls(cv, b, Hw, (face, u, z) => {
+    if (face === 0) {
+      // 말끔한 얼굴: 흰 회벽 · 검은 창틀의 창 (안은 따뜻한 빛) · 바닥 띠 · 처마 아래 붉은 줄
+      if (z > Hw - 4) return '#a82a3a';
+      if (z < 5) return '#5a5650';
+      if (win(u, z, LW)) { const n = Math.max(1, Math.round(LW / 22)), cell = LW / n, uu = u % cell; return (Math.abs(uu - cell / 2) < 1 || z === 21 || z === Math.round(Hw * 0.55 + 7)) ? '#141216' : '#e8c878'; }
+      return shade('#ece6da', 0.92 + hash(u >> 2, z >> 2, seed) * 0.08);
+    }
+    // 썩은 옆면: 갈라진 검은 돌 · 핏물 자국 · 뜯긴 판자 사이로 어둠
+    if (hash(u >> 2, z >> 3, seed + 7) < 0.12) return '#08060a';
+    const row = Math.floor(z / 7), off = row % 2 ? 4 : 0;
+    if (z % 7 === 0 || (u + off) % 9 === 0) return '#141018';
+    let c = shade('#3a3440', 0.6 + hash((u + off) >> 3, row, seed + 3) * 0.4);
+    if (hash(u, z >> 1, seed + 11) < 0.05 && z > 10) c = '#5a0e14';
+    return c;
+  });
+  // 썩은 면의 흘러내린 핏물 줄기 몇
+  for (let k = 0; k < 4; k++) { const [sx, sy] = P(i1, j1 - 0.3 - k * (d - 0.6) / 3, Hw - 6 - (k % 2) * 10); R(sx, sy, 1, 10 + (k * 7) % 14, '#6a0a12'); }
+  // 말끔한 면의 꽃 상자 (창 아래) · 문 위의 웃는 가면
+  const n = Math.max(1, Math.round(LW / 22));
+  for (let q = 0; q < n; q++) { const [fx, fy] = P(i0 + ((q + 0.5) / n) * w, j1, 13); R(fx - 5, fy, 10, 3, '#5a3a22'); for (let k = 0; k < 5; k++) R(fx - 4 + k * 2, fy - 2, 1, 2, k % 2 ? '#e85a7a' : '#f2d27a'); }
+  { const [mx, my] = P(i0 + w * 0.5, j1, Hw * 0.42); R(mx - 5, my - 6, 10, 11, '#f2eee6'); R(mx - 3, my - 3, 2, 1, '#141014'); R(mx + 2, my - 3, 2, 1, '#141014'); for (let k = 0; k < 6; k++) R(mx - 3 + k, my + 2 + (k === 0 || k === 5 ? -1 : 0), 1, 1, '#b8283a'); }
+  // 지붕: 말끔한 검푸른 기와 (앞쪽 반) · 뒤쪽은 내려앉아 구멍
+  const zr = Hw, zt = Hw + 22;
+  poly([P(i0 - 0.15, j1 + 0.15, zr), P(i1 + 0.15, j1 + 0.15, zr), P(i1 + 0.15, (j0 + j1) / 2, zt), P(i0 - 0.15, (j0 + j1) / 2, zt)], '#2a3048');
+  poly([P(i0 - 0.15, (j0 + j1) / 2, zt), P(i1 + 0.15, (j0 + j1) / 2, zt), P(i1 + 0.15, j0 - 0.15, zr), P(i0 - 0.15, j0 - 0.15, zr)], '#1a1a24');
+  poly([P(i1 + 0.15, j1 + 0.15, zr), P(i1 + 0.15, (j0 + j1) / 2, zt), P(i1 + 0.15, j0 - 0.15, zr)], '#1e1a22');
+  for (let r = 1; r < 5; r++) { const t2 = r / 5; line(P(i0 - 0.15, j1 + 0.15 - (d / 2 + 0.15) * t2, zr + (zt - zr) * t2), P(i1 + 0.15, j1 + 0.15 - (d / 2 + 0.15) * t2, zr + (zt - zr) * t2), 1, '#3a4260'); }
+  for (let k = 0; k < 3; k++) { const [hx, hy] = P(i1 - 0.2 - hash(k, 1, seed) * 0.6, j0 + 0.3 + hash(k, 2, seed) * (d / 2 - 0.4), zr + 8); R(hx - 2, hy - 1, 4, 2, '#0a0810'); }
+  finish();
+  return { canvas: cv.c, x: cv.minX, y: cv.minY };
+}
+/** 5층 한가운데의 큰 가면 조형물: 두 단 흰 돌 받침 위에 선 거대한 가면 — 왼쪽 반은 웃고 오른쪽 반은 운다. 금 테두리, 붉은 눈물. 둘레엔 작은 가면과 촛불 */
+function maskIdol(b: Building) {
+  const top = b.h + 40;
+  const cv = canvasFor(b, top, 20);
+  const { g, P, R, finish } = cv;
+  const { i0, j0, w, d } = b, j1 = j0 + d;
+  plinth(cv, b, 0, 10, 0.05, '#c8c2b8', '#a8a298', '#8a847a');
+  plinth(cv, b, 10, 20, 0.5, '#dcd6cc', '#bcb6ac', '#9a948a');
+  const [cx, cy] = P(i0 + w / 2, j0 + d / 2, 20);
+  const E = (x: number, y: number, rx: number, ry: number, col: string) => { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); g.fill(); };
+  const H = b.h - 10;
+  E(cx, cy - H / 2 - 4, 30, H / 2, '#d8b048'); E(cx, cy - H / 2 - 4, 27, H / 2 - 3, '#f2eee6');
+  g.fillStyle = '#e2dcd0'; g.beginPath(); g.ellipse(cx, cy - H / 2 - 4, 27, H / 2 - 3, 0, -Math.PI / 2, Math.PI / 2); g.fill(); // 오른쪽 반은 조금 어둡다
+  const ey = cy - H * 0.62;
+  // 왼쪽 눈: 웃는 초승달 · 오른쪽 눈: 처진 눈 + 붉은 눈물
+  for (let k = 0; k < 9; k++) R(cx - 17 + k, ey - Math.round(Math.sin((k / 8) * Math.PI) * 4), 1, 2, '#141014');
+  for (let k = 0; k < 9; k++) R(cx + 8 + k, ey - 3 + Math.round(Math.sin((k / 8) * Math.PI) * 3), 1, 2, '#141014');
+  R(cx + 12, ey + 2, 2, 20, '#a82030'); R(cx + 12, ey + 22, 3, 3, '#a82030');
+  // 입: 왼쪽 반은 올라가고 오른쪽 반은 내려간다
+  const my = cy - H * 0.3;
+  for (let k = 0; k < 13; k++) R(cx - 13 + k, my - Math.round((12 - k) * 0.35), 1, 2, '#141014');
+  for (let k = 0; k < 13; k++) R(cx + k, my + Math.round(k * 0.35), 1, 2, '#141014');
+  R(cx - 1, ey + 8, 2, 12, '#c8c0b4');
+  // 받침 둘레의 작은 가면과 촛불
+  for (let k = 0; k < 7; k++) { const [x, y] = P(i0 + 0.2 + k * (w - 0.4) / 6, j1 + 0.15, 0); E(x, y - 5, 3, 4, k % 3 === 1 ? '#d8b048' : k % 3 === 2 ? '#a82a3a' : '#f2eee6'); R(x - 2, y - 6, 1, 1, '#141014'); R(x + 1, y - 6, 1, 1, '#141014'); }
+  for (let k = 0; k < 4; k++) { const [x, y] = P(i0 + 0.1 + hash(k, 5, i0) * w, j1 + 0.35, 0); R(x, y - 6, 2, 6, '#ece6da'); R(x, y - 8, 2, 2, '#ffd27a'); }
+  finish();
+  return { canvas: cv.c, x: cv.minX, y: cv.minY };
+}
+/** 인형 진열창의 인형 얼굴 자리 (장면이 몇몇 인형의 눈을 굴린다): [x, y, z] 칸 좌표 */
+export function puppetEyes(b: Building): [number, number, number][] {
+  const out: [number, number, number][] = [];
+  const { i0, j0, w, d } = b, j1 = j0 + d;
+  for (let row = 0; row < 3; row++) for (let k = 0; k < 6; k++) if ((k * 7 + row * 3) % 4 === 1) out.push([i0 + 0.3 + (k + 0.5) * (w - 0.6) / 6, j1 + 0.02, 14 + row * 11 + 6]);
+  return out;
+}
+/** 인형술사 마리의 공방: 낡은 나무 가게 · 왼쪽 앞면 큰 진열창에 세 줄로 앉힌 인형 수십 개 (흰 얼굴 · 빨간 볼) · 오른쪽 면엔 실에 매달린 마리오네트 · 가위와 실패 간판 */
+function puppetShop(b: Building) {
+  const Hw = b.h;
+  const top = Hw + 30;
+  const cv = canvasFor(b, top, 14);
+  const { P, poly, R, line, finish } = cv;
+  const { i0, j0, w, d } = b, i1 = i0 + w, j1 = j0 + d;
+  const seed = i0 * 29 + j0 * 7;
+  const LW = w * (TW / 2);
+  const glass = (u: number, z: number) => u > LW * 0.08 && u < LW * 0.92 && z > 10 && z < 46;
+  walls(cv, b, Hw, (face, u, z) => {
+    if (face === 0 && glass(u, z)) return (z === 21 || z === 32) ? '#3a2416' : shade('#3a2a2a', 0.8 + hash(u >> 3, z >> 3, seed) * 0.3); // 진열창 안 (선반 둘)
+    if (z < 6) return '#2a1c14';
+    if (u % 7 === 0) return '#1e140e';
+    return shade(face ? '#5a3a24' : '#6a4630', 0.75 + hash(u >> 1, z >> 3, seed + face) * 0.35);
+  });
+  // 진열창의 인형들: 세 줄, 흰 얼굴 · 빨간 볼 · 알록달록한 옷
+  const cols = ['#a82a3a', '#2a4a7a', '#d8b048', '#3a6a3a', '#6a3a7a', '#ece6da'];
+  for (let row = 0; row < 3; row++) for (let k = 0; k < 6; k++) {
+    const [x, y] = P(i0 + 0.3 + (k + 0.5) * (w - 0.6) / 6, j1 + 0.02, 14 + row * 11);
+    R(x - 2, y - 4, 5, 4, cols[(k + row * 2) % cols.length]);
+    R(x - 2, y - 9, 5, 5, '#f2eee6'); R(x - 1, y - 7, 1, 1, '#141014'); R(x + 1, y - 7, 1, 1, '#141014'); R(x - 2, y - 6, 1, 1, '#e88a8a'); R(x + 2, y - 6, 1, 1, '#e88a8a');
+    R(x - 2, y - 10, 5, 1, ['#2a1a12', '#d8b048', '#141014'][(k + row) % 3]);
+  }
+  // 오른쪽 면: 처마 끝에서 실에 매달린 마리오네트 셋
+  for (let k = 0; k < 3; k++) {
+    const [ax, ay] = P(i1 + 0.05, j1 - 0.35 - k * (d - 0.7) / 2, Hw - 2);
+    line([ax, ay], [ax, ay + 14], 1, '#ece8e0');
+    R(ax - 2, ay + 14, 5, 5, '#f2eee6'); R(ax - 2, ay + 19, 5, 7, cols[k + 1]); R(ax - 4, ay + 19, 2, 6, '#b88a5a'); R(ax + 3, ay + 19, 2, 6, '#b88a5a'); R(ax - 1, ay + 26, 1, 6, '#b88a5a'); R(ax + 1, ay + 26, 1, 6, '#b88a5a');
+    R(ax - 1, ay + 16, 1, 1, '#141014'); R(ax + 1, ay + 16, 1, 1, '#141014');
+  }
+  // 앞으로 튀어나온 처마 (줄무늬 천) · 실패와 가위 간판
+  const ze = Hw;
+  poly([P(i0 - 0.1, j1 + 0.45, ze - 8), P(i1 + 0.1, j1 + 0.45, ze - 8), P(i1 + 0.1, j1, ze), P(i0 - 0.1, j1, ze)], '#7a1e2a');
+  for (let k = 0; k < 6; k++) { const x0 = i0 - 0.1 + (k / 6) * (w + 0.2), x1 = x0 + (w + 0.2) / 12; poly([P(x0, j1 + 0.45, ze - 8), P(x1, j1 + 0.45, ze - 8), P(x1, j1, ze), P(x0, j1, ze)], '#ece6da'); }
+  poly([P(i0 - 0.1, j0 - 0.1, ze + 16), P(i1 + 0.1, j0 - 0.1, ze + 16), P(i1 + 0.1, j1, ze), P(i0 - 0.1, j1, ze)], '#2a1e18');
+  poly([P(i1 + 0.1, j0 - 0.1, ze + 16), P(i1 + 0.1, j1, ze), P(i1 + 0.1, j1, ze - 3), P(i1 + 0.1, j0 - 0.1, ze + 13)], '#1a120e');
+  { const [sx, sy] = P(i0 + w * 0.5, j1 + 0.45, ze - 10); R(sx - 8, sy, 16, 10, '#2a1a12'); R(sx - 7, sy + 1, 14, 8, '#d8c8a8'); R(sx - 4, sy + 3, 3, 4, '#a82a3a'); R(sx - 3, sy + 2, 1, 6, '#5a3a22'); R(sx + 1, sy + 3, 1, 4, '#5a5652'); R(sx + 3, sy + 3, 1, 4, '#5a5652'); R(sx + 1, sy + 6, 3, 1, '#5a5652'); }
   finish();
   return { canvas: cv.c, x: cv.minX, y: cv.minY };
 }

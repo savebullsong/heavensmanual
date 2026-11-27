@@ -122,6 +122,12 @@ export function hellGroundJob(z: Zone, theme: Theme, i0: number, j0: number): Gr
         } else if (theme === 'forge') {
           molten(n1, n2, n3, grain);
           if (edge < 0.05) set(edge < 0.025 ? '#fff6d0' : '#ffb02a');
+        } else if (theme === 'mask') {
+          // 43차 5층: 먹물처럼 검고 고요한 물 — 아주 옅은 보랏빛 물결 · 가장자리의 흰 거품 (가면 조각이 떠 있다)
+          lerp('#0c0a10', '#1a1622', n1);
+          if (Math.abs(Math.sin(X * 0.07 + Yp * 0.04 + n2 * 8)) < 0.04) set('#3a3448');
+          if (grain < 0.004) set('#d8d2c8');
+          if (edge < 0.05) set(edge < 0.025 ? '#8a8496' : '#4a4458');
         } else {
           // 피의 용암: 검붉게 식은 껍질 사이로 핏빛 금이 달아오른다
           bloodLava(X, Yp, n1, n2, n3, grain);
@@ -138,9 +144,9 @@ export function hellGroundJob(z: Zone, theme: Theme, i0: number, j0: number): Gr
           const cu = Math.floor(u), du = u - cu, dv = v - rowj;
           const id = hash(cu, rowj, 5);
           const e = Math.min(du, 1 - du, dv, 1 - dv);
-          if (e < 0.07 + n3 * 0.03) set(theme === 'market' ? '#1e0c0a' : theme === 'forge' ? '#0a0808' : '#141010');
+          if (e < 0.07 + n3 * 0.03) set(theme === 'market' ? '#1e0c0a' : theme === 'forge' ? '#0a0808' : theme === 'mask' ? '#2a2830' : '#141010');
           else {
-            if (theme === 'market') lerp('#6a2e24', '#4e2018', id * 0.8 + n1 * 0.3); else if (theme === 'forge') { lerp('#3e3836', '#2a2624', id * 0.8 + n1 * 0.3); if (du < 0.12 && dv < 0.18) set('#6a625a'); } else lerp('#4a4440', '#36302c', id * 0.8 + n1 * 0.3);
+            if (theme === 'mask') lerp('#9a968e', '#7a766e', id * 0.8 + n1 * 0.3); else if (theme === 'market') lerp('#6a2e24', '#4e2018', id * 0.8 + n1 * 0.3); else if (theme === 'forge') { lerp('#3e3836', '#2a2624', id * 0.8 + n1 * 0.3); if (du < 0.12 && dv < 0.18) set('#6a625a'); } else lerp('#4a4440', '#36302c', id * 0.8 + n1 * 0.3);
             if (du < 0.2 || dv < 0.2) shade(1.16); else if (du > 0.82 || dv > 0.8) shade(0.78);
             if (grain < 0.02) shade(0.7);
           }
@@ -152,7 +158,7 @@ export function hellGroundJob(z: Zone, theme: Theme, i0: number, j0: number): Gr
         else { lerp('#4a3424', '#34241a', hash(Math.floor(u), 2, 3) + n1 * 0.3); if (pu < 0.26) shade(1.15); if (pu > 0.88) shade(0.75); }
         if ((theme === 'market' || theme === 'forge') && ((fi * 6) % 1 < 0.18)) set('#3a3a3a'); // 쇠 창살 다리
       } else if (best === 6) {
-        lerp(theme === 'swamp' ? '#20221a' : theme === 'market' ? '#2a1816' : theme === 'forge' ? '#161212' : '#221e1c', theme === 'swamp' ? '#16180f' : theme === 'market' ? '#1c100e' : theme === 'forge' ? '#0c0a0a' : '#161312', n1);
+        lerp(theme === 'swamp' ? '#20221a' : theme === 'market' ? '#2a1816' : theme === 'forge' ? '#161212' : theme === 'mask' ? '#2a2830' : '#221e1c', theme === 'swamp' ? '#16180f' : theme === 'market' ? '#1c100e' : theme === 'forge' ? '#0c0a0a' : theme === 'mask' ? '#1a181e' : '#161312', n1);
       } else if (theme === 'ash') {
         if (best === 1) {
           // 그을린 모래: 바람에 쓸린 물결 무늬 + 검은 재 알갱이
@@ -197,6 +203,19 @@ export function hellGroundJob(z: Zone, theme: Theme, i0: number, j0: number): Gr
           if (grain < 0.006) set('#c8b8a0'); else if (grain < 0.012) set('#ff6a1a');
         }
         if (second === 2 && edge < 0.24) { const k = 1 - edge / 0.24; r = r * (1 - k * 0.3) + 90 * k; gg = gg * (1 - k * 0.5) + 30 * k; b *= 1 - k * 0.7; if (edge < 0.08 && grain < 0.3) set('#ffb02a'); } // 쇳물가는 달아오른다
+      } else if (theme === 'mask') {
+        // 43차 5층 가면의 도시: 시든 정원(잿빛 풀) · 흰 돌을 깐 골목 · 바랜 흙 바닥에 떨어진 가면 조각과 종이
+        if (best === 1) { lerp('#4e5248', '#3c4036', n1); const blade = hash(X, Y >> 2, 21); if (blade < 0.06) set('#6a6e60'); else if (blade < 0.1) shade(0.84); }
+        else if (best === 4) {
+          const u = fi * 4 + (Math.floor(fj * 4) % 2) * 0.5, du = u - Math.floor(u), dv = fj * 4 - Math.floor(fj * 4);
+          if (du < 0.1 || dv < 0.12) set('#2a2830'); else { lerp('#8e8a84', '#74706a', hash(Math.floor(u), Math.floor(fj * 4), 4) + n1 * 0.3); if (du < 0.24 || dv < 0.26) shade(1.1); }
+        } else {
+          lerp('#5e5a54', '#48443f', n1 * 1.2 - 0.1);
+          if (n2 > 0.74) shade(0.86);
+          if (grain < 0.006) set('#e8e2d6'); else if (grain < 0.009) set('#b8283a');
+          if (hash(X >> 1, Y >> 1, 13) < 0.01) set('#7a766e');
+        }
+        if (second === 2 && edge < 0.2) shade(0.6 + edge * 2);
       } else {
         if (best === 1) { lerp('#3e2620', '#2e1c18', n1); if (n2 > 0.66) shade(0.75); }
         else if (best === 4) {

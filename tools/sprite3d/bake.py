@@ -139,7 +139,25 @@ def key_for(spec):
     if spec['kind'] == 'hair': return f"h-{'c' if D.child else D.sex}-{spec['style']}"
     return f"w-{D.sex}-{spec['weapon']}"
 
-def decode(shade_png, id_png):
+# 43차 crisp: 손으로 찍은 도트처럼 — 음영을 몇 단으로 끊고, 3D 눈 자리에 또렷한 눈 픽셀을 찍는다 (보이는 쪽 눈만, 살 위에만)
+CRISP = bool(job.get('crisp'))
+BANDS = np.array([2, 5, 8, 11, 13])
+EYES = {}
+def eye_points():
+    """지금 자세에서 두 눈 앞쪽 끝의 화면 자리 (보이는 눈만) — 출력 해상도 픽셀"""
+    from bpy_extras.object_utils import world_to_camera_view
+    hcr = Vector((0, -.005, 1.615)) * s; hc2 = hcr + Vector((0, 0, (hk - 1) * .10 * s))
+    pb = arm.pose.bones['head']; M = arm.matrix_world @ pb.matrix @ arm.data.bones['head'].matrix_local.inverted()
+    out = []
+    for sx in (1, -1):
+        p = hc2 + (Vector((sx * .034, -.1, 1.625)) * s - hcr) * hk
+        n = (M.to_3x3() @ (p - hc2)).normalized()
+        if n.dot(-fwd) < .2: continue
+        q = world_to_camera_view(sc, cam, M @ p)
+        out.append((q.x * CELL_W, (1 - q.y) * CELL_H))
+    return out
+
+def decode(shade_png, id_png, eyes=()):
     a = np.asarray(Image.open(shade_png).convert('RGBA'), dtype=np.float32) / 255
     b = np.asarray(Image.open(id_png).convert('RGBA'))
     H, W = a.shape[0] // SS, a.shape[1] // SS
@@ -156,7 +174,12 @@ def decode(shade_png, id_png):
     cover = A.mean(-1)
     opaque = has & (maj > 0) & (cover >= .45)
     lvl = np.clip(np.round(shade / LREF * 11), 0, 15).astype(np.uint8)
+    if CRISP: lvl = BANDS[np.abs(lvl[..., None].astype(np.int16) - BANDS[None, None, :]).argmin(-1)].astype(np.uint8)
     val = (maj.astype(np.uint8) * 16 + lvl).astype(np.uint8)
+    for ex, ey in eyes:
+        x, y = int(ex), int(ey)
+        for dy in range(2 if SCALE >= 3 else 1):
+            if 0 <= y + dy < H and 0 <= x < W and opaque[y + dy, x] and maj[y + dy, x] == 1: val[y + dy, x] = 6 * 16 + 2
     return np.where(opaque, val, 0).astype(np.uint8), np.where(opaque, 255, 0).astype(np.uint8)
 
 def pack(key, items, merge=False):
@@ -213,13 +236,14 @@ for spec in job['sets']:
     engine('cycles')
     for name, P, dd in jobs:
         pose(P, dd); sc.render.filepath = f'{TMP}/{name}_s.png'; bpy.ops.render.render(write_still=True)
+        if CRISP and spec['kind'] == 'base': EYES[name] = eye_points()
     engine('workbench'); idmode(keep)
     for name, P, dd in jobs:
         pose(P, dd); sc.render.filepath = f'{TMP}/{name}_i.png'; bpy.ops.render.render(write_still=True)
     idmode(None)
     items = []
     for name, P, dd in jobs:
-        L, Al = decode(f'{TMP}/{name}_s.png', f'{TMP}/{name}_i.png'); items.append((name, L, Al))
+        L, Al = decode(f'{TMP}/{name}_s.png', f'{TMP}/{name}_i.png', EYES.get(name, ())); items.append((name, L, Al))
     pack(key, items, job.get('merge', False))
     total += len(jobs)
     print(f'[bake] {key} {len(jobs)} frames  {time.time() - t0:.0f}s', flush=True)

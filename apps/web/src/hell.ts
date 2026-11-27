@@ -3,9 +3,9 @@
 import { TYPES, finalize, type Zone, type Building, type HellBuildKind, type Prop, type TileType , type HellVendor} from './zone.ts';
 import type { Lang } from './i18n.ts';
 
-export const OPEN_FLOORS = 4; // 지금 열린 층 (4~13층은 하나씩 업데이트)
+export const OPEN_FLOORS = 5; // 지금 열린 층 (43차: 5층 가면의 도시까지 · 6~13층은 하나씩 업데이트)
 
-export type Theme = 'ash' | 'swamp' | 'market' | 'forge'; // 24차: 4층 용광로
+export type Theme = 'ash' | 'swamp' | 'market' | 'forge' | 'mask'; // 24차: 4층 용광로 · 43차: 5층 가면의 도시
 export interface FloorDef { floor: number; theme: Theme; name: Record<Lang, string>; sin: Record<Lang, string>; monsters: string[]; boss: string; guard?: string; /** 고문 장면의 고문자 (그 층의 큰 괴물이 몽둥이를 든다) */ torturer: string }
 export const FLOORS: FloorDef[] = [
   { floor: 1, theme: 'ash', name: { ko: '재의 문턱', th: 'ธรณีแห่งเถ้าถ่าน', en: 'Threshold of Ash' }, sin: { ko: '경미한 잘못, 책임 회피', th: 'ความผิดเล็กน้อย การหนีความรับผิดชอบ', en: 'Petty wrongs, evading responsibility' }, monsters: ['ashbug', 'ashen', 'gateyak', 'bonewalker'], boss: 'ashgal', guard: 'ashwarden', torturer: 'gateyak' }, // 26차 설정집: 재충 · 회색 망령 · 뼈지기 (+ 걷는 해골은 우리 것)
@@ -13,13 +13,14 @@ export const FLOORS: FloorDef[] = [
   { floor: 3, theme: 'market', name: { ko: '피의 시장', th: 'ตลาดเลือด', en: 'Blood Market' }, sin: { ko: '사기와 반복적인 기만', th: 'การฉ้อโกงและหลอกลวงซ้ำซาก', en: 'Fraud and repeated deceit' }, monsters: ['pactworm', 'broker', 'haggler', 'debtbones'], boss: 'serane', guard: 'waxseal', torturer: 'broker' }, // 26차 설정집: 계약충 · 피상인 · 가면도적 (+ 빚쟁이 해골)
   // 25차: 설정집대로 — 비명의 용광로 · 고의적인 폭력과 상해 · 불씨귀(불을 뿜는다) · 쇠망치병(거대한 망치) · 철갑마(쇠로 덮인 전사) / 층주 바르칸, 용광로의 장군
   { floor: 4, theme: 'forge', name: { ko: '비명의 용광로', th: 'เตาหลอมแห่งเสียงกรีดร้อง', en: 'Furnace of Screams' }, sin: { ko: '고의적인 폭력과 상해', th: 'ความรุนแรงและการทำร้ายโดยเจตนา', en: 'Deliberate violence and injury' }, monsters: ['cinderimp', 'hammerman', 'ironclad', 'chainbones'], boss: 'barkan', guard: 'anvilward', torturer: 'hammerman' }, // + 사슬 해골 (해골은 층마다 우리 것)
+  // 43차 5층 가면의 도시 (설정집): 선의를 가장한 조종과 착취 — 수많은 가면이 벽에 걸린 고요한 도시, 모든 건물의 안과 밖이 다르다. 가면귀 · 속삭임꾼 · 인형병사 (+ 가면 쓴 해골)
+  { floor: 5, theme: 'mask', name: { ko: '가면의 도시', th: 'นครหน้ากาก', en: 'City of Masks' }, sin: { ko: '선의를 가장한 조종과 착취', th: 'การชักใยและเอาเปรียบภายใต้หน้ากากความดี', en: 'Manipulation and exploitation disguised as kindness' }, monsters: ['maskfiend', 'whisperer', 'puppetsoldier', 'maskbones'], boss: 'marcion', guard: 'maskward', torturer: 'puppetsoldier' },
 ];
 /**
  * 25차: 아직 열지 않은 5~13층 계획 (지옥 설정집). 악업 띠 — 1~4층 개인의 죄 · 5~8층 남을 고의로 망가뜨린 죄 · 9~12층 오래 이어진 학대와 조직적 착취 · 13층 절멸.
  * 설정상 지옥은 144층, 지옥의 주인이 사는 어비스까지 이어지지만 지금 계획은 13층까지. 떨어지는 깊이는 packages/shared rules.ts의 hellNeed()
  */
 export const HELL_PLAN: { floor: number; name: string; monsters: string[]; boss: string; title?: string; karma?: string; land?: string; trial?: string }[] = [
-  { floor: 5, name: '가면의 도시', monsters: ['가면귀', '속삭임꾼', '인형병사'], boss: '마르시온' },
   { floor: 6, name: '거울 미궁', monsters: ['유리거미', '모방귀', '파편기사'], boss: '릴미르' },
   { floor: 7, name: '사슬의 감옥해', monsters: ['사슬귀', '익사망령', '검은 간수'], boss: '도르카인' },
   { floor: 8, name: '검은 사냥숲', monsters: ['그림자늑대', '뿔사냥꾼', '목 없는 기사'], boss: '펜르자' },
@@ -83,13 +84,22 @@ export const GUARDS: Record<string, GuardDef> = {
     cols: { 1: '#3a3634', 3: '#2a2624', 4: '#1a1716', 10: '#5a524c', 14: '#8a7e6e', 15: '#060404', 12: '#ff8a1a', 6: '#ff8a1a' },
     hp: 5400, dmg: [34, 46], atk: 1.0, speed: 0.6, special: 'push', // 층주 바르칸만큼
   },
+  // 43차 5층: 가면지기 — 흰 가면 · 검은 예복 · 가면을 꿴 인장 지팡이 (마을 안에서 칼을 빼면 봉인 낙인)
+  maskward: {
+    key: 'maskward', body: 'warden3', weapon: 'sealstaff',
+    name: { ko: '가면지기', th: 'ผู้เฝ้าหน้ากาก', en: 'Mask Warden' },
+    line: { ko: '여기선 누구도 얼굴을 바꾸지 못한다. 칼도.', th: 'ที่นี่ไม่มีใครเปลี่ยนหน้าได้ มีดก็ด้วย', en: 'No one changes faces here. Not even blades.' },
+    look: { ko: '표정이 지워진 흰 가면, 목까지 채운 검은 예복, 끝에 작은 가면을 줄줄이 꿴 긴 지팡이. 가면 틈으로 숨소리만 샌다.', th: 'หน้ากากขาวไร้สีหน้า ชุดพิธีดำติดกระดุมถึงคอ ไม้เท้ายาวร้อยหน้ากากเล็กๆ ไว้ที่ปลาย มีเพียงเสียงลมหายใจลอดออกจากหน้ากาก', en: 'A blank white mask, a black formal coat buttoned to the throat, a long staff strung with little masks at its tip. Only breath escapes the mask.' },
+    cols: { 1: '#efe8dc', 3: '#141216', 4: '#0e0c10', 14: '#c8c4bc', 13: '#2a2430', 12: '#a82a3a', 6: '#e8e4dc', 15: '#08060a', 10: '#efe8dc' },
+    hp: 6400, dmg: [36, 50], atk: 1.0, speed: 0.6, special: 'seal', // 층주 마르시온만큼
+  },
 };
 
 /** 괴물: 몸 + 색. 일반 괴물은 모두 무기를 든다. 16차부터 층마다 몸이 다르다:
  *  1층 잿빛 망자(곡괭이) · 불씨 망자(머리가 타오르는 숯 몸, 낙인 쇠) · 걷는 해골 · 문지기 야크 / 층주 아쉬갈(숯 바위 거인, 성문 빗장)
  *  2층 프렛(국자) · 늪 망자(불어 터진 시체, 쇠갈고리 장대) · 탐식귀(두꺼비 거구, 몽둥이) / 층주 구르마(산 같은 배, 맨손)
  *  3층 흥정꾼(웃는 가면 상인, 고기 칼) · 빚쟁이 해골(멍에·족쇄, 빚 갈고리) · 살점 거간꾼(뚱뚱한 금붙이 상인, 고기 칼) / 층주 세라네 */
-export type MonsterBody = 'ash' | 'pret' | 'yak' | 'bones' | 'serane' | 'ashgal' | 'gurma' | 'cinder' | 'bloat' | 'glutton' | 'hawker' | 'debtor' | 'broker' | 'forgeknight';
+export type MonsterBody = 'ash' | 'pret' | 'yak' | 'bones' | 'serane' | 'ashgal' | 'gurma' | 'cinder' | 'bloat' | 'glutton' | 'hawker' | 'debtor' | 'broker' | 'forgeknight' | 'maskfiend' | 'whisperer' | 'puppet' | 'marcion' | 'manette'; // 43차: 5층 가면의 도시
 export interface MonsterDef {
   key: string; body: MonsterBody; name: Record<Lang, string>;
   skin: string; cloth: string; glow: string; // 살·옷·빛나는 곳 색
@@ -105,6 +115,8 @@ export interface MonsterDef {
   ghost?: boolean;
   /** 몸 구역 색 덮어쓰기 (가면·금붙이·뿔처럼 살·옷·빛 셋으로 모자란 곳) */
   cols?: Record<number, string>;
+  /** 43차 5층: feign = 선량한 얼굴로 천천히 다가와 상냥한 말을 하다 곁에서 찌른다 · rumor = 나를 보면 거짓 소문을 퍼뜨려 둘레 괴물이 몰려온다 · revive = 쓰러져도 한 번 실에 끌려 다시 선다 */
+  feign?: boolean; rumor?: boolean; revive?: boolean;
 }
 const M = (key: string, body: MonsterBody, ko: string, th: string, en: string, skin: string, cloth: string, glow: string, hp: number, dmg: [number, number], speed: number, notice: number, atk: number, scale: number, notes: [number, number], extra: Partial<MonsterDef> = {}): MonsterDef =>
   ({ key, body, name: { ko, th, en }, skin, cloth, glow, hp, dmg, speed, notice, atk, scale, notes, ...extra });
@@ -140,9 +152,17 @@ export const MONSTERS: Record<string, MonsterDef> = Object.fromEntries([
   M('gulon', 'gurma', '굴론', 'กูลอน', 'Gulon', '#4e5a3a', '#2e3420', '#d8f04a', 7000, [26, 38], 0.9, 8, 1.15, 1.85, [760, 960], { weapon: null, title: { ko: '빈배의 포식자', th: 'ผู้กลืนกินท้องกลวง', en: 'Hollow Maw' } }),
   M('merk', 'broker', '메르크', 'เมิร์ก', 'Merk', '#6a5a3a', '#2a2018', '#f2c84a', 7600, [28, 40], 0.95, 8, 1.1, 1.8, [820, 1020], { weapon: 'cleaver', title: { ko: '계약포식자', th: 'ผู้กลืนสัญญา', en: 'Contract Eater' }, cols: { 14: '#c9a23e', 13: '#8a1a14' } }),
   M('ferron', 'forgeknight', '페론', 'เฟอร์รอน', 'Ferron', '#3a3430', '#4a2a1a', '#ff7a1a', 8800, [32, 46], 0.85, 8, 1.15, 2.0, [900, 1150], { weapon: 'greatsword', title: { ko: '용광로의 심장', th: 'หัวใจเตาหลอม', en: 'Furnace Heart' }, cols: { 12: '#ffb04a', 6: '#ff6a1a' } }),
+  // 43차 5층 가면의 도시: 가면귀(웃는 얼굴로 다가와 찌른다) · 속삭임꾼(소문을 퍼뜨려 둘레의 괴물을 부른다) · 인형병사(쓰러져도 실에 끌려 한 번 다시 선다) · 가면 쓴 해골(우리 것)
+  M('maskfiend', 'maskfiend', '가면귀', 'ผีหน้ากาก', 'Mask fiend', '#efe8dc', '#8a8680', '#d84a5a', 1250, [26, 38], 1.15, 7, 0.95, 1, [24, 40], { weapon: 'rapier', feign: true, cols: { 10: '#f2eee6', 15: '#0e0c0c', 12: '#d84a5a', 9: '#141214', 14: '#b8a070', 4: '#1a1818' } }),
+  M('whisperer', 'whisperer', '속삭임꾼', 'นักกระซิบ', 'Whisperer', '#8a9078', '#3a4430', '#c8a040', 900, [18, 28], 1.3, 9, 0.85, 1, [18, 32], { weapon: null, rumor: true, cols: { 9: '#2a3020', 15: '#1a0a0a', 10: '#e8e0c8', 12: '#c8a040', 4: '#1e221a' } }),
+  M('puppetsoldier', 'puppet', '인형병사', 'ทหารหุ่นเชิด', 'Puppet soldier', '#b88a5a', '#a8281e', '#e0b437', 1400, [28, 40], 0.9, 8, 1.05, 1.05, [26, 42], { weapon: 'saber', revive: true, cols: { 13: '#b88a5a', 4: '#6a4a2a', 10: '#f2eee6', 12: '#d8483a', 15: '#141214', 14: '#e0b437', 9: '#d8d4cc' } }),
+  M('maskbones', 'bones', '가면 쓴 해골', 'โครงกระดูกสวมหน้ากาก', 'Masked bones', '#e8e2d4', '#2a2430', '#d84a5a', 520, [16, 26], 1.25, 7, 0.88, 1, [9, 16], { weapon: 'hook', cols: { 10: '#f2eee6' } }), // 해골은 층마다 우리 것
+  M('marcion', 'marcion', '마르시온', 'มาร์ซิออน', 'Marcion', '#d8d0c8', '#141016', '#a82030', 6800, [38, 52], 0.9, 9, 1.5, 1.55, [600, 760], { boss: true, weapon: 'sealstaff', title: { ko: '천 개의 가면을 가진 자', th: 'ผู้มีหน้ากากพันหน้า', en: 'He of a Thousand Masks' }, cols: { 9: '#3a1a2a', 10: '#ece6da', 14: '#d8b048', 12: '#a82030', 15: '#08060a', 4: '#100c10', 5: '#0a080a' } }),
+  // 43차 5층 필드 보스: 마네트, 실의 어미 — 도자기 가면을 쓴 거대한 목각 인형 (손끝의 검은 실로 작은 인형을 부린다)
+  M('manette', 'manette', '마네트', 'มาเนตต์', 'Manette', '#a87a4a', '#5a2a4a', '#c83a3a', 9600, [34, 48], 0.8, 8, 1.2, 2.0, [950, 1200], { weapon: null, title: { ko: '실의 어미', th: 'มารดาแห่งเส้นด้าย', en: 'Mother of Threads' }, cols: { 13: '#a87a4a', 4: '#5a3a22', 10: '#f4f0ea', 12: '#c83a3a', 15: '#141014', 9: '#e8e0d0' } }),
 ].map((m) => [m.key, m]));
 /** 31차: 층마다 하루 한 번 나오는 필드 보스 */
-export const FIELD_BOSS: Record<number, string> = { 1: 'rokk', 2: 'gulon', 3: 'merk', 4: 'ferron' };
+export const FIELD_BOSS: Record<number, string> = { 1: 'rokk', 2: 'gulon', 3: 'merk', 4: 'ferron', 5: 'manette' };
 
 // ───────────────────────── 지도 ─────────────────────────
 const TI = Object.fromEntries(TYPES.map((t, k) => [t, k])) as Record<TileType, number>;
@@ -163,8 +183,8 @@ function vnoise(x: number, y: number, seed: number) {
 }
 const cache = new Map<number, Zone>();
 /** 위층 통행세와 속죄의 회당 목표 (노전). 층주를 피해 지나가는 값은 아주 비싸다 */
-export const TOLL: Record<number, number> = { 1: 10000, 2: 20000, 3: 30000, 4: 40000 };
-export const ATONE_GOAL: Record<number, number> = { 1: 11000, 2: 21000, 3: 31000, 4: 41000 };
+export const TOLL: Record<number, number> = { 1: 10000, 2: 20000, 3: 30000, 4: 40000, 5: 50000 };
+export const ATONE_GOAL: Record<number, number> = { 1: 11000, 2: 21000, 3: 31000, 4: 41000, 5: 51000 };
 /**
  * 4층부터: 마을의 결계(보호)가 주기적으로 걷힌다. 그동안 괴물이 마을로 몰려들고, 경비병은 휴전 협약대로 움직이지 않는다.
  * 모두에게 같은 시각에 일어나도록 실제 시계로 정한다 (층마다 어긋나게). 매 15분 중 2분.
@@ -245,6 +265,11 @@ export function hellZone(floor: number): Zone {
       disc(i, j, rad, 'water');
     }
     for (let n = 0; n < 500; n++) { const i = 4 + Math.floor(r() * (W - 8)), j = 4 + Math.floor(r() * (H - 8)); if (at(i, j) === TI.lot && free(i, j)) set(i, j, 'park'); }
+  } else if (T === 'mask') {
+    // 43차 5층 가면의 도시: 9칸마다 좁은 골목이 반듯하게 · 사이사이 시든 정원 (피도 용암도 없는 고요한 도시)
+    for (let i = 6; i < W - 4; i += 9) for (let j = 4; j < H - 4; j++) { set(i, j, 'soi'); set(i + 1, j, 'soi'); }
+    for (let j = 6; j < H - 4; j += 9) for (let i = 4; i < W - 4; i++) { set(i, j, 'soi'); set(i, j + 1, 'soi'); }
+    for (let n = 0; n < 260; n++) { const i = 4 + Math.floor(r() * (W - 8)), j = 4 + Math.floor(r() * (H - 8)); if (at(i, j) === TI.lot && free(i, j)) set(i, j, 'park'); }
   } else {
     // 피의 시장: 11칸마다 골목, 몇몇 골목 가운데에 핏물 도랑
     for (let i = 6; i < W - 4; i += 11) for (let j = 4; j < H - 4; j++) { set(i, j, 'soi'); set(i + 1, j, 'soi'); }
@@ -401,6 +426,10 @@ export function hellZone(floor: number): Zone {
     forge: [[-1, -6, 2, 2, 58, 'ujusae', undefined, 'left'], [4, -6, 2, 2, 48, 'hbank', undefined, 'left'], [-7, -6, 2, 2, 46, 'atone', undefined, 'left'],
       [3, 3, 2, 1, 26, 'generic', 'butcher'], [-3, 5, 2, 1, 22, 'generic', 'stall'], [5, -1, 1, 2, 22, 'generic', 'stall'], [-7, 1, 1, 2, 22, 'generic', 'stall'], [-3, -2, 2, 2, 76, 'generic', 'idol'],
       [5, 3, 2, 2, 54, 'generic', 'smithy']], // 34차: 칼드렉의 낡은 대장간 (4층엔 이 대장장이 하나뿐)
+    // 43차 5층: 가운데 큰 가면 조형물 · 인형술사 마리의 작은 공방 (수백 개의 인형이 진열되었다)
+    mask: [[-1, -6, 2, 2, 58, 'ujusae', undefined, 'left'], [4, -6, 2, 2, 48, 'hbank', undefined, 'left'], [-7, -6, 2, 2, 46, 'atone', undefined, 'left'],
+      [3, 3, 2, 1, 26, 'generic', 'butcher'], [-3, 5, 2, 1, 22, 'generic', 'stall'], [5, -1, 1, 2, 22, 'generic', 'stall'], [-7, 1, 1, 2, 22, 'generic', 'stall'], [-3, -2, 2, 2, 90, 'generic', 'idol'],
+      [5, 3, 2, 2, 50, 'generic', 'puppetshop']],
   };
   let shop: Building | null = null;
   for (const [di, dj, w, d, h, cat, hk, sign] of LAYOUT[T]) {
@@ -452,6 +481,7 @@ export function hellZone(floor: number): Zone {
     swamp: [['bonehouse', 1], ['carcass', 3], ['bonepile', 3], ['guts', 3]],
     market: [['bonehouse', 4], ['prison', 3], ['carcass', 3], ['bonepile', 3], ['guts', 2]],
     forge: [['prison', 4], ['burnt', 4], ['bonepile', 3], ['carcass', 2]], // 4층: 쇠 감옥 · 타 버린 집 · 녹다 만 뼈 무더기
+    mask: [['maskhouse', 9], ['prison', 2], ['bonepile', 2]], // 43차 5층: 앞은 말끔하고 옆은 썩은 집 · 인형 감옥
   };
   const sizeOf = (k: HellBuildKind): [number, number, number] => {
     const a = r() < 0.5;
@@ -460,6 +490,7 @@ export function hellZone(floor: number): Zone {
     if (k === 'guts') return r() < 0.3 ? [3, 3, 22] : [2, 2, 16 + Math.floor(r() * 6)];
     if (k === 'prison') return [2 + Math.floor(r() * 3), 2 + Math.floor(r() * 2), 38 + Math.floor(r() * 10)];
     if (k === 'burnt') return [3 + Math.floor(r() * 2), 3 + Math.floor(r() * 2), 40 + Math.floor(r() * 30)];
+    if (k === 'maskhouse') return [3 + Math.floor(r() * 2), 3 + Math.floor(r() * 2), 56 + Math.floor(r() * 34)];
     if (k === 'bonehouse') return [2 + Math.floor(r() * 2), 2 + Math.floor(r() * 2), 26 + Math.floor(r() * 8)];
     return [2 + Math.floor(r() * 2), 2 + Math.floor(r() * 2), 28 + Math.floor(r() * 6)];
   };
@@ -535,6 +566,9 @@ export function hellZone(floor: number): Zone {
   }
   // 30차 대장간: 모루와 숯불 화로 옆에 선 대장장이 (지옥 장비 수리 · 템브라 강화)
   // 34차: 4층은 칼드렉 — 제 대장간(건물) 앞에 선다. 다른 대장장이는 없다
+  // 43차 5층: 인형술사 마리는 제 공방 앞에 선다
+  const pshop = buildings.find((b) => b.hk === 'puppetshop');
+  if (pshop) vendors.push({ i: pshop.i0 + 1, j: pshop.j0 + pshop.d, kind: 'puppeteer' });
   const smithy = buildings.find((b) => b.hk === 'smithy');
   if (smithy) { vendors.push({ i: smithy.i0 + 1, j: smithy.j0 + smithy.d, kind: 'smith' }); props.push({ i: smithy.i0 + smithy.w, j: smithy.j0 + smithy.d, kind: 'anvil' }); }
   else {
@@ -614,6 +648,7 @@ export function hellZone(floor: number): Zone {
       props.push({ i, j, kind, o: o?.(k) }); k++;
     }
   };
+  if (T === 'mask') place('maskpost', Math.round(22 * S), 2, undefined, (k) => k % 3, 5); // 43차: 길가마다 가면을 줄줄이 건 기둥
   place('torture', Math.round(4 * S), 3, (i, j) => empty(i + 1, j) && empty(i - 1, j), (k) => k % 2, 22);
   place('cauldron', Math.round(3 * S), 4, undefined, undefined, 22);
   place('cage', Math.round((T === 'market' ? 6 : 5) * S), 4, undefined, undefined, 14);

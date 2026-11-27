@@ -35,14 +35,18 @@ export interface Save {
   // 2단계: 지금 있는 세계와 지옥에서의 걸음
   realm?: 'real' | 'ghost' | 'hell' | 'heaven' | 'border'; // ghost = 예전 저장 (24차부터 border로 옮긴다)
   /** 24차 경계의 해변: 언제 왔는지 (깨달음 없는 자는 잠깐만) · 불다를 만났는지 */
-  border?: { since: number; met?: boolean };
+  border?: { since: number; met?: boolean; still?: boolean; told?: boolean }; // 43차: still = 뱃속에서 죽어 왔다 · told = 불다가 그네 이야기를 했다
   /** 24차: 서울 달동네 골목에서 '내 집이 여기 있다…'를 이미 보았는가 (한 번만) */
   homeSeen?: boolean;
+  /** 43차: 집에 들어간 서울 날짜 (하루에 한 번만) */
+  homeDay?: string;
+  /** 43차: 다시 태어난 뒤 집의 회상이 잦은 남은 횟수 · 골목에서 낯익음을 느낄 차례 */
+  bond?: number; bondAlley?: boolean;
   /** 40차 유내 미용실: 원장에게 유내를 물은 횟수 · 들어가 본 적 있는가 */
   ysAsk?: number; ysSeen?: boolean;
   adminTrip?: 'real' | 'ghost' | 'heaven' | 'hell'; // 관리자가 시찰(지옥 층 이동·천국)을 떠나기 전의 세계 (돌아갈 곳)
   /** 천국: 환생할 때 받을 선행 보너스 (영혼 경험치) */
-  heaven?: { met?: boolean; admin?: boolean; adapted?: boolean; ywLost?: boolean; rites?: number; acc?: 'lover' | 'friend' | 'family' | 'alone' }; // 35차 acc = 아큐버스와 정한 사이 // 21차: 행사에 다녀와 익숙해졌나 · 안내천사를 따돌렸나 · 다녀온 행사 수
+  heaven?: { met?: boolean; admin?: boolean; adapted?: boolean; ywLost?: boolean; rites?: number; noeulMet?: boolean; acc?: 'lover' | 'friend' | 'family' | 'alone' }; // 35차 acc = 아큐버스와 정한 사이 // 21차: 행사에 다녀와 익숙해졌나 · 안내천사를 따돌렸나 · 다녀온 행사 수
   /** 19차 지옥면죄부: 앞으로 짓는 악행에서 지워 줄 남은 점수 (한 장 = 30, 최대 10장 = 300) */
   absolve?: number;
   /** 33차: 염소대왕의 방 환전상 — 이번 지옥길(gk = 상담 번호)에 바꾼 이승 돈과 그때 통장 */
@@ -53,6 +57,8 @@ export interface Save {
   eco?: Record<string, { e: Record<string, number>; s: Record<string, number>; he: Record<string, number>; hs: Record<string, number>; t: number }>;
   /** 34차 앵무새 먹이: 준 횟수 (108·144번째에 짧은 장면, 144 다음은 다시 1부터) · 34차 칼드렉의 완성 템브라: 마지막으로 산 날 */
   parrotFed?: number;
+  /** 43차: 앵무새에게 마지막으로 먹이를 준 때 (30분 동안 비싼 물건 수수료 2% 덜) */
+  parrotAt?: number;
   ferumDay?: number;
   ferumMet?: boolean;
   /** 34차 보관 우리: 늘린 칸 수 (기본 칸 + 늘린 칸) */
@@ -76,6 +82,10 @@ export interface Save {
     fed?: number;
     /** 25차: 이 영혼이 가 본 가장 깊은 층 (계단으로는 여기까지만 내려간다 · 다음 생에도 남는다) */
     deepest?: number;
+    /** 43차: 5층 인형술사 마리를 만났다 */
+    mariMet?: boolean;
+    /** 43차: 5층 상승 시련(맨얼굴)을 통과했다 */
+    bared?: boolean;
   };
   /** 26차: 환생 상담에서 미리 정한 다음 생 — 처음 모습의 운, 고른 몸, 도시, 선업으로 산 물건 */
   nextLife?: { kind: import('./character.ts').Arrival; look: import('./character.ts').Look; region: string; bag: Record<string, number>; /** 37차 선업의 값 (바트 셈) */ cash?: number };

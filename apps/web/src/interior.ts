@@ -928,6 +928,13 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
     poly([P(x2, y0, z0), P(x2, y2, z0), P(x2, y2, z1), P(x2, y0, z1)], right);
     poly([P(x0, y2, z0), P(x2, y2, z0), P(x2, y2, z1), P(x0, y2, z1)], left);
     poly([P(x0, y0, z1), P(x2, y0, z1), P(x2, y2, z1), P(x0, y2, z1)], top);
+    // 43차: 손으로 찍은 도트처럼 모서리를 또렷하게 — 앞 윗모서리 두 줄은 밝게, 앞 세로 모서리는 어둡게 (아주 얇은 것은 건너뛴다)
+    if (z1 - z0 >= 3 && Math.min(x2 - x0, y2 - y0) >= 0.12) {
+      const ln = (a: [number, number], b2: [number, number], col: string) => { g.strokeStyle = col; g.lineWidth = 1; g.beginPath(); g.moveTo(Math.round(a[0]) + 0.5, Math.round(a[1]) + 0.5); g.lineTo(Math.round(b2[0]) + 0.5, Math.round(b2[1]) + 0.5); g.stroke(); };
+      ln(P(x0, y2, z1), P(x2, y2, z1), mixHex(top, '#ffffff', 0.35));
+      ln(P(x2, y0, z1), P(x2, y2, z1), mixHex(top, '#ffffff', 0.25));
+      ln(P(x2, y2, z0), P(x2, y2, z1), mixHex(right, '#000000', 0.35));
+    }
   };
   const tri = (base: string) => [mixHex(base, '#ffffff', 0.18), base, mixHex(base, '#000000', 0.25)] as const;
   const B3 = (x0: number, y0: number, x2: number, y2: number, z0: number, z1: number, col: string) => { const [a, b, cc] = tri(col); box(x0, y0, x2, y2, z0, z1, a, b, cc); };
@@ -1064,7 +1071,18 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       B3(i, j, i1, j1, 0, h - 3, wood);
       box(i - 0.05, j - 0.05, i1 + 0.05, j1 + 0.05, h - 3, h, '#e8e4dc', '#c8c4bc', '#b0aca4');
       if (f.kind === 'teller') { poly([P(i, j + 0.5, h), P(i1, j + 0.5, h), P(i1, j + 0.5, h + 34), P(i, j + 0.5, h + 34)], '#bcdce8', 0.35); for (let x = i + 1; x < i1; x += 1.5) poly([P(x, j + 0.5, h), P(x + 0.04, j + 0.5, h), P(x + 0.04, j + 0.5, h + 34), P(x, j + 0.5, h + 34)], '#8a9aa8'); }
-      if (f.kind === 'kitchen') { for (let x = i + 0.3; x < i1 - 0.5; x += 1.3) { B3(x, j + 0.2, x + 0.5, j + 0.7, h, h + 6, '#3a3a3a'); } }
+      if (f.kind === 'kitchen') {
+        // 43차: 붙박이 주방 — 아래 서랍 문짝 줄 · 스테인리스 개수대와 수도꼭지 · 가스레인지 화구 둘 · 벽의 위 수납장과 후드
+        for (let x = i + 0.08; x < i1 - 0.1; x += 0.5) faceL(x, x + 0.44, 3, h - 6, mixHex(wood, '#ffffff', 0.1));
+        for (let x = i + 0.2; x < i1 - 0.1; x += 0.5) faceL(x, x + 0.1, h - 10, h - 9, '#d8d8d4');
+        box(i + 0.25, j + 0.2, i + 1.05, j + 0.75, h - 1, h + 0.5, '#c8ccd0', '#a8acb0', '#90949a');
+        poly([P(i + 0.32, j + 0.28, h + 0.6), P(i + 0.98, j + 0.28, h + 0.6), P(i + 0.98, j + 0.68, h + 0.6), P(i + 0.32, j + 0.68, h + 0.6)], '#7a8288');
+        B3(i + 0.62, j + 0.08, i + 0.68, j + 0.16, h, h + 9, '#d8dcde');
+        for (const x of [i1 - 1.0, i1 - 0.55]) { const [bx, by] = P(x + 0.18, j + 0.45, h + 0.6); g.fillStyle = '#1e1e1e'; g.beginPath(); g.ellipse(bx, by, 5, 2.6, 0, 0, Math.PI * 2); g.fill(); g.strokeStyle = night ? '#3a6ae8' : '#5a5a5a'; g.lineWidth = 1; g.beginPath(); g.ellipse(bx, by, 3, 1.5, 0, 0, Math.PI * 2); g.stroke(); }
+        box(i, j, i1, j + 0.35, h + 26, h + 44, '#e8e4dc', mixHex(wood, '#ffffff', 0.15), mixHex(wood, '#000000', 0.1));
+        for (let x = i + 0.08; x < i1 - 0.1; x += 0.75) faceL(x, x + 0.68, h + 28, h + 42, mixHex(wood, '#ffffff', 0.25));
+        box(i1 - 1.05, j, i1 - 0.35, j + 0.55, h + 20, h + 26, '#b8bcc0', '#a0a4a8', '#888c90');
+      }
       if (f.kind === 'counter') B3(i1 - 0.8, j + 0.2, i1 - 0.3, j + 0.7, h, h + 7, '#2a2a2a'); // 계산대
       if (f.kind === 'bar') for (let x = i + 0.4; x < i1; x += 0.9) B3(x, j + 0.3, x + 0.12, j + 0.42, h, h + 8, pick(Math.floor(x * 5)));
       break;
@@ -1086,6 +1104,14 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       break;
     }
     case 'fridge': {
+      if (info.kind === 'home') {
+        // 43차 옛집 냉장고: 누렇게 바랜 상아색 · 위 냉동칸 · 세로 손잡이 · 붙여 둔 자석과 쪽지
+        B3(i + 0.05, j + 0.08, i1 - 0.05, j1 - 0.05, 0, h, '#e8e0c8');
+        faceL(i + 0.08, i1 - 0.08, h - 16, h - 15, '#a89a7a');
+        for (const [z0, z1] of [[h - 13, h - 4], [12, h - 20]]) faceL(i1 - 0.22, i1 - 0.17, z0, z1, '#8a8070');
+        for (const [x, z, col] of [[i + 0.3, h - 26, '#c83a3a'], [i + 0.5, h - 32, '#3a7aa8'], [i + 0.38, h - 40, '#f2f0e4']] as [number, number, string][]) faceL(x, x + 0.12, z, z + 3, col);
+        break;
+      }
       B3(i, j, i1, j1, 0, h, '#d8dcde');
       faceL(i + 0.08, i1 - 0.08, 6, h - 8, night ? '#cfe8f2' : '#bcdce8');
       for (let z = 10; z < h - 10; z += 10) for (let x = i + 0.15; x < i1 - 0.1; x += 0.18) faceL(x, x + 0.08, z, z + 7, pick(Math.floor(x * 9 + z)));
@@ -1100,7 +1126,14 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       g.fillStyle = pick(f.v ?? 1); g.beginPath(); g.ellipse(px, py - 1, 4, 2, 0, 0, Math.PI * 2); g.fill();
       break;
     }
-    case 'chair': case 'stool': B3(i + 0.25, j + 0.25, i1 - 0.25, j1 - 0.25, 0, h, f.kind === 'stool' ? '#5a3a2a' : '#6a7a8a'); break;
+    case 'chair': case 'stool': {
+      // 43차: 상자 대신 진짜 의자 — 네 다리 · 앉는 판 · (의자는) 등받이. v=1은 등받이가 반대쪽
+      const col = f.kind === 'stool' ? '#5a3a2a' : info.kind === 'myhome' || info.kind === 'furnshop' ? '#7a5638' : '#6a7a8a';
+      for (const [x, y] of [[i + 0.27, j + 0.27], [i1 - 0.33, j + 0.27], [i + 0.27, j1 - 0.33], [i1 - 0.33, j1 - 0.33]]) B3(x, y, x + 0.06, y + 0.06, 0, h - 3, mixHex(col, '#000000', 0.25));
+      box(i + 0.24, j + 0.24, i1 - 0.24, j1 - 0.24, h - 3, h, mixHex(col, '#ffffff', 0.2), col, mixHex(col, '#000000', 0.2));
+      if (f.kind === 'chair') { const back = f.v === 1 ? j1 - 0.3 : j + 0.24; B3(i + 0.24, back, i1 - 0.24, back + 0.06, h, h + 13, col); }
+      break;
+    }
     case 'bench': B3(i + 0.05, j + 0.2, i1 - 0.05, j1 - 0.2, 0, h, '#6a7a8a'); break;
     case 'sofa': B3(i + 0.05, j + 0.05, i1 - 0.05, j1 - 0.05, 0, h, '#7a4a5a'); B3(i + 0.05, j + 0.05, i + 0.3, j1 - 0.05, h, h + 10, '#6a3a4a'); break;
     case 'bed': {
@@ -1572,6 +1605,7 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       for (const y of [j + 0.05, j1 - 0.22]) B3(i + 0.1, y, i1 - 0.3, y + 0.17, h - 4, h + 5, dk);
       if (f.v === 1) for (let y = j + 0.5; y < j1 - 0.3; y += 0.5) { const [bx, by] = P(i1 - 0.3, y, h + 7); g.fillStyle = '#2a1810'; g.fillRect(Math.round(bx), Math.round(by), 1, 1); }
       for (const y of [j + 0.4, j1 - 0.9]) B3(i1 - 0.55, y, i1 - 0.32, y + 0.5, h, h + 7, f.v === 1 ? '#c9a23e' : '#d8c8a8');
+      for (let y = j + 0.25; y < j1 - 0.4; y += (d - 0.4) / 3) faceR(y, y + 0.02, h - 3, h, mixHex(col, '#000000', 0.35)); // 43차: 앉는 쿠션 이음
       break;
     }
     case 'arcadecab': {
@@ -1633,14 +1667,18 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       for (let n = 0; n < 4; n++) { const x = i + 0.12 + n * (w - 0.24) / 4; B3(x, j + 0.2, x + (w - 0.3) / 4, j + 0.55, h, h + 5, n % 3 ? '#ffffff' : '#e8e2d6'); }
       poly([P(i + 0.05, j + 1.9, h + 0.5), P(i1 - 0.05, j + 1.9, h + 0.5), P(i1 - 0.05, j + 2.35, h + 0.5), P(i + 0.05, j + 2.35, h + 0.5)], '#6a6e78');
       faceL(i + 0.05, i1 - 0.05, h - 5, h, '#e2e0da');
+      { const [lx2, ly2] = P(i1 - 0.15, j + 0.2, h + 26); g.fillStyle = night ? 'rgba(255,214,140,0.35)' : 'rgba(255,240,210,0.2)'; g.beginPath(); g.ellipse(lx2, ly2 + 4, 12, 8, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = night ? '#ffe2a8' : '#efe4cc'; g.fillRect(Math.round(lx2) - 3, Math.round(ly2), 6, 4); } // 43차: 머리판 위의 은은한 벽등
       break;
     }
     case 'tv': {
       // 브라운관 텔레비전: 낮은 받침장 위 볼록한 상자, 화면
       B3(i + 0.12, j + 0.15, i1 - 0.12, j1 - 0.15, 0, 8, '#6a4a32');
-      B3(i + 0.2, j + 0.22, i1 - 0.2, j1 - 0.22, 8, h, '#3a3a3c');
-      faceL(i + 0.26, i1 - 0.3, 10, h - 3, night ? '#6a9ac8' : '#2a3a4a');
-      if (night) faceL(i + 0.3, i + 0.5, 12, h - 6, '#a8d0f0');
+      B3(i + 0.2, j + 0.22, i1 - 0.2, j1 - 0.22, 8, h, '#4a3a2e');
+      faceL(i + 0.24, i1 - 0.36, 10, h - 3, '#1a1a1c');
+      faceL(i + 0.27, i1 - 0.39, 11.5, h - 4.5, night ? '#6a9ac8' : '#2a3a4a');
+      faceL(i + 0.3, i + 0.42, h - 9, h - 6, night ? '#c8e4ff' : '#5a6a7a');
+      for (const z of [h - 7, h - 13]) { const [kx, ky] = P(i1 - 0.29, j1 - 0.22, z); g.fillStyle = '#c9a23e'; g.fillRect(Math.round(kx) - 1, Math.round(ky) - 1, 2, 2); }
+      { const [ax, ay] = P(i + 0.5, j + 0.5, h); g.strokeStyle = '#8a8a8a'; g.lineWidth = 1; g.beginPath(); g.moveTo(ax, ay); g.lineTo(ax - 7, ay - 13); g.moveTo(ax, ay); g.lineTo(ax + 6, ay - 14); g.stroke(); g.fillStyle = '#2a2a2a'; g.fillRect(Math.round(ax) - 2, Math.round(ay) - 1, 4, 2); }
       break;
     }
     case 'wardrobe': {
@@ -1648,14 +1686,26 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       B3(i + 0.04, j + 0.2, i1 - 0.04, j1 - 0.1, 0, h, '#2a1e1a');
       faceL(i + 0.08, i + w / 2 - 0.03, 4, h - 4, '#3a2a22'); faceL(i + w / 2 + 0.03, i1 - 0.08, 4, h - 4, '#3a2a22');
       for (let n = 0; n < 9; n++) { const [mx, my] = P(i + 0.2 + ((n * 37) % 80) / 100 * (w - 0.4), j1 - 0.1, 10 + ((n * 53) % 70) / 100 * (h - 20)); g.fillStyle = n % 3 ? '#9ad0c8' : '#e8d8f0'; g.fillRect(Math.round(mx), Math.round(my), 2, 1); }
+      { // 43차: 자개 학 한 마리 (날개를 편 흰 선) · 매화 가지
+        const [cx3, cy3] = P(i + w * 0.3, j1 - 0.1, h * 0.62); g.fillStyle = '#e8f2f0';
+        g.fillRect(Math.round(cx3) - 3, Math.round(cy3), 7, 1); g.fillRect(Math.round(cx3) - 4, Math.round(cy3) - 1, 2, 1); g.fillRect(Math.round(cx3) + 3, Math.round(cy3) - 1, 2, 1); g.fillRect(Math.round(cx3), Math.round(cy3) + 1, 1, 3);
+        const [bx2, by2] = P(i + w * 0.72, j1 - 0.1, h * 0.35); g.fillStyle = '#c8a8d8';
+        for (let n = 0; n < 5; n++) g.fillRect(Math.round(bx2) + (n % 3) * 2 - 2, Math.round(by2) - n * 2, 1, 1);
+      }
       for (const x of [i + w / 2 - 0.12, i + w / 2 + 0.08]) faceL(x, x + 0.05, h / 2 - 2, h / 2 + 2, '#c9a23e');
+      for (const z of [8, h - 8]) { faceL(i + 0.1, i + 0.16, z, z + 3, '#b08a3a'); faceL(i1 - 0.16, i1 - 0.1, z, z + 3, '#b08a3a'); }
       break;
     }
     case 'futon': {
       // 개어 둔 이불 셋과 베개
       const cols = ['#c84a5a', '#3a7aa8', '#e8c86a'];
-      for (let n = 0; n < 3; n++) B3(i + 0.1 + n * 0.02, j + 0.12, i1 - 0.1 - n * 0.02, j1 - 0.12, n * 4, n * 4 + 4, cols[n]);
+      for (let n = 0; n < 3; n++) {
+        B3(i + 0.1 + n * 0.02, j + 0.12, i1 - 0.1 - n * 0.02, j1 - 0.12, n * 4, n * 4 + 4, cols[n]);
+        // 43차: 이불마다 무늬 — 줄 · 작은 꽃 점
+        for (let x = i + 0.2; x < i1 - 0.15; x += 0.25) faceL(x, x + 0.05, n * 4 + 1, n * 4 + 3, mixHex(cols[n], '#ffffff', 0.45));
+      }
       B3(i + 0.25, j + 0.2, i1 - 0.25, j + 0.7, 12, 15, '#f2eee4');
+      { const [px2, py2] = P(i + w / 2, j + 0.45, 15); g.fillStyle = '#c84a5a'; g.fillRect(Math.round(px2) - 1, Math.round(py2) - 1, 3, 2); g.fillStyle = '#3a8a4a'; g.fillRect(Math.round(px2) + 2, Math.round(py2), 2, 1); }
       break;
     }
     case 'lowtable': {
@@ -1664,6 +1714,8 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       for (const x of [i + 0.15, i1 - 0.2]) B3(x, j + 0.2, x + 0.05, j + 0.25, 0, h - 3, '#5a3a1e');
       const dish = (x: number, y: number, rx: number, col: string) => { const [px, py] = P(x, y, h); g.fillStyle = '#f2f0e8'; g.beginPath(); g.ellipse(px, py, rx, rx / 2, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = col; g.beginPath(); g.ellipse(px, py - 0.5, rx - 1.5, (rx - 1.5) / 2, 0, 0, Math.PI * 2); g.fill(); };
       dish(i + 0.5, j + 0.5, 4, '#f8f8f2'); dish(i + 1.4, j + 0.5, 4, '#c8562a');
+      { const [rx, ry] = P(i + 0.5, j + 0.5, h); g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(rx, ry - 2, 2.5, 2, 0, 0, Math.PI * 2); g.fill(); } // 소복한 밥
+      { const [sx2, sy2] = P(i + 0.75, j + 0.82, h); g.fillStyle = '#c8c8c0'; g.fillRect(Math.round(sx2), Math.round(sy2), 6, 1); g.fillRect(Math.round(sx2), Math.round(sy2) + 2, 7, 1); } // 수저
       dish(i + 0.9, j + 0.3, 3, '#3a8a3a'); dish(i + 1.0, j + 0.7, 3, '#c83a2a'); dish(i + 0.3, j + 0.75, 2.5, '#e8c86a'); dish(i + 1.7, j + 0.75, 2.5, '#6a4a2a');
       break;
     }
@@ -1696,7 +1748,18 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       break;
     }
     case 'plant': {
-      B3(i + 0.3, j + 0.3, i1 - 0.3, j1 - 0.3, 0, 12, '#9a5a3a');
+      B3(i + 0.3, j + 0.3, i1 - 0.3, j1 - 0.3, 0, 12, info.kind === 'myhome' || info.kind === 'furnshop' ? '#e8e4dc' : '#9a5a3a');
+      if (info.kind === 'myhome' || info.kind === 'furnshop') {
+        // 43차 몬스테라: 줄기마다 갈라진 큰 잎 (밝은 잎맥)
+        const [bx3, by3] = P(i + 0.5, j + 0.5, 12);
+        for (let n = 0; n < 6; n++) {
+          const a = -Math.PI / 2 + (n - 2.5) * 0.45, L2 = 10 + (n % 3) * 4, ex = bx3 + Math.cos(a) * L2, ey = by3 + Math.sin(a) * L2 * 0.9 - 6;
+          g.strokeStyle = '#3a6a2a'; g.lineWidth = 1; g.beginPath(); g.moveTo(bx3, by3); g.lineTo(ex, ey); g.stroke();
+          g.fillStyle = n % 2 ? '#2e7a36' : '#3a8a3e'; g.beginPath(); g.ellipse(ex, ey, 6, 4, a, 0, Math.PI * 2); g.fill();
+          g.fillStyle = '#1e5a26'; g.fillRect(Math.round(ex) - 1, Math.round(ey), 3, 1);
+        }
+        break;
+      }
       for (let n = 0; n < 14; n++) { const [lx, ly] = P(i + 0.2 + ((n * 37) % 60) / 100, j + 0.2 + ((n * 53) % 60) / 100, 12 + ((n * 7) % (h - 8))); g.fillStyle = n % 2 ? '#3a7a32' : '#5a9a42'; g.fillRect(Math.round(lx) - 2, Math.round(ly) - 2, 5, 4); }
       break;
     }

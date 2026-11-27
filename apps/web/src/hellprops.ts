@@ -133,7 +133,7 @@ export function hellDecor(kind: string, theme: Theme, v: number, o = 0): HPic {
     // 끓는 가마솥: 장작불 위 쇠솥, 넘칠 듯 끓는 것 (1층 녹은 쇠 · 2층 담즙 · 3층 피), 밖으로 뻗은 뼈 손
     const p = pen(64, 60);
     const cx = 64, cy = 74;
-    const fill: Record<Theme, [string, string, string]> = { ash: ['#ff7a1a', '#ffc24a', '#b8320e'], swamp: ['#6a8a2a', '#a8c24a', '#3a4a16'], market: ['#9a0e0a', '#d8261a', '#5a0606'], forge: ['#ff9a2a', '#fff0a8', '#c8420e'] };
+    const fill: Record<Theme, [string, string, string]> = { ash: ['#ff7a1a', '#ffc24a', '#b8320e'], swamp: ['#6a8a2a', '#a8c24a', '#3a4a16'], market: ['#9a0e0a', '#d8261a', '#5a0606'], forge: ['#ff9a2a', '#fff0a8', '#c8420e'], mask: ['#c8c0e0', '#f4f0ff', '#6a5a8a'] };
     const [m, mh, md] = fill[theme];
     p.E(cx, 112, 46, 8, '#120a08');
     for (const [a, b] of [[-30, 26], [26, -28]]) p.L(cx + a, 110, cx + b, 100, 5, '#3a2416');
@@ -342,9 +342,41 @@ export function hellDecor(kind: string, theme: Theme, v: number, o = 0): HPic {
       for (const lx of [18, 54]) { p.L(lx, 29, lx, 40, 1, '#2a1a12'); p.E(lx, 54, 10, 14, '#a8140e'); p.E(lx - 3, 50, 5, 9, '#e0301e'); p.R(lx - 6, 39, 12, 3, '#2a1a12'); p.R(lx - 6, 66, 12, 3, '#2a1a12'); p.R(lx, 69, 1, 8, '#d8a83a'); for (let y = 44; y < 66; y += 5) p.R(lx - 9, y, 18, 1, '#7a0e0a'); }
       p.finish();
       out = { canvas: p.c, ax: 0.5, ay: 94 / 96, glow: [0, -70], glowTint: 0xff3a2a };
+    } else if (theme === 'mask') {
+      // 43차 5층: 검은 장대에 매단 흰 종이 등 — 등마다 붉게 그린 웃는 얼굴 (빛은 희고 차갑다)
+      const p = pen(28, 96);
+      p.E(28, 188, 12, 3, '#0e0c10');
+      p.R(26, 30, 4, 158, '#141216'); p.R(26, 30, 1, 158, '#2a2630'); p.R(16, 28, 24, 3, '#141216');
+      p.L(36, 31, 36, 40, 1, '#2a2630');
+      p.E(36, 56, 11, 15, '#e8e4f0'); p.E(33, 52, 6, 10, '#ffffff');
+      for (let y = 46; y < 68; y += 5) p.R(26, y, 20, 1, '#c8c0d8');
+      p.R(32, 52, 2, 2, '#1a1418'); p.R(39, 52, 2, 2, '#1a1418');
+      for (let k = 0; k < 7; k++) p.R(31 + k, 59 + Math.round(Math.abs(k - 3) * -0.6 + 2), 1, 1, '#b8283a');
+      p.R(30, 40, 12, 3, '#141216'); p.R(30, 70, 12, 3, '#141216'); p.R(36, 73, 1, 8, '#b8283a');
+      p.finish([8, 6, 10]);
+      out = { canvas: p.c, ax: 28 / 56, ay: 94 / 96, glow: [8, -70], glowTint: 0xd8d0ff };
     } else {
       out = { canvas: document.createElement('canvas'), ax: 0.5, ay: 1 };
     }
+  } else if (kind === 'maskpost') {
+    // 43차 5층: 가면을 줄줄이 건 나무 기둥 — 가로대에서 끈으로 늘어진 가면 다섯 (웃는 · 우는 · 금빛 · 붉은 · 표정 없는)
+    const p = pen(40, 72);
+    p.E(40, 140, 16, 4, '#0e0c10');
+    p.R(37, 20, 6, 120, '#4a3a2e'); p.R(37, 20, 2, 120, '#6a5644'); p.R(12, 22, 56, 5, '#3a2e24'); p.R(12, 22, 56, 1, '#5a4a3a');
+    const cols = ['#f2eee6', '#e8c860', '#b8283a', '#f2eee6', '#2a2430'];
+    for (let k = 0; k < 5; k++) {
+      const x = 16 + k * 12, y = 40 + ((k + o) % 3) * 9, col = cols[(k + v) % 5];
+      p.L(x, 27, x, y - 8, 1, '#8a8070');
+      p.E(x, y, 5, 7, col); p.E(x - 1, y - 2, 3, 4, col === '#2a2430' ? '#3a3440' : '#ffffff');
+      const eye = col === '#2a2430' ? '#e8e4dc' : '#141014';
+      p.R(x - 3, y - 2, 2, 1, eye); p.R(x + 1, y - 2, 2, 1, eye);
+      const mood = (k + v + o) % 3;
+      if (mood === 0) { p.R(x - 2, y + 3, 5, 1, eye); p.R(x - 3, y + 2, 1, 1, eye); p.R(x + 3, y + 2, 1, 1, eye); }
+      else if (mood === 1) { p.R(x - 2, y + 2, 5, 1, eye); p.R(x - 3, y + 3, 1, 1, eye); p.R(x + 3, y + 3, 1, 1, eye); p.R(x - 2, y, 1, 3, '#7ab8e8'); }
+      else p.R(x - 1, y + 3, 3, 1, eye);
+    }
+    p.finish([10, 8, 12]);
+    out = { canvas: p.c, ax: 0.5, ay: 140 / 144 };
   } else {
     // wallfence: 마을 울타리 한 칸 (o = 0: i 방향, 1: j 방향, 2: 모서리 기둥)
     out = villageFence(theme, v, o, r);
@@ -671,7 +703,7 @@ function thornTree(r: (k: number) => number): HPic {
 /** 바위 무더기: 1층 현무암(틈의 용암 빛) · 2층 이끼 낀 바위 · 3층 붉은 사암과 핏자국 */
 function rock(theme: Theme, r: (k: number) => number): HPic {
   const p = pen(52, 40);
-  const pal: Record<Theme, [string, string, string]> = { ash: ['#2e2a28', '#4a4440', '#161210'], swamp: ['#3a3e30', '#565c46', '#1e2018'], market: ['#5a2a22', '#7e4234', '#2e1410'], forge: ['#262222', '#3e3836', '#0e0c0c'] };
+  const pal: Record<Theme, [string, string, string]> = { ash: ['#2e2a28', '#4a4440', '#161210'], swamp: ['#3a3e30', '#565c46', '#1e2018'], market: ['#5a2a22', '#7e4234', '#2e1410'], forge: ['#262222', '#3e3836', '#0e0c0c'], mask: ['#8a8680', '#b8b2a8', '#3a3634'] };
   const [base, lit, dark] = pal[theme];
   p.E(52, 70, 46, 9, '#0e0a08');
   const n = 2 + Math.floor(r(1) * 2);

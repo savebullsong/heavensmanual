@@ -28,11 +28,11 @@ export interface Building {
   yunae?: boolean; // 40차: 서울 달동네의 '유내 미용실' (지금은 다른 사람이 한다)
 }
 /** 지옥: 초가집 · 감옥 · 뼈집 · 대형 짐승 시체 · 뼈 무더기 · 내장 더미 */
-export type HellBuildKind = 'thatch' | 'prison' | 'bonehouse' | 'carcass' | 'bonepile' | 'guts' | 'butcher' | 'stall' | 'burnt' | 'idol' | 'smithy'; // 34차 smithy = 4층 칼드렉의 대장간
+export type HellBuildKind = 'thatch' | 'prison' | 'bonehouse' | 'carcass' | 'bonepile' | 'guts' | 'butcher' | 'stall' | 'burnt' | 'idol' | 'smithy' | 'maskhouse' | 'puppetshop'; // 34차 smithy = 4층 칼드렉의 대장간 · 43차 5층: 안과 밖이 다른 집 · 인형술사 마리의 공방
 /** fence o: 0 = i 방향, 1 = j 방향, 2 = 모서리 기둥 */
 export interface Prop { i: number; j: number; kind: 'tree' | 'lamp' | 'pillar' | 'cart' | 'fence' | 'pole' | 'spirit' | 'moto' | 'plant' | 'bin' | 'stools' | 'pushcart' | HellDecorKind | 'sunbed' | 'parasol' | 'giraffe' | 'elephant' | 'lion' | 'zebra' | 'flamingo' | 'panda' | 'fountain' | 'balloons' | 'icecream'; o?: number }
 /** 지옥 소품: 경계 바위·성벽, 뼈, 해골 더미, 꼬챙이, 가마솥, 철창, 마을 불빛, 고문 장면(움직임) */
-export type HellDecorKind = 'crag' | 'bones' | 'skulls' | 'stake' | 'cauldron' | 'cage' | 'lantern' | 'bonfire' | 'torture' | 'htree' | 'rock' | 'crack' | 'dicetable' | 'campfire' | 'junk' | 'reeds' | 'mattress' | 'anvil' | 'forge';
+export type HellDecorKind = 'crag' | 'bones' | 'skulls' | 'stake' | 'cauldron' | 'cage' | 'lantern' | 'bonfire' | 'torture' | 'htree' | 'rock' | 'crack' | 'dicetable' | 'campfire' | 'junk' | 'reeds' | 'mattress' | 'anvil' | 'forge' | 'maskpost'; // 43차: 가면을 줄줄이 건 나무 기둥 (5층)
 /** 차가 달리는 구간: j 행의 i0~i1, dir = +1 이면 +i 방향 */
 export interface Lane { j: number; i0: number; i1: number; dir: 1 | -1 }
 export interface Zone {
@@ -104,7 +104,7 @@ export interface HellInfo {
 }
 
 /** 22차: 지옥 마을 장사꾼 — 고깃간 · 물장수 · 넝마 · 약장수 · 장사꾼 · 무기상 · 지옥호텔 지배인 · 서큐버스 (층마다 한 명씩) */
-export type HellVendor = 'butcher' | 'water' | 'junk' | 'medic' | 'trader' | 'arms' | 'hotel' | 'succubus' | 'smith'; // 30차: 대장장이
+export type HellVendor = 'butcher' | 'water' | 'junk' | 'medic' | 'trader' | 'arms' | 'hotel' | 'succubus' | 'smith' | 'puppeteer'; // 30차: 대장장이 · 43차: 5층 인형술사 마리
 
 export function tileAt(z: Zone, i: number, j: number): TileType {
   if (i < 0 || j < 0 || i >= z.W || j >= z.H) return 'void';

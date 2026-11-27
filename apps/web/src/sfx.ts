@@ -20,11 +20,19 @@ let master: GainNode | null = null;
 let noiseBuf: AudioBuffer | null = null;
 let muted = (() => { try { return localStorage.getItem(KEY) === 'off'; } catch { return false; } })();
 
+/** 43차: 효과음 음량 (0~1, 영혼 설정의 막대) */
+let vol = (() => { try { const v = parseFloat(localStorage.getItem('heavensmanual.sfxvol') ?? ''); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1; } catch { return 1; } })();
 export function isMuted() { return muted; }
 export function setMuted(m: boolean) {
   muted = m;
   try { localStorage.setItem(KEY, m ? 'off' : 'on'); } catch { /* 저장 못 해도 그만 */ }
-  if (master) master.gain.value = m ? 0 : 0.55;
+  if (master) master.gain.value = m ? 0 : 0.55 * vol;
+}
+export function sfxVolume() { return vol; }
+export function setSfxVolume(v: number) {
+  vol = Math.max(0, Math.min(1, v));
+  try { localStorage.setItem('heavensmanual.sfxvol', String(vol)); } catch { /* 그만 */ }
+  if (master) master.gain.value = muted ? 0 : 0.55 * vol;
 }
 
 /** 배경 소리도 같은 AudioContext를 쓴다 (효과음 끄기와는 따로) */
@@ -40,7 +48,7 @@ export function unlockAudio() {
     if (!AC) return;
     ctx = new AC();
     master = ctx.createGain();
-    master.gain.value = muted ? 0 : 0.55;
+    master.gain.value = muted ? 0 : 0.55 * vol;
     // 한꺼번에 여러 소리가 겹쳐도 찢어지지 않게
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -14; comp.ratio.value = 6;
@@ -335,6 +343,12 @@ export function hellDrone(dur = 8) {
   swell(o, t, dur, 'sine', 55, 0.18, 2.0);
   swell(o, t + 0.5, dur - 0.5, 'sine', 58.3, 0.08, 2.5);
   noise(o, t, dur, 'lowpass', 180, 90, 0.7, 0.18, 2.0);
+}
+/** 43차: 뱃속에서 듣는 심장 소리 — 낮고 둔한 두 번 (쿵-쿵) */
+export function heartbeat() {
+  if (!ready()) return;
+  const t = ctx!.currentTime, o = out({ pan: 0, vol: 0.9 }, 1);
+  for (const dt of [0, 0.22]) { tone(o, t + dt, 0.18, 'sine', 62, 38, dt ? 0.38 : 0.5); noise(o, t + dt, 0.12, 'lowpass', 140, 60, 0.8, dt ? 0.18 : 0.25, 0.004); }
 }
 /** 무거운 발소리 한 번 (판초 악마 · 저승사자) */
 export function step(heavy = false) {
