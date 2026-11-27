@@ -1112,6 +1112,9 @@ export const more16 = {
     ywShopPickArmor: "{item}{iyo}? 잘 어울리실 거예요. 여기서만 입을 수 있는 건 아시죠?",
     ywCageLines: ["......", "여긴 맡길 게 없어.", "천국에선 아무것도 안 잃어버려. 그러니 맡아 둘 것도 없지."],
     ywShopName: "황색날개의 가게",
+    ammoUnits: "{n}발",
+    ammoNeedBow: "활을 들어야 화살을 걸 수 있다",
+    ammoNeedGun: "맞는 총을 들어야 끼울 수 있다",
     // 48차 끝
   },
   th: {
@@ -2226,6 +2229,9 @@ export const more16 = {
     ywShopPickArmor: "{item} เหรอคะ ต้องเข้ากับคุณแน่ รู้ใช่ไหมคะว่าใส่ได้แค่ที่นี่",
     ywCageLines: ["......", "ที่นี่ไม่มีอะไรให้ฝาก", "บนสวรรค์ไม่มีอะไรหาย เลยไม่มีอะไรต้องฝาก"],
     ywShopName: "ร้านของปีกเหลือง",
+    ammoUnits: "{n} นัด",
+    ammoNeedBow: "ต้องถือธนูก่อนจึงจะพาดลูกธนูได้",
+    ammoNeedGun: "ต้องถือปืนที่ใช้กระสุนนี้ก่อน",
     // 48차 끝
   },
   en: {
@@ -3340,6 +3346,9 @@ export const more16 = {
     ywShopPickArmor: "{item}? It'll suit you. You know it can only be worn here?",
     ywCageLines: ["......", "Nothing to keep here.", "Nothing gets lost in heaven. So there is nothing to keep."],
     ywShopName: "Yellow Wing's shop",
+    ammoUnits: "{n} rounds",
+    ammoNeedBow: "You need a bow in hand to nock arrows",
+    ammoNeedGun: "You need the right gun in hand to load these",
     // 48차 끝
   },
 };

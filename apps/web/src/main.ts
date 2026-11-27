@@ -119,6 +119,42 @@ function switchArrows(k: string) {
   const nm = itemByKey(k).name[lang()];
   toast(t().arrowSwitched.replace('{item}을(를)', nm + eulReul(nm)).replace('{item}', nm));
 }
+// ───────────────────────── 48차 화살·탄약: 가방에 보이고 · 팔리고 · 무게가 있다 ─────────────────────────
+const isAmmo = (it: ItemDef | null | undefined) => !!it && (it.note === 'arrows' || it.note === 'ammo' || it.note === 'rifleammo');
+/** 한 묶음에 든 수 (가게에서 사는 단위) */
+const ammoBundle = (it: ItemDef) => (it.note === 'arrows' ? 20 : it.note === 'rifleammo' ? 10 : 12);
+/** 한 발 무게: 화살 0.05 · 권총 탄 0.03 · 소총 탄 0.06 — 가볍지만 끝없이 들 수는 없다 */
+const ammoUnitW = (it: ItemDef) => (it.note === 'arrows' ? 0.05 : it.note === 'rifleammo' ? 0.06 : 0.03);
+/** 가진 낱개 수 (권총 탄은 현실 탄 · 지옥 유황 탄환이 한 주머니) */
+function ammoHave(it: ItemDef): number {
+  if (it.note === 'arrows') return (state.arrowKey === it.key ? state.arrows ?? 0 : 0) + (state.quiver?.[it.key] ?? 0);
+  if (it.note === 'rifleammo') return state.rifle ?? 0;
+  if (it.note === 'ammo') return (it.hell ? inHell() : !inHell()) ? state.ammo ?? 0 : 0;
+  return 0;
+}
+function ammoTake(it: ItemDef, units: number) {
+  if (it.note === 'arrows') {
+    let left = units;
+    const q = state.quiver?.[it.key] ?? 0;
+    const fromQ = Math.min(q, left); if (fromQ) { state.quiver![it.key] = q - fromQ; if (!state.quiver![it.key]) delete state.quiver![it.key]; left -= fromQ; }
+    if (left > 0 && state.arrowKey === it.key) state.arrows = Math.max(0, (state.arrows ?? 0) - left);
+  } else if (it.note === 'rifleammo') state.rifle = Math.max(0, (state.rifle ?? 0) - units);
+  else state.ammo = Math.max(0, (state.ammo ?? 0) - units);
+}
+/** 화살·탄약 종류 (이 세계 것 · 가진 것) */
+function ammoKinds(): ItemDef[] {
+  const keys = new Set<string>([state.arrowKey ?? '', ...Object.keys(state.quiver ?? {}), inHell() ? 'hshot' : 'ammo', 'rifleammo'].filter(Boolean));
+  return [...keys].map((k) => itemByKey(k)).filter((it) => it && isAmmo(it) && ammoHave(it) > 0);
+}
+/** 지금 장비 칸에 걸린 것인가 (든 무기가 쓰는 종류 · 빼 두지 않았을 때) */
+function ammoLoaded(it: ItemDef): boolean {
+  if (state.unloaded) return false;
+  const w = state.equip?.weapon ? itemByKey(state.equip.weapon) : null;
+  if (it.note === 'arrows') return w?.note === 'needsArrows' && state.arrowKey === it.key;
+  if (it.note === 'rifleammo') return w?.note === 'needsRifle';
+  return w?.note === 'needsAmmo';
+}
+function ammoWeight() { let w = 0; for (const it of ammoKinds()) w += ammoHave(it) * ammoUnitW(it); return w; }
 /** 지금 보이는 몸: 이번 생의 몸이 정해지기 전에는 처음 모습 */
 const bodyLook = (): Look => state.look ?? state.arrival!.look;
 document.documentElement.lang = lang();
@@ -2537,7 +2573,7 @@ async function talkToHwang() {
       if (have <= 0) continue;
       const n = have > 1 ? await askQty(it, unit, have, 'sell') : 1;
       if (n <= 0 || sellFree(it.key) < n) continue;
-      state.bag![it.key] = (state.bag![it.key] ?? 0) - n;
+      sellTake(it.key, n);
       if (hell) hellState().notes += unit * n; else state.wallet = (state.wallet ?? 0) + unit * n;
       ecoLog('earn', 'sell', unit * n, hell);
       save(state);
@@ -2755,14 +2791,23 @@ type ShopTab = ItemCat | 'sell' | 'ask';
 /** 이 세계 돈으로 값이 매겨지는 내 물건 (지옥 = 노전 물건, 현실 = 바트 물건). 끼고 있는 건 팔지 않는다 */
 /** 44차: 팔 수 있는 수 = 가방의 수 − 몸에 걸친 수 (우주새·유황새 계산대에서도 — 걸친 것까지 세어 '×2'로 보이던 것) */
 function sellFree(k: string) {
+  const it = itemByKey(k);
+  if (isAmmo(it)) return Math.floor(ammoHave(it) / ammoBundle(it)); // 48차: 화살·탄약은 묶음으로 판다
   const worn = Object.values(state.equip ?? {}).filter((x) => x === k).length;
   return Math.max(0, (state.bag?.[k] ?? 0) - worn);
+}
+/** 48차: 판 만큼 덜어 낸다 (화살·탄약은 묶음 단위) */
+function sellTake(k: string, n: number) {
+  const it = itemByKey(k);
+  if (isAmmo(it)) { ammoTake(it, n * ammoBundle(it)); ammoGear(); return; }
+  state.bag![k] = (state.bag![k] ?? 0) - n;
 }
 function sellable(hell: boolean) {
   const bag = state.bag ?? {};
   const worn = new Set(Object.values(state.equip ?? {}));
   const here = hell ? 'hell' : realm() === 'heaven' ? 'heaven' : 'real'; // 45차: 천국의 물건은 현실·지옥에서 팔리지 않는다
-  return Object.keys(bag).filter((k) => bag[k] > 0).map(itemByKey).filter((it) => it && it.price > 0 && (hell ? (!!it.hell && !it.heaven) || it.store === 'talus' : worldOf(it) === here && it.store !== 'talus') && !(worn.has(it.key) && bag[it.key] <= 1));
+  const ok = (it: ItemDef) => it && it.price > 0 && (hell ? (!!it.hell && !it.heaven) || it.store === 'talus' : worldOf(it) === here && it.store !== 'talus');
+  return [...Object.keys(bag).filter((k) => bag[k] > 0).map(itemByKey).filter((it) => ok(it) && !isAmmo(it) && !(worn.has(it.key) && bag[it.key] <= 1)), ...ammoKinds().filter((it) => ok(it) && sellFree(it.key) > 0)]; // 48차: 화살·탄약도
 }
 
 /** 상품 창: 고른 물건(사기·팔기)을 돌려준다. '나가기'나 창 밖 빈 곳을 누르면 null */
@@ -3196,8 +3241,7 @@ function sellList(list: Element, hell: boolean, redraw: () => void) {
   const mine = sellable(hell);
   if (!mine.length) { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = L.sellNothing; list.appendChild(p); return; }
   // 37차: 몸에 걸친 것은 팔 수 있는 수에서 뺀다 (가방 3 · 1개 착용이면 2개까지)
-  const wornN = (k: string) => Object.values(state.equip ?? {}).filter((x) => x === k).length;
-  const free = (k: string) => Math.max(0, (state.bag?.[k] ?? 0) - wornN(k));
+  const free = (k: string) => sellFree(k);
   for (const it of mine) {
     const p = sellPrice(it);
     if (free(it.key) <= 0) continue;
@@ -3205,7 +3249,7 @@ function sellList(list: Element, hell: boolean, redraw: () => void) {
       const have = free(it.key);
       const n = await askQty(it, p, have, 'sell');
       if (n <= 0 || free(it.key) < n) return;
-      state.bag![it.key] -= n;
+      sellTake(it.key, n);
       if (hell) hellState().notes += p * n; else state.wallet = (state.wallet ?? 0) + p * n;
       ecoLog('earn', 'sell', p * n, hell);
       save(state); updateHud(); renderQuick();
@@ -3232,7 +3276,7 @@ function itemRow(it: ItemDef, right: string, onClick: () => void, dim = false) {
   ef.className = 'effect';
   ef.textContent = effectText(it, lang());
   // 23차: 화살·탄약은 가방에 따로 안 보이니 지금 가진 수를 함께
-  if (it.note === 'arrows' || it.note === 'ammo' || it.note === 'rifleammo') ef.textContent += ' · ' + (it.note === 'arrows' ? t().haveArrows : it.note === 'rifleammo' ? t().haveRifle : t().haveAmmo).replace('{n}', String((it.note === 'arrows' ? state.arrows : it.note === 'rifleammo' ? state.rifle : state.ammo) ?? 0));
+  if (it.note === 'arrows' || it.note === 'ammo' || it.note === 'rifleammo') ef.textContent += ' · ' + (it.note === 'arrows' ? t().haveArrows : it.note === 'rifleammo' ? t().haveRifle : t().haveAmmo).replace('{n}', String(ammoHave(it))); // 48차: 종류마다 가진 수
   else ef.textContent = [ef.textContent, weightText(it)].filter(Boolean).join(' · '); // 48차: 모든 물건에 무게
   const pr = document.createElement('span');
   pr.className = 'price';
@@ -3325,7 +3369,8 @@ function slotOf(k: string): Slot | undefined {
 const ARMOR_W: Partial<Record<Slot, number>> = { head: 2.5, body: 7, hands: 1, legs: 3, shins: 1.5, feet: 2, offhand: 5 };
 function itemWeight(it: ItemDef | undefined): number {
   if (!it) return 0;
-  if (it.note === 'ammo' || it.note === 'arrows' || it.note === 'rifleammo' || it.note === 'fuel') return 0;
+  if (it.note === 'fuel') return 0;
+  if (isAmmo(it)) return Math.round(ammoBundle(it) * ammoUnitW(it) * 100) / 100; // 48차: 한 묶음 무게
   if (/^(diary|tshard|tembra|redseal|manettethread|parrotfeed)$/.test(it.key)) return 0.02; // 48차: 일기장·템브라 조각처럼 가벼운 것은 거의 무게가 없다
   if (it.cat === 'goods') return it.heal ? 0.15 : it.use ? 0.2 : 0.3; // 48차: 먹고 바르는 것은 조금 더 가볍게
   const heavy = it.price >= (it.hell ? 20_000 : 100_000) ? 1.4 : it.price >= (it.hell ? 3_000 : 10_000) ? 1.15 : 1;
@@ -3347,7 +3392,8 @@ function loadCap() {
 }
 function loadNow() {
   let w = 0;
-  for (const [k, n] of Object.entries(state.bag ?? {})) if (n > 0) w += itemWeight(itemByKey(k)) * n;
+  for (const [k, n] of Object.entries(state.bag ?? {})) if (n > 0 && !isAmmo(itemByKey(k))) w += itemWeight(itemByKey(k)) * n;
+  w += ammoWeight(); // 48차: 화살·탄약 낱개 무게
   return Math.round(w * 10) / 10;
 }
 /** 무게 비율 → 걷는 빠르기 · 회복 배수 · 기어감 */
@@ -3854,8 +3900,31 @@ function renderBag() {
   // 20차: 장비 탭에서는 끼고 있는 것은 위 몸 그림에만 (같은 것을 두 번 보이지 않게) — 남는 것만 목록에
   const worn = (k: string) => Object.values(state.equip ?? {}).filter((x) => x === k).length;
   const keys = Object.keys(bag).filter((k) => bag[k] > 0 && itemByKey(k) && isGearItem(itemByKey(k)) === (bagTab === 'gear') && (bagTab !== 'gear' || bag[k] - worn(k) > 0));
-  if (!keys.length) { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = bagTab === 'gear' ? L.bagEmptyGear : L.bagEmpty; list.appendChild(p); }
+  // 48차: 칸에 걸리지 않은 화살·탄약은 가방(장비) 목록에 — 누르면 건다, 🗑로 한 묶음씩 버린다
+  const spare = bagTab === 'gear' ? ammoKinds().filter((it) => !ammoLoaded(it)) : [];
+  if (!keys.length && !spare.length) { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = bagTab === 'gear' ? L.bagEmptyGear : L.bagEmpty; list.appendChild(p); }
   const redraw = () => { renderBag(); renderHud(); renderQuick(); };
+  for (const it of spare) {
+    const n = ammoHave(it);
+    const w = state.equip?.weapon ? itemByKey(state.equip.weapon) : null;
+    const fits = it.note === 'arrows' ? w?.note === 'needsArrows' : it.note === 'rifleammo' ? w?.note === 'needsRifle' : w?.note === 'needsAmmo';
+    const row = itemRow(it, `${!worldOk(it) ? L.otherWorldTag + ' · ' : ''}${L.ammoSlot} · ${L.ammoUnits.replace('{n}', String(n))}`, () => {
+      if (!worldOk(it)) { toast(L.otherWorldItem); return; }
+      if (!fits) { toast(it.note === 'arrows' ? L.ammoNeedBow : L.ammoNeedGun); return; }
+      if (it.note === 'arrows' && state.arrowKey !== it.key) addArrows(it.key, 0);
+      state.unloaded = false;
+      world?.setGear(gear()); save(state); renderBag(); renderAmmo(); renderHud();
+    });
+    { const ef = row.querySelector('.effect'); if (ef) ef.textContent = [effectText(it, lang()), L.weightTag.replace('{n}', String(Math.round(n * ammoUnitW(it) * 10) / 10))].filter(Boolean).join(' · '); } // 가진 수는 오른쪽에 한 번만 · 무게는 가진 만큼
+    if (fits) { const tag = document.createElement('span'); tag.className = 'act'; tag.textContent = L.equip; row.appendChild(tag); row.classList.add('has-act'); }
+    const wrap = document.createElement('div'); wrap.className = 'bag-row';
+    wrap.appendChild(row);
+    const side = document.createElement('div'); side.className = 'bag-side';
+    const del = document.createElement('button'); del.className = 'b-drop'; del.title = L.dropItem; del.textContent = '🗑';
+    del.onclick = () => { const b = Math.min(n, ammoBundle(it)); ammoTake(it, b); ammoGear(); save(state); toast(L.dropped.replace('{item}', it.name[lang()]).replace('{n}', String(1))); redraw(); };
+    side.appendChild(del); wrap.appendChild(side);
+    list.appendChild(wrap);
+  }
   for (const k of keys) {
     const it = itemByKey(k);
     const slot = slotOf(k);
@@ -4083,6 +4152,7 @@ function pouch(): { it: ItemDef; n: number; label: string; need: boolean; text?:
   const L = t();
   const w = state.equip?.weapon ? itemByKey(state.equip.weapon) : null;
   if (w?.note === 'fuel') { const n = fuelLeft(); return [{ it: w, n: Math.ceil(n), label: L.fuelLeft.replace('{t}', mmss(n)), need: true, text: mmss(n) }]; }
+  if (state.unloaded) return []; // 48차: 빼 두면 칸은 비고 가방 목록으로 돌아간다
   const hell = inHell();
   const arrows = { it: itemByKey(state.arrowKey ?? (hell ? 'harrows' : 'arrows')), n: state.arrows ?? 0, label: L.arrowsLeft.replace('{n}', String(state.arrows ?? 0)), need: w?.note === 'needsArrows' };
   const ammo = { it: itemByKey(hell ? 'hshot' : 'ammo'), n: state.ammo ?? 0, label: L.ammoLeft.replace('{n}', String(state.ammo ?? 0)), need: w?.note === 'needsAmmo' };
@@ -4090,7 +4160,7 @@ function pouch(): { it: ItemDef; n: number; label: string; need: boolean; text?:
   if (arrows.need) return [arrows];
   if (ammo.need) return [ammo];
   if (rifle.need) return [rifle];
-  return [arrows, ammo, rifle].filter((x) => x.n > 0);
+  return []; // 48차: 쏘는 무기를 들지 않으면 칸은 비고, 화살·탄약은 가방 목록에
 }
 /** 23차: 공격 버튼 위의 남은 화살·탄약 (쏘는 무기를 들었을 때만). 누르면 장비 칸 */
 const ammoChip = document.createElement('button');
@@ -4472,7 +4542,7 @@ async function ywShopLoop() {
       if (have <= 0) continue;
       const n = have > 1 ? await askQty(it, unit, have, 'sell') : 1;
       if (n <= 0 || sellFree(it.key) < n) continue;
-      state.bag![it.key] = (state.bag![it.key] ?? 0) - n;
+      sellTake(it.key, n);
       state.wallet = (state.wallet ?? 0) + unit * n;
       ecoLog('earn', 'sell', unit * n);
       save(state); renderHud(); renderQuick();
@@ -4680,7 +4750,7 @@ function openHeavenArmory() {
           const have = sellFree(it.key); if (have <= 0) return;
           const n = have > 1 ? await askQty(it, unit, have, 'sell') : 1;
           if (n <= 0 || sellFree(it.key) < n) return;
-          state.bag![it.key] = (state.bag![it.key] ?? 0) - n;
+          sellTake(it.key, n);
           state.wallet = (state.wallet ?? 0) + unit * n;
           ecoLog('earn', 'sell', unit * n);
           save(state); renderHud(); renderQuick();
