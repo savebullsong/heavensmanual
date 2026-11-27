@@ -1,4 +1,5 @@
 // 우주새 상품: 소비품 · 무기 · 방어구 (브랜드 실명 없음, 가격은 바트)
+import { weaponArt } from './weaponart.ts';
 import { t, type Lang } from './i18n.ts';
 
 export type ItemCat = 'goods' | 'weapon' | 'armor';
@@ -485,16 +486,31 @@ export function itemByKey(k: string): ItemDef {
   return d;
 }
 export function iconFor(it: ItemDef): HTMLCanvasElement {
-  const c = itemIcon(it.icon ?? it.sprite ?? it.key, it.tint);
+  const key = it.icon ?? it.sprite ?? it.key;
+  // 45차 후속: 무기는 고급 그림(96×96, 부드럽게 줄여 보인다). 화살 · 탄약 묶음은 예전 점 그림
+  const hd = it.cat === 'weapon' && it.note !== 'arrows' && it.note !== 'ammo' && it.note !== 'rifleammo' ? weaponArt(key, it) ?? (it.sprite ? weaponArt(it.sprite, it) : null) : null;
+  const c = hd ?? itemIcon(key, it.tint);
+  const K = c.width / 32; // 아래 장식은 32칸 좌표로 그린다
   if (it.heaven) { // 45차 천국의 물건: 위쪽에 작은 빛 고리와 반짝임 (현실·지옥 물건과 한눈에 갈리게)
     const g0 = c.getContext('2d')!;
-    g0.strokeStyle = '#f2d66a'; g0.lineWidth = 1.2;
-    g0.beginPath(); g0.ellipse(25, 5, 5, 2, 0, 0, Math.PI * 2); g0.stroke();
-    g0.fillStyle = '#fff6d0'; g0.fillRect(4, 3, 1, 3); g0.fillRect(3, 4, 3, 1);
+    g0.save(); g0.scale(K, K);
+    if (hd) { // 고급 그림: 부드러운 금빛 고리와 네 갈래 반짝임
+      g0.shadowColor = 'rgba(255,230,150,0.9)'; g0.shadowBlur = 3;
+      g0.strokeStyle = '#f6dc78'; g0.lineWidth = 0.9;
+      g0.beginPath(); g0.ellipse(26, 4.6, 3.8, 1.4, 0, 0, Math.PI * 2); g0.stroke();
+      g0.fillStyle = '#fff8dc';
+      g0.beginPath(); g0.moveTo(4.5, 2); g0.lineTo(5.1, 4.4); g0.lineTo(7.5, 5); g0.lineTo(5.1, 5.6); g0.lineTo(4.5, 8); g0.lineTo(3.9, 5.6); g0.lineTo(1.5, 5); g0.lineTo(3.9, 4.4); g0.closePath(); g0.fill();
+    } else {
+      g0.strokeStyle = '#f2d66a'; g0.lineWidth = 1.2;
+      g0.beginPath(); g0.ellipse(25, 5, 5, 2, 0, 0, Math.PI * 2); g0.stroke();
+      g0.fillStyle = '#fff6d0'; g0.fillRect(4, 3, 1, 3); g0.fillRect(3, 4, 3, 1);
+    }
+    g0.restore();
   }
   if (it.wreck) {
     // 35차 박살난 무기: 빛이 빠지고, 가운데가 깨져 갈라진 금 · 떨어져 나간 조각
     const g0 = c.getContext('2d')!;
+    g0.save(); g0.scale(K, K);
     g0.globalCompositeOperation = 'source-atop';
     g0.fillStyle = 'rgba(40,36,34,0.5)'; g0.fillRect(0, 0, 32, 32);
     g0.globalCompositeOperation = 'destination-out';
@@ -503,9 +519,10 @@ export function iconFor(it: ItemDef): HTMLCanvasElement {
     g0.strokeStyle = '#e8e0d0'; g0.lineWidth = 1;
     g0.beginPath(); g0.moveTo(9, 6); g0.lineTo(12, 11); g0.lineTo(10, 15); g0.moveTo(24, 18); g0.lineTo(27, 23); g0.stroke();
     g0.fillStyle = '#b8b0a4'; g0.fillRect(24, 27, 2, 2); g0.fillRect(6, 25, 2, 1); g0.fillRect(27, 4, 1, 2);
+    g0.restore();
   }
-  if (it.enh) { const g0 = c.getContext('2d')!; g0.fillStyle = '#1a120a'; g0.fillRect(0, 0, 13, 9); g0.fillStyle = '#ffd45a'; g0.font = 'bold 9px system-ui, sans-serif'; g0.fillText(`+${it.enh}`, 1, 8); }
-  if (!it.hell) return c;
+  // 45차 후속: 그림 왼쪽 위의 '+N'은 뺐다 — 이름에 이미 '+N'이 붙어 있다 (같은 것을 두 번 보이지 않게)
+  if (!it.hell || hd) return c; // 고급 무기 그림은 지옥 물건도 제 색(검은 쇠 · 달아오른 날)으로 그린다
   const g = c.getContext('2d')!;
   g.globalCompositeOperation = 'source-atop';
   g.fillStyle = 'rgba(70,8,4,0.42)';

@@ -3236,7 +3236,7 @@ function migrateDura() {
  * 무기는 남은 내구도가 20% · 10% · 3%가 되면 그림 알림, 0이 되면 박살난다 — 고칠 수 없는 '박살난 무기'가 되어 싸게 팔기만 된다 (손은 맨손)
  */
 function wear(kind: 'weapon' | 'armor') {
-  if (Math.random() >= (kind === 'weapon' ? 0.4 : 0.5)) return;
+  if (Math.random() >= (kind === 'weapon' ? 0.12 : 0.3)) return; // 45차 후속: 몹 하나에 여러 번 때려야 하는데 너무 빨리 닳았다 — 무기 0.4 → 0.12(약 3.3배 오래), 방어구 0.5 → 0.3
   const eq = state.equip ?? {};
   const keys = kind === 'weapon' ? [eq.weapon].filter(Boolean) as string[] : Object.entries(eq).filter(([sl, k]) => sl !== 'weapon' && k).map(([, k]) => k as string);
   if (!keys.length) return;
@@ -3290,12 +3290,14 @@ function duraAlert(it: ItemDef, now: number, max: number, spare = false) {
   if (gone) {
     // 비스듬히 갈라진 두 조각 + 튀는 파편
     for (const side of [0, 1]) {
-      const c = document.createElement('canvas'); c.width = c.height = 32;
+      const c = document.createElement('canvas'); c.width = c.height = base.width; // 45차 후속: 고급 무기 그림은 96칸 — 같은 크기로 잘라 쪼갠다
+      if (base.dataset.hd) c.dataset.hd = '1';
       const g = c.getContext('2d')!;
+      g.scale(base.width / 32, base.width / 32);
       g.beginPath();
       if (side === 0) { g.moveTo(0, 0); g.lineTo(18, 0); g.lineTo(14, 10); g.lineTo(19, 17); g.lineTo(13, 24); g.lineTo(16, 32); g.lineTo(0, 32); }
       else { g.moveTo(18, 0); g.lineTo(32, 0); g.lineTo(32, 32); g.lineTo(16, 32); g.lineTo(13, 24); g.lineTo(19, 17); g.lineTo(14, 10); }
-      g.closePath(); g.clip(); g.drawImage(base, 0, 0);
+      g.closePath(); g.clip(); g.drawImage(base, 0, 0, 32, 32);
       c.className = 'da-half ' + (side ? 'r' : 'l');
       pic.appendChild(c);
     }

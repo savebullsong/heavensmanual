@@ -639,3 +639,7 @@ body.passing #hud, body.passing .stance, body.passing .quick-slot, body.passing 
 /* 45차 후속: 단추를 누른 뒤 키보드(Tab · W·A·S·D)를 쓰면 브라우저가 단추 둘레에 네모 테(포커스 표시)를 그리던 것 */
 .stance button, #hud button { -webkit-tap-highlight-color: transparent; }
 .stance button:focus, .stance button:focus-visible, #hud button:focus, #hud button:focus-visible { outline: none; }
+
+/* 45차 후속: 고급 무기 그림(96칸 벡터)은 점 그림처럼 깨뜨리지 않고 부드럽게 줄인다 */
+canvas[data-hd] { image-rendering: auto !important; }
+.menu-item canvas.icon[data-hd] { width: 40px; height: 40px; margin: -4px; } /* 목록에서는 조금 크게 (줄 높이는 그대로) */

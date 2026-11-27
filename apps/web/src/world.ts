@@ -3697,9 +3697,10 @@ export class WorldScene {
     [x, y] = this.reachableSpot(x, y, 0.25, 0.2); // 35차: 닿지 않는 바닥(숲·늪 건너편)도 피한다
     const box = new Container();
     const glow = new Graphics().ellipse(0, 0, 9, 4).fill({ color: 0xffd27a, alpha: 0.35 });
-    const ic = new Sprite(Texture.from(iconFor(it)));
-    ic.texture.source.scaleMode = 'nearest';
-    ic.anchor.set(0.5, 0.85); ic.scale.set(0.55);
+    const icc = iconFor(it);
+    const ic = new Sprite(Texture.from(icc));
+    ic.texture.source.scaleMode = icc.dataset.hd ? 'linear' : 'nearest'; // 45차 후속: 고급 무기 그림(96칸)은 부드럽게 줄인다
+    ic.anchor.set(0.5, 0.85); ic.scale.set(0.55 * 32 / icc.width);
     box.addChild(glow, ic);
     const cx = x + 0.25, cy = y + 0.2;
     const [sx, sy] = iso(cx, cy);
