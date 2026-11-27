@@ -1035,6 +1035,9 @@ export const more16 = {
     accDateToast: "데이트 · {place}",
     accDatePlace: {"fountain": "구름 분수", "ferris": "대관람차 앞", "carousel": "회전목마 앞", "bar": "풀사이드 바", "zoo": "동물원"},
     accDate: {"fountain": [["동전 하나 던져요. 소원은… 말하면 안 이뤄진대요.", "이미 이뤄진 것 같은데."], ["물소리 좋다. 당신 목소리 다음으로.", "그 말 연습한 거지?"]], "ferris": [["저거 같이 타면 꼭대기에서 뭐 해야 하는지 알죠?", "…바깥 구경?"], ["내려다보면 다들 작아요. 당신만 그대로고.", "높은 데 올라가면 원래 그렇게 보여."]], "carousel": [["나는 날개 달린 말. 당신은 그 옆에 하얀 말.", "나란히 돌기만 하는 거네."], ["어렸을 때 이런 거 타 봤어요? 나는 지금이 처음이에요.", "그럼 오늘이 첫 번째네."]], "bar": [["당신은 늘 마시던 거. 나는… 당신이 고르는 걸로.", "그럼 둘 다 같은 걸로."], ["여기 앉으면 해가 안 져요. 천국은 반칙이야.", "반칙이라도 좋은데."]], "zoo": [["기린은 목이 길어서 슬픔이 늦게 닿는대요.", "그거 지금 지어낸 말이지?"], ["플라밍고는 한 발로 서서 자요. 나는 당신 어깨에 기대서 자고.", "…무거워."]]},
+    repairAllPartial: "가진 만큼 수리 · {p}",
+    repairAllSome: "가진 돈만큼 {n}가지를 고쳤다 · {p}",
+    repairedSome: "{item} 내구 +{n} (가진 돈만큼 · {p})",
     // 46차 끝
   },
   th: {
@@ -2072,6 +2075,9 @@ export const more16 = {
     accDateToast: "เดต · {place}",
     accDatePlace: {"fountain": "น้ำพุเมฆ", "ferris": "หน้าชิงช้าสวรรค์", "carousel": "หน้าม้าหมุน", "bar": "พูลไซด์บาร์", "zoo": "สวนสัตว์"},
     accDate: {"fountain": [["โยนเหรียญสักเหรียญสิ คำขอห้ามพูดนะ พูดแล้วไม่เป็นจริง", "เหมือนจะเป็นจริงไปแล้วนะ"], ["เสียงน้ำเพราะดี รองจากเสียงเธอ", "ซ้อมประโยคนี้มาใช่ไหม"]], "ferris": [["ถ้าขึ้นด้วยกัน รู้ใช่ไหมว่าบนยอดต้องทำอะไร", "…ชมวิว?"], ["มองลงไปทุกคนตัวเล็กหมด มีแต่เธอที่เท่าเดิม", "ขึ้นที่สูงมันก็เห็นแบบนั้นแหละ"]], "carousel": [["ฉันม้ามีปีก เธอม้าขาวข้างๆ", "ก็แค่หมุนเคียงกันไป"], ["ตอนเด็กเคยขี่อะไรแบบนี้ไหม ฉันเพิ่งครั้งแรก", "งั้นวันนี้ก็ครั้งแรกของเรา"]], "bar": [["เธอเอาแก้วเดิม ฉันเอา… ตามที่เธอเลือก", "งั้นเอาเหมือนกันสองแก้ว"], ["นั่งตรงนี้พระอาทิตย์ไม่ตก สวรรค์ขี้โกง", "โกงก็ดีนะ"]], "zoo": [["ยีราฟคอยาว ความเศร้าเลยมาถึงช้า", "เพิ่งแต่งขึ้นเมื่อกี้ใช่ไหม"], ["ฟลามิงโกยืนขาเดียวหลับ ส่วนฉันหลับพิงไหล่เธอ", "…หนักนะ"]]},
+    repairAllPartial: "ซ่อมเท่าที่มีเงิน · {p}",
+    repairAllSome: "ซ่อมได้ {n} ชิ้นเท่าที่มีเงิน · {p}",
+    repairedSome: "{item} ความทน +{n} (เท่าที่มีเงิน · {p})",
     // 46차 끝
   },
   en: {
@@ -3109,6 +3115,9 @@ export const more16 = {
     accDateToast: "Date · {place}",
     accDatePlace: {"fountain": "Cloud fountain", "ferris": "By the Ferris wheel", "carousel": "By the carousel", "bar": "Poolside bar", "zoo": "The zoo"},
     accDate: {"fountain": [["Toss a coin. Don't say the wish, or it won't come true.", "Feels like it already did."], ["I like the sound of the water. Second only to your voice.", "You practiced that line, right?"]], "ferris": [["If we ride that together, you know what to do at the top?", "…look at the view?"], ["From up there everyone looks small. Except you.", "That is how heights work."]], "carousel": [["I'm the winged horse. You're the white one beside me.", "So we just go round side by side."], ["Did you ride these as a kid? This is my first time.", "Then today is the first one."]], "bar": [["You get your usual. I'll have… whatever you pick.", "Two of the same, then."], ["Sit here and the sun never sets. Heaven cheats.", "I don't mind the cheating."]], "zoo": [["Giraffes have long necks, so sadness reaches them late.", "You just made that up."], ["Flamingos sleep on one leg. I sleep on your shoulder.", "…you are heavy."]]},
+    repairAllPartial: "Repair what I can afford · {p}",
+    repairAllSome: "Repaired {n} pieces as far as the money went · {p}",
+    repairedSome: "{item} durability +{n} (as far as the money went · {p})",
     // 46차 끝
   },
 };

@@ -3386,11 +3386,32 @@ function duraAlert(it: ItemDef, now: number, max: number, spare = false) {
   setTimeout(() => el.remove(), gone ? 4200 : 3400);
 }
 /** 수리비: 닳은 만큼 물건 값의 3할 (적어도 ฿20 / 지옥 2닢) */
+/**
+ * 46차 후속: 다 닳은 것을 새것처럼 고치는 값. 지옥은 값이 열 배 넘게 올라 고치는 값이 너무 비쌌다 —
+ * 3,000닢까지는 값의 3할, 그 위로는 8푼만 더 (맨얼굴 38,000닢: 11,400 → 3,700닢 · 쇳물 판금 32,000닢: 3,220닢). 현실은 예전대로 3할
+ */
+function repairFull(it: ItemDef) {
+  return it.hell ? 0.3 * Math.min(it.price, 3000) + 0.08 * Math.max(0, it.price - 3000) : it.price * 0.3;
+}
+/** 내구 n칸을 고치는 값 (지옥 적어도 2닢 · 현실 ฿20) */
+function repairPts(it: ItemDef, n: number) {
+  return n <= 0 ? 0 : Math.max(it.hell ? 2 : 20, Math.ceil((repairFull(it) * n) / duraMax(it)));
+}
 function repairCost(k: string) {
   const it = itemByKey(k);
-  const max = duraMax(it), miss = max - duraOf(k);
-  if (miss <= 0) return 0;
-  return Math.max(it.hell ? 2 : 20, Math.ceil((it.price * 0.3 * miss) / max));
+  return repairPts(it, duraMax(it) - duraOf(k));
+}
+/** 46차 후속: 돈이 모자라면 가진 만큼만 고친다 — 고친 칸 수와 낸 값 */
+function repairAfford(it: ItemDef, money: number): { n: number; cost: number } {
+  const miss = duraMax(it) - duraOf(it.key);
+  let n = Math.min(miss, Math.floor((money * duraMax(it)) / Math.max(1e-9, repairFull(it))));
+  while (n > 0 && repairPts(it, n) > money) n--;
+  return n > 0 ? { n, cost: repairPts(it, n) } : { n: 0, cost: 0 };
+}
+/** 내구를 n칸 올린다 (가득 차면 기록을 지운다) */
+function mendBy(it: ItemDef, n: number) {
+  const v = duraOf(it.key) + n;
+  if (v >= duraMax(it)) delete state.dura![it.key]; else state.dura![it.key] = v;
 }
 /** 고칠 것: 입고 있는 것과 가방의 장비 중 닳은 것 (현실 철물점은 현실 물건만 · 지옥 대장간은 지옥 물건만) */
 function repairables(hell: boolean) {
@@ -3408,16 +3429,28 @@ function repairList(list: Element, hell: boolean, redraw: () => void) {
     const all = document.createElement('button');
     all.className = 'primary repair-all';
     all.textContent = L.repairAll.replace('{n}', String(items.length)).replace('{p}', priceText(total, hell));
-    const have0 = hell ? hellState().notes : state.wallet ?? 0;
-    all.disabled = have0 < total;
+    const have0 = Math.floor(hell ? hellState().notes : state.wallet ?? 0);
+    // 46차 후속: 돈이 모자라면 '가진 만큼 수리' — 손에 든 무기 → 입은 것 → 가방 순으로, 마지막 것은 돈만큼 일부만
+    if (have0 < total) all.textContent = L.repairAllPartial.replace('{p}', priceText(have0, hell));
+    all.disabled = have0 < (hell ? 2 : 20);
     all.onclick = () => {
-      const have = hell ? hellState().notes : state.wallet ?? 0;
-      if (have < total) { toast(hell ? L.hwNoMoney : L.noMoney); return; }
-      if (hell) hellState().notes -= total; else state.wallet = (state.wallet ?? 0) - total;
-      ecoLog('spend', 'repair', total, hell);
-      for (const it of items) delete state.dura![it.key];
+      const have = Math.floor(hell ? hellState().notes : state.wallet ?? 0);
+      if (have < (hell ? 2 : 20)) { toast(hell ? L.hwNoMoney : L.noMoney); return; }
+      const worn = new Set(Object.values(state.equip ?? {}).filter(Boolean) as string[]);
+      const order = items.slice().sort((a, b) => (a.key === state.equip?.weapon ? 0 : worn.has(a.key) ? 1 : 2) - (b.key === state.equip?.weapon ? 0 : worn.has(b.key) ? 1 : 2));
+      let left = have, spent = 0, full = 0, part = 0;
+      for (const it of order) {
+        const c = repairCost(it.key);
+        if (c <= left) { left -= c; spent += c; delete state.dura![it.key]; full++; continue; }
+        const a = repairAfford(it, left);
+        if (a.n > 0) { left -= a.cost; spent += a.cost; mendBy(it, a.n); part++; }
+        break;
+      }
+      if (!spent) { toast(hell ? L.hwNoMoney : L.noMoney); return; }
+      if (hell) hellState().notes -= spent; else state.wallet = (state.wallet ?? 0) - spent;
+      ecoLog('spend', 'repair', spent, hell);
       save(state); updateHud(); world?.setGear(gear()); renderAmmo();
-      toast(L.repairAllDone.replace('{n}', String(items.length)), 'good');
+      toast(part || full < items.length ? L.repairAllSome.replace('{n}', String(full + part)).replace('{p}', priceText(spent, hell)) : L.repairAllDone.replace('{n}', String(items.length)), 'good');
       redraw();
     };
     list.appendChild(all);
@@ -3425,15 +3458,17 @@ function repairList(list: Element, hell: boolean, redraw: () => void) {
   for (const it of items) {
     const cost = repairCost(it.key);
     const row = itemRow(it, `${L.duraShort.replace('{n}', String(duraOf(it.key))).replace('{m}', String(duraMax(it)))} · ${priceText(cost, hell)}`, () => {
-      const have = hell ? hellState().notes : state.wallet ?? 0;
-      if (have < cost) { toast(hell ? L.hwNoMoney : L.noMoney); return; }
-      if (hell) hellState().notes -= cost; else state.wallet = (state.wallet ?? 0) - cost;
-      ecoLog('spend', 'repair', cost, hell);
-      delete state.dura![it.key];
+      const have = Math.floor(hell ? hellState().notes : state.wallet ?? 0);
+      // 46차 후속: 모자라면 가진 돈만큼 고친다
+      const a = have >= cost ? { n: duraMax(it) - duraOf(it.key), cost } : repairAfford(it, have);
+      if (a.n <= 0) { toast(hell ? L.hwNoMoney : L.noMoney); return; }
+      if (hell) hellState().notes -= a.cost; else state.wallet = (state.wallet ?? 0) - a.cost;
+      ecoLog('spend', 'repair', a.cost, hell);
+      mendBy(it, a.n);
       save(state); updateHud(); world?.setGear(gear()); renderAmmo();
-      toast(withItem(L.repaired, it.name[lang()]), 'good');
+      toast(have >= cost ? withItem(L.repaired, it.name[lang()]) : withItem(L.repairedSome, it.name[lang()]).replace('{n}', String(a.n)).replace('{p}', priceText(a.cost, hell)), 'good');
       redraw();
-    }, (hell ? hellState().notes : state.wallet ?? 0) < cost);
+    }, repairAfford(it, Math.floor(hell ? hellState().notes : state.wallet ?? 0)).n <= 0);
     list.appendChild(row);
   }
 }
