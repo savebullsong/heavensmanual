@@ -22,7 +22,8 @@ import { heavenZone, HEAVEN_ID, heavenPriceMul, heavenMeta } from './heavenworld
 import { designateHomes, HOME_PRICE, FURN, furnByKey, type FurnDef } from './home.ts';
 import { borderZone } from './border.ts';
 import { TWO, DOT3, setDot3 } from './sprites.ts';
-import { buildingName, hasBank, nameSeoulBanks, bankName } from './names.ts';
+import { buildingName, hasBank, nameSeoulBanks, bankName, tagLandmarks } from './names.ts';
+import { LANDMARKS } from './landmarks.ts';
 import { bangkokClock, seoulClock } from './clock.ts';
 import { unlockAudio, isMuted, setMuted, plunge, chime } from './sfx.ts';
 import { hellPassage, heavenPassage, borderPassage, type Passage } from './passage.ts';
@@ -148,7 +149,7 @@ function loadZone(id: string): Promise<Zone> {
   if (!p) {
     p = artUrl(`zones/${id}.json`).then((u) => fetch(u))
       .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
-      .then((j) => { const z = decodeZone(j); designateHomes(z); markOwned(z); nameSeoulBanks(z, (i, k) => walkable(z, i, k)); return z; }) // 35차: 아속·강남에 분양 중인 집과 가구점
+      .then((j) => { const z = decodeZone(j); designateHomes(z); markOwned(z); nameSeoulBanks(z, (i, k) => walkable(z, i, k)); tagLandmarks(z, LANDMARKS); return z; }) // 35차: 아속·강남에 분양 중인 집과 가구점
       .catch(() => { zoneCache.delete(id); return sukhumvitTestZone(); });
     zoneCache.set(id, p);
   }
@@ -634,7 +635,7 @@ async function crossEdge(dir: 'w' | 'e', x: number, y: number) {
   if (!world || crossing || busy || world.zone.interior || world.zone.hell || dlg.isOpen) return;
   const z = world.zone;
   const id = dir === 'w' ? z.edges?.w : z.edges?.e;
-  if (!id) { toast(t().edgeEnd); return; }
+  if (!id) { if (realm() === 'real') void airportAsk(); else toast(t().edgeEnd); return; } // 47차: 현실 도시의 끝 = 공항 가는 길
   crossing = true;
   try {
     const next = await loadZone(id);
@@ -1011,6 +1012,8 @@ const hooks: WorldHooks = {
     toast(t().ywLostToast);
   },
   hutDoor(which) { void hutDoor(which); },
+  airport() { void airportAsk(); },
+  immig() { void immigration(); },
   promo(username) { promoTap(username); },
   bed(room) { void bedAsk(room); },
   ride(k, att) { void rideAsk(k, att); },
@@ -1703,6 +1706,7 @@ function clerkTalk() {
   if (info.kind === 'home') { talkToYunae(); return; }
   if (info.kind === 'ysalon') { void talkToSalon(); return; } // 40차 유내 미용실
   if (info.kind === 'hpalace') { void palaceTalk(); return; } // 46차 천국 본청 접수 천사
+  if (info.kind === 'airport') { void airportCounter(); return; } // 47차 항공사 카운터
   if (info.store === 'bank') { openBank(info.name); return; }
   if (info.store === 'furniture') { void openFurnStore(info.name); return; }
   if (info.kind === 'arcade') { void arcadeTalk(info.name); return; }
@@ -4916,6 +4920,68 @@ async function hutDoor(which: 'mine' | 'twins') {
   dlg.close();
   busy = false;
   if (go) void roomSwap(hhomeZone);
+}
+// ───────────────────────── 47차 공항: 서울 ↔ 방콕 ─────────────────────────
+// 도시 맨 끝 길가의 공항 정류장(또는 끝 구역의 가장자리) → 공항 출국장 → 항공사 카운터에서 표 사기 → 출입국 심사대로 걸어가면 건너간다
+const TICKET_PRICE = 9_500; // 바트 셈 (서울에서는 ₩380,000)
+const otherCity = (): 'bkk' | 'seoul' => (state.region === 'seoul' ? 'bkk' : 'seoul');
+async function airportAsk() {
+  if (!world || busy || dlg.isOpen || world.zone.interior || realm() !== 'real') return;
+  const L = t();
+  busy = true;
+  dlg.open({ name: '', monologue: true });
+  await dlg.say(L.airportAsk[state.region === 'seoul' ? 1 : 0]);
+  const c = await dlg.choose([L.airportGo, L.ywNo]);
+  const go = c === 0 && !dlg.cancelled;
+  endTalk();
+  if (!go || !world) return;
+  const p = world.playerTile();
+  const b = { i0: p.i, j0: p.j, w: 1, d: 1, h: 0, cat: 'airport', color: '#ffffff', pois: [{ t: 'airport', n: L.airportName }] } as unknown as Building;
+  openRoom(interiorZone(b, -8, { i: p.i, j: p.j }, L.airportName), null, false);
+  toast(L.airportArrive);
+}
+async function airportCounter() {
+  const L = t();
+  if (busy || dlg.isOpen) return;
+  busy = true;
+  const to = otherCity();
+  dlg.open({ name: L.airportClerk, exit: true });
+  if (state.ticket === to) { await dlg.say(L.ticketHave); endTalk(); return; }
+  await dlg.say(L.ticketAsk[to === 'seoul' ? 0 : 1].replace('{p}', moneyText(TICKET_PRICE)));
+  const c = await dlg.choose([L.ticketBuy.replace('{p}', moneyText(TICKET_PRICE)), L.ywNo]);
+  if (c === 0 && !dlg.cancelled) {
+    if ((state.wallet ?? 0) < TICKET_PRICE) await dlg.say(L.ticketShort);
+    else { state.wallet = (state.wallet ?? 0) - TICKET_PRICE; ecoLog('spend', 'travel', TICKET_PRICE); state.ticket = to; save(state); renderHud(); await dlg.say(L.ticketDone); }
+  }
+  endTalk();
+}
+async function immigration() {
+  const L = t();
+  if (busy || dlg.isOpen || !world) return;
+  const to = otherCity();
+  if (state.ticket !== to) { toast(L.immigNoTicket); return; }
+  busy = true;
+  dlg.open({ name: L.immigOfficer, exit: true });
+  for (const line of L.immigLines) await dlg.say(line);
+  const ok = !dlg.cancelled;
+  endTalk();
+  if (!ok) return;
+  busy = true;
+  const el = document.createElement('div');
+  el.className = 'sleep-cover'; el.innerHTML = '<p></p>';
+  el.querySelector('p')!.textContent = L.flightLine[to === 'seoul' ? 0 : 1];
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  await new Promise((r) => setTimeout(r, 3200));
+  delete state.ticket;
+  state.region = to;
+  save(state);
+  if (world.zone.interior) dropInterior();
+  if (world) { world.destroy(); world = null; net.leaveZone(); }
+  busy = false;
+  await enterWorld('door');
+  el.classList.remove('show'); setTimeout(() => el.remove(), 900);
+  toast(L.landed[to === 'seoul' ? 0 : 1], 'good');
 }
 /** 47차 침대: 구름 위 내 오두막에서는 잔다(체력 가득 · 꿈 한 조각). 현실의 집에서는 잠이 오지 않는다 — 호텔에 가면 잘 수 있다 */
 async function bedAsk(room: string) {

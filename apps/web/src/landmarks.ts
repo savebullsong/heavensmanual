@@ -269,3 +269,76 @@ export function parkSignCanvas(text: string, sub: string): Pic {
   g.font = '800 7px system-ui, sans-serif'; g.fillText(text, 40, 19.5);
   return { canvas: c, ax: 0.5, ay: 1 };
 }
+
+// ───────────────────────── 47차 명소 리모델링: 건물 자체를 명소답게 ─────────────────────────
+// 터미널 21(공항 터미널 콘셉트 — 유리 커튼월 · 출발 안내판 띠 · 비행기 · 'DEPARTURE' 차양) · 엠포리움(크림색 석재 · 금빛 세로 지느러미 · 유리 아트리움)
+// · 엠쿼티어(유리 상자 · 나선형 녹색 테라스 '헬릭스'). 건물 칸(i0, j0, w, d)과 높이(h)는 지도 그대로 쓰고 겉만 바꾼다
+export type LandmarkBuild = 't21' | 'emporium' | 'emquartier';
+export function landmarkBuildingCanvas(b: { i0: number; j0: number; w: number; d: number; h: number }, key: LandmarkBuild, night: boolean): { canvas: HTMLCanvasElement; x: number; y: number } {
+  const { i0, j0, w, d } = b, i1 = i0 + w, j1 = j0 + d;
+  const H = Math.max(b.h, key === 't21' ? 190 : key === 'emporium' ? 150 : 120);
+  const minX = (i0 - j1) * (TW / 2) - 12, maxX = (i1 - j0) * (TW / 2) + 12;
+  const minY = (i0 + j0) * (TH / 2) - H - 40, maxY = (i1 + j1) * (TH / 2) + 8;
+  const c = document.createElement('canvas');
+  c.width = Math.ceil(maxX - minX); c.height = Math.ceil(maxY - minY);
+  const g = c.getContext('2d')!;
+  const { P, poly, box } = isoPen(g, minX, minY);
+  const lineS = (a: number, z0: number, z1: number, col: string, wd = 1) => { const p0 = P(a, j1, z0), p1 = P(a, j1, z1); g.strokeStyle = col; g.lineWidth = wd; g.beginPath(); g.moveTo(...p0); g.lineTo(...p1); g.stroke(); };
+  const lineE = (a: number, z0: number, z1: number, col: string, wd = 1) => { const p0 = P(i1, a, z0), p1 = P(i1, a, z1); g.strokeStyle = col; g.lineWidth = wd; g.beginPath(); g.moveTo(...p0); g.lineTo(...p1); g.stroke(); };
+  const bandS = (z0: number, z1: number, col: string, a0 = i0, a1 = i1) => poly([P(a0, j1, z0), P(a1, j1, z0), P(a1, j1, z1), P(a0, j1, z1)], col);
+  const bandE = (z0: number, z1: number, col: string, a0 = j0, a1 = j1) => poly([P(i1, a0, z0), P(i1, a1, z0), P(i1, a1, z1), P(i1, a0, z1)], col);
+  const glow = night ? '#ffe9a8' : '#cfe6f6';
+  const text = (s: string, a: number, z: number, size: number, col: string, face: 'S' | 'E') => {
+    // 면을 따라 비스듬히 (등각) 쓴 큰 글씨
+    const [x, y] = face === 'S' ? P(a, j1, z) : P(i1, a, z);
+    g.save(); g.translate(x, y); g.transform(1, face === 'S' ? 0.5 : -0.5, 0, 1, 0, 0);
+    g.font = `900 ${size}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillText(s, 1, 1); g.fillStyle = col; g.fillText(s, 0, 0); g.restore();
+  };
+  if (key === 't21') {
+    // 기단(밝은 석재) · 유리 커튼월 몸통 · 위 띠에 TERMINAL 21 · 출발 안내판 띠 · 차양
+    box(i0, i1, j0, j1, 0, 18, '#d8d4cc', '#c8c2b8', '#b0aaa0');
+    box(i0 + 0.1, i1 - 0.1, j0 + 0.1, j1 - 0.1, 18, H - 26, '#9ab4c8', '#5a7a96', '#4a6a86');
+    for (let z = 26; z < H - 30; z += 12) { bandS(z, z + 1.5, '#3a5068'); bandE(z, z + 1.5, '#2e4458'); }
+    for (let a = i0 + 0.6; a < i1 - 0.2; a += 0.9) lineS(a, 18, H - 26, '#2e4458');
+    for (let a = j0 + 0.6; a < j1 - 0.2; a += 0.9) lineE(a, 18, H - 26, '#24384a');
+    for (let k = 0; k < 40; k++) { const a = i0 + 0.3 + ((k * 37) % 97) / 97 * (w - 0.6), z = 24 + ((k * 53) % 89) / 89 * (H - 60); bandS(z, z + 6, k % 3 ? 'rgba(207,230,246,0.25)' : (night ? 'rgba(255,233,168,0.7)' : 'rgba(255,255,255,0.35)'), a, a + 0.5); }
+    box(i0, i1, j0, j1, H - 26, H, '#e8e4dc', '#f2efe8', '#d8d4cc');
+    text('TERMINAL 21', i0 + w / 2, H - 13, Math.min(18, w * 2.2), '#d8262e', 'S');
+    bandE(H - 22, H - 6, '#1a1e24', j0 + 0.4, j1 - 0.4); // 출발 안내판
+    for (let n = 0; n < 3; n++) bandE(H - 19 + n * 4.5, H - 17.5 + n * 4.5, n === 1 ? '#7ad8a8' : '#f2c84a', j0 + 0.7, j1 - 0.7);
+    // 커다란 비행기 그림 (남쪽 면)
+    { const [x, y] = P(i0 + w * 0.7, j1, H * 0.55); g.save(); g.translate(x, y); g.transform(1, 0.5, 0, 1, 0, 0); g.fillStyle = '#f6f6f8';
+      g.beginPath(); g.ellipse(0, 0, 26, 4, 0, 0, Math.PI * 2); g.fill(); g.beginPath(); g.moveTo(-4, -2); g.lineTo(8, -18); g.lineTo(13, -18); g.lineTo(6, -2); g.fill(); g.beginPath(); g.moveTo(-4, 2); g.lineTo(8, 16); g.lineTo(13, 16); g.lineTo(6, 2); g.fill(); g.beginPath(); g.moveTo(-22, -1); g.lineTo(-27, -10); g.lineTo(-23, -10); g.lineTo(-18, -2); g.fill(); g.fillStyle = '#d8262e'; g.fillRect(-27, -10, 4, 3); g.restore(); }
+    // 입구 차양 DEPARTURE
+    poly([P(i0 + w * 0.3, j1, 22), P(i0 + w * 0.7, j1, 22), P(i0 + w * 0.7, j1 + 0.8, 20), P(i0 + w * 0.3, j1 + 0.8, 20)], '#2a2e36');
+    text('DEPARTURE', i0 + w / 2, 27, 7, '#f2c84a', 'S');
+    bandS(2, 16, night ? '#fff0c0' : '#a8c8e0', i0 + w * 0.35, i0 + w * 0.65);
+  } else if (key === 'emporium') {
+    box(i0, i1, j0, j1, 0, 22, '#e6dccb', '#d8ccb6', '#c4b8a2');
+    box(i0 + 0.15, i1 - 0.15, j0 + 0.15, j1 - 0.15, 22, H - 18, '#efe6d6', '#e2d6c0', '#cfc2aa');
+    for (let a = i0 + 0.5; a < i1 - 0.2; a += 0.7) { lineS(a, 22, H - 18, '#c9a23e', 2); }
+    for (let a = j0 + 0.5; a < j1 - 0.2; a += 0.7) { lineE(a, 22, H - 18, '#a8822e', 2); }
+    for (let z = 34; z < H - 24; z += 16) { bandS(z, z + 7, night ? 'rgba(255,233,168,0.55)' : 'rgba(150,180,200,0.45)'); bandE(z, z + 7, night ? 'rgba(255,220,150,0.45)' : 'rgba(120,150,170,0.45)'); }
+    box(i0, i1, j0, j1, H - 18, H, '#f6f0e4', '#c9a23e', '#a8822e');
+    text('EMPORIUM', i0 + w / 2, H - 9, Math.min(16, w * 1.9), '#fffbf0', 'S');
+    // 유리 아트리움 입구 · 화분
+    poly([P(i0 + w * 0.3, j1, 0), P(i0 + w * 0.7, j1, 0), P(i0 + w * 0.7, j1, 34), P(i0 + w * 0.5, j1, 44), P(i0 + w * 0.3, j1, 34)], night ? '#ffe9a8' : '#b8d4e6');
+    for (let a = i0 + w * 0.34; a < i0 + w * 0.68; a += 0.35) lineS(a, 0, 34, '#8a9aa6');
+    for (const a of [i0 + w * 0.22, i0 + w * 0.78]) { const [x, y] = P(a, j1 + 0.4, 0); g.fillStyle = '#6a5a4a'; g.fillRect(x - 4, y - 8, 8, 8); g.fillStyle = '#3a7a3a'; g.beginPath(); g.ellipse(x, y - 14, 8, 8, 0, 0, Math.PI * 2); g.fill(); }
+  } else {
+    // 엠쿼티어: 유리 상자 위로 나선처럼 감긴 녹색 테라스 (헬릭스)
+    box(i0, i1, j0, j1, 0, H - 10, '#b8d0dc', '#7a9aae', '#6a8a9e');
+    for (let z = 12; z < H - 14; z += 10) { bandS(z, z + 1.2, '#4a6a7e'); bandE(z, z + 1.2, '#3e5e72'); }
+    for (let n = 0; n < 7; n++) {
+      const z = 16 + n * ((H - 30) / 7), s0 = (n / 7) % 1;
+      bandS(z, z + 4, '#4a8a3a', i0 + w * s0 * 0.6, i0 + w * (0.4 + s0 * 0.6)); bandS(z + 4, z + 6, '#6aaa4a', i0 + w * s0 * 0.6, i0 + w * (0.4 + s0 * 0.6));
+      bandE(z + 5, z + 9, '#3e7a32', j0 + d * (1 - s0) * 0.5, j0 + d * (0.5 + (1 - s0) * 0.5));
+    }
+    box(i0, i1, j0, j1, H - 10, H, '#e8eef2', '#d0d8de', '#b8c2ca');
+    text('EmQuartier', i0 + w / 2, H - 22, Math.min(14, w * 1.6), '#ffffff', 'S');
+    if (night) for (let k = 0; k < 18; k++) { const a = i0 + 0.4 + ((k * 31) % 23) / 23 * (w - 0.8), z = 14 + ((k * 17) % 29) / 29 * (H - 40); bandS(z, z + 5, 'rgba(255,233,168,0.6)', a, a + 0.4); }
+  }
+  void glow;
+  return { canvas: c, x: minX, y: minY };
+}

@@ -143,3 +143,22 @@ export function storeOf(b: Building): StoreKind | null {
   }
   return null;
 }
+
+/** 47차 명소 건물 표시: 표지판(터미널 21 · 엠포리움) 둘레의 가장 큰 건물, 이름이 엠쿼티어인 건물 → 겉을 명소답게 그린다 */
+export function tagLandmarks(z: { buildings: Building[]; origin?: { i: number; j: number }; city?: string }, marks: { key: string; i: number; j: number }[]) {
+  if (z.city === 'seoul') return;
+  const o = z.origin ?? { i: 0, j: 0 };
+  const eq = marks.find((m) => m.key === 'emquartier');
+  if (eq) for (const b of z.buildings) if (((b as B).pois ?? []).some((p) => /EmQuartier/i.test(p.n ?? '')) && Math.hypot(b.i0 + b.w / 2 - (eq.i - o.i), b.j0 + b.d / 2 - (eq.j - o.j)) < 16 && b.d > 2) (b as Building & { lmk?: string }).lmk = 'emquartier';
+  for (const m of marks) {
+    if (m.key !== 't21' && m.key !== 'emporium') continue;
+    const li = m.i - o.i, lj = m.j - o.j;
+    let best: Building | null = null, area = 0;
+    for (const b of z.buildings) {
+      const cx = b.i0 + b.w / 2, cy = b.j0 + b.d / 2;
+      if (Math.hypot(cx - li, cy - lj) > 14 || b.cat === 'home' || b.cat === 'estate' || b.cat === 'ujusae') continue;
+      if (b.w * b.d > area) { area = b.w * b.d; best = b; }
+    }
+    if (best && area >= 16 && !(best as Building & { lmk?: string }).lmk) (best as Building & { lmk?: string }).lmk = m.key;
+  }
+}

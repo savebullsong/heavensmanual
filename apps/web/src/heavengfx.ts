@@ -7,7 +7,7 @@ const wingCache = new Map<number, Texture>();
 export function wingTexture(color: number): Texture {
   const hit = wingCache.get(color);
   if (hit) return hit;
-  const W = 124, H = 96, cx = W / 2, ay = Math.round(H * 0.62); // 기준점(어깨) = (cx, ay)
+  const W = 156, H = 136, cx = W / 2, ay = Math.round(H * 0.62); // 기준점(어깨) = (cx, ay) · 47차: 머리 위로 솟았다가 허리 아래까지 늘어지는 큰 날개
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   const g = c.getContext('2d')!;
@@ -34,22 +34,22 @@ export function wingTexture(color: number): Texture {
     g.beginPath(); g.moveTo(...m(0.08, 0)); g.lineTo(...m(0.78, 0)); g.stroke();
   };
   for (const sd of [-1, 1]) {
-    const S: [number, number] = [cx + sd * 7, ay - 4]; // 어깨 (등에 붙는 곳)
-    const Wr: [number, number] = [cx + sd * 33, ay - 46]; // 날개뼈 손목 (가장 높은 곳)
-    const T: [number, number] = [cx + sd * 56, ay - 30]; // 첫째 깃이 붙는 바깥 끝
-    // 1) 첫째 깃 (칼깃): 손목에서 바깥 끝까지, 바깥으로 갈수록 길고 바깥으로 눕는다
-    for (let f = 0; f < 6; f++) { const t = f / 5; feather(lerp(Wr, T, t), sd, 0.18 + t * 0.5, 44 + t * 14, 9, 0.8); }
-    // 2) 둘째 깃: 어깨에서 손목까지, 아래로 곧게 (어깨 쪽은 짧게)
-    for (let f = 0; f < 6; f++) { const t = 0.12 + (f / 5) * 0.88; feather(lerp(S, Wr, t), sd, 0.04 + t * 0.16, 16 + t * 30, 10, 0.9); }
+    const S: [number, number] = [cx + sd * 6, ay - 6]; // 어깨뼈 (등 위쪽에 붙는 곳)
+    const Wr: [number, number] = [cx + sd * 26, ay - 66]; // 날개뼈 손목 — 머리 위로 높이 솟는다
+    const T: [number, number] = [cx + sd * 50, ay - 44]; // 첫째 깃이 붙는 바깥 끝
+    // 1) 첫째 깃 (칼깃): 손목에서 바깥 끝까지 — 길게 아래로 늘어지고, 바깥 것일수록 살짝 벌어진다 (허리 아래까지)
+    for (let f = 0; f < 7; f++) { const t = f / 6; feather(lerp(Wr, T, t), sd, 0.06 + t * 0.34, 60 + t * 22, 9, 0.78 + t * 0.06); }
+    // 2) 둘째 깃: 어깨에서 손목까지, 아래로 곧게 (어깨 쪽은 짧게 · 손목 쪽은 길게)
+    for (let f = 0; f < 7; f++) { const t = 0.1 + (f / 6) * 0.9; feather(lerp(S, Wr, t), sd, 0.02 + t * 0.1, 22 + t * 44, 10, 0.88); }
     // 3) 덮깃: 날개뼈 바로 밑의 짧은 비늘 깃 두 줄
     for (let f = 0; f < 7; f++) { const t = f / 6; const b = t < 0.6 ? lerp(S, Wr, 0.25 + t / 0.6 * 0.75) : lerp(Wr, T, (t - 0.6) / 0.4 * 0.7); feather([b[0], b[1] + 3], sd, 0.1 + t * 0.35, 18, 9, 0.97); }
     for (let f = 0; f < 6; f++) { const t = f / 5; const b = lerp(S, Wr, 0.35 + t * 0.65); feather([b[0] + sd * 1, b[1] + 1], sd, 0.12 + t * 0.2, 10, 8, 1.04); }
     // 4) 날개뼈 띠: 어깨 → 손목 → 바깥 끝 (둥글고 굵게)
     g.lineCap = 'round'; g.lineJoin = 'round';
     g.strokeStyle = col(0.7); g.lineWidth = 8;
-    g.beginPath(); g.moveTo(...S); g.quadraticCurveTo(cx + sd * 12, ay - 40, ...Wr); g.quadraticCurveTo(cx + sd * 46, ay - 46, ...T); g.stroke();
+    g.beginPath(); g.moveTo(...S); g.quadraticCurveTo(cx + sd * 8, ay - 52, ...Wr); g.quadraticCurveTo(cx + sd * 44, ay - 66, ...T); g.stroke();
     g.strokeStyle = col(1.06); g.lineWidth = 5.5;
-    g.beginPath(); g.moveTo(...S); g.quadraticCurveTo(cx + sd * 12, ay - 40, ...Wr); g.quadraticCurveTo(cx + sd * 46, ay - 46, ...T); g.stroke();
+    g.beginPath(); g.moveTo(...S); g.quadraticCurveTo(cx + sd * 8, ay - 52, ...Wr); g.quadraticCurveTo(cx + sd * 44, ay - 66, ...T); g.stroke();
   }
   // 점 그림처럼: 반투명 가장자리 정리 + 어두운 외곽선
   const im = g.getImageData(0, 0, W, H), D = im.data;

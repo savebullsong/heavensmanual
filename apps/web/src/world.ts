@@ -32,7 +32,7 @@ import { SKIN_COLORS } from './character.ts';
 import { weatherHell } from './hellweather.ts';
 import { drawHellGround, hellGroundJob, type GroundJob, drawHellStructure, hellTint, hellProp, liquidInside, bloodLavaTile } from './hellgfx.ts';
 import { drawCosmicBird, drawCosmicBirdHeaven, COSMIC_TOP } from './ujusae.ts';
-import { SOI_SIGNS, SOI_ALIAS, BTS_STATIONS, LANDMARKS, soiSignCanvas, stationCanvas, neonGateCanvas, billboardCanvas, helixCanvas, fountainCanvas, parkSignCanvas, type Pic } from './landmarks.ts';
+import { SOI_SIGNS, SOI_ALIAS, BTS_STATIONS, LANDMARKS, soiSignCanvas, stationCanvas, neonGateCanvas, billboardCanvas, helixCanvas, fountainCanvas, parkSignCanvas, landmarkBuildingCanvas, type Pic, type LandmarkBuild } from './landmarks.ts';
 import { drawYuhwang } from './yuhwang.ts';
 import { drawLoanHouse, LOAN_TOP } from './loanhouse.ts';
 import { portraitUrl, type PortraitSlot } from './portraits.ts';
@@ -376,6 +376,9 @@ export interface WorldHooks {
   heavenAct(what: 'officer' | 'yellowwing' | 'shop' | 'assault' | 'terrace' | 'taxi' | 'ceremony' | 'noeul'): void;
   /** 46차 천국 놀이기구 앞 (대관람차 · 회전목마 · 롤러코스터) */
   ride(k: number, att: string): void;
+  /** 47차 공항: 거리 끝의 공항 가는 정류장 · 출입국 심사대 앞 */
+  airport(): void;
+  immig(): void;
   /** 47차 홍보 말풍선을 눌렀다 (그 사람의 프로필) */
   promo(username: string): void;
   /** 47차 침대 곁에 섰다 (구름 위 오두막 · 현실의 집) */
@@ -756,6 +759,7 @@ export class WorldScene {
       for (let n = 0; n < this.streetHostiles(); n++) this.spawnNpc('thug');
       if (this.realm === 'real') { this.setupStreetLife(decProps); for (let n = 0; n < 10; n++) this.spawnNpc('passer'); } // 19차: 사람이 더 북적이게 · 42차: 시민을 더
       if (this.realm === 'real' && Math.random() < 0.7) this.spawnGoat(); // 24차: 떠도는 염소 (구역마다 있을 수도, 없을 수도)
+      this.setupAirportStop(); // 47차 공항 가는 정류장
       if (this.realm === 'real' && this.zone.home) this.placeYunae();
       if (this.realm === 'real' && this.zone.city !== 'seoul') this.spawnFieldBosses(); // 31차: 수쿰빗 필드 보스
     }
@@ -1247,7 +1251,8 @@ export class WorldScene {
     // 24차 서울 달동네: 낮은 벽돌집과 내 집은 따로 그린다
     const dal = this.zone.city === 'seoul' && (b.hut || b.cat === 'home');
     const snowy = this.season() === 'winter';
-    let d = dal ? drawDalHouse(b, this.night === 1, b.cat === 'home', !!b.yunae, snowy) : b.cat === 'palace' ? drawHeavenPalace(b) : b.cat === 'attraction' ? drawAttraction(b) : b.cat === 'sanct' ? drawSanctum(b) : this.realm === 'heaven' && b.cat === 'shop' && !this.zone.interior ? drawMarbleShop(b, this.nameOf(b)) : b.cat === 'ujusae' ? (hf ? drawYuhwang(b, hf) : this.realm === 'heaven' ? drawCosmicBirdHeaven(b) : drawCosmicBird(b, this.night === 1)) : b.cat === 'hbank' ? drawHellBank(b, hf || 1) : b.cat === 'atone' ? drawAtone(b, hf || 1) : b.cat === 'rebirth' ? drawRebirthGate(b) : b.cat === 'loan' ? drawLoanHouse(b) : hellTheme ? drawHellStructure(b, hellTheme, true) : kitOk ? drawBuildingKit(b, this.nameOf(b), this.night === 1, this.low) : drawBuilding(b, this.nameOf(b), this.night === 1);
+    const lmk = (b as { lmk?: LandmarkBuild }).lmk; // 47차 명소 건물
+    let d = lmk && this.realm === 'real' ? landmarkBuildingCanvas(b, lmk, this.night === 1) : dal ? drawDalHouse(b, this.night === 1, b.cat === 'home', !!b.yunae, snowy) : b.cat === 'palace' ? drawHeavenPalace(b) : b.cat === 'attraction' ? drawAttraction(b) : b.cat === 'sanct' ? drawSanctum(b) : this.realm === 'heaven' && b.cat === 'shop' && !this.zone.interior ? drawMarbleShop(b, this.nameOf(b)) : b.cat === 'ujusae' ? (hf ? drawYuhwang(b, hf) : this.realm === 'heaven' ? drawCosmicBirdHeaven(b) : drawCosmicBird(b, this.night === 1)) : b.cat === 'hbank' ? drawHellBank(b, hf || 1) : b.cat === 'atone' ? drawAtone(b, hf || 1) : b.cat === 'rebirth' ? drawRebirthGate(b) : b.cat === 'loan' ? drawLoanHouse(b) : hellTheme ? drawHellStructure(b, hellTheme, true) : kitOk ? drawBuildingKit(b, this.nameOf(b), this.night === 1, this.low) : drawBuilding(b, this.nameOf(b), this.night === 1);
     // 44차 서울 겨울: 옥상 · 처마 · 창턱에 쌓인 눈 (달동네는 더 수북이)
     if (snowy && b.cat !== 'palace' && !b.yunae) d = { ...d, canvas: snowBuilding(d.canvas, b.i0 * 31 + b.j0 * 17, dal || this.dalSnow(b.i0, b.j0), !dal && kitOk && b.cat !== 'ujusae' && b.cat !== 'loan' && b.cat !== 'attraction' ? { ox: d.x, oy: d.y, b, z: buildingTop(b, this.low) - PPX } : undefined) };
     // 17차: 지옥 건물마다 층의 흔적 (1층 화산재 · 2층 이끼와 진흙 · 3층 핏빛과 홍등). 유황새는 따로 그린다, 환생 로비는 홀로 멀쩡하다
@@ -1260,7 +1265,7 @@ export class WorldScene {
     const base = tex(art && k ? art : d.canvas);
     const W = d.canvas.width, H = d.canvas.height;
     const parts = this.strips(base, d.x, d.y, b.i0, b.j0, b.w, b.d, -0.2, k === 2 ? 2 : 1);
-    const top = dal ? 34 + 16 + Math.min(b.w, b.d) * 3 : b.cat === 'palace' ? 1440 : b.cat === 'attraction' ? b.h + 30 : b.cat === 'sanct' ? (SANCT_TOP[(b as { att?: string }).att ?? 'church'] ?? 260) + 20 : this.realm === 'heaven' && b.cat === 'shop' ? b.h + 30 : b.cat === 'ujusae' ? COSMIC_TOP : b.cat === 'loan' ? LOAN_TOP : b.cat === 'hbank' ? b.h + 6 : b.cat === 'atone' ? b.h + 46 : b.cat === 'rebirth' ? b.h + 4 : hellTheme ? b.h : kitOk ? buildingTop(b, this.low) : buildingHeight(b.h);
+    const top = lmk && this.realm === 'real' ? Math.max(b.h, lmk === 't21' ? 190 : lmk === 'emporium' ? 150 : 120) + 40 : dal ? 34 + 16 + Math.min(b.w, b.d) * 3 : b.cat === 'palace' ? 1440 : b.cat === 'attraction' ? b.h + 30 : b.cat === 'sanct' ? (SANCT_TOP[(b as { att?: string }).att ?? 'church'] ?? 260) + 20 : this.realm === 'heaven' && b.cat === 'shop' ? b.h + 30 : b.cat === 'ujusae' ? COSMIC_TOP : b.cat === 'loan' ? LOAN_TOP : b.cat === 'hbank' ? b.h + 6 : b.cat === 'atone' ? b.h + 46 : b.cat === 'rebirth' ? b.h + 4 : hellTheme ? b.h : kitOk ? buildingTop(b, this.low) : buildingHeight(b.h);
     const [lx] = iso(b.i0 + b.w / 2, b.j0 + b.d / 2);
     // 22차: 벽이 있는 자리(투명 여백 판정)는 처음 필요할 때 만든다 — 건물을 세울 때마다 픽셀 전체를 읽던 비용을 뺐다
     return { parts, base, x: d.x, y: d.y, w: W, h: H, top, lx, ly: (b.i0 + b.j0) * (TH / 2) - top + 4, cv: d.canvas, b };
@@ -3600,6 +3605,43 @@ export class WorldScene {
     const key = hit ? `${hit.kind}` : '';
     if (key && key !== this.hutAt) this.hooks.hutDoor(hit!.kind === 'hut' ? 'mine' : 'twins');
     this.hutAt = key;
+  }
+  /** 47차 출입국 심사대 앞에 서면 */
+  private immigAt = false;
+  private checkImmig() {
+    const info = this.zone.interior;
+    if (!info || info.kind !== 'airport' || this.player.path.length) { this.immigAt = false; return; }
+    const pi = Math.floor(this.player.x), pj = Math.floor(this.player.y);
+    const hit = info.furn.some((f) => f.kind === 'immig' && pi >= f.i - 1 && pi <= f.i + f.w && pj >= f.j + f.d && pj <= f.j + f.d + 1);
+    if (hit && !this.immigAt) this.hooks.immig();
+    this.immigAt = hit;
+  }
+  // ───── 47차 공항 가는 정류장: 도시의 맨 끝 길가 (방콕 동쪽 끝 구역 · 서울 동쪽 가장자리) ─────
+  private airportSpot: [number, number] | null = null;
+  private airportNear = false;
+  private setupAirportStop() {
+    if (this.realm !== 'real' || this.zone.interior || this.zone.hell) return;
+    const z = this.zone, ed = z.edges;
+    if (ed && ed.e !== null) return; // 끝 구역에만
+    const W = z.W, H = z.H, jd = z.door.j;
+    let best: [number, number] | null = null;
+    for (let i = (ed ? ed.i1 : W) - 3; i > W * 0.5 && !best; i--) for (let dj = 0; dj < 40 && !best; dj++) for (const j of [jd + dj, jd - dj]) if (j > 1 && j < H - 2 && walkable(z, i, j) && walkable(z, i - 1, j) && walkable(z, i, j + 1)) { best = [i, j]; break; }
+    if (!best) return;
+    this.airportSpot = best;
+    const g = new Graphics(); g.eventMode = 'none';
+    // 표지판: 기둥 · 파란 판 · 흰 비행기
+    g.rect(-1.5, -64, 3, 64).fill(0x5a6068);
+    g.roundRect(-22, -86, 44, 26, 4).fill(0x2a5a9a).stroke({ color: 0xffffff, width: 1.5 });
+    g.poly([-12, -73, 10, -75, 14, -73, 10, -71]).fill(0xffffff); g.poly([-2, -74, 2, -84, 5, -84, 4, -74]).fill(0xffffff); g.poly([-2, -72, 2, -64, 5, -64, 4, -72]).fill(0xffffff); g.poly([-12, -73, -14, -78, -11, -78, -9, -73]).fill(0xffffff);
+    const [x, y] = iso(best[0] + 0.5, best[1] + 0.5);
+    g.position.set(x, y); g.zIndex = best[0] + best[1] + 0.99;
+    this.objects.addChild(g);
+  }
+  private checkAirportStop() {
+    const s = this.airportSpot; if (!s || this.zone.interior) return;
+    const near = Math.hypot(this.player.x - (s[0] + 0.5), this.player.y - (s[1] + 0.5)) < 1.6 && !this.player.path.length;
+    if (near && !this.airportNear) this.hooks.airport();
+    this.airportNear = near;
   }
   private bedAt = '';
   private checkBed() {
@@ -8267,6 +8309,7 @@ export class WorldScene {
     this.holdSeat(); // 46차 예배 자리
     this.checkHutDoor(); // 46차 구름 위 오두막 문
     this.checkBed(); // 47차 침대
+    this.checkImmig(); this.checkAirportStop(); // 47차 공항
     this.updateRide(dt); // 46차 놀이기구
     if (this.stiffMark) this.updateStiffMark(); // 47차 떼먹은 사장의 칼 표시
     if (this.myPromo || this.promos.size || this.walkers.some((w) => w.rinfo?.promo)) this.updatePromos(); // 47차 홍보 말풍선

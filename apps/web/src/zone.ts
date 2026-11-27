@@ -13,7 +13,7 @@ export type Category =
   | 'home' // 24차 서울 달동네 골목 끝의 내 집 (유내)
   | 'palace' | 'attraction' // 35차 천국 1층: 천국 본청 · 놀이공원 탈것
   | 'estate' // 35차 사서 들어가 사는 집: 방콕 아속의 콘도 · 서울 역삼의 아파트
-  | 'sanct' | 'cottage' | 'hhome'; // 46차 천국: 성소(교회 · 불당 · 모스크) · 구름 위의 오두막 · 47차 오두막 안
+  | 'sanct' | 'cottage' | 'hhome' | 'airport'; // 46차 천국: 성소(교회 · 불당 · 모스크) · 구름 위의 오두막 · 47차 오두막 안
 
 export interface Building {
   /** 31차: 지옥 좌판에 자리 잡은 장사꾼 (좌판 모양이 장사마다 다르다) */
