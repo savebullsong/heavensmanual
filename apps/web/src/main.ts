@@ -1596,19 +1596,23 @@ function accDate(key: string) {
 }
 /** 46차 천국 놀이공원: 안내 천사에게 묻고 탄다 (천국에선 값을 받지 않는다) */
 async function rideAsk(k: number, att: string) {
-  if (!world || world.isRiding || busy) return;
+  if (!world || world.isRiding || busy || dlg.isOpen) return;
+  busy = true;
   const L = t();
   const ix = att === 'ferris' ? 0 : att === 'carousel' ? 1 : 2;
   dlg.open({ name: L.rideAngel, exit: true });
   await dlg.say(L.rideAsk[ix]);
   const c = await dlg.choose([L.rideYes, L.rideNo]);
-  dlg.close();
-  if (c !== 0) return;
+  const go = c === 0 && !dlg.cancelled;
+  endTalk();
+  if (!go) return;
   world?.ride(k);
   toast(L.rideToast[ix]);
 }
 /** 46차 천국 본청 접수 천사: 생명책에서 내 장 찾기 · 본청이 하는 일 · 예배 시간 */
 async function palaceTalk() {
+  if (busy || dlg.isOpen) return;
+  busy = true;
   const L = t();
   dlg.open({ name: L.palaceClerkSub, exit: true });
   await dlg.say(pick(L.palaceGreet));
@@ -1620,8 +1624,9 @@ async function palaceTalk() {
     } else if (c === 1) { for (const line of L.palaceAbout) await dlg.say(line); }
     else if (c === 2) await dlg.say(L.palaceSvc.replace('{t}', svcTime()));
     else break;
+    if (dlg.cancelled) break;
   }
-  dlg.close();
+  endTalk();
 }
 /** 방의 직원: 업종마다 할 수 있는 것 */
 function clerkTalk() {

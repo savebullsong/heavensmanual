@@ -6452,7 +6452,7 @@ export class WorldScene {
     this.storeWant = { k, kind: 'ride', spot };
   }
   // ───── 46차 놀이기구 타기: 대관람차는 한 바퀴(칸에 앉아 하늘까지) · 회전목마는 두 바퀴(오르내리며) · 롤러코스터는 레일을 따라 오르내린다 ─────
-  private riding: { k: number; att: string; t: number; T: number; back: [number, number] } | null = null;
+  private riding: { k: number; att: string; t: number; t0: number; T: number; back: [number, number] } | null = null;
   private rideCar: Graphics | null = null;
   /** 타는 것: 대관람차 칸(지붕 · 창틀 · 앞판) · 날개 달린 목마(기둥) · 롤러코스터 빨간 칸 — 사람 앞에 그린다 */
   private drawRideCar(att: string, x: number, y: number, t: number) {
@@ -6480,12 +6480,12 @@ export class WorldScene {
     this.rideCar?.destroy(); this.rideCar = new Graphics(); this.rideCar.eventMode = 'none'; this.objects.addChild(this.rideCar);
     const p = this.player;
     this.cancelActs(); p.path = []; p.target = null; p.act = null;
-    this.riding = { k, att: b.att, t: 0, T: b.att === 'ferris' ? 18 : b.att === 'carousel' ? 14 : 10, back: [p.x, p.y] };
+    this.riding = { k, att: b.att, t: 0, t0: performance.now(), T: b.att === 'ferris' ? 18 : b.att === 'carousel' ? 14 : 10, back: [p.x, p.y] };
   }
   private updateRide(dt: number) {
     const r = this.riding; if (!r) return;
     const p = this.player, b = this.zone.buildings[r.k] as Building & { att?: string };
-    r.t += dt;
+    r.t = (performance.now() - r.t0) / 1000; // 벽시계로 (프레임이 느려도 제때 끝난다)
     const q = Math.min(1, r.t / r.T);
     const cx = b.i0 + b.w / 2, cy = b.j0 + b.d / 2;
     p.path = []; p.target = null; p.x = cx; p.y = b.j0 + b.d + 0.6; // 카메라는 놀이기구를 본다
@@ -6505,16 +6505,17 @@ export class WorldScene {
       const [ax, ay] = iso(ii, jj); x = ax; y = ay - z - 6;
       p.dir = q < 0.5 ? 'se' : 'nw'; sc = 0.75;
     }
-    sc = r.att === 'ferris' ? 0.5 : r.att === 'carousel' ? 0.55 : 0.5;
+    const base = Math.abs(p.sprite.scale.y) || 0.5; // 이 프레임에 몸 그림이 정한 크기 (도트 밀도마다 다르다)
+    sc = base * (r.att === 'carousel' ? 0.9 : 0.8);
     const yy = r.att === 'carousel' ? y - 6 : y;
     p.sprite.position.set(x, yy);
-    p.sprite.scale.set(sc);
+    p.sprite.scale.set(Math.sign(p.sprite.scale.x || 1) * sc, sc);
     p.sprite.zIndex = front ? 1e7 : (b.i0 + b.j0) - 1;
     if (this.rideCar) { this.drawRideCar(r.att, x, y, r.t); this.rideCar.zIndex = p.sprite.zIndex + 0.5; }
     if (q >= 1) {
       this.riding = null;
       this.rideCar?.destroy(); this.rideCar = null;
-      p.sprite.scale.set(1);
+      p.sprite.scale.set(base);
       const f = this.frontOf(b) ?? [Math.round(r.back[0]), Math.round(r.back[1])];
       p.x = f[0] + 0.5; p.y = f[1] + 0.5;
       const ls = t().rideDone[r.att === 'ferris' ? 0 : r.att === 'carousel' ? 1 : 2]; this.bubble(p, ls[Math.floor(Math.random() * ls.length)]);
