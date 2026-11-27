@@ -270,6 +270,8 @@ interface Walker {
   tagIt?: boolean; tagNear?: number;
   /** 47차 쓰레기장을 맡은 천사 */
   dumpAngel?: boolean;
+  /** 47차 일당을 떼먹은 사장 (1 = 평범 · 2 = 아주 셈) — 내가 방을 나가기 전까지 칼 표시가 뜬다 · 떼인 돈 */
+  stiffBoss?: 1 | 2; owed?: number;
   gestT?: number; // 42차: 고유 동작까지 남은 시간
   watchT?: number; // 43차: 노을이 다시 멀찍이 따라붙기까지
   marion?: { left: number; dmg: [number, number]; said?: number }; // 43차 마리오네트: 남은 초 · 한 대 피해
@@ -3602,6 +3604,40 @@ export class WorldScene {
     this.hooks.work(null);
     this.hooks.wage(w.earned, w.name, stiffed);
     this.shift = null;
+    if (stiffed && this.realm === 'real' && !this.zone.interior?.rest) this.armStiffBoss(w.earned);
+  }
+  /**
+   * 47차: 돈을 떼먹은 사장 — 내가 방을 나가기 전까지 머리 위에 칼 표시(덤비라는 듯). 먼저 치면 악행.
+   * 사장마다 들고 있는 것이 다르다: 셋에 하나는 아주 세다(일본도 · 오함마 · 마체테), 나머지는 평범하다(식칼 · 쇠파이프 · 배트 · 맨손)
+   */
+  private stiffMark: Graphics | null = null;
+  private armStiffBoss(owed: number) {
+    const c = this.clerkW;
+    if (!c || c.down > 0) return;
+    const strong = Math.random() < 0.33;
+    const pool = strong ? ['katana', 'sledge', 'machete'] : ['knife', 'pipe', 'bat', null];
+    const wpn = pool[Math.floor(Math.random() * pool.length)];
+    c.kind = 'thug'; c.stiffBoss = strong ? 2 : 1; c.owed = Math.max(1, owed);
+    c.maxHp = c.hp = strong ? 1600 : 280; c.speed = strong ? 1.6 : 1.1; c.target = null; c.path = []; c.wait = 1e9;
+    this.dress(c, c.look, wpn, c.armor ?? []);
+    this.clerkW = null;
+    // 계산대 뒤에서 걸어 나와 내 앞을 막아선다 (팔짱 끼고 비웃는다)
+    const p = this.player, to = this.nearestWalkable(Math.floor(p.x + 1.5), Math.floor(p.y - 1)) ?? this.nearestWalkable(Math.floor(p.x), Math.floor(p.y - 2));
+    if (to) { const path = findPath(this.zone, Math.floor(c.x), Math.floor(c.y), to[0], to[1]); if (path) c.path = path; else { c.x = to[0] + 0.5; c.y = to[1] + 0.5; } } // 계산대에 갇혀 있으면 넘어 나온다
+    this.stiffMark?.destroy();
+    const g = new Graphics(); g.eventMode = 'none'; g.zIndex = 9e5;
+    g.poly([-2, -12, 2, -12, 1.2, 2, -1.2, 2]).fill(0xe8ecf0).stroke({ color: 0x3a3a40, width: 1 }); // 날
+    g.rect(-5, 2, 10, 2).fill(0xc9a23e); g.rect(-1.5, 4, 3, 7).fill(0x5a3a22); // 날밑 · 손잡이
+    g.circle(0, -2, 13).stroke({ color: 0xff5a4a, width: 1.5, alpha: 0.7 });
+    this.objects.addChild(g);
+    this.stiffMark = g;
+  }
+  private updateStiffMark() {
+    const g = this.stiffMark; if (!g) return;
+    const b = this.walkers.find((x) => x.stiffBoss && x.down <= 0);
+    if (!b) { g.destroy(); this.stiffMark = null; return; }
+    g.position.set(b.sprite.x, b.sprite.y - 78 * BODY_K + Math.sin(this.time * 4) * 2);
+    g.visible = b.sprite.visible;
   }
   /**
    * 19차 현실의 잔인함: 일한 값은 그만둘 때 한꺼번에 받는다. 그런데 가끔(교대 열에 하나쯤) 사장이 일을 시킬 만큼 시키고는
@@ -6476,6 +6512,7 @@ export class WorldScene {
     if (w.tail) return w.tail.kind === 'chef' ? L.chefName : w.tail.kind === 'accubus' ? L.accName : L.admirer;
     if (w.kind === 'officer') return L.officer;
     if (w.dumpAngel) return L.dumpAngel;
+    if (w.stiffBoss) return L.bossOf.replace('{shop}', this.zone.interior?.name ?? '');
     if (w.kind === 'angel') return L.angel;
     if (w.kind === 'passer' && this.realm === 'heaven') return L.soulPasser;
     return w.kind === 'suturer' ? L.suturer : L.npc[w.kind as 'passer' | 'thug'];
@@ -6522,6 +6559,7 @@ export class WorldScene {
     if (w.tail) return w.tail.kind === 'chef' ? L.chefSub : w.tail.kind === 'accubus' ? L.accSub : L.admirerSub;
     if (w.kind === 'officer') return L.officerSub;
     if (w.dumpAngel) return L.dumpAngelSub;
+    if (w.stiffBoss) return w.stiffBoss === 2 ? L.stiffBossSub2 : L.stiffBossSub;
     if (w.kind === 'angel') return L.angelSub;
     if (w.kind === 'passer' && this.realm === 'heaven') return L.soulPasserSub;
     return w.kind === 'suturer' ? L.suturerSub : L.npcSub[w.kind as 'passer' | 'thug'];
@@ -6854,6 +6892,7 @@ export class WorldScene {
     } // 31차: 헛방 — 글자 없이 (휘두름만 있고 타격음·번쩍임·움찔이 없다)
     if (to.isPlayer) this.lastHitBy = from.kind === 'remote' ? (from.rid ?? null) : null;
     // 30차 내구도: 내가 때리면 무기가, 맞으면 입은 방어구가 닳는다
+    if (from.isPlayer && to.stiffBoss && !to.firstBy) { to.firstBy = from; to.wait = 0; to.target = from; this.hooks.deed('firstStrike'); this.markCrime(); this.bubble(to, t().stiffBossFight[Math.floor(Math.random() * t().stiffBossFight.length)]); } // 47차: 사장을 먼저 치면 악행
     if (from.isPlayer && from !== to && this.gear.weapon) this.hooks.wear('weapon');
     if (to.isPlayer && from !== to && dmg > 0) this.hooks.wear('armor');
     // 마을과 둘레에서 다른 영혼이나 경비병을 치면 경비병이 나선다
@@ -7043,7 +7082,8 @@ export class WorldScene {
     }
     if (by.isPlayer) {
       by.target = null;
-      if (w.kind === 'thug') {
+      if (w.kind === 'thug' && w.stiffBoss) { /* 47차 떼먹은 사장: 쓰러뜨려도 선행은 아니다 (먼저 친 악행은 이미 셈했다) */ }
+      else if (w.kind === 'thug') {
         if (w.weak === 'drunk') this.hooks.deed('drunkDown');
         else if (w.weak === 'shade') this.hooks.deed('shadeDown');
         else {
@@ -7096,7 +7136,7 @@ export class WorldScene {
     // 22차: 적대 NPC가 떨어뜨리는 돈은 폭을 넓혀 무작위로 — 취객 1~4 · 불량배 2~6 · 강도 3~9 · 마피아 4~12
     // 26차 경제: 싸움 한 번에 드는 끼니값보다 조금 더 (취객 2~6 · 불량배 5~12 · 강도 12~28 · 마피아 25~60)
     // 42차: 현실의 돈은 일해서 번다 — 거리의 적이 떨어뜨리는 돈을 대략 절반으로
-    const amount = w.kind === 'thug' ? (w.gang === 'mafia' ? rand(15, 35) : w.gang === 'robber' ? rand(7, 16) : w.gang === 'enforcer' ? rand(24, 50) : w.gang === 'boxer' ? rand(12, 25) : w.gang === 'pickpocket' ? rand(3, 8) + (w.pick?.stolen ?? 0) : w.weak === 'drunk' ? rand(1, 3) : rand(3, 7)) : w.tour ? touristCash() : passerCash();
+    const amount = w.stiffBoss ? Math.round((w.owed ?? 50) * (1.5 + Math.random())) : w.kind === 'thug' ? (w.gang === 'mafia' ? rand(15, 35) : w.gang === 'robber' ? rand(7, 16) : w.gang === 'enforcer' ? rand(24, 50) : w.gang === 'boxer' ? rand(12, 25) : w.gang === 'pickpocket' ? rand(3, 8) + (w.pick?.stolen ?? 0) : w.weak === 'drunk' ? rand(1, 3) : rand(3, 7)) : w.tour ? touristCash() : passerCash();
     this.dropCoin(w.x, w.y, amount, w.kind === 'passer');
   }
 
@@ -7728,7 +7768,7 @@ export class WorldScene {
     } else {
       w.atkT = w.noeulAlly ? 0.48 : w.kind === 'goat' ? 1.05 : w.gdef ? w.gdef.atk : w.mdef ? w.mdef.atk : w.kind === 'suturer' ? (w.monster ? 0.68 : 0.8) : w.weak ? 1.25 : w.weapon === 'pistol' ? 1.4 : w.gang ? 0.8 : 0.9;
       const f = this.zone.hell?.floor ?? 1;
-      const base = w.fb && FB[w.fb] ? rand(FB[w.fb].dmg[0], FB[w.fb].dmg[1]) * FB_HIT : w.kind === 'goat' ? rand(10, 19) : w.kind === 'angel' ? rand(30, 52) : w.gdef ? (tg.isPlayer ? Math.max(rand(w.gdef.dmg[0], w.gdef.dmg[1]) * 0.6, tg.maxHp * 0.12) : rand(w.gdef.dmg[0], w.gdef.dmg[1])) * (tg.sealT && tg.sealT > 0 ? 1.5 : 1) : w.mdef ? rand(w.mdef.dmg[0], w.mdef.dmg[1]) * (w.mdef.boss ? BOSS_HIT * (1 + 0.15 * (f - 1)) : 1 + 0.25 * (f - 1)) * (w.sealT && w.sealT > 0 ? 0.5 : 1) * (w.elite ? 1.5 : 1) * floorCurve(f).dmg : w.kind === 'suturer' ? rand(10, 18) * (w.monster ? 1.6 : 1) : w.marion ? rand(w.marion.dmg[0], w.marion.dmg[1]) : w.kind === 'fighter' ? rand(20, 34) * (1 + 0.3 * (f - 1)) : w.weak ? rand(1, 4) : w.kind === 'passer' ? (w.gunman ? rand(14, 22) : rand(3, 7) + (w.weapon ? 3 : 0)) * (1 + 0.9 * (w.ptier ?? 0)) * (w.civ ? CIV[w.civ].dmg : 1) : w.gang === 'mafia' ? rand(10, 17) + (w.weapon ? 4 : 0) : w.gang === 'robber' ? rand(6, 12) + (w.weapon ? 3 : 0) : w.gang === 'enforcer' ? rand(13, 21) + (w.weapon ? 4 : 0) : w.gang === 'boxer' ? rand(11, 19) : w.gang === 'pickpocket' ? rand(3, 6) + (w.weapon ? 3 : 0) : rand(3, 7) + (w.weapon ? 2 : 0);
+      const base = w.fb && FB[w.fb] ? rand(FB[w.fb].dmg[0], FB[w.fb].dmg[1]) * FB_HIT : w.kind === 'goat' ? rand(10, 19) : w.kind === 'angel' ? rand(30, 52) : w.gdef ? (tg.isPlayer ? Math.max(rand(w.gdef.dmg[0], w.gdef.dmg[1]) * 0.6, tg.maxHp * 0.12) : rand(w.gdef.dmg[0], w.gdef.dmg[1])) * (tg.sealT && tg.sealT > 0 ? 1.5 : 1) : w.mdef ? rand(w.mdef.dmg[0], w.mdef.dmg[1]) * (w.mdef.boss ? BOSS_HIT * (1 + 0.15 * (f - 1)) : 1 + 0.25 * (f - 1)) * (w.sealT && w.sealT > 0 ? 0.5 : 1) * (w.elite ? 1.5 : 1) * floorCurve(f).dmg : w.kind === 'suturer' ? rand(10, 18) * (w.monster ? 1.6 : 1) : w.marion ? rand(w.marion.dmg[0], w.marion.dmg[1]) : w.kind === 'fighter' ? rand(20, 34) * (1 + 0.3 * (f - 1)) : w.weak ? rand(1, 4) : w.stiffBoss ? (w.stiffBoss === 2 ? rand(26, 42) : rand(6, 12)) + (w.weapon ? 3 : 0) : w.kind === 'passer' ? (w.gunman ? rand(14, 22) : rand(3, 7) + (w.weapon ? 3 : 0)) * (1 + 0.9 * (w.ptier ?? 0)) * (w.civ ? CIV[w.civ].dmg : 1) : w.gang === 'mafia' ? rand(10, 17) + (w.weapon ? 4 : 0) : w.gang === 'robber' ? rand(6, 12) + (w.weapon ? 3 : 0) : w.gang === 'enforcer' ? rand(13, 21) + (w.weapon ? 4 : 0) : w.gang === 'boxer' ? rand(11, 19) : w.gang === 'pickpocket' ? rand(3, 6) + (w.weapon ? 3 : 0) : rand(3, 7) + (w.weapon ? 2 : 0);
       const dmg = Math.max(1, Math.round(base) - (tg.isPlayer ? this.gear.dr ?? 0 : 0));
       this.startAttack(w, tg, dmg);
     }
@@ -8188,6 +8228,7 @@ export class WorldScene {
     this.checkHutDoor(); // 46차 구름 위 오두막 문
     this.checkBed(); // 47차 침대
     this.updateRide(dt); // 46차 놀이기구
+    if (this.stiffMark) this.updateStiffMark(); // 47차 떼먹은 사장의 칼 표시
     this.drawFx(dt);
     this.updateDoor(p);
     this.updatePings(dt, p); // 38차 상점 알림 화살표
@@ -8235,6 +8276,7 @@ export class WorldScene {
   private think(w: Walker, moving: boolean, dt: number, nf: number) {
     if (w.claimT && this.thinkClaim(w, moving)) return; // 44차: 버려진 물건을 주우러 가는 중
     const p = this.netRole === 'host' && this.isShared(w) ? this.nearestBody(w) : this.player; // 41차: 방장 기기는 손님들도 '사람'으로 본다
+    if (w.stiffBoss && !w.target && w.down <= 0) { if (!moving) w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); if (!w.bubble && Math.random() < dt * 0.06) { const ls = t().stiffBossTaunt; this.bubble(w, ls[Math.floor(Math.random() * ls.length)]); } return; } // 47차: 떼먹은 사장은 먼저 덤비지 않고 비웃는다
     if (w.fb && this.thinkFieldBoss(w, moving, dt)) return;
     if (w.kind === 'guard') { this.thinkGuard(w, moving, dt); return; }
     if (w.kind === 'talus') { this.thinkTalus(w, dt); return; }
