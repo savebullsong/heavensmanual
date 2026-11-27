@@ -190,6 +190,8 @@ interface Walker {
   pick?: { stolen: number; flee: number };
   wings?: Sprite; // 천사·황색날개의 날개
   aggroCool?: number;
+  /** 48차: 고문하던 괴물 — 맞기 전까지는 덤비지 않는다 */
+  untilHit?: boolean;
   mdef?: MonsterDef; // 지옥 괴물
   gdef?: GuardDef; // 휴식 마을 경비병
   post?: number; // 경비병 번호 (순찰로)
@@ -1973,6 +1975,22 @@ export class WorldScene {
   private accMode: 'lover' | 'friend' | 'family' | 'alone' | undefined;
   setAccubusMode(m: 'lover' | 'friend' | 'family' | 'alone' | undefined) { this.accMode = m; }
   get hpRatio() { return this.player.hp / this.player.maxHp; }
+  /** 48차: 연락이 와도 되는 한가한 때 — 싸움 · 쓰러짐 · 타는 중 · 날아가는 몸이 없을 때 */
+  get calm() { const p = this.player; return !this.dead && p.down <= 0 && !p.target && !p.act && this.attackersOnMe() === 0 && !this.riding && !this.walkers.some((w) => w.target === p && w.down <= 0); }
+  /** 48차: 한 시간에 한 번 황색날개가 날아와 곁에 내린다 (따라다니던 중이면 그 자리에서) */
+  ywCome(): boolean {
+    if (this.realm !== 'heaven' || this.zone.interior) return false;
+    const p = this.player;
+    let yw = this.walkers.find((w) => w.kind === 'yellowwing');
+    const s0 = this.nearestWalkable(Math.floor(p.x + 1.5), Math.floor(p.y + 1));
+    if (!s0) return false;
+    if (!yw) yw = this.makeYellowWing(s0[0], s0[1]);
+    else if (Math.hypot(yw.x - p.x, yw.y - p.y) > 3) { yw.x = s0[0] + 0.5; yw.y = s0[1] + 0.5; }
+    yw.path = []; yw.dir = dirFromTile(p.x - yw.x, p.y - yw.y, yw.dir);
+    p.dir = dirFromTile(yw.x - p.x, yw.y - p.y, p.dir);
+    for (let k = 0; k < 14; k++) { const a = Math.random() * Math.PI * 2, v = 20 + Math.random() * 40; const [sx, sy] = iso(yw.x, yw.y); this.sparks.push({ x: sx, y: sy - 30, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.4, t: 0.5 + Math.random() * 0.3, col: 0xf2d24a }); }
+    return true;
+  }
   private ywFollow = false;
   setYwFollow(on: boolean) {
     this.ywFollow = on && this.realm === 'heaven' && !this.zone.interior;
@@ -5727,8 +5745,7 @@ export class WorldScene {
       m.x = q.tx; m.y = q.ty; m.dir = q.tdir;
       m.home = [Math.floor(q.tx), Math.floor(q.ty)];
       this.walkers.push(m);
-      this.bubble(m, t().torturerAngry[Math.floor(Math.random() * t().torturerAngry.length)]);
-      if (!this.invisible && !this.dead) { m.target = this.player; m.firstBy = m; }
+      m.untilHit = true; // 48차: 칼 태세로 누르기만 해서는 눈치채지 않는다 — 내가 먼저 때리면 그때 반격
       return m;
     }
     return null;
@@ -6984,6 +7001,7 @@ export class WorldScene {
     } // 31차: 헛방 — 글자 없이 (휘두름만 있고 타격음·번쩍임·움찔이 없다)
     if (to.isPlayer) this.lastHitBy = from.kind === 'remote' ? (from.rid ?? null) : null;
     // 30차 내구도: 내가 때리면 무기가, 맞으면 입은 방어구가 닳는다
+    if (to.untilHit && from.isPlayer) { to.untilHit = false; to.target = from; to.firstBy ??= from; this.bubble(to, t().torturerAngry[Math.floor(Math.random() * t().torturerAngry.length)]); } // 48차: 고문하던 괴물은 맞고서야 돌아선다
     if (from.isPlayer && to.stiffBoss && !to.firstBy) { to.firstBy = from; to.wait = 0; to.target = from; this.hooks.deed('firstStrike'); this.markCrime(); this.bubble(to, t().stiffBossFight[Math.floor(Math.random() * t().stiffBossFight.length)]); } // 47차: 사장을 먼저 치면 악행
     if (from.isPlayer && from !== to && this.gear.weapon) this.hooks.wear('weapon');
     if (to.isPlayer && from !== to && dmg > 0) this.hooks.wear('armor');
@@ -8469,7 +8487,7 @@ export class WorldScene {
         if (!moving) { const path = findPath(this.zone, Math.floor(w.x), Math.floor(w.y), Math.floor(p.x), Math.floor(p.y)); if (path) w.path = path.length > 1 ? path.slice(0, -1) : path; }
         return;
       }
-      if (!w.target && !this.dead && !this.invisible && !this.inRest(p.x, p.y) && d < w.mdef.notice && Math.random() < dt * 3) {
+      if (!w.target && !w.untilHit && !this.dead && !this.invisible && !this.inRest(p.x, p.y) && d < w.mdef.notice && Math.random() < dt * 3) {
         w.target = p;
         w.firstBy ??= w;
         // 43차 속삭임꾼: 나를 보면 거짓 소문을 퍼뜨린다 — 둘레 10칸의 괴물이 모두 나를 노린다

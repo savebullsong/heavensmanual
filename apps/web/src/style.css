@@ -117,7 +117,13 @@ button.primary:hover { background: #e0b437; }
 #hud > div { pointer-events: auto; background: rgba(20, 15, 11, 0.78); border: 1px solid #4a3424; border-radius: 6px; padding: 6px 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 14px; }
 #hud .hud-left { flex-direction: column; align-items: flex-start; gap: 2px; }
 /* 43차: 화면이 좁아져 두 줄이 되면 위치(지역 이름)는 상태창 아래로 — 줄을 아래에서 위로 쌓는다 (한 줄일 때는 그대로) */
-@media (min-width: 641px) { #hud { flex-wrap: wrap-reverse; align-items: flex-end; } }
+/* 48차: 화면 폭이나 장소 이름 길이에 따라 줄이 바뀌던 것(이름이 길면 상태창 아래로 떨어졌다) — 이제 늘 한 줄: 왼쪽 장소 · 오른쪽 상태창, 긴 이름은 말줄임 */
+@media (min-width: 641px) {
+  #hud { flex-wrap: nowrap; align-items: flex-start; }
+  #hud > .hud-left { flex: 0 1 auto; min-width: 72px; max-width: 38%; overflow: hidden; }
+  #hud > .hud-left .where b, #hud > .hud-left .where small { max-width: 100%; }
+  #hud > .hud-tools { flex: 0 1 auto; min-width: 0; }
+}
 #hud .hint { font-size: 12px; color: #b8a888; }
 #hud button, #hud select { padding: 3px 8px; font-size: 13px; }
 #hud .clock { color: #e0b437; font-variant-numeric: tabular-nums; }

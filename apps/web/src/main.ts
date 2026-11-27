@@ -524,13 +524,19 @@ async function boot() {
   const pos = state.pos && state.pos.w === realm() ? state.pos : null;
   const ghosted = returnedGhost(); // 31차: 살기로 결정하지 않고 며칠 비웠다 — 모르는 사이에 죽었다
   state.played ??= state.look ? RETURN_PLAYED : 0; // 예전 저장은 오래 한 사람으로 친다
+  // 48차: 살기로 결정하지 않은 채 하루 넘게 비웠다 돌아오면 — 그 세계의 가게(우주새 · 유황새 · 황색날개의 가게) 안에서, 주인이 먼저 말을 건다
+  const r0 = realm();
+  const awayDay = !ghosted && !net.account() && !!state.look && state.seen !== undefined && Date.now() - state.seen > 864e5 && (r0 === 'real' || r0 === 'hell' || r0 === 'heaven');
+  const firstTime = !state.look && r0 === 'real';
   state.seen = Date.now();
+  if (awayDay) { state.comeback = (state.comeback ?? 0) + 1; save(state); comebackGreet = true; }
   if (ghosted) fallToGoat('returned');
+  else if (awayDay) { enterShop(false); setTimeout(() => { if (scene === 'shop' && !busy && !dlg.isOpen) void talkToHwang(); }, 1200); }
   else if (realm() === 'hell') enterHell(hellState().floor, 'resume');
   else if (realm() === 'border') enterBorder('resume');
   else if (pos && (state.look || realm() !== 'real')) resumeAt(pos);
   else if (realm() === 'ghost' || realm() === 'heaven') enterWorld(realm() === 'heaven' ? 'door' : undefined);
-  else enterShop(false);
+  else { enterShop(false); if (firstTime) setTimeout(() => { if (scene === 'shop' && !busy && !dlg.isOpen) void talkToHwang(); }, 1200); } // 48차: 처음 온 사람도 말이 걸린 채로
   setInterval(updateHud, 1000);
   setInterval(() => { snapPos(); state.played = (state.played ?? 0) + 4; state.seen = Date.now(); if (scene === 'world' && !document.hidden) ecoDay().t += 4; save(state); }, 4000);
   addEventListener('pagehide', () => { snapPos(); save(state); });
@@ -558,6 +564,8 @@ async function resumeAt(pos: NonNullable<typeof state.pos>) {
 }
 /** 우주새 안도 쉬는 곳: 머문 시간만큼 체력이 찬다 (나올 때 계산) */
 let shopSince = 0;
+/** 48차: 하루 넘게 비웠다 돌아온 미가입자 — 가게 주인이 먼저 말을 건다 */
+let comebackGreet = false;
 function restInShop() {
   if (!shopSince) return;
   const sec = (performance.now() - shopSince) / 1000;
@@ -2501,6 +2509,50 @@ function iyo(word: string) {
   return (c - 0xac00) % 28 ? '이요' : '요';
 }
 
+/**
+ * 48차 미가입자에게 가게 주인이 하는 말 — 가입하라는 말 · 꺼지라는 말 · 달콤함 · 냉정함이 번갈아.
+ * 미스 황 · 황혼 · 황색날개는 같은 얼굴(스스로는 서로를 남이라 여긴다)이라 말의 결이 같고, 세계마다 몇 마디가 더 있다.
+ * 돌아온 횟수를 센다 (몇 번째인지 아는 말). 살기로 하면 true
+ */
+async function comebackTalk(w: 'real' | 'hell' | 'heaven'): Promise<boolean> {
+  const L = t();
+  const n = state.comeback ?? 1;
+  const milestone = (L.cbCount as Record<string, string>)[String(n)];
+  const pool = [...L.cbLines, ...(w === 'hell' ? L.cbHell : w === 'heaven' ? L.cbHeaven : L.cbReal)];
+  const first = milestone ?? (n >= 2 && Math.random() < 0.35 ? L.cbNth.replace('{n}', String(n)) : pick(pool));
+  await dlg.say(first);
+  if (Math.random() < 0.5) await dlg.say(pick(pool.filter((x) => x !== first)));
+  const c = await dlg.choose([L.cbLive, L.cbJustLook]);
+  if (c === 0) { await dlg.say(pick(L.cbYes)); return true; }
+  await dlg.say(pick(L.cbNo));
+  return false;
+}
+/** 48차: 시간마다 오는 연락 — 연락해도 되는 때인가 (싸움 · 예배 · 정벌 · 잠 · 타기 · 건너가기 · 창이 열려 있을 때는 미룬다) */
+function contactOk(): boolean {
+  if (busy || dlg.isOpen || document.hidden || scene !== 'world' || !world || !world.calm) return false;
+  if (document.querySelector('.phone, .sleep-cover, .passage, .store-panel, .shop-menu, .bag-panel, .soul-panel, .set-panel, .prof-card')) return false;
+  if (state.crusade || svc) return false;
+  if (realm() === 'heaven') {
+    if (world.zone.interior) return false; // 성소 · 본청 · 오두막 · 가게 안에서는 부르지 않는다
+    const now = bangkokClock(); const mm = now.h * 60 + now.m, st = SVC_HOUR * 60;
+    if (mm >= st - 15 && mm < st + 10) return false; // 예배 앞뒤 (데리러 오는 때와 겹치지 않게)
+  }
+  return true;
+}
+/** 48차: 천국 — 황색날개가 날아와 말을 건다 */
+async function ywDropIn() {
+  if (!world?.ywCome()) return;
+  const L = t(), member = !!net.account();
+  busy = true;
+  dlg.open({ name: L.yellowWing, portrait: 'yellow-wing' });
+  await dlg.say(pick(member ? L.ywHourly : [...L.cbLines, ...L.cbHeaven]));
+  const opts = member ? [L.ywShopOpen, L.ywHourlyBye] : [L.cbLive, L.ywShopOpen, L.ywHourlyBye];
+  const c = await dlg.choose(opts);
+  if (!member && c === 0) { await dlg.say(pick(L.cbYes)); dlg.close(); busy = false; openSignup('signup'); return; }
+  if (opts[c] === L.ywShopOpen) await ywShopLoop();
+  else await dlg.say(pick(L.ywHourlyEnd));
+  dlg.close(); busy = false;
+}
 async function talkToHwang() {
   busy = true;
   shop.lock(true);
@@ -2509,7 +2561,10 @@ async function talkToHwang() {
   const heaven = realm() === 'heaven'; // 48차: 천국의 같은 가게는 황색날개가 연다
   const money = () => (hell ? hellState().notes : state.wallet ?? 0);
   dlg.open({ name: heaven ? L.yellowWing : hell ? L.hwanghon : L.clerk, portrait: heaven ? 'yellow-wing' : hell ? 'hwanghon' : 'miss-hwang' });
-  if (heaven) { if (!talkedThisVisit) await dlg.say(pick(L.ywShopGreet)); }
+  if (comebackGreet && !talkedThisVisit && !net.account()) {
+    comebackGreet = false; talkedThisVisit = true;
+    if (await comebackTalk(heaven ? 'heaven' : hell ? 'hell' : 'real')) { endTalk(); openSignup('signup'); return; }
+  } else if (heaven) { if (!talkedThisVisit) await dlg.say(pick(L.ywShopGreet)); }
   else if (!talkedThisVisit && state.grudge) {
     // 20차: 지난번에 훔쳐 간 손님
     state.grudge = false;
@@ -6592,32 +6647,58 @@ function welcome(id: string) {
 
 // ───────────────────────── 미스 황의 전화 (비회원, 처음 거리로 나선 뒤 5분) ─────────────────────────
 const CALL_AFTER = params.has('call') ? 5 : 300;
+// 48차: 그 뒤로는 한 시간에 한 번 — 현실 · 지옥은 전화, 천국은 황색날개가 직접 (회원에게도, 하는 말이 다르다)
+const CONTACT_EVERY = params.has('call') ? 25 : 3600;
 setInterval(() => {
-  if (scene !== 'world' || realm() !== 'real' || net.account() || state.called || busy || dlg.isOpen) return;
-  state.streetSecs = (state.streetSecs ?? 0) + 1;
-  if (state.streetSecs >= CALL_AFTER) { state.called = true; save(state); phoneCall(); }
+  const r = realm();
+  if (scene !== 'world' || document.hidden || (r !== 'real' && r !== 'hell' && r !== 'heaven')) return;
+  if (r === 'real' && !net.account() && !state.called) {
+    if (busy || dlg.isOpen) return;
+    state.streetSecs = (state.streetSecs ?? 0) + 1;
+    if (state.streetSecs >= CALL_AFTER) { state.called = true; state.contactSecs = 0; save(state); phoneCall('first'); }
+    return;
+  }
+  state.contactSecs = (state.contactSecs ?? 0) + 1;
+  if (state.contactSecs < CONTACT_EVERY || !contactOk()) return; // 한가해질 때까지 미룬다
+  state.contactSecs = 0; save(state);
+  if (r === 'heaven') void ywDropIn(); else phoneCall(r === 'hell' ? 'hell' : 'real');
 }, 1000);
-function phoneCall() {
+function phoneCall(kind: 'first' | 'real' | 'hell' = 'first') {
   const L = t();
+  const member = !!net.account(), hellCall = kind === 'hell';
+  const who = hellCall ? L.hwanghon : L.clerk, face = hellCall ? 'hwanghon' : 'miss-hwang';
   const el = document.createElement('div');
   el.className = 'phone';
   el.innerHTML = `<div class="phone-box"><div class="ring">📱</div><b></b><span></span><div class="row"><button class="ans primary"></button><button class="dec"></button></div></div>`;
-  el.querySelector('b')!.textContent = L.clerk;
+  el.querySelector('b')!.textContent = who;
   el.querySelector('span')!.textContent = L.ring;
   const ans = el.querySelector('.ans') as HTMLButtonElement, dec = el.querySelector('.dec') as HTMLButtonElement;
   ans.textContent = L.answer; dec.textContent = L.decline;
   try { navigator.vibrate?.([300, 200, 300, 200, 300]); } catch { /* 무시 */ }
-  dec.onclick = () => el.remove();
   ans.onclick = async () => {
     el.remove();
     busy = true;
-    dlg.open({ name: L.clerk, portrait: 'miss-hwang' });
-    await dlg.say(L.callLine);
-    const yes = await dlg.choose([L.yes, L.no]);
-    dlg.close();
-    busy = false;
-    if (yes === 0) openSignup('signup');
+    dlg.open({ name: who, portrait: face });
+    if (kind === 'first') {
+      await dlg.say(L.callLine);
+      const yes = await dlg.choose([L.yes, L.no]);
+      dlg.close(); busy = false;
+      if (yes === 0) openSignup('signup');
+      return;
+    }
+    if (member) { // 48차: 회원에게는 그냥 목소리 — 이유 없는 전화
+      await dlg.say(pick([...L.callMember, ...(hellCall ? L.callMemberHell : [])]));
+      if (Math.random() < 0.4) await dlg.say(pick(L.callHangup));
+      dlg.close(); busy = false;
+      return;
+    }
+    await dlg.say(pick([...L.cbLines, ...(hellCall ? L.cbHell : L.cbReal)]));
+    const c = await dlg.choose([L.cbLive, L.cbHangUp]);
+    if (c === 0) { await dlg.say(pick(L.cbYes)); dlg.close(); busy = false; openSignup('signup'); return; }
+    await dlg.say(pick(L.cbNo));
+    dlg.close(); busy = false;
   };
+  dec.onclick = () => { el.remove(); if (kind !== 'first' && Math.random() < 0.5) toast(pick(t().callMissed)); };
   document.body.appendChild(el);
 }
 

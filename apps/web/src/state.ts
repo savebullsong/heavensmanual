@@ -38,6 +38,9 @@ export interface Save {
   // 비회원: 처음 거리로 나선 뒤 지난 시간(초)과 미스 황의 전화
   streetSecs?: number;
   called?: boolean;
+  /** 48차: 미가입으로 하루 넘게 비웠다 돌아온 횟수 · 마지막 연락(전화·천국에서 말 걸기) 뒤 거리에서 보낸 초 */
+  comeback?: number;
+  contactSecs?: number;
   // 2단계: 지금 있는 세계와 지옥에서의 걸음
   realm?: 'real' | 'ghost' | 'hell' | 'heaven' | 'border'; // ghost = 예전 저장 (24차부터 border로 옮긴다)
   /** 24차 경계의 해변: 언제 왔는지 (깨달음 없는 자는 잠깐만) · 불다를 만났는지 */
