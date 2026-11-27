@@ -114,7 +114,7 @@ export function heavenZone(): Zone {
     for (let i = a; i <= c; i += 2) { prop(i, b - 2, i % 4 ? 'sunbed' : 'parasol'); prop(i, d + 2, (i + 1) % 4 ? 'sunbed' : 'parasol'); }
   }
   // 동물원: 울타리 친 우리 여섯, 우리마다 동물
-  const zoo: [number, number, string][] = [[96, 92, 'giraffe'], [104, 92, 'elephant'], [114, 92, 'lion'], [96, 102, 'zebra'], [104, 102, 'flamingo'], [114, 102, 'panda']];
+  const zoo = ZOO_PENS;
   for (const [a, b, an] of zoo) {
     for (let i = a; i <= a + 5; i++) { prop(i, b, 'fence', 0); prop(i, b + 6, 'fence', 0); }
     for (let j = b + 1; j <= b + 5; j++) { prop(a, j, 'fence', 1); prop(a + 5, j, 'fence', 1); }
@@ -372,6 +372,8 @@ export function drawHeavenPalace(b: Building) {
   return { canvas: f.c, x: f.x, y: f.y };
 }
 /** 놀이공원 탈것: 대관람차 · 회전목마 · 롤러코스터 */
+/** 46차: 동물원 우리 (울타리 i a..a+5 · j b..b+6) — 동물은 우리 안을 천천히 걸어 다닌다 */
+export const ZOO_PENS: [number, number, string][] = [[96, 92, 'giraffe'], [104, 92, 'elephant'], [114, 92, 'lion'], [96, 102, 'zebra'], [104, 102, 'flamingo'], [114, 102, 'panda']];
 export function drawAttraction(b: Building & { att?: string }) {
   const f = frame(b, b.h + 20);
   const { g, Q, box, poly } = f;

@@ -8,7 +8,7 @@ import { vendorGear, hasVendorGear, VGEAR_FOOT } from './vendorgear.ts';
 import { drawDalHouse } from './dalgfx.ts';
 import { snowGround, snowBuilding } from './snow.ts';
 import { drownedCanvas, monkLook, shoreF, shoreLine, shoreSkyCanvas, drawShoreChunk, capeRocks, drawCapeRock } from './border.ts';
-import { drawHeavenGround, drawHeavenPalace, drawAttraction, heavenMeta } from './heavenworld.ts';
+import { drawHeavenGround, drawHeavenPalace, drawAttraction, heavenMeta , ZOO_PENS } from './heavenworld.ts';
 import { drawSanctum, drawMarbleShop, SANCT_TOP } from './heavensanct.ts';
 import { wingTexture, cloudTexture, heavenVignette, cloudStairTexture, heavenTowerTexture, terraceSkyTexture, hellPortalTexture, bedTexture, BED_ANCHOR, batWingTexture, hornTexture, devilTailTexture, succWingTexture, spadeTailTexture, SPADE_ANCHOR, demonArmTexture, ARM_PIVOT } from './heavengfx.ts';
 import { hellDecor } from './hellprops.ts';
@@ -366,6 +366,10 @@ export interface WorldHooks {
   notes(n: number): void;
   /** 천국: 환생관 · 황색날개 · 빈 우주새 · 천국에서 손을 듦 */
   heavenAct(what: 'officer' | 'yellowwing' | 'shop' | 'assault' | 'terrace' | 'taxi' | 'ceremony' | 'noeul'): void;
+  /** 46차 천국 놀이기구 앞 (대관람차 · 회전목마 · 롤러코스터) */
+  ride(k: number, att: string): void;
+  /** 46차 아큐버스(연인)와 데이트 장소에 머물렀다 */
+  accDate(key: string, x: number, y: number): void;
   /** 35차 아큐버스에게 말을 건다 */
   accubus(name: string): void;
   /** 21차 천국: 천사·요리사가 권하는 음식 (먹어도 아무 효과 없다) */
@@ -544,6 +548,7 @@ function pingIcon(g: Graphics, kind: string) {
     default: g.rect(-5.5, -1, 11, 6).fill(0xe0b437); g.poly([-6.5, -1, -5, -5, 5, -5, 6.5, -1]).fill(0xc8381e); g.rect(-1.2, 1.5, 2.4, 3.5).fill(0x18120c); break; // 가게
   }
 }
+const ZOO_KINDS = new Set(['giraffe', 'elephant', 'lion', 'zebra', 'flamingo', 'panda']);
 export class WorldScene {
   /** 46차: 다음에 여는 성소가 예배 중인지 · 비워 둘 내 자리 */
   static svcNext: { on: boolean; seat: [number, number] | null } | null = null;
@@ -815,6 +820,7 @@ export class WorldScene {
       s.position.set(x, y);
       s.zIndex = p.i + p.j + 0.99;
       this.objects.addChild(s);
+      if (this.zone.heavenGen && ZOO_KINDS.has(p.kind)) { const pen = ZOO_PENS.find(([a, b]) => p.i > a && p.i < a + 5 && p.j > b && p.j < b + 6); if (pen) this.zooAnimals.push({ s, x: p.i + 0.5, y: p.j + 0.5, tx: p.i + 0.5, ty: p.j + 0.5, wait: Math.random() * 4, pen: [pen[0], pen[1]], sp: p.kind === 'flamingo' ? 0.55 : p.kind === 'elephant' || p.kind === 'panda' ? 0.28 : 0.4, ph: Math.random() * 6 }); } // 46차 걷는 동물
       if (p.kind === 'pillar' || p.kind === 'lamp' || p.kind === 'tree') {
         const w = s.width, h = s.height, x0 = x - w * pt.ax, y0 = y - h * pt.ay;
         this.addTall(s, x0, y0, x0 + w, y0 + h);
@@ -2457,6 +2463,69 @@ export class WorldScene {
       g.rect(e.x + 1 + e.o, e.y, 1, 1).fill(0x141014);
     }
   }
+  // ───── 46차 아큐버스 데이트: 연인으로 정한 아큐버스가 곁에 있을 때 데이트 장소(분수 · 대관람차 · 회전목마 · 풀사이드 바 · 동물원)에 2초 머물면 한 장면 (장소마다 하루 한 번) ─────
+  private dateSpots: { i: number; j: number; key: string }[] | null = null;
+  private dateT = 0; private dateHold = 0; private dateAt = '';
+  private updateDates(dt: number) {
+    if (this.realm !== 'heaven' || !this.zone.heavenGen || this.zone.interior || this.accMode !== 'lover' || this.riding) return;
+    this.dateT -= dt; if (this.dateT > 0) return; this.dateT = 0.5;
+    const acc = this.walkers.find((w) => w.tail?.kind === 'accubus' && w.tail.t > 0);
+    const p = this.player;
+    if (!acc || Math.hypot(acc.x - p.x, acc.y - p.y) > 4) { this.dateHold = 0; return; }
+    if (!this.dateSpots) {
+      const ds: { i: number; j: number; key: string }[] = [];
+      for (const q of this.zone.props) if (q.kind === 'fountain' && !ds.some((d) => d.key === 'fountain' && Math.hypot(d.i - q.i, d.j - q.j) < 8)) ds.push({ i: q.i + 0.5, j: q.j + 0.5, key: 'fountain' });
+      this.zone.buildings.forEach((b) => {
+        const att = (b as { att?: string }).att, f = this.frontOf(b);
+        if (!f) return;
+        if (b.cat === 'attraction' && (att === 'ferris' || att === 'carousel')) ds.push({ i: f[0] + 0.5, j: f[1] + 0.5, key: att });
+        else if (mainPoi(b)?.t === 'bar') ds.push({ i: f[0] + 0.5, j: f[1] + 0.5, key: 'bar' });
+      });
+      for (const [a, b] of ZOO_PENS) ds.push({ i: a + 2.5, j: b + 7.5, key: 'zoo' });
+      this.dateSpots = ds;
+    }
+    const near = this.dateSpots.find((d) => Math.hypot(d.i - p.x, d.j - p.y) < (d.key === 'fountain' ? 3.2 : 2.6));
+    if (!near) { this.dateHold = 0; this.dateAt = ''; return; }
+    if (this.dateAt !== near.key) { this.dateAt = near.key; this.dateHold = 0; }
+    this.dateHold += 0.5;
+    if (this.dateHold >= 2) { this.dateHold = -1e9; this.hooks.accDate(near.key, acc.x, acc.y); }
+  }
+  /** 데이트 장면의 말 (아큐버스 → 나) · 둘 사이에 떠오르는 하트 */
+  dateScene(lines: [string, string]) {
+    const acc = this.walkers.find((w) => w.tail?.kind === 'accubus');
+    if (acc) { acc.dir = dirFromTile(this.player.x - acc.x, this.player.y - acc.y, acc.dir); this.bubble(acc, lines[0]); }
+    window.setTimeout(() => { if (!this.player.sprite.destroyed) this.bubble(this.player, lines[1]); }, 2600);
+    const [hx, hy] = iso((this.player.x + (acc?.x ?? this.player.x)) / 2, (this.player.y + (acc?.y ?? this.player.y)) / 2);
+    for (let k = 0; k < 7; k++) {
+      const h = new Text({ text: '♥', style: { fontFamily: 'system-ui, sans-serif', fontSize: 11 + Math.random() * 6, fill: k % 2 ? '#ff7aa8' : '#ffb8d0', fontWeight: '800' } });
+      h.anchor.set(0.5); h.position.set(hx + (Math.random() - 0.5) * 30, hy - 40); h.zIndex = 9e5; h.eventMode = 'none';
+      this.objects.addChild(h);
+      const t0 = performance.now() + k * 160, vx = (Math.random() - 0.5) * 14;
+      const tick = () => { if (h.destroyed) return; const q = (performance.now() - t0) / 1800; if (q < 0) { h.alpha = 0; requestAnimationFrame(tick); return; } if (q >= 1) { h.destroy(); return; } h.alpha = 1 - q; h.y = hy - 40 - q * 40; h.x += vx * 0.016; requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+    }
+  }
+  // ───── 46차 천국 동물원: 우리 안을 천천히 걷다 서다 한다 (가는 쪽을 바라본다 · 걸을 때 살짝 들썩) ─────
+  private zooAnimals: { s: Sprite; x: number; y: number; tx: number; ty: number; wait: number; pen: [number, number]; sp: number; ph: number }[] = [];
+  private updateZoo(dt: number) {
+    for (const a of this.zooAnimals) {
+      if (a.s.destroyed) continue;
+      const dx = a.tx - a.x, dy = a.ty - a.y, d = Math.hypot(dx, dy);
+      let walking = false;
+      if (d < 0.05) {
+        a.wait -= dt;
+        if (a.wait <= 0) { a.tx = a.pen[0] + 1.4 + Math.random() * 3.2; a.ty = a.pen[1] + 1.4 + Math.random() * 4.2; a.wait = 2 + Math.random() * 6; }
+      } else {
+        const st = Math.min(d, a.sp * dt);
+        a.x += (dx / d) * st; a.y += (dy / d) * st; walking = true;
+        const sdx = dx - dy; if (Math.abs(sdx) > 0.02) a.s.scale.x = sdx > 0 ? 1 : -1; // 화면에서 오른쪽으로 가면 오른쪽을 본다
+      }
+      const [x, y] = iso(a.x, a.y);
+      a.ph += dt * (walking ? 9 : 0);
+      a.s.position.set(x, y - (walking ? Math.abs(Math.sin(a.ph)) * 1.5 : 0));
+      a.s.zIndex = a.x + a.y + 0.49;
+    }
+  }
   // ───── 46차: 모닥불 · 화톳불 · 대장간 화덕의 불꽃이 살아 움직인다 (불 혀 · 불티) ─────
   private liveFires: { g: Graphics; x: number; y: number; hw: number; base: number; top: number; n: number; seed: number; sparks: { x: number; y: number; vx: number; vy: number; life: number }[] }[] = [];
   private addFire(x: number, y: number, kind: string, z: number) {
@@ -3581,6 +3650,23 @@ export class WorldScene {
         this.giveWings(a, 0xf4efe4);
         this.walkers.push(a);
       }
+      seats.length = 0;
+    }
+    if (info.kind === 'hpalace') {
+      // 46차 천국 본청: 접수 천사 셋(가운데 · 양쪽 창구) · 창구와 저울 앞에 줄 선 영혼 · 긴 의자에서 기다리는 영혼 · 서류를 들고 오가는 천사들
+      const W = this.zone.W, mid = Math.floor(W / 2);
+      if (this.clerkW) { this.giveWings(this.clerkW, 0xf6f2e6); this.clerkW.dir = 'sw'; }
+      const still = (wk: Walker, d: Dir) => { wk.dir = d; wk.wait = 1e9; wk.speed = 0; wk.maxHp = wk.hp = 99999; this.walkers.push(wk); return wk; };
+      for (const [i, j, d] of [[2, 6, 'e'], [W - 3, 6, 'n']] as [number, number, Dir][]) this.giveWings(still(this.makeWalker(this.npcLook('angel'), i, j, 'angel'), d), 0xf4efe4);
+      for (let q = 0; q < 3; q++) { still(this.makeWalker(this.congregantLook(), 4 + q, 6, 'soul'), 'w'); still(this.makeWalker(this.congregantLook(), W - 5 - q, 6, 'soul'), 'e'); }
+      for (let q = 0; q < 4; q++) still(this.makeWalker(this.congregantLook(), mid + (q % 2), 9 + q, 'soul'), 'ne');
+      for (const [i, j] of seats) {
+        if (Math.random() > 0.6) continue;
+        const c = this.makeWalker(this.congregantLook(), i, j, 'soul');
+        c.x = i + 0.5; c.y = j + 0.38; c.still = 'sit'; c.worship = true;
+        still(c, 'ne');
+      }
+      for (let k = 0; k < 3; k++) { const a = this.makeWalker(this.npcLook('angel'), 6 + k * 5, 10, 'angel'); a.wait = 2 + Math.random() * 5; a.speed = 0.7; a.maxHp = a.hp = 99999; this.giveWings(a, 0xf4efe4); this.walkers.push(a); }
       seats.length = 0;
     }
     if (info.kind === 'shore') {
@@ -5641,6 +5727,7 @@ export class WorldScene {
 
   private onTap(gx: number, gy: number, force: boolean) {
     if (this.seat) { if (!this.player.bubble) this.bubble(this.player, t().svcStay); return; } // 46차: 예배 중에는 가만히
+    if (this.riding) return; // 46차: 놀이기구를 타는 동안
     if (this.dead) return;
     const L = t();
     // 일하는 중이면: 어디를 누르든 일을 그만두고 가게에서 나온다
@@ -6039,6 +6126,7 @@ export class WorldScene {
       if (k === -1 || this.zone.buildings[k]?.cat === 'ujusae') { this.hooks.heavenAct('shop'); return; }
       const hb = this.zone.buildings[k];
       // 37차: 천국 1층(구름섬)의 가게·은행·호텔·오락실은 현실처럼 들어간다 (일자리는 없다 — 천국엔 돈이 모자랄 일이 없으니)
+      if (hb && (hb as { att?: string }).att && hb.cat === 'attraction') { this.goRide(k); return; } // 46차 놀이기구 타기
       if (hb && this.zone.heavenGen) { if (canEnter(hb)) this.goEnter(k); return; }
       if (hb && ['food', 'cafe', 'mart'].includes(roomKindOf(hb))) this.hooks.heavenFood(this.nameOf(hb)); // 21차: 천국의 가게는 모두 열려 있다
       return;
@@ -6309,7 +6397,7 @@ export class WorldScene {
     if (w.kind === 'goat') return L.goatSub;
     if (w.kind === 'goatking') return L.gkSub;
     if (w.kind === 'changer') return L.xchSub;
-    if (w.kind === 'clerk') return this.zone.interior?.kind === 'terrace' ? L.officerSub : L.clerkSub[(this.zone.interior?.kind ?? 'shop') as keyof typeof L.clerkSub] ?? '';
+    if (w.kind === 'clerk') return this.zone.interior?.kind === 'terrace' ? L.officerSub : this.zone.interior?.kind === 'hpalace' ? L.palaceClerkSub : L.clerkSub[(this.zone.interior?.kind ?? 'shop') as keyof typeof L.clerkSub] ?? '';
     if (w.mdef) return w.mdef.title ? `${L.hellBoss.replace('{n}', String(this.zone.hell?.floor ?? 1))} · ${w.mdef.title[lang()]}` : w.mdef.boss ? L.hellBoss.replace('{n}', String(this.zone.hell?.floor ?? 1)) : L.hellMonster;
     if (w.kind === 'pashar') return L.pasharSub;
     if (w.kind === 'elder') return L.elderSub;
@@ -6353,7 +6441,85 @@ export class WorldScene {
     if (!this.walkTo(spot[0], spot[1]) && Math.hypot(spot[0] + 0.5 - this.player.x, spot[1] + 0.5 - this.player.y) >= 2.6) return;
     this.storeWant = { k, kind, spot };
   }
-  private storeWant: { k: number; kind: StoreKind | 'bank' | 'enter'; spot: [number, number] } | null = null;
+  private storeWant: { k: number; kind: StoreKind | 'bank' | 'enter' | 'ride'; spot: [number, number] } | null = null;
+  /** 46차: 놀이기구 앞까지 걸어가 안내 천사에게 묻는다 */
+  private goRide(k: number) {
+    const b = this.zone.buildings[k];
+    const spot = this.frontOf(b);
+    if (!spot) return;
+    this.cancelActs();
+    if (!this.walkTo(spot[0], spot[1])) { if (Math.hypot(spot[0] + 0.5 - this.player.x, spot[1] + 0.5 - this.player.y) < 3) this.hooks.ride(k, (b as { att?: string }).att ?? ''); return; }
+    this.storeWant = { k, kind: 'ride', spot };
+  }
+  // ───── 46차 놀이기구 타기: 대관람차는 한 바퀴(칸에 앉아 하늘까지) · 회전목마는 두 바퀴(오르내리며) · 롤러코스터는 레일을 따라 오르내린다 ─────
+  private riding: { k: number; att: string; t: number; T: number; back: [number, number] } | null = null;
+  private rideCar: Graphics | null = null;
+  /** 타는 것: 대관람차 칸(지붕 · 창틀 · 앞판) · 날개 달린 목마(기둥) · 롤러코스터 빨간 칸 — 사람 앞에 그린다 */
+  private drawRideCar(att: string, x: number, y: number, t: number) {
+    const g = this.rideCar!; g.clear();
+    if (att === 'ferris') {
+      g.moveTo(x, y - 40).lineTo(x, y - 30).stroke({ color: 0xc9a23e, width: 2 });
+      g.roundRect(x - 15, y - 31, 30, 6, 3).fill(0xf28aa8);
+      g.rect(x - 14, y - 26, 2, 22).fill(0xfbf8f0); g.rect(x + 12, y - 26, 2, 22).fill(0xfbf8f0);
+      g.roundRect(x - 15, y - 10, 30, 12, 3).fill(0xf28aa8).stroke({ color: 0xfbf8f0, width: 1.5 });
+      g.rect(x - 11, y - 7, 22, 2).fill({ color: 0xffffff, alpha: 0.6 });
+    } else if (att === 'carousel') {
+      g.rect(x - 1, y - 60, 2, 66).fill(0xd9b44a);
+      g.ellipse(x, y - 4, 13, 6).fill(0xfbfaf6); g.rect(x + 9, y - 14, 5, 10).fill(0xfbfaf6); g.ellipse(x + 13, y - 15, 4, 3).fill(0xfbfaf6);
+      g.rect(x - 9, y + 1, 2, 7).fill(0xeeeae0); g.rect(x + 6, y + 1, 2, 7).fill(0xeeeae0);
+      const fl = Math.sin(t * 8) * 3; g.poly([x - 4, y - 8, x - 16, y - 16 - fl, x - 10, y - 6]).fill(0xf2d27a); g.rect(x - 6, y - 7, 10, 3).fill(0xe85a6a);
+    } else {
+      g.roundRect(x - 14, y - 9, 28, 11, 3).fill(0xe83a4a).stroke({ color: 0x8a1a22, width: 1 });
+      g.rect(x - 12, y - 7, 24, 2).fill({ color: 0xffd8a8, alpha: 0.8 }); g.circle(x - 8, y + 3, 2.5).fill(0x3a3a40); g.circle(x + 8, y + 3, 2.5).fill(0x3a3a40);
+    }
+  }
+  get isRiding() { return !!this.riding; }
+  ride(k: number) {
+    const b = this.zone.buildings[k] as Building & { att?: string };
+    if (!b?.att || b.cat !== 'attraction' || this.riding) return;
+    this.rideCar?.destroy(); this.rideCar = new Graphics(); this.rideCar.eventMode = 'none'; this.objects.addChild(this.rideCar);
+    const p = this.player;
+    this.cancelActs(); p.path = []; p.target = null; p.act = null;
+    this.riding = { k, att: b.att, t: 0, T: b.att === 'ferris' ? 18 : b.att === 'carousel' ? 14 : 10, back: [p.x, p.y] };
+  }
+  private updateRide(dt: number) {
+    const r = this.riding; if (!r) return;
+    const p = this.player, b = this.zone.buildings[r.k] as Building & { att?: string };
+    r.t += dt;
+    const q = Math.min(1, r.t / r.T);
+    const cx = b.i0 + b.w / 2, cy = b.j0 + b.d / 2;
+    p.path = []; p.target = null; p.x = cx; p.y = b.j0 + b.d + 0.6; // 카메라는 놀이기구를 본다
+    const [bx, by] = iso(cx, cy);
+    let x = bx, y = by, sc = 0.82, front = true;
+    if (r.att === 'ferris') {
+      const a = Math.PI / 2 - q * Math.PI * 2, R = 130; // 맨 아래에서 시작해 한 바퀴
+      x = bx + Math.cos(a) * R; y = by - 160 + Math.sin(a) * R + 36; // 바퀴 테에 매달린 칸 바닥
+      p.dir = 'sw';
+    } else if (r.att === 'carousel') {
+      const a = Math.PI / 2 + q * Math.PI * 4;
+      x = bx + Math.cos(a) * 70; y = by - 70 + Math.sin(a) * 30 + 48 - Math.abs(Math.sin(r.t * 3)) * 6; front = Math.sin(a) > -0.2;
+      p.dir = Math.cos(a) > 0 ? 'nw' : 'se'; sc = 0.78;
+    } else {
+      const u = q < 0.5 ? q * 2 : 2 - q * 2; // 끝까지 갔다가 되돌아온다
+      const ii = b.i0 + 0.6 + u * (b.w - 1.2), jj = b.j0 + b.d / 2 + Math.sin(u * Math.PI * 3) * (b.d / 2 - 1), z = 30 + Math.abs(Math.sin(u * Math.PI * 2.2)) * (b.h - 50);
+      const [ax, ay] = iso(ii, jj); x = ax; y = ay - z - 6;
+      p.dir = q < 0.5 ? 'se' : 'nw'; sc = 0.75;
+    }
+    sc = r.att === 'ferris' ? 0.5 : r.att === 'carousel' ? 0.55 : 0.5;
+    const yy = r.att === 'carousel' ? y - 6 : y;
+    p.sprite.position.set(x, yy);
+    p.sprite.scale.set(sc);
+    p.sprite.zIndex = front ? 1e7 : (b.i0 + b.j0) - 1;
+    if (this.rideCar) { this.drawRideCar(r.att, x, y, r.t); this.rideCar.zIndex = p.sprite.zIndex + 0.5; }
+    if (q >= 1) {
+      this.riding = null;
+      this.rideCar?.destroy(); this.rideCar = null;
+      p.sprite.scale.set(1);
+      const f = this.frontOf(b) ?? [Math.round(r.back[0]), Math.round(r.back[1])];
+      p.x = f[0] + 0.5; p.y = f[1] + 0.5;
+      const ls = t().rideDone[r.att === 'ferris' ? 0 : r.att === 'carousel' ? 1 : 2]; this.bubble(p, ls[Math.floor(Math.random() * ls.length)]);
+    }
+  }
   private goEnter(k: number) {
     const b = this.zone.buildings[k];
     const spot = this.frontOf(b);
@@ -7782,7 +7948,8 @@ export class WorldScene {
     if (this.storeWant && !p.path.length && Math.hypot(this.storeWant.spot[0] + 0.5 - p.x, this.storeWant.spot[1] + 0.5 - p.y) < (Math.floor(p.x) === this.storeWant.spot[0] && Math.floor(p.y) === this.storeWant.spot[1] ? 9 : 2.6)) {
       const sw = this.storeWant;
       this.storeWant = null;
-      if (sw.kind === 'enter') this.hooks.enterBuilding(sw.k, { i: sw.spot[0], j: sw.spot[1] }, this.zone.buildings[sw.k]?.cat === 'home' ? null : this.takeChaser()); // 24차: 내 집 문은 도망가는 문 — 대식자는 따라 들어오지 못한다
+      if (sw.kind === 'ride') this.hooks.ride(sw.k, (this.zone.buildings[sw.k] as { att?: string }).att ?? '');
+      else if (sw.kind === 'enter') this.hooks.enterBuilding(sw.k, { i: sw.spot[0], j: sw.spot[1] }, this.zone.buildings[sw.k]?.cat === 'home' ? null : this.takeChaser()); // 24차: 내 집 문은 도망가는 문 — 대식자는 따라 들어오지 못한다
       else if (sw.kind === 'bank') this.hooks.bank(this.nameOf(this.zone.buildings[sw.k]));
       else this.hooks.store(sw.kind, this.nameOf(this.zone.buildings[sw.k]), cuisineOf(this.zone.buildings[sw.k]));
     }
@@ -7913,6 +8080,7 @@ export class WorldScene {
     this.updateKeys();
     this.holdSeat(); // 46차 예배 자리
     this.checkHutDoor(); // 46차 구름 위 오두막 문
+    this.updateRide(dt); // 46차 놀이기구
     this.drawFx(dt);
     this.updateDoor(p);
     this.updatePings(dt, p); // 38차 상점 알림 화살표
@@ -7925,7 +8093,7 @@ export class WorldScene {
       const a = 0.2 + Math.sin(this.time * 5) * 0.08;
       for (let k = 0; k < 6; k++) this.danger.rect(k * 6, k * 6, W - k * 12, H - k * 12).stroke({ color: 0xb01010, width: 6, alpha: a * (1 - k / 6) });
     }
-    this.seeThrough(px, py, p.x + p.y);
+    if (this.riding) this.seeThrough(-1e6, -1e6, -1e6); else this.seeThrough(px, py, p.x + p.y); // 46차: 놀이기구 위에선 건물을 비추지 않는다
     this.updateGhosts(p.x, p.y, dt);
     this.refreshNight(nf);
     this.streamT -= dt;
@@ -7934,6 +8102,8 @@ export class WorldScene {
     this.updateGoatFx(dt); // 33차
     this.updateChimney(dt); // 34차
     this.updateFires(dt); // 46차
+    if (this.zooAnimals.length) this.updateZoo(dt); // 46차
+    this.updateDates(dt); // 46차 아큐버스 데이트
     this.updateDollEyes(dt); // 43차
     this.updateArea(dt); // 44차
     this.updateLitPath(dt);

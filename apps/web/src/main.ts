@@ -996,6 +996,8 @@ const hooks: WorldHooks = {
     toast(t().ywLostToast);
   },
   hutDoor(which) { void hutDoor(which); },
+  ride(k, att) { void rideAsk(k, att); },
+  accDate(key) { accDate(key); },
   twinsTalk() { void twinsTalk(); },
   heavenAct(what) {
     heavenAct(what);
@@ -1577,6 +1579,50 @@ function stopTraining(quiet = false) {
   if (!quiet) toast(t().trainDone.replace('{e}', String(tr.gained)), tr.gained ? 'good' : '');
 }
 
+/** 46차 아큐버스 데이트: 장소마다 하루 한 번 — 둘의 짧은 말, 하트, 마음이 놓여 체력이 조금 찬다 */
+function accDate(key: string) {
+  const L = t();
+  const day = svcDayKey();
+  const h = (state.heaven ??= {} as NonNullable<typeof state.heaven>);
+  const seen = h.dates && h.dates.day === day ? h.dates.keys : [];
+  if (seen.includes(key)) return;
+  h.dates = { day, keys: [...seen, key], n: (h.dates?.n ?? 0) + 1 };
+  save(state);
+  const set = L.accDate[key as keyof typeof L.accDate];
+  if (!set) return;
+  world?.dateScene(set[Math.floor(Math.random() * set.length)] as [string, string]);
+  world?.heal(maxHp() * 0.15);
+  toast(L.accDateToast.replace('{place}', L.accDatePlace[key as keyof typeof L.accDatePlace] ?? ''), 'good');
+}
+/** 46차 천국 놀이공원: 안내 천사에게 묻고 탄다 (천국에선 값을 받지 않는다) */
+async function rideAsk(k: number, att: string) {
+  if (!world || world.isRiding || busy) return;
+  const L = t();
+  const ix = att === 'ferris' ? 0 : att === 'carousel' ? 1 : 2;
+  dlg.open({ name: L.rideAngel, exit: true });
+  await dlg.say(L.rideAsk[ix]);
+  const c = await dlg.choose([L.rideYes, L.rideNo]);
+  dlg.close();
+  if (c !== 0) return;
+  world?.ride(k);
+  toast(L.rideToast[ix]);
+}
+/** 46차 천국 본청 접수 천사: 생명책에서 내 장 찾기 · 본청이 하는 일 · 예배 시간 */
+async function palaceTalk() {
+  const L = t();
+  dlg.open({ name: L.palaceClerkSub, exit: true });
+  await dlg.say(pick(L.palaceGreet));
+  for (;;) {
+    const c = await dlg.choose([...L.palaceMenu]);
+    if (c === 0) {
+      const d = state.deeds ?? { good: 0, evil: 0 };
+      await dlg.say(L.palaceFind.replace('{g}', String(Math.round(d.good * 10) / 10)).replace('{e}', String(Math.round(d.evil * 10) / 10)).replace('{r}', String(state.heaven?.rites ?? 0)));
+    } else if (c === 1) { for (const line of L.palaceAbout) await dlg.say(line); }
+    else if (c === 2) await dlg.say(L.palaceSvc.replace('{t}', svcTime()));
+    else break;
+  }
+  dlg.close();
+}
 /** 방의 직원: 업종마다 할 수 있는 것 */
 function clerkTalk() {
   const info = world?.zone.interior;
@@ -1592,6 +1638,7 @@ function clerkTalk() {
   if (info.kind === 'shore') { talkToBulda(); return; }
   if (info.kind === 'home') { talkToYunae(); return; }
   if (info.kind === 'ysalon') { void talkToSalon(); return; } // 40차 유내 미용실
+  if (info.kind === 'hpalace') { void palaceTalk(); return; } // 46차 천국 본청 접수 천사
   if (info.store === 'bank') { openBank(info.name); return; }
   if (info.store === 'furniture') { void openFurnStore(info.name); return; }
   if (info.kind === 'arcade') { void arcadeTalk(info.name); return; }

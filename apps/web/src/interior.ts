@@ -21,6 +21,7 @@ export function canEnter(b: Building) {
   const p = mainPoi(b);
   if (b.cat === 'condo' && adminVisit) return true;
   if (b.cat === 'home' || b.cat === 'estate') return true; // 24차 내 집 · 35차 사는 집
+  if (b.cat === 'palace') return true; // 46차 천국 본청
   if (!p || b.cat === 'ujusae') return false;
   // 간판이 없어도 들어갈 수 있는 곳: 종교시설·병원·은행
   // 32차: 물건을 파는 곳·은행은 반드시 안으로 들어가서 산다 (문 앞에서 사던 버그)
@@ -45,6 +46,7 @@ export function roomKind(b: Building): string {
   if (b.yunae) return 'ysalon'; // 40차 유내 미용실 (회상 속 그 미용실 그대로, 사람만 다르다)
   if (b.cat === 'sanct') { const att = (b as { att?: string }).att; return att === 'temple' ? 'htemple' : att === 'mosque' ? 'hmosque' : 'hchurch'; } // 46차 천국 성소
   if (b.cat === 'cottage') return 'cloudisle'; // 46차 구름 위의 오두막 (옆집 쌍둥이)
+  if (b.cat === 'palace') return 'hpalace'; // 46차 천국 본청 안 (생명책 · 저울 · 접수 천사)
   if (b.cat === 'hbank' || b.cat === 'atone' || b.cat === 'rebirth' || b.cat === 'terrace' || b.cat === 'home' || b.cat === 'goatroom') return b.cat; // 31차 goatroom = 지옥 142층 염소대왕의 방 // 지옥 은행 · 속죄의 회당 · 지옥 로비 · 천국 환생의 테라스
   const k = kindOf(b);
   if (k === 'place_of_worship' || b.cat === 'worship') {
@@ -74,10 +76,11 @@ export function roomKind(b: Building): string {
 }
 
 /** 쉬는 곳: 종교시설·은행·병원·약국 (싸움 불가 · 빠른 회복) */
-export const REST_ROOMS = new Set(['hchurch', 'htemple', 'hmosque', 'cloudisle', 'home', 'myhome', 'temple', 'church', 'mosque', 'gurdwara', 'bank', 'clinic', 'pharmacy', 'hbank', 'atone', 'rebirth', 'terrace', 'goatroom']);
+export const REST_ROOMS = new Set(['hpalace', 'hchurch', 'htemple', 'hmosque', 'cloudisle', 'home', 'myhome', 'temple', 'church', 'mosque', 'gurdwara', 'bank', 'clinic', 'pharmacy', 'hbank', 'atone', 'rebirth', 'terrace', 'goatroom']);
 
 const SIZE: Record<string, [number, number]> = {
   hchurch: [19, 16], htemple: [19, 16], hmosque: [19, 16], cloudisle: [20, 15], // 46차
+  hpalace: [24, 18],
   temple: [13, 11], church: [13, 11], mosque: [12, 11], gurdwara: [12, 11], bank: [12, 10], clinic: [12, 10], pharmacy: [9, 8],
   mart: [11, 9], food: [12, 10], cafe: [10, 9], bar: [10, 9], salon: [9, 8], ysalon: [10, 9], massage: [10, 9], laundry: [9, 8], lobby: [11, 9], shop: [9, 8], loan: [10, 8],
   hbank: [10, 8], atone: [11, 10], myhome: [14, 11], furnshop: [12, 10], hardware: [12, 10], arcade: [13, 10], rebirth: [31, 17], terrace: [23, 16], home: [11, 9], gym: [13, 11], dojo: [13, 11], condo: [13, 10], dept: [26, 20], goatroom: [17, 17],
@@ -85,6 +88,7 @@ const SIZE: Record<string, [number, number]> = {
 const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   hchurch: { floor: 'marble', wall: '#f6f2ea', trim: '#c9a23e' }, htemple: { floor: 'temple', wall: '#faf2e2', trim: '#c9a23e' }, hmosque: { floor: 'prayer', wall: '#f8f6f0', trim: '#2a8a80' }, // 46차 천국 성소
   cloudisle: { floor: 'cloud', wall: '#f6f2ea', trim: '#c9a23e' }, // 46차 구름 위 오두막
+  hpalace: { floor: 'marble', wall: '#fbf8f0', trim: '#c9a23e' }, // 46차 천국 본청
   temple: { floor: 'temple', wall: '#e9dcc0', trim: '#a8322a' }, church: { floor: 'stone', wall: '#e8e2d4', trim: '#6b4a30' },
   mosque: { floor: 'prayer', wall: '#efe8d8', trim: '#2a6a5a' }, gurdwara: { floor: 'prayer', wall: '#f2ecdc', trim: '#c9822a' },
   bank: { floor: 'marble', wall: '#dfe2e4', trim: '#2a4a6a' }, clinic: { floor: 'pale', wall: '#e8eeec', trim: '#3a8a7a' },
@@ -177,6 +181,17 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
       F(10, 11, 2, 1, 12, 'cbench');
       // 둥근 섬: 네 귀퉁이를 깎는다
       for (const [ii, jj] of [[1, 1], [W - 2, 1], [W - 3, 1], [W - 2, 2], [1, H - 2], [2, H - 2], [1, H - 3], [W - 2, H - 2], [W - 3, H - 2], [W - 2, H - 3], [W - 4, H - 2], [W - 2, H - 4]]) tiles[jj * W + ii] = TI.void;
+      break;
+    }
+    case 'hpalace': {
+      // 46차 천국 본청: 맨 안쪽 단 위의 생명책(영혼마다 한 장) · 한가운데 금 저울 · 양쪽 접수 창구 · 대리석 기둥 · 기다리는 영혼들의 긴 의자
+      F(mid - 1, 3, 3, y1 - 2, 1, 'rug', 0); // 생명책까지 이어진 붉은 금테 깔개
+      F(mid - 2, 1, 5, 2, 46, 'lifebook'); clerk = { i: mid + 3, j: 2 }; counter = { i: mid + 3, j: 4 };
+      for (const ii of [mid - 5, mid + 6]) F(ii, 1, 1, 1, 34, 'lampstand');
+      for (let jj = 3; jj < y1; jj += 3) { F(1, jj, 1, 1, 120, 'pillar'); F(x1, jj, 1, 1, 120, 'pillar'); }
+      F(mid - 1, 7, 3, 2, 44, 'hscale');
+      F(3, 5, 1, 4, 24, 'counter'); F(x1 - 2, 5, 1, 4, 24, 'counter');
+      for (const jj of [12, 14, 16]) if (jj < y1) { F(4, jj, 5, 1, 12, 'cbench'); F(W - 9, jj, 5, 1, 12, 'cbench'); for (let ii = 4; ii < 9; ii++) seats.push([ii, jj]); for (let ii = W - 9; ii < W - 4; ii++) seats.push([ii, jj]); }
       break;
     }
     // ── 46차 천국 성소: 하루 한 번 예배. 자리(seats)는 앉는 곳 — 많은 영혼이 채운다 ──
@@ -455,7 +470,7 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
   const info: InteriorInfo = {
     // 28차: 내 집의 유내 — 거리에서 정해 둔 시절을 따른다. 20대(1)면 방은 비어 있다 (대문 앞에 나가 있거나, 그 사람 만나러 갔다)
     kind, rest: REST_ROOMS.has(kind), name, ...look, exit, clerk: kind === 'myhome' || kind === 'condo' || hAge === 3 ? undefined : clerk, counter: kind === 'myhome' || kind === 'condo' || hAge === 3 ? undefined : counter, furn, age: hAge,
-    from: { b: k, out, bd: b }, store: kind === 'bank' ? 'bank' : kind === 'furnshop' ? 'furniture' : ['mart', 'pharmacy', 'food', 'cafe'].includes(kind) ? kind : streetSeller(b), cuisine: cuisineOf(b), seats: kind === 'hchurch' || kind === 'htemple' ? seats : seats.filter(([i, j]) => tiles[j * W + i] === TI.walk), // 46차: 성소는 의자 · 방석 위가 자리
+    from: { b: k, out, bd: b }, store: kind === 'bank' ? 'bank' : kind === 'furnshop' ? 'furniture' : ['mart', 'pharmacy', 'food', 'cafe'].includes(kind) ? kind : streetSeller(b), cuisine: cuisineOf(b), seats: kind === 'hchurch' || kind === 'htemple' || kind === 'hpalace' ? seats : seats.filter(([i, j]) => tiles[j * W + i] === TI.walk), // 46차: 성소는 의자 · 방석 위가 자리
   };
   return finalize({ id: `in-${k}`, W, H, tiles, buildings: [], props: [], lanes: [], door: exit, spawn: { i: exit.i, j: exit.j - 1 }, interior: info });
 }
@@ -1446,6 +1461,35 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       const [lx, ly] = P(cxm, yy, h * 0.5); g.fillStyle = 'rgba(255,240,190,0.5)'; g.beginPath(); g.arc(lx, ly, 6, 0, Math.PI * 2); g.fill();
       break;
     }
+    case 'lifebook': { // 46차 생명책: 세 계단 흰 단 · 금 독서대 · 펼친 큰 책(빛나는 쪽) · 책장 넘기는 깃털 펜
+      for (let k = 0; k < 3; k++) box(i - 0.3 + k * 0.25, j - 0.1 + k * 0.15, i1 + 0.3 - k * 0.25, j1 + 0.2 - k * 0.2, k * 5, k * 5 + 5, k % 2 ? '#f2eee4' : '#fbf8f0', '#e2dccc', '#d2cab8');
+      faceL(i - 0.3, i1 + 0.3, 3, 4, '#c9a23e');
+      B3(i + w / 2 - 0.2, j + 0.7, i + w / 2 + 0.2, j + 1.1, 15, h - 10, '#d8b44a'); // 독서대 기둥
+      box(i + 0.6, j + 0.3, i1 - 0.6, j1 - 0.4, h - 10, h - 6, '#e0b84e', '#c89a3a', '#a8822e');
+      // 펼친 책: 두 쪽 · 가운데 접힌 골 · 글줄
+      box(i + 0.75, j + 0.4, i + w / 2 - 0.02, j1 - 0.5, h - 6, h - 3, '#fbf6e6', '#e8dcc0', '#d8ccb0');
+      box(i + w / 2 + 0.02, j + 0.4, i1 - 0.75, j1 - 0.5, h - 6, h - 3, '#fbf6e6', '#e8dcc0', '#d8ccb0');
+      for (let n = 0; n < 6; n++) for (const [a0, a1] of [[i + 0.9, i + w / 2 - 0.15], [i + w / 2 + 0.15, i1 - 0.9]]) poly([P(a0, j + 0.5 + n * 0.1, h - 2.9), P(a1, j + 0.5 + n * 0.1, h - 2.9), P(a1, j + 0.52 + n * 0.1, h - 2.9), P(a0, j + 0.52 + n * 0.1, h - 2.9)], n === 2 ? '#c9a23e' : '#8a8068');
+      { const [cx, cy] = P(i + w / 2, j + 0.8, h); const gl = g.createRadialGradient(cx, cy - 8, 2, cx, cy - 8, 40); gl.addColorStop(0, 'rgba(255,244,200,0.55)'); gl.addColorStop(1, 'rgba(255,230,160,0)'); g.fillStyle = gl; g.beginPath(); g.arc(cx, cy - 8, 40, 0, Math.PI * 2); g.fill(); }
+      { const [fx, fy] = P(i1 - 0.9, j + 0.5, h - 2); g.strokeStyle = '#f6f2ea'; g.lineWidth = 2; g.beginPath(); g.moveTo(fx, fy); g.quadraticCurveTo(fx + 6, fy - 10, fx + 4, fy - 20); g.stroke(); g.strokeStyle = '#c9a23e'; g.lineWidth = 1; g.beginPath(); g.moveTo(fx, fy); g.lineTo(fx + 2, fy - 8); g.stroke(); } // 깃털 펜
+      break;
+    }
+    case 'hscale': { // 46차 금 저울: 받침 · 기둥 · 가로대 · 두 접시(한쪽이 조금 기운다) · 맨 위 날개 장식
+      const [cx, cy] = P(i + w / 2, j + 1, 0);
+      box(i + 0.6, j + 0.5, i1 - 0.6, j1 - 0.5, 0, 6, '#fbf8f0', '#e2dccc', '#d2cab8');
+      faceL(i + 0.6, i1 - 0.6, 5, 6, '#c9a23e');
+      g.fillStyle = '#c89a3a'; g.fillRect(Math.round(cx) - 2, Math.round(cy - h), 4, h - 6); g.fillStyle = '#f0d070'; g.fillRect(Math.round(cx) - 2, Math.round(cy - h), 1, h - 6);
+      const tilt = 3, by = cy - h + 6;
+      g.strokeStyle = '#e0b84e'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx - 30, by + tilt); g.lineTo(cx + 30, by - tilt); g.stroke();
+      for (const [dx, dy] of [[-30, tilt], [30, -tilt]]) {
+        g.strokeStyle = '#c9a23e'; g.lineWidth = 1; for (const sx of [-8, 0, 8]) { g.beginPath(); g.moveTo(cx + dx, by + dy); g.lineTo(cx + dx + sx, by + dy + 22); g.stroke(); }
+        g.fillStyle = '#c89a3a'; g.beginPath(); g.ellipse(cx + dx, by + dy + 23, 10, 3.5, 0, 0, Math.PI); g.fill(); g.fillStyle = '#f0d070'; g.beginPath(); g.ellipse(cx + dx, by + dy + 22, 10, 2.6, 0, 0, Math.PI * 2); g.fill();
+      }
+      { const fx = cx - 30, fy = by + tilt + 19; g.fillStyle = '#fff8e8'; g.beginPath(); g.ellipse(fx, fy, 3, 2, -0.4, 0, Math.PI * 2); g.fill(); } // 한쪽 접시의 깃털 하나
+      g.fillStyle = '#fbf8f0'; for (const sd of [-1, 1]) { g.beginPath(); g.moveTo(cx, by - 6); g.quadraticCurveTo(cx + sd * 10, by - 18, cx + sd * 16, by - 10); g.quadraticCurveTo(cx + sd * 8, by - 8, cx, by - 4); g.fill(); }
+      g.fillStyle = '#e0b84e'; g.beginPath(); g.arc(cx, by - 6, 3, 0, Math.PI * 2); g.fill();
+      break;
+    }
     case 'lampstand': { // 금 촛대: 가는 기둥 · 세 갈래 · 불꽃
       const [cx, cy] = P(i + 0.5, j + 0.5, 0);
       g.fillStyle = '#b8862f'; g.fillRect(Math.round(cx) - 4, Math.round(cy) - 3, 8, 3); g.fillStyle = '#e0b84e'; g.fillRect(Math.round(cx) - 1, Math.round(cy - h), 2, h);
@@ -1993,6 +2037,7 @@ export const YSALON_LOOK: Look = { sex: 'f', build: 1, skin: 0, hair: 2, hairCol
 export function clerkLook(kind: string, seed: number): Look {
   if (kind === 'terrace') return LUEN_LOOK;
   if (kind === 'cloudisle') return YELLOW_WING_LOOK;
+  if (kind === 'hpalace') return { sex: seed % 2 ? 'f' : 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'angelk', cols: { 2: '#f2e6c8', 3: '#fbf8f0', 4: '#efe8d8', 5: '#b89a6a', 14: '#e0b450', 12: '#7ad8ff' } } as Look; // 46차 본청 접수 천사
   if (kind === 'hchurch' || kind === 'htemple' || kind === 'hmosque') return { sex: kind === 'htemple' ? 'm' : seed % 2 ? 'f' : 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'angelk', cols: { 2: kind === 'hmosque' ? '#f2e6c8' : '#e8c870', 3: '#fbf8f0', 4: '#efe8d8', 5: '#b89a6a', 14: '#e0b450', 12: kind === 'htemple' ? '#f2a040' : '#7ad8ff' } } as Look; // 46차: 예배를 이끄는 천사 // 46차 구름 위 오두막: 데려다준 황색날개가 곁에
   if (kind === 'shore') return BULDA_LOOK;
   if (kind === 'loan') return BESK_LOOK;
