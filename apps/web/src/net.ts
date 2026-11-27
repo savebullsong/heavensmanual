@@ -61,10 +61,10 @@ export async function logout() {
 export async function loadServer() {
   const a = account();
   if (!a) return null;
-  const r = await rpc<{ username: string; name: string | null; save: unknown; profile: { intro?: string; contact?: string }; email: string | null; email_verified: boolean; admin?: boolean; error?: Err }>('hm_load', { p_token: a.token });
+  const r = await rpc<{ username: string; name: string | null; save: unknown; profile: ProfileDecor; email: string | null; email_verified: boolean; admin?: boolean; error?: Err }>('hm_load', { p_token: a.token });
   if ('error' in r && r.error === 'session') setAccount(null);
   if ('error' in r && r.error) return null;
-  const ok = r as { username: string; name: string | null; save: unknown; profile: { intro?: string; contact?: string }; email: string | null; email_verified: boolean; admin?: boolean };
+  const ok = r as { username: string; name: string | null; save: unknown; profile: ProfileDecor; email: string | null; email_verified: boolean; admin?: boolean };
   // 게임 속 이름과 관리자 지정은 기기에도 적어 둔다
   if ((ok.name ?? undefined) !== a.name || !!ok.admin !== !!a.admin) setAccount({ ...a, name: ok.name ?? undefined, admin: !!ok.admin || undefined });
   return ok;
@@ -80,10 +80,12 @@ export async function pushSave(save: unknown, force = false) {
   if (r === true) lastSaved = s;
   return r === true;
 }
-export async function setProfile(intro: string, contact: string, email: string) {
+/** 47차 프로필 꾸미기: 칭호 · 소개 · 연락처 · 링크(http/https) · 색 · 테두리 */
+export interface ProfileDecor { intro: string; contact: string; title?: string; link?: string; theme?: string; frame?: string }
+export async function setProfile(p: ProfileDecor, email: string) {
   const a = account();
   if (!a) return false;
-  return (await rpc<boolean>('hm_profile_set', { p_token: a.token, p_intro: intro, p_contact: contact, p_email: email })) === true;
+  return (await rpc<boolean>('hm_profile_set2', { p_token: a.token, p_profile: p, p_email: email })) === true;
 }
 /** 게임 속 이름 짓기·바꾸기 */
 export async function setName(name: string): Promise<{ name?: string; error?: string; days?: number }> {
@@ -117,7 +119,7 @@ export const requestReset = (username: string, lang: string) => mail({ action: '
 export const finishReset = (code: string, password: string) => mail({ action: 'resetDone', code, password });
 
 export async function getProfile(username: string) {
-  const r = await rpc<{ username: string; name: string | null; rank: number; intro: string | null; contact: string | null } | null>('hm_profile_get', { p_username: username });
+  const r = await rpc<{ username: string; name: string | null; rank: number; intro: string | null; contact: string | null; title?: string | null; link?: string | null; theme?: string | null; frame?: string | null } | null>('hm_profile_get', { p_username: username });
   return r && !('error' in r) ? r : null;
 }
 export async function report(target: string, reason: string) {

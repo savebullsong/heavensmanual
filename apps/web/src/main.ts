@@ -497,7 +497,7 @@ async function boot() {
   setInterval(updateHud, 1000);
   setInterval(() => { snapPos(); state.played = (state.played ?? 0) + 4; state.seen = Date.now(); if (scene === 'world' && !document.hidden) ecoDay().t += 4; save(state); }, 4000);
   addEventListener('pagehide', () => { snapPos(); save(state); });
-  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior(), store: (k: 'tools' | 'antique', n: string) => openStore(k, n), terrace: () => enterTerrace(), officer: () => talkToOfficer(), pasharTalk: () => talkToPashar(), cage: () => openCage(), parrot: () => talkToParrot(), hstore: (k: HellVendor) => openHellStore(k), smith: () => openSmith(), soul: () => renderSoul(), give: (k: string) => { addToBag(itemByKey(k)); save(state); }, regear: () => world?.setGear(gear()), eco: () => openEcoStats(), perf: (v: boolean) => setPerf(v), xchTalk: () => talkToChanger(), shopIn: () => enterShop(true), ferum: () => talkToFerum(), parrotFeed: (n: number) => { state.parrotFed = n; save(state); }, wearW: (n: number) => { for (let i = 0; i < n; i++) wear('weapon'); }, setDura: (k: string, n: number) => { (state.dura ??= {})[k] = n; save(state); }, duraMax: (k: string) => duraMax(itemByKey(k)), ysalon: () => talkToSalon(), besk: () => talkToBesk(), grandpa: (h: boolean) => talkToGrandpa(h), mari: () => talkToMari(), marion: (k: string) => useMarionette(k), bare: () => bareTrial(), svc: (k?: Sanct) => { svcForce = true; if (k) void svcGo(k); }, svcEnd: () => { if (svc) svc.end = Date.now(); }, home: () => flyHome(), ywTalk: () => talkToYellowWing(), lifePick: () => chooseLife('system2', lifeLine({ soul: { rank: 5, exp: 0 }, realm: 'hell', hell: { floor: 3 } as typeof state.hell }), lifeLine(state)) }; // 개발용 확인 창구
+  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior(), store: (k: 'tools' | 'antique', n: string) => openStore(k, n), terrace: () => enterTerrace(), officer: () => talkToOfficer(), pasharTalk: () => talkToPashar(), cage: () => openCage(), parrot: () => talkToParrot(), hstore: (k: HellVendor) => openHellStore(k), smith: () => openSmith(), soul: () => renderSoul(), give: (k: string) => { addToBag(itemByKey(k)); save(state); }, regear: () => world?.setGear(gear()), eco: () => openEcoStats(), perf: (v: boolean) => setPerf(v), xchTalk: () => talkToChanger(), shopIn: () => enterShop(true), ferum: () => talkToFerum(), parrotFeed: (n: number) => { state.parrotFed = n; save(state); }, wearW: (n: number) => { for (let i = 0; i < n; i++) wear('weapon'); }, setDura: (k: string, n: number) => { (state.dura ??= {})[k] = n; save(state); }, duraMax: (k: string) => duraMax(itemByKey(k)), ysalon: () => talkToSalon(), besk: () => talkToBesk(), grandpa: (h: boolean) => talkToGrandpa(h), mari: () => talkToMari(), marion: (k: string) => useMarionette(k), bare: () => bareTrial(), svc: (k?: Sanct) => { svcForce = true; if (k) void svcGo(k); }, svcEnd: () => { if (svc) svc.end = Date.now(); }, home: () => flyHome(), ywTalk: () => talkToYellowWing(), prof: (p: Parameters<typeof profileCard>[0]) => profileCard(p), lifePick: () => chooseLife('system2', lifeLine({ soul: { rank: 5, exp: 0 }, realm: 'hell', hell: { floor: 3 } as typeof state.hell }), lifeLine(state)) }; // 개발용 확인 창구
   if (perfOn()) setPerf(true); // 34차: 관리자가 켜 둔 성능 표시
 }
 
@@ -1011,6 +1011,7 @@ const hooks: WorldHooks = {
     toast(t().ywLostToast);
   },
   hutDoor(which) { void hutDoor(which); },
+  promo(username) { promoTap(username); },
   bed(room) { void bedAsk(room); },
   ride(k, att) { void rideAsk(k, att); },
   accDate(key) { accDate(key); },
@@ -3694,7 +3695,7 @@ function gear() {
 function myInfo(): RemoteInfo {
   const g = gear();
   const acc = net.account();
-  return { name: acc?.username ?? '', nick: acc?.name, look: bodyLook(), weapon: g.weapon, armor: g.armor, member: !!acc, hidden: invisible() || undefined };
+  return { name: acc?.username ?? '', nick: acc?.name, look: bodyLook(), weapon: g.weapon, armor: g.armor, member: !!acc, hidden: invisible() || undefined, promo: acc && promoOn() && myIntro ? myIntro.slice(0, 60) : undefined };
 }
 
 function toggleBag() {
@@ -4750,7 +4751,7 @@ function svcTick() {
 window.setInterval(svcTick, 1000);
 // 47차 무게: 짐이 바뀌면 곧 반영 (1초마다 셈 — 가볍다)
 { const chip = document.createElement('div'); chip.className = 'load-chip'; chip.hidden = true; document.body.appendChild(chip); }
-window.setInterval(applyLoad, 1000);
+window.setInterval(() => { applyLoad(); applyPromo(); }, 1000); // 47차: 무게 · 홍보 말풍선 (새 장면에도 곧 붙는다)
 const SANCT_ROOMS = ['hchurch', 'htemple', 'hmosque'];
 async function svcEscort() {
   if (!world || svcGoing) return;
@@ -5458,7 +5459,7 @@ function renderSettings() {
     </section>
     <section class="set-sec"><h4 class="h-fight"></h4><div class="set-row"><span class="lbl l-counter"></span><div class="seg s-counter"></div></div><p class="note n-counter"></p>
       <div class="set-row"><span class="lbl l-heal"></span><div class="seg s-heal"></div></div><div class="set-row"><span class="lbl l-healpct"></span><div class="seg s-healpct"></div></div><p class="note n-heal"></p></section>
-    <section class="set-sec"><h4 class="h-screen"></h4><div class="set-row"><span class="lbl l-zoom"></span><div class="seg s-zoom"></div></div><div class="set-row"><span class="lbl l-ping"></span><div class="seg s-ping"></div></div><div class="set-row"><span class="lbl l-low"></span><div class="seg s-low"></div></div></section>
+    <section class="set-sec"><h4 class="h-screen"></h4><div class="set-row"><span class="lbl l-zoom"></span><div class="seg s-zoom"></div></div><div class="set-row"><span class="lbl l-ping"></span><div class="seg s-ping"></div></div><div class="set-row"><span class="lbl l-promo"></span><div class="seg s-promo"></div></div><div class="set-row"><span class="lbl l-low"></span><div class="seg s-low"></div></div></section>
     ${matchMedia('(pointer: coarse)').matches ? '' : '<section class="set-sec set-keys"><h4 class="h-keys"></h4><div class="keys"></div><p class="note n-keys"></p></section>'}
     <section class="set-sec"><h4 class="h-lang"></h4><div class="seg s-lang wide"></div></section>
     <section class="set-sec set-acc"><h4 class="h-acc"></h4><div class="acc"></div></section>
@@ -5519,6 +5520,13 @@ function renderSettings() {
   const zooms = ['auto', '1', '1.2', '1.6', '1.9', '2.4'];
   seg(el.querySelector('.s-zoom')!, zooms, [L.zoomAuto, '1×', '1.2×', '1.6×', '1.9×', '2.4×'], () => lsGet('heavensmanual.zoom') ?? 'auto', (v) => { lsSet('heavensmanual.zoom', v); world?.setZoomPref(v); street?.setZoomPref(v); shop?.setZoomPref(v); });
   el.querySelector('.l-low')!.textContent = L.lowLabel;
+  // 47차 홍보: 켜면 내 소개 글이 말풍선으로 내 머리 위에 뜬다 (다른 사람도 본다 · 누르면 내 프로필)
+  (el.querySelector('.l-promo') as HTMLElement).textContent = L.promoLabel;
+  seg(el.querySelector('.s-promo')!, ['on', 'off'], L.onOff, () => (promoOn() ? 'on' : 'off'), (v) => {
+    if (v === 'on' && !net.account()) { toast(L.promoNeedMember); return; }
+    if (v === 'on' && !myIntro) toast(L.promoNoIntro);
+    lsSet('heavensmanual.promo', v === 'on' ? '1' : '0'); applyPromo();
+  });
   seg(el.querySelector('.s-ping')!, ['on', 'off'], L.onOff, () => (lsGet(PING_KEY) === '0' ? 'off' : 'on'), (v) => { lsSet(PING_KEY, v === 'on' ? '1' : '0'); world?.setShopPing(v === 'on'); });
   seg(el.querySelector('.s-low')!, ['on', 'off'], L.onOff, () => (world?.low ? 'on' : 'off'), (v) => { if (!world) return; world.setLowBuildings(v === 'on'); street?.setLowBuildings(v === 'on'); });
   // 38차: PC 키 지정 (손가락 기기에서는 보이지 않는다)
@@ -5623,7 +5631,7 @@ function renderAccountSettings(box: Element) {
     <div class="set-field f-name"><label><span class="lbl"></span><div class="inline"><input class="name" maxlength="12" autocomplete="nickname" spellcheck="false"><button class="name-go"></button></div></label><small class="hint"></small><small class="f-err"></small></div>
     <div class="set-field f-mail"><label><span class="lbl"></span><span class="chip"></span><div class="inline"><input class="mail" type="email" inputmode="email" maxlength="120" autocomplete="email" autocapitalize="none" spellcheck="false"><button class="mail-go"></button></div></label><small class="hint"></small><small class="f-err"></small></div>
     <details class="set-field f-pw"><summary></summary><div class="pw-box"><input class="pw-old" type="password" autocomplete="current-password" maxlength="72"><input class="pw-new" type="password" autocomplete="new-password" maxlength="72"><small class="f-err"></small><div class="row"><button class="pw-go"></button></div></div></details>
-    <div class="set-field f-prof"><span class="lbl"></span><input class="intro" maxlength="140"><input class="contact" maxlength="80"><div class="row"><button class="logout"></button><button class="save primary"></button></div></div>`;
+    <div class="set-field f-prof"><span class="lbl"></span><input class="ptitle" maxlength="20"><textarea class="intro" maxlength="140" rows="2"></textarea><input class="contact" maxlength="80"><input class="plink" maxlength="200" inputmode="url" autocapitalize="none" spellcheck="false"><div class="pick-row p-theme"></div><div class="pick-row p-frame"></div><div class="row"><button class="pview"></button><button class="logout"></button><button class="save primary"></button></div></div>`;
   const q = <T extends Element>(s: string) => box.querySelector(s) as T;
   const lbls = box.querySelectorAll('.lbl');
   lbls[0].textContent = L.setId; lbls[1].textContent = L.setName; lbls[2].textContent = L.setEmail; lbls[3].textContent = L.profileTitle;
@@ -5642,6 +5650,21 @@ function renderAccountSettings(box: Element) {
   q<HTMLInputElement>('.pw-new').placeholder = L.pwNew;
   q<HTMLButtonElement>('.pw-go').textContent = L.pwBtn;
   intro.placeholder = L.introPh; contact.placeholder = L.contactPh;
+  // 47차 프로필 꾸미기: 칭호 · 링크 · 색 · 테두리 · 미리 보기
+  const ptitle = q<HTMLInputElement>('.ptitle'), plink = q<HTMLInputElement>('.plink');
+  ptitle.placeholder = L.profTitlePh; plink.placeholder = L.profLinkPh;
+  let pTheme = 'gold', pFrame = 'plain';
+  const picks = (sel: string, keys: string[], names: string[], get: () => string, set: (v: string) => void) => {
+    const row = q<HTMLElement>(sel); row.innerHTML = '';
+    keys.forEach((k, n) => { const b = document.createElement('button'); b.className = `pick pk-${k}` + (get() === k ? ' on' : ''); b.textContent = names[n]; b.onclick = () => { set(k); picks(sel, keys, names, get, set); }; row.appendChild(b); });
+  };
+  const drawPicks = () => {
+    picks('.p-theme', PROF_THEMES, L.profThemes, () => pTheme, (v) => { pTheme = v; });
+    picks('.p-frame', PROF_FRAMES, L.profFrames, () => pFrame, (v) => { pFrame = v; });
+  };
+  drawPicks();
+  q<HTMLButtonElement>('.pview').textContent = L.profPreview;
+  q<HTMLButtonElement>('.pview').onclick = () => profileCard({ username: acc.username, name: nameIn.value || acc.name || acc.username, rank: state.soul?.rank ?? 1, intro: intro.value, contact: contact.value, title: ptitle.value, link: plink.value, theme: pTheme, frame: pFrame });
   q<HTMLButtonElement>('.save').textContent = L.save;
   q<HTMLButtonElement>('.logout').textContent = L.logout;
   let verified = false, savedMail = '';
@@ -5656,6 +5679,8 @@ function renderAccountSettings(box: Element) {
   net.loadServer().then((r) => {
     if (!r) return;
     intro.value = r.profile?.intro ?? ''; contact.value = r.profile?.contact ?? '';
+    ptitle.value = r.profile?.title ?? ''; plink.value = r.profile?.link ?? ''; pTheme = r.profile?.theme || 'gold'; pFrame = r.profile?.frame || 'plain'; drawPicks();
+    myIntro = r.profile?.intro ?? '';
     savedMail = (r.email ?? '').toLowerCase(); verified = !!r.email_verified;
     mailIn.value = r.email ?? '';
     if (r.name && !nameIn.value) nameIn.value = r.name;
@@ -5692,7 +5717,13 @@ function renderAccountSettings(box: Element) {
     else pwErr.textContent = L.pwErr[r.error ?? 'net'] ?? L.pwErr.net;
   };
   const sv = q<HTMLButtonElement>('.save');
-  sv.onclick = async () => { const ok = await busyBtn(sv, () => net.setProfile(intro.value, contact.value, savedMail)); toast(ok ? L.saved : L.errNet); };
+  sv.onclick = async () => {
+    const link = plink.value.trim();
+    if (link && !/^https?:\/\/\S+$/i.test(link)) { toast(L.profLinkBad); return; }
+    const ok = await busyBtn(sv, () => net.setProfile({ intro: intro.value, contact: contact.value, title: ptitle.value, link, theme: pTheme, frame: pFrame }, savedMail));
+    if (ok) myIntro = intro.value;
+    toast(ok ? L.saved : L.errNet);
+  };
   q<HTMLButtonElement>('.logout').onclick = async () => { try { localStorage.setItem(LAST_ACC, acc.username); } catch { /* 무시 */ } await net.pushSave(state, true); await net.logout(); renderHud(); renderSettings(); };
 }
 
@@ -6124,7 +6155,7 @@ function personMenu(id: string, info: RemoteInfo, x: number, y: number, attack: 
   const L = t();
   const name = info.member ? info.nick || info.name : L.guestName;
   const opts: { label: string; danger?: boolean; act: () => void }[] = [];
-  if (info.member) opts.push({ label: L.viewProfile, act: () => showProfile(info.name) });
+  if (info.member) opts.push({ label: L.act.look, act: () => showProfile(info.name) }); // 47차: 살펴보기 = 그 사람의 프로필 카드
   opts.push({ label: L.act.force, danger: true, act: attack });
   if (info.member && net.account()) opts.push({ label: L.report, danger: true, act: () => reportMenu(info.name, x, y) });
   opts.push({ label: L.act.close, act: () => undefined });
@@ -6135,9 +6166,39 @@ async function showProfile(username: string) {
   const L = t();
   const p = await net.getProfile(username);
   if (!p) { toast(L.errNet); return; }
-  const lines = [`${L.rank} ${p.rank}`, p.intro || L.noIntro, p.contact || ''].filter(Boolean).join('\n');
-  npcSay(p.name || p.username, lines);
+  profileCard({ username: p.username, name: p.name || p.username, rank: p.rank, intro: p.intro ?? '', contact: p.contact ?? '', title: p.title ?? '', link: p.link ?? '', theme: p.theme || 'gold', frame: p.frame || 'plain' });
 }
+// ───────────────────────── 47차 프로필 카드 · 홍보 말풍선 ─────────────────────────
+const PROF_THEMES = ['gold', 'rose', 'sky', 'ink', 'jade', 'violet'];
+const PROF_FRAMES = ['plain', 'wing', 'thorn', 'cloud', 'chain'];
+/** 내 소개 글 (홍보 말풍선에 쓴다) */
+let myIntro = '';
+const promoOn = () => lsGet('heavensmanual.promo') === '1';
+function profileCard(p: { username: string; name: string; rank: number; intro: string; contact: string; title: string; link: string; theme: string; frame: string }) {
+  const L = t();
+  document.querySelector('.prof-card')?.remove();
+  const el = document.createElement('div');
+  el.className = `prof-card th-${PROF_THEMES.includes(p.theme) ? p.theme : 'gold'} fr-${PROF_FRAMES.includes(p.frame) ? p.frame : 'plain'}`;
+  el.innerHTML = `<div class="pc-in"><button class="menu-close">✕</button><div class="pc-orn"></div><p class="pc-title"></p><h3 class="pc-name"></h3><p class="pc-rank"></p><p class="pc-intro"></p><p class="pc-contact"></p><a class="pc-link primary" target="_blank" rel="noopener noreferrer nofollow"></a></div>`;
+  const q = <T extends Element>(s: string) => el.querySelector(s) as T;
+  q<HTMLElement>('.pc-title').textContent = p.title; q<HTMLElement>('.pc-title').hidden = !p.title;
+  q<HTMLElement>('.pc-name').textContent = p.name;
+  q<HTMLElement>('.pc-rank').textContent = `${L.rank} ${p.rank}`;
+  q<HTMLElement>('.pc-intro').textContent = p.intro || L.noIntro;
+  q<HTMLElement>('.pc-contact').textContent = p.contact; q<HTMLElement>('.pc-contact').hidden = !p.contact;
+  const a = q<HTMLAnchorElement>('.pc-link');
+  const ok = /^https?:\/\/\S+$/i.test(p.link);
+  a.hidden = !ok;
+  if (ok) { a.href = p.link; a.textContent = L.profVisit.replace('{host}', (() => { try { return new URL(p.link).host; } catch { return p.link; } })()); }
+  q<HTMLButtonElement>('.menu-close').onclick = () => el.remove();
+  el.onclick = (e) => { if (e.target === el) el.remove(); };
+  document.body.appendChild(el);
+}
+/** 내 머리 위 홍보 말풍선 켜고 끄기 (다른 사람에게는 접속 정보로 함께 간다) */
+function applyPromo() { const acc = net.account(); world?.setMyPromo(acc && promoOn() && myIntro ? myIntro.slice(0, 60) : null, acc?.username ?? ''); }
+if (net.account()) void net.loadServer().then((r) => { if (r) { myIntro = r.profile?.intro ?? ''; applyPromo(); } });
+/** 홍보 말풍선을 누르면 그 사람의 프로필 (내 것이면 내 프로필) */
+function promoTap(username: string) { if (username) void showProfile(username); }
 function reportMenu(username: string, x: number, y: number) {
   const L = t();
   openTargetMenu(L.report, username, L.reportReasons.map((r) => ({ label: r, act: async () => toast((await net.report(username, r)) ? L.reported : L.errNet) })), x, y);

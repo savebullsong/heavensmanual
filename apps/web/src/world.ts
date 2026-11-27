@@ -137,7 +137,7 @@ export type NpcKind = 'passer' | 'thug' | 'suturer' | 'monster' | 'pashar' | 'cl
 export type Realm = 'real' | 'ghost' | 'hell' | 'heaven' | 'border'; // 24차: border = 경계의 해변 (귀신 대신)
 export type Stance = 'talk' | 'hostile' | 'all';
 /** name = 아이디(프로필·신고에 쓰는 열쇠), nick = 게임 속 이름(보이는 이름) */
-export interface RemoteInfo { name: string; nick?: string; look: Look; weapon: string | null; armor: string[]; member: boolean; hidden?: boolean }
+export interface RemoteInfo { name: string; nick?: string; look: Look; weapon: string | null; armor: string[]; member: boolean; hidden?: boolean; /** 47차 홍보 말풍선 (소개 글) */ promo?: string }
 const bk = (w: { size?: number }) => (w.size ?? 1) * BODY_K;
 /** 42차: t = 가는 곳(길의 끝), v = 걷는 빠르기 — 위치를 0.2초마다 보내지 않고 목적지만 보낸다 (받는 쪽이 길을 찾아 걷게 한다) */
 export interface NetPos { x: number; y: number; d: Dir; m: 0 | 1; a?: Anim; h?: number; c?: 1; k?: 1; t?: [number, number]; v?: number }
@@ -376,6 +376,8 @@ export interface WorldHooks {
   heavenAct(what: 'officer' | 'yellowwing' | 'shop' | 'assault' | 'terrace' | 'taxi' | 'ceremony' | 'noeul'): void;
   /** 46차 천국 놀이기구 앞 (대관람차 · 회전목마 · 롤러코스터) */
   ride(k: number, att: string): void;
+  /** 47차 홍보 말풍선을 눌렀다 (그 사람의 프로필) */
+  promo(username: string): void;
   /** 47차 침대 곁에 섰다 (구름 위 오두막 · 현실의 집) */
   bed(room: string): void;
   /** 46차 아큐버스(연인)와 데이트 장소에 머물렀다 */
@@ -2528,6 +2530,43 @@ export class WorldScene {
       const tick = () => { if (h.destroyed) return; const q = (performance.now() - t0) / 1800; if (q < 0) { h.alpha = 0; requestAnimationFrame(tick); return; } if (q >= 1) { h.destroy(); return; } h.alpha = 1 - q; h.y = hy - 40 - q * 40; h.x += vx * 0.016; requestAnimationFrame(tick); };
       requestAnimationFrame(tick);
     }
+  }
+  // ───── 47차 홍보 말풍선: 소개 글이 캐릭터 머리 위에 떠 있다 (나 · 다른 사람). 누르면 그 사람의 프로필 ─────
+  private promos = new Map<Walker, { o: Container; text: string; user: string }>();
+  private myPromo: { text: string; user: string } | null = null;
+  setMyPromo(text: string | null, user: string) {
+    const cur = this.myPromo;
+    if ((cur?.text ?? null) === text && (cur?.user ?? '') === user) return;
+    this.myPromo = text ? { text, user } : null;
+  }
+  private promoTag(text: string) {
+    const o = new Container(); o.eventMode = 'none'; o.zIndex = 9e5 - 2;
+    const tx = new Text({ text, style: { fontFamily: 'system-ui, sans-serif', fontSize: 10, fontWeight: '600', fill: '#2a2216', wordWrap: true, wordWrapWidth: 140, breakWords: true, lineHeight: 13 } });
+    tx.anchor.set(0.5, 1);
+    const w = Math.min(152, Math.ceil(tx.width) + 14), h = Math.ceil(tx.height) + 8;
+    const g = new Graphics();
+    g.roundRect(-w / 2, -h, w, h, 7).fill({ color: 0xfffbf0, alpha: 0.95 }).stroke({ color: 0xe0b437, width: 1.5 });
+    g.poly([-5, 0, 5, 0, 0, 7]).fill(0xfffbf0);
+    tx.position.set(0, -4);
+    o.addChild(g, tx);
+    return o;
+  }
+  private updatePromos() {
+    const want = new Map<Walker, { text: string; user: string }>();
+    if (this.myPromo && !this.dead && !this.invisible) want.set(this.player, this.myPromo);
+    for (const w of this.walkers) if (w.kind === 'remote' && w.rinfo?.promo && w.down <= 0 && !w.rinfo.hidden) want.set(w, { text: w.rinfo.promo, user: w.rinfo.name });
+    for (const [w, pr] of this.promos) { const n = want.get(w); if (!n || n.text !== pr.text || w.sprite.destroyed) { pr.o.destroy({ children: true }); this.promos.delete(w); } }
+    for (const [w, n] of want) {
+      let pr = this.promos.get(w);
+      if (!pr) { pr = { o: this.promoTag(n.text), text: n.text, user: n.user }; this.objects.addChild(pr.o); this.promos.set(w, pr); }
+      pr.o.position.set(Math.round(w.sprite.x), Math.round(w.sprite.y - 74 * BODY_K - (w.bubble ? 30 : 0)));
+      pr.o.visible = w.sprite.visible;
+    }
+  }
+  /** 화면 좌표의 홍보 말풍선 (누른 곳) */
+  private promoAt(gx: number, gy: number): string | null {
+    for (const pr of this.promos.values()) { if (!pr.o.visible) continue; const b = pr.o.getBounds(); if (gx >= b.x - 4 && gx <= b.x + b.width + 4 && gy >= b.y - 4 && gy <= b.y + b.height + 8) return pr.user; }
+    return null;
   }
   // ───── 47차 천국의 닭 한 마리: 걷다 서서 모이를 쪼고, 가끔 푸드덕 ─────
   private chicken: { s: Sprite; x: number; y: number; tx: number; ty: number; wait: number; peck: number; tex: Texture[] } | null = null;
@@ -5856,6 +5895,7 @@ export class WorldScene {
   private onTap(gx: number, gy: number, force: boolean) {
     if (this.seat) { if (!this.player.bubble) this.bubble(this.player, t().svcStay); return; } // 46차: 예배 중에는 가만히
     if (this.riding) return; // 46차: 놀이기구를 타는 동안
+    { const u = this.promoAt(gx, gy); if (u) { this.hooks.promo(u); return; } } // 47차: 홍보 말풍선을 누르면 그 사람의 프로필
     if (this.dead) return;
     const L = t();
     // 일하는 중이면: 어디를 누르든 일을 그만두고 가게에서 나온다
@@ -8229,6 +8269,7 @@ export class WorldScene {
     this.checkBed(); // 47차 침대
     this.updateRide(dt); // 46차 놀이기구
     if (this.stiffMark) this.updateStiffMark(); // 47차 떼먹은 사장의 칼 표시
+    if (this.myPromo || this.promos.size || this.walkers.some((w) => w.rinfo?.promo)) this.updatePromos(); // 47차 홍보 말풍선
     this.drawFx(dt);
     this.updateDoor(p);
     this.updatePings(dt, p); // 38차 상점 알림 화살표

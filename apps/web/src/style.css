@@ -657,3 +657,30 @@ body:has(.bag-panel) .load-chip { display: none; }
 .bag-weight { margin: 2px 12px 6px; font-size: 12px; color: #cfc3a6; }
 .bag-weight.over { color: #ffb07a; }
 .bag-weight.crawl { color: #ff7a6a; font-weight: 700; }
+/* 47차 프로필 카드 */
+.prof-card { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(8, 6, 4, 0.45); }
+.prof-card .pc-in { --c1: #f2d27a; --c2: #2a2116; --c3: #fff6dc; position: relative; width: min(330px, 88vw); padding: 26px 22px 20px; border-radius: 14px; background: linear-gradient(170deg, var(--c2), #120e0a); border: 2px solid var(--c1); color: var(--c3); text-align: center; box-shadow: 0 0 0 4px rgba(0,0,0,0.35), 0 10px 40px rgba(0,0,0,0.5); }
+.prof-card.th-rose .pc-in { --c1: #f28aa8; --c2: #3a1a24; --c3: #ffe8ee; }
+.prof-card.th-sky .pc-in { --c1: #8ac8f2; --c2: #152638; --c3: #e8f4ff; }
+.prof-card.th-ink .pc-in { --c1: #c8c4bc; --c2: #141416; --c3: #f0eee8; }
+.prof-card.th-jade .pc-in { --c1: #7ad8a8; --c2: #12281e; --c3: #e6fff2; }
+.prof-card.th-violet .pc-in { --c1: #c8a8f2; --c2: #22163a; --c3: #f2eaff; }
+.prof-card .menu-close { position: absolute; right: 8px; top: 8px; }
+.prof-card .pc-orn { height: 18px; margin: -8px auto 6px; width: 70%; opacity: 0.9; background-repeat: no-repeat; background-position: center; }
+.prof-card.fr-wing .pc-orn { background-image: radial-gradient(ellipse 30% 60% at 20% 60%, var(--c1) 60%, transparent 62%), radial-gradient(ellipse 30% 60% at 80% 60%, var(--c1) 60%, transparent 62%); }
+.prof-card.fr-thorn .pc-in { border-style: dashed; }
+.prof-card.fr-thorn .pc-orn { background-image: repeating-linear-gradient(135deg, var(--c1) 0 3px, transparent 3px 9px); height: 6px; }
+.prof-card.fr-cloud .pc-in { border-radius: 28px; border-width: 3px; }
+.prof-card.fr-cloud .pc-orn { background-image: radial-gradient(circle at 30% 70%, var(--c3) 30%, transparent 32%), radial-gradient(circle at 50% 50%, var(--c3) 36%, transparent 38%), radial-gradient(circle at 70% 70%, var(--c3) 30%, transparent 32%); }
+.prof-card.fr-chain .pc-in { border-style: double; border-width: 5px; }
+.prof-card.fr-chain .pc-orn { background-image: repeating-radial-gradient(circle at 6px 50%, transparent 0 3px, var(--c1) 3px 5px, transparent 5px 12px); height: 10px; }
+.prof-card .pc-title { margin: 0; font-size: 12px; letter-spacing: 1px; color: var(--c1); }
+.prof-card .pc-name { margin: 4px 0 2px; font-size: 20px; }
+.prof-card .pc-rank { margin: 0 0 12px; font-size: 12px; opacity: 0.75; }
+.prof-card .pc-intro { margin: 0 0 10px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.prof-card .pc-contact { margin: 0 0 12px; font-size: 12px; opacity: 0.8; word-break: break-all; }
+.prof-card .pc-link { display: inline-block; padding: 7px 14px; border-radius: 8px; background: var(--c1); color: #1a140c; font-weight: 700; font-size: 13px; text-decoration: none; }
+.f-prof textarea.intro { width: 100%; resize: vertical; }
+.f-prof .pick-row { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
+.f-prof .pick { padding: 3px 9px; font-size: 12px; border-radius: 12px; }
+.f-prof .pick.on { border-color: #e0b437; background: rgba(120, 90, 30, 0.6); color: #fff2c8; }
