@@ -445,10 +445,10 @@ export class ShopRoom {
   private zoomPref: string = (() => { try { return localStorage.getItem('heavensmanual.zoom') ?? 'auto'; } catch { return 'auto'; } })();
   setZoomPref(v: string) { this.zoomPref = v; }
   private wantZoom(): number {
-    if (this.zoomPref !== 'auto') return Math.max(1, Math.min(1.6, Number(this.zoomPref) || 1));
     const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-    if (!coarse) return 1.2;
-    return Math.min(this.app.screen.width, this.app.screen.height) < 600 ? 1.5 : 1.3;
+    if (coarse) return Math.min(1.2, this.zoomPref !== 'auto' ? Math.max(1, Number(this.zoomPref) || 1) : 1.2); // 47차 후속: 휴대폰 실내는 1.2배까지
+    if (this.zoomPref !== 'auto') return Math.max(1, Math.min(1.6, Number(this.zoomPref) || 1));
+    return 1.2;
   }
 
   private hit(gx: number, gy: number): ShopTarget | null {

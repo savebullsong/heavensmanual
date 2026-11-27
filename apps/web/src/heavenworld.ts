@@ -28,7 +28,7 @@ const SHOPS = [
   P('department_store', '에덴 백화점', 'ห้างอีเดน', 'Eden Department Store'),
   P('hardware', '천국 공구점', 'ร้านเครื่องมือสวรรค์', 'Heaven Hardware'),
   P('bank', '구름은행', 'ธนาคารเมฆ', 'Cloud Bank'),
-  P('restaurant', '오로라 스시', 'ออโรร่าซูชิ', 'Aurora Sushi', 'japanese'),
+  P('furniture', '구름 가구점', 'ร้านเฟอร์นิเจอร์เมฆ', 'Cloud Furniture'), // 47차: 구름 위 내 오두막에 놓을 가구 (거리 칸이 열여섯이라 스시집 자리에)
   P('cafe', '무지개 디저트', 'ขนมรุ้ง', 'Rainbow Desserts', 'dessert'),
   P('antiques', '영원 골동품', 'ของเก่านิรันดร์', 'Eternity Antiques'),
 ];
@@ -39,7 +39,7 @@ export function heavenPriceMul(name: string): number {
   return [1, 2, 3, 5, 10, 50, 200][h % 7];
 }
 
-export interface HeavenMeta { sancts: Record<'church' | 'temple' | 'mosque', number>; palace: number; base: { i: number; j: number }; pools: [number, number, number, number][]; cages: { i0: number; j0: number; i1: number; j1: number; kind: 'demon' | 'beast' | 'sinner' }[] }
+export interface HeavenMeta { sancts: Record<'church' | 'temple' | 'mosque', number>; palace: number; base: { i: number; j: number }; pools: [number, number, number, number][]; cages: { i0: number; j0: number; i1: number; j1: number; kind: 'demon' | 'beast' | 'sinner' }[]; dump: { i0: number; j0: number; i1: number; j1: number }; chicken: { i: number; j: number } }
 let meta: HeavenMeta | null = null;
 export const heavenMeta = () => meta;
 
@@ -139,7 +139,13 @@ export function heavenZone(): Zone {
   // 성소 앞길의 나무 · 분수
   for (let i = 30; i <= 90; i += 5) { if (i >= 55 && i <= 60) continue; prop(i, 92, 'tree'); }
   prop(57, 84, 'fountain');
-  meta = { sancts, palace, base, pools, cages };
+  // 47차 과소비의 쓰레기장 (남동쪽): 뜯지도 않은 선물 상자 · 쇼핑백 · 멀쩡한 TV · 매트리스 · 금 의자 · 샴페인 병 더미. 관리 천사가 한숨을 쉰다
+  const dump = { i0: 173, j0: 80, i1: 190, j1: 97 };
+  rect(dump.i0, dump.j0, dump.i1, dump.j1, 'lot'); rect(172, 58, 172, 80, 'walk');
+  for (let j = dump.j0 + 1; j < dump.j1; j += 2) for (let i = dump.i0 + 1; i < dump.i1; i += 2) if ((i * 7 + j * 3) % 7 !== 0) prop(i + (j % 4 === 1 ? 1 : 0), j, 'junkpile'); // 빽빽하게 — 산처럼 쌓였다
+  // 47차 닭 한 마리 (광장 서쪽에서 돌아다닌다)
+  const chicken = { i: 88, j: 64 };
+  meta = { sancts, palace, base, pools, cages, dump, chicken };
   return finalize({ id: HEAVEN_ID, W, H, tiles, buildings, props, lanes: [], door, spawn: door, heavenGen: true } as unknown as Omit<Zone, 'blocked'>);
 }
 
@@ -431,7 +437,7 @@ export function drawAttraction(b: Building & { att?: string }) {
 }
 
 // ───────────────────────── 소품 ─────────────────────────
-export const HEAVEN_PROPS = new Set(['sunbed', 'parasol', 'giraffe', 'elephant', 'lion', 'zebra', 'flamingo', 'panda', 'fountain', 'balloons', 'icecream']);
+export const HEAVEN_PROPS = new Set(['sunbed', 'parasol', 'giraffe', 'elephant', 'lion', 'zebra', 'flamingo', 'panda', 'fountain', 'balloons', 'icecream', 'junkpile', 'chicken']);
 function pic(w: number, h: number, ax: number, ay: number, draw: (R: (x: number, y: number, w: number, h: number, c: string) => void, g: CanvasRenderingContext2D) => void): PropPic {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
@@ -503,6 +509,31 @@ export function heavenProp(kind: string, v: number): PropPic {
       R(10, 64, 20, 14, '#f6efe0'); R(10, 64, 20, 3, '#e85a6a'); R(12, 78, 3, 3, '#5a4a3a'); R(25, 78, 3, 3, '#5a4a3a');
       const cols = ['#f28aa8', '#7ac8e8', '#f2d27a', '#a8e0a0', '#c8a8f2', '#f2a87a', '#ffffff'];
       for (let k = 0; k < 7; k++) { const x = 8 + ((k * 37) % 25), y = 8 + ((k * 23) % 26); g.strokeStyle = 'rgba(120,110,100,0.6)'; g.lineWidth = 1; g.beginPath(); g.moveTo(20, 64); g.lineTo(x, y + 8); g.stroke(); E(g, x, y, 6, 7.5, cols[k]); E(g, x - 2, y - 3, 1.5, 2, 'rgba(255,255,255,0.7)'); }
+    });
+    case 'junkpile': return pic(76, 58, 38, 50, (R, g) => {
+      // 47차 과소비의 더미: 리본 달린 선물 상자 · 브랜드 쇼핑백 · 멀쩡한 TV · 금 의자 · 샴페인 병 · 하이힐 · 꽃다발 (여섯 가지가 섞인다)
+      E(g, 38, 50, 34, 8, 'rgba(0,0,0,0.12)');
+      const r = (k: number) => { const x = Math.sin((v + 1) * 91.7 + k * 12.9) * 43758.5453; return x - Math.floor(x); };
+      E(g, 38, 43, 34, 12, '#d8d2c6'); E(g, 37, 38, 27, 12, '#e6e0d6'); E(g, 36, 31, 17, 10, '#efeae2'); // 봉긋 쌓인 더미 (포장재 · 비닐)
+      for (let k = 0; k < 14; k++) R(6 + r(k + 60) * 62, 28 + r(k + 75) * 20, 4, 2, ['#ffffff', '#d8e4f0', '#f2e6d0'][k % 3]); // 구겨진 포장지
+      const box = (x: number, y: number, w: number, h: number, c: string, rb: string) => { R(x, y, w, h, c); R(x, y, w, 2, 'rgba(255,255,255,0.45)'); R(x + w - 2, y, 2, h, 'rgba(0,0,0,0.12)'); R(x + w / 2 - 1, y, 2, h, rb); R(x, y + h / 2 - 1, w, 2, rb); R(x + w / 2 - 4, y - 3, 3, 3, rb); R(x + w / 2 + 1, y - 3, 3, 3, rb); };
+      const cols = ['#f28aa8', '#8ac8f2', '#f2d27a', '#c8a8f2', '#a8e0a0', '#ffffff', '#e85a6a'];
+      for (let k = 0; k < 8; k++) box(6 + r(k) * 52, 14 + r(k + 9) * 26, 9 + r(k + 3) * 9, 7 + r(k + 5) * 7, cols[Math.floor(r(k + 7) * cols.length)], k % 2 ? '#c9a23e' : '#ffffff');
+      if (v % 3 === 0) { R(46, 20, 20, 14, '#1e1e24'); R(48, 22, 16, 10, '#3a4a6a'); R(49, 23, 6, 3, '#8aa8d8'); R(54, 34, 4, 3, '#2a2a30'); } // 멀쩡한 TV
+      if (v % 3 === 1) { R(12, 14, 3, 20, '#c9a23e'); R(12, 26, 14, 3, '#e0b84e'); R(24, 26, 3, 12, '#c9a23e'); R(12, 14, 12, 3, '#e0b84e'); R(14, 17, 9, 8, '#e85a6a'); } // 금 의자
+      if (v % 3 === 2) { R(40, 12, 22, 8, '#fbfaf6'); R(40, 12, 22, 2, '#e8e4dc'); for (let x = 42; x < 62; x += 4) R(x, 14, 1, 5, '#d8d4cc'); } // 매트리스
+      for (let k = 0; k < 3; k++) { const x = 18 + r(k + 20) * 40, y = 34 + r(k + 23) * 8; R(x, y, 3, 8, '#2a5a3a'); R(x, y - 3, 2, 3, '#e0b84e'); } // 샴페인 병
+      R(26 + r(30) * 20, 40, 8, 10, '#1e1e1e'); R(26 + r(30) * 20, 40, 8, 2, '#c9a23e'); R(27 + r(30) * 20, 37, 6, 3, '#1e1e1e'); // 쇼핑백
+      R(50 + r(31) * 10, 44, 6, 3, '#e85a6a'); R(55 + r(31) * 10, 41, 1, 4, '#e85a6a'); // 하이힐
+      for (let k = 0; k < 4; k++) E(g, 10 + r(k + 40) * 56, 46 + r(k + 44) * 6, 2.5, 2, ['#f28aa8', '#f2d27a', '#ffffff', '#c8a8f2'][k]); // 시든 꽃잎
+    });
+    case 'chicken': return pic(24, 24, 12, 21, (R, g) => {
+      // 47차 천국의 닭 한 마리: 흰 몸 · 붉은 볏 · 노란 부리와 다리 (v 1 = 모이 쪼기)
+      E(g, 12, 21, 7, 2, 'rgba(0,0,0,0.15)');
+      const dn = v % 2 ? 3 : 0;
+      R(9, 17, 1, 4, '#e0a83a'); R(13, 17, 1, 4, '#e0a83a'); R(8, 20, 3, 1, '#e0a83a'); R(12, 20, 3, 1, '#e0a83a');
+      E(g, 11, 13, 6, 5, '#fbfaf6'); E(g, 9, 14, 4, 3, '#ece8e0'); R(4, 9, 3, 5, '#f4f2ee'); R(3, 8, 2, 3, '#ffffff'); // 몸 · 날개 · 꼬리
+      E(g, 16, 8 + dn, 3, 3, '#fbfaf6'); R(15, 4 + dn, 3, 2, '#e8322a'); R(16, 3 + dn, 1, 1, '#e8322a'); R(19, 8 + dn, 2, 1, '#f2b23a'); R(16, 10 + dn, 2, 2, '#e8322a'); R(17, 7 + dn, 1, 1, '#1e1a16');
     });
     case 'icecream': return pic(44, 56, 22, 50, (R, g) => {
       E(g, 22, 50, 16, 4, 'rgba(0,0,0,0.12)');

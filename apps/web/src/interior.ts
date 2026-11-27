@@ -47,6 +47,7 @@ export function roomKind(b: Building): string {
   if (b.cat === 'sanct') { const att = (b as { att?: string }).att; return att === 'temple' ? 'htemple' : att === 'mosque' ? 'hmosque' : 'hchurch'; } // 46차 천국 성소
   if (b.cat === 'cottage') return 'cloudisle'; // 46차 구름 위의 오두막 (옆집 쌍둥이)
   if (b.cat === 'palace') return 'hpalace'; // 46차 천국 본청 안 (생명책 · 저울 · 접수 천사)
+  if (b.cat === 'hhome') return 'hhome'; // 47차 구름 위 내 오두막 안 (천국 가구 · 침대에서 자기)
   if (b.cat === 'hbank' || b.cat === 'atone' || b.cat === 'rebirth' || b.cat === 'terrace' || b.cat === 'home' || b.cat === 'goatroom') return b.cat; // 31차 goatroom = 지옥 142층 염소대왕의 방 // 지옥 은행 · 속죄의 회당 · 지옥 로비 · 천국 환생의 테라스
   const k = kindOf(b);
   if (k === 'place_of_worship' || b.cat === 'worship') {
@@ -76,11 +77,11 @@ export function roomKind(b: Building): string {
 }
 
 /** 쉬는 곳: 종교시설·은행·병원·약국 (싸움 불가 · 빠른 회복) */
-export const REST_ROOMS = new Set(['hpalace', 'hchurch', 'htemple', 'hmosque', 'cloudisle', 'home', 'myhome', 'temple', 'church', 'mosque', 'gurdwara', 'bank', 'clinic', 'pharmacy', 'hbank', 'atone', 'rebirth', 'terrace', 'goatroom']);
+export const REST_ROOMS = new Set(['hhome', 'hpalace', 'hchurch', 'htemple', 'hmosque', 'cloudisle', 'home', 'myhome', 'temple', 'church', 'mosque', 'gurdwara', 'bank', 'clinic', 'pharmacy', 'hbank', 'atone', 'rebirth', 'terrace', 'goatroom']);
 
 const SIZE: Record<string, [number, number]> = {
   hchurch: [19, 16], htemple: [19, 16], hmosque: [19, 16], cloudisle: [20, 15], // 46차
-  hpalace: [24, 18],
+  hpalace: [24, 18], hhome: [14, 11],
   temple: [13, 11], church: [13, 11], mosque: [12, 11], gurdwara: [12, 11], bank: [12, 10], clinic: [12, 10], pharmacy: [9, 8],
   mart: [11, 9], food: [12, 10], cafe: [10, 9], bar: [10, 9], salon: [9, 8], ysalon: [10, 9], massage: [10, 9], laundry: [9, 8], lobby: [11, 9], shop: [9, 8], loan: [10, 8],
   hbank: [10, 8], atone: [11, 10], myhome: [14, 11], furnshop: [12, 10], hardware: [12, 10], arcade: [13, 10], rebirth: [31, 17], terrace: [23, 16], home: [11, 9], gym: [13, 11], dojo: [13, 11], condo: [13, 10], dept: [26, 20], goatroom: [17, 17],
@@ -89,6 +90,7 @@ const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   hchurch: { floor: 'marble', wall: '#f6f2ea', trim: '#c9a23e' }, htemple: { floor: 'temple', wall: '#faf2e2', trim: '#c9a23e' }, hmosque: { floor: 'prayer', wall: '#f8f6f0', trim: '#2a8a80' }, // 46차 천국 성소
   cloudisle: { floor: 'cloud', wall: '#f6f2ea', trim: '#c9a23e' }, // 46차 구름 위 오두막
   hpalace: { floor: 'marble', wall: '#fbf8f0', trim: '#c9a23e' }, // 46차 천국 본청
+  hhome: { floor: 'wood', wall: '#f8f2e6', trim: '#c9a23e' }, // 47차 구름 위 내 오두막
   temple: { floor: 'temple', wall: '#e9dcc0', trim: '#a8322a' }, church: { floor: 'stone', wall: '#e8e2d4', trim: '#6b4a30' },
   mosque: { floor: 'prayer', wall: '#efe8d8', trim: '#2a6a5a' }, gurdwara: { floor: 'prayer', wall: '#f2ecdc', trim: '#c9822a' },
   bank: { floor: 'marble', wall: '#dfe2e4', trim: '#2a4a6a' }, clinic: { floor: 'pale', wall: '#e8eeec', trim: '#3a8a7a' },
@@ -307,7 +309,14 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
       F(12, 3, 3, 1, 20, 'xchdesk'); // 33차: 환전상 오볼로의 탁자 (오른쪽 벽가)
       break;
     }
-    case 'myhome': furnishHome(owned ?? [], W, H, F); break; // 35차: 산 가구가 저절로 놓인다 (직원 없음)
+    case 'myhome': furnishHome(owned ?? [], W, H, F); break;
+    case 'hhome': { // 47차: 천국에서 산 가구가 놓인다. 침대를 안 샀으면 구름 침대 하나 (여기서 잔다)
+      const own = owned ?? [];
+      furnishHome(own, W, H, F);
+      if (!own.some((k) => ['mattress', 'queenbed', 'kingbed'].includes(k))) F(W - 4, 1, 2, 3, 12, 'cbed');
+      F(1, 1, 1, 1, 40, 'skywin'); F(3, 0, 2, 1, 40, 'skywin', 1);
+      break;
+    } // 35차: 산 가구가 저절로 놓인다 (직원 없음)
     case 'dojo': {
       // 45차 도장: 바닥 매트 넷 · 샌드백 줄 · 거울 · 앞쪽 관장 자리 (무에타이는 샌드백, 태권도는 매트 위 발차기)
       F(W - 5, y1 - 2, 3, 1, 22, 'counter', 6); clerk = { i: W - 4, j: y1 - 3 }; counter = { i: W - 4, j: y1 - 1 };
@@ -469,7 +478,7 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
   const look = kind === 'myhome' && b.estate === 'seoul' ? { floor: 'marble', wall: '#f2eee6', trim: '#9a8a6a' } : hAge === 0 ? { floor: 'sand', wall: '#b8b0a4', trim: '#6a6a66' } : hAge === 1 || kind === 'ysalon' ? { floor: 'checker', wall: '#f2e6e0', trim: '#b85a74' } : hAge === 2 ? { floor: 'pale', wall: '#e6ecea', trim: '#3a8a7a' } : LOOKS[kind];
   const info: InteriorInfo = {
     // 28차: 내 집의 유내 — 거리에서 정해 둔 시절을 따른다. 20대(1)면 방은 비어 있다 (대문 앞에 나가 있거나, 그 사람 만나러 갔다)
-    kind, rest: REST_ROOMS.has(kind), name, ...look, exit, clerk: kind === 'myhome' || kind === 'condo' || hAge === 3 ? undefined : clerk, counter: kind === 'myhome' || kind === 'condo' || hAge === 3 ? undefined : counter, furn, age: hAge,
+    kind, rest: REST_ROOMS.has(kind), name, ...look, exit, clerk: kind === 'myhome' || kind === 'hhome' || kind === 'condo' || hAge === 3 ? undefined : clerk, counter: kind === 'myhome' || kind === 'hhome' || kind === 'condo' || hAge === 3 ? undefined : counter, furn, age: hAge,
     from: { b: k, out, bd: b }, store: kind === 'bank' ? 'bank' : kind === 'furnshop' ? 'furniture' : ['mart', 'pharmacy', 'food', 'cafe'].includes(kind) ? kind : streetSeller(b), cuisine: cuisineOf(b), seats: kind === 'hchurch' || kind === 'htemple' || kind === 'hpalace' ? seats : seats.filter(([i, j]) => tiles[j * W + i] === TI.walk), // 46차: 성소는 의자 · 방석 위가 자리
   };
   return finalize({ id: `in-${k}`, W, H, tiles, buildings: [], props: [], lanes: [], door: exit, spawn: { i: exit.i, j: exit.j - 1 }, interior: info });
@@ -1062,6 +1071,26 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
   // 그림자
   poly([P(i, j1, 0), P(i1, j1, 0), P(i1 + 0.12, j1 + 0.12, 0), P(i + 0.12, j1 + 0.12, 0)], '#000000', 0.18);
   switch (f.kind) {
+    case 'cbed': { // 47차 구름 침대: 뭉게구름 받침 · 흰 매트 · 금빛 머리판 · 베개 둘 · 얇은 이불
+      for (let k = 0; k < 6; k++) { const [cx, cy] = P(i + 0.3 + (k % 3) * 0.7, j + 0.4 + Math.floor(k / 3) * 2.2, 4); g.fillStyle = k % 2 ? '#f4f6fb' : '#ffffff'; g.beginPath(); g.ellipse(cx, cy, 18, 9, 0, 0, Math.PI * 2); g.fill(); }
+      box(i + 0.1, j + 0.1, i1 - 0.1, j1 - 0.1, 6, h, '#fbfaf6', '#e6e4de', '#d8d6d0');
+      B3(i + 0.08, j + 0.02, i1 - 0.08, j + 0.14, 4, h + 20, '#e0b84e'); B3(i + 0.2, j + 0.04, i1 - 0.2, j + 0.12, h + 14, h + 18, '#f2d27a');
+      for (const x of [i + 0.25, i + 1.1]) B3(x, j + 0.25, x + 0.65, j + 0.65, h, h + 4, '#ffffff');
+      poly([P(i + 0.12, j + 1.2, h + 1), P(i1 - 0.12, j + 1.2, h + 1), P(i1 - 0.12, j1 - 0.12, h + 1), P(i + 0.12, j1 - 0.12, h + 1)], '#dfe8f6');
+      faceL(i + 0.12, i1 - 0.12, h - 3, h, '#c8d6ec');
+      break;
+    }
+    case 'skywin': { // 47차 벽에 난 둥근 창: 바깥은 하늘과 구름
+      const wall = f.v === 1 ? 'L' : 'R';
+      const pts: Pt[] = [];
+      for (let k = 0; k <= 16; k++) { const a = (k / 16) * Math.PI * 2; pts.push(wall === 'R' ? P(i + 0.05, j + 0.5 + Math.cos(a) * 0.35, h - 14 + Math.sin(a) * 11) : P(i + 1 + Math.cos(a) * 0.35, j + 0.95, h - 14 + Math.sin(a) * 11)); }
+      poly(pts, '#c9a23e');
+      const inner = pts.map(([x, y]) => [x + (pts[0][0] - x) * 0, y] as Pt);
+      poly(pts.map(([x, y], k) => { const [cx, cy] = wall === 'R' ? P(i + 0.05, j + 0.5, h - 14) : P(i + 1, j + 0.95, h - 14); return [cx + (x - cx) * 0.82, cy + (y - cy) * 0.82] as Pt; }), '#9fd0f2');
+      { const [cx, cy] = wall === 'R' ? P(i + 0.05, j + 0.5, h - 18) : P(i + 1, j + 0.95, h - 18); g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(cx - 2, cy + 6, 6, 3, 0, 0, Math.PI * 2); g.fill(); g.beginPath(); g.ellipse(cx + 3, cy + 4, 4, 2.5, 0, 0, Math.PI * 2); g.fill(); }
+      void inner;
+      break;
+    }
     case 'vbed': {
       // 34차 우주의 방 침대: 나무 머리판 · 흰 이불 위 접힌 푸른 이불 · 베개 둘 (누군가 막 일어난 듯 한쪽이 젖혀졌다)
       B3(i + 0.05, j + 0.05, i1 - 0.05, j1 - 0.05, 0, 8, '#6a4a32');

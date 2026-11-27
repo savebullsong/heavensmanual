@@ -996,6 +996,7 @@ const hooks: WorldHooks = {
     toast(t().ywLostToast);
   },
   hutDoor(which) { void hutDoor(which); },
+  bed(room) { void bedAsk(room); },
   ride(k, att) { void rideAsk(k, att); },
   accDate(key) { accDate(key); },
   twinsTalk() { void twinsTalk(); },
@@ -1359,17 +1360,58 @@ async function openFurnStore(name: string) {
   const L = t();
   const el = document.createElement('div');
   el.className = 'store-panel shop-menu';
-  el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close">✕</button></div><p class="store-line"></p><div class="menu-list"></div>`;
+  el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close">✕</button></div><p class="store-line"></p><div class="menu-tabs store-tabs"></div><div class="menu-list"></div>`;
   el.querySelector('.menu-head b')!.textContent = name;
+  // 47차: 천국 가구점의 가구는 구름 위 내 오두막에 놓인다 (집이 늘 있다) · 판매 탭에서 팔거나 철거
+  const heaven = realm() === 'heaven';
   const homes = state.homes ?? {};
-  el.querySelector('.store-line')!.textContent = homes.bkk || homes.seoul ? L.furnLine : L.furnNoHome;
+  const hasHome = heaven || !!(homes.bkk || homes.seoul);
+  const mine = () => (heaven ? (state.hfurn ??= []) : (state.furn ??= []));
+  el.querySelector('.store-line')!.textContent = heaven ? L.furnLineHeaven : hasHome ? L.furnLine : L.furnNoHome;
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
   const list = el.querySelector('.menu-list')!;
+  const tabs = el.querySelector('.store-tabs')!;
+  let tab: 'buy' | 'sell' = 'buy';
+  const tBuy = document.createElement('button'), tSell = document.createElement('button');
+  tBuy.textContent = L.furnTabBuy; tSell.textContent = L.furnTabSell;
+  tBuy.onclick = () => { tab = 'buy'; draw(); }; tSell.onclick = () => { tab = 'sell'; draw(); };
+  tabs.append(tBuy, tSell);
   const info = world?.zone.interior;
+  const drawSell = () => {
+    const own = FURN.filter((f) => mine().includes(f.key));
+    if (!own.length) { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = L.furnNoneOwned; list.appendChild(p); return; }
+    for (const f of own) {
+      const back = Math.floor(f.price * 0.5);
+      const row = document.createElement('button');
+      row.className = 'menu-item';
+      row.appendChild(furnIcon(f, info));
+      const nm = document.createElement('span'); nm.className = 'name'; nm.textContent = f.name[lang()];
+      const pr = document.createElement('span'); pr.className = 'price'; pr.textContent = moneyText(back);
+      row.append(nm, pr);
+      row.onclick = async () => {
+        if (busy || dlg.isOpen) return;
+        busy = true;
+        dlg.open({ name, exit: true });
+        await dlg.say(L.furnSellAsk.replace('{item}', f.name[lang()]));
+        const c = await dlg.choose([L.furnSellBtn.replace('{p}', moneyText(back)), L.furnRemoveBtn, L.ywNo]);
+        endTalk();
+        if (c === 0) { state.wallet = (state.wallet ?? 0) + back; ecoLog('earn', 'furniture', back); }
+        if (c === 0 || c === 1) {
+          const arr = mine(); arr.splice(arr.indexOf(f.key), 1);
+          save(state); renderHud();
+          toast((c === 0 ? L.furnSold : L.furnRemoved).replace('{item}', f.name[lang()]), 'good');
+          draw();
+        }
+      };
+      list.appendChild(row);
+    }
+  };
   const draw = () => {
     list.innerHTML = '';
+    tBuy.classList.toggle('on', tab === 'buy'); tSell.classList.toggle('on', tab === 'sell');
+    if (tab === 'sell') { drawSell(); return; }
     for (const f of FURN) {
-      const owned = (state.furn ?? []).includes(f.key);
+      const owned = mine().includes(f.key);
       const row = document.createElement('button');
       row.className = 'menu-item' + (owned ? ' dim' : '');
       row.appendChild(furnIcon(f, info));
@@ -1379,10 +1421,10 @@ async function openFurnStore(name: string) {
       row.append(nm, ef, pr);
       row.onclick = () => {
         if (owned) return;
-        if (!homes.bkk && !homes.seoul) { toast(L.furnNoHome); return; }
+        if (!hasHome) { toast(L.furnNoHome); return; }
         if ((state.wallet ?? 0) < f.price) { toast(L.noMoney); return; }
         state.wallet = (state.wallet ?? 0) - f.price;
-        (state.furn ??= []).push(f.key);
+        mine().push(f.key);
         ecoLog('spend', 'furniture', f.price);
         save(state); renderHud();
         toast(L.furnBought.replace('{item}', f.name[lang()]), 'good');
@@ -1457,6 +1499,7 @@ function openRoom(z: Zone, chaser: { monster: boolean; hp: number } | null, work
 function leaveInterior(force = false) {
   if (!world?.zone.interior || !street) return;
   if (!force && world.zone.interior.kind === 'cloudisle') { void flyBack(); return; } // 46차: 구름 위 섬은 황색날개가 안고 내려간다
+  if (!force && world.zone.interior.kind === 'hhome') { void roomSwap(isleZone, { i: 4, j: 6 }); return; } // 47차: 오두막을 나서면 섬의 문 앞
   if (!force && svc) { toast(t().svcStay); return; } // 46차 예배 중
   // 31차: 염소대왕의 방은 나가는 매트로 그냥 나가지 않는다 — 상담 전이면 염소대왕이 부르고, 끝났으면 아래로 떨어진다
   if (!force && world.zone.interior.kind === 'goatroom') { if (gkPending) world.gkBlock(); else leaveGoatRoom(); return; } // 42차: 이야기 전에는 못 나간다
@@ -1699,6 +1742,10 @@ function clerkTalk() {
     } });
   } else if (info.kind === 'bar') {
     opts.push({ label: L.drinkBtn, act: () => { if (pay(80)) { world?.heal(60); toast(L.drank); } } });
+  } else if (info.kind === 'lobby') {
+    // 47차: 호텔에서 방을 잡고 잔다 (현실의 집에서는 잠이 오지 않는다)
+    const fee = realm() === 'heaven' ? 300 : 1500;
+    opts.push({ label: L.hotelSleep.replace('{p}', moneyText(fee)), act: () => { if (pay(fee)) void sleepScene(pick(L.hotelDream), realm() === 'heaven'); } });
   } else {
     npcSay(info.name, L.clerkIdle[Math.floor(Math.random() * L.clerkIdle.length)]);
     return;
@@ -4745,11 +4792,39 @@ async function flyHome() {
   if (world.zone.interior) leaveInterior(true);
   if (!world || world.zone.interior) { fx.done(); return; }
   const p = world.playerTile();
-  const b = { i0: p.i, j0: p.j, w: 1, d: 1, h: 0, cat: 'cottage', att: 'isle', color: '#ffffff' } as unknown as Building;
-  openRoom(interiorZone(b, -6, { i: p.i, j: p.j }, L.cottageName), null, false, true);
+  isleOut = { i: p.i, j: p.j };
+  openRoom(isleZone(), null, false, true);
   if (!state.heaven?.homeSeen) { state.heaven = { ...state.heaven, homeSeen: true }; save(state); }
   toast(L.cottageArrive);
   fx.done();
+}
+/** 47차: 구름 위 섬과 내 오두막 안 (방 안의 방이라 섬을 닫고 새 방을 연다 — 나오면 다시 섬의 오두막 문 앞) */
+let isleOut: { i: number; j: number } = { i: 0, j: 0 };
+function isleZone() {
+  const b = { i0: isleOut.i, j0: isleOut.j, w: 1, d: 1, h: 0, cat: 'cottage', att: 'isle', color: '#ffffff' } as unknown as Building;
+  return interiorZone(b, -6, { ...isleOut }, t().cottageName);
+}
+function hhomeZone() {
+  const b = { i0: isleOut.i, j0: isleOut.j, w: 1, d: 1, h: 0, cat: 'hhome', color: '#ffffff' } as unknown as Building;
+  return interiorZone(b, -7, { ...isleOut }, t().hhomeName, undefined, state.hfurn ?? []);
+}
+function swapRoom(z: Zone, at?: { i: number; j: number }) {
+  if (!world?.zone.interior || !street) return;
+  closeMenus();
+  const outer = street;
+  world.destroy();
+  world = outer; street = null;
+  openRoom(z, null, false, true);
+  if (at && world) world.placeNear(at.i, at.j, state.hp ?? maxHp());
+}
+async function roomSwap(z: () => Zone, at?: { i: number; j: number }) {
+  if (busy) return;
+  busy = true;
+  const fx = worldFade('heaven', false);
+  await fx.covered;
+  swapRoom(z(), at);
+  fx.done();
+  busy = false;
 }
 async function flyBack() {
   if (!world?.zone.interior || world.zone.interior.kind !== 'cloudisle') return;
@@ -4765,19 +4840,41 @@ async function hutDoor(which: 'mine' | 'twins') {
   busy = true;
   dlg.open({ name: which === 'mine' ? L.hutMine : L.hutTwins, monologue: which === 'mine' });
   if (which === 'twins') { await dlg.say(L.hutTwinsLocked); dlg.close(); busy = false; return; }
-  const c = await dlg.choose([L.hutRestBtn, L.ywNo]);
-  if (c === 0 && !dlg.cancelled) {
-    dlg.close();
-    const fx = worldFade('heaven', false);
-    await fx.covered;
-    dlg.open({ name: '', monologue: true });
-    for (const line of L.hutRest) await dlg.say(line);
-    dlg.close();
-    world?.heal(maxHp()); state.hp = maxHp(); save(state); renderHud();
-    fx.done();
-    toast(L.hutRested, 'good');
-  } else dlg.close();
+  // 47차: 들어간다 (예전엔 문 앞에서 쉬는 장면이 화면 덮개 밑에 깔려 눌리지 않았다 — 무한 로딩처럼 보이던 것)
+  const c = await dlg.choose([L.hutEnterBtn, L.ywNo]);
+  const go = c === 0 && !dlg.cancelled;
+  dlg.close();
   busy = false;
+  if (go) void roomSwap(hhomeZone);
+}
+/** 47차 침대: 구름 위 내 오두막에서는 잔다(체력 가득 · 꿈 한 조각). 현실의 집에서는 잠이 오지 않는다 — 호텔에 가면 잘 수 있다 */
+async function bedAsk(room: string) {
+  if (busy || dlg.isOpen) return;
+  const L = t();
+  busy = true;
+  dlg.open({ name: '', monologue: true });
+  if (room !== 'hhome') { await dlg.say(pick(L.bedNoSleep)); endTalk(); return; }
+  await dlg.say(L.bedAsk);
+  const c = await dlg.choose([L.bedSleep, L.ywNo]);
+  const go = c === 0 && !dlg.cancelled;
+  endTalk();
+  if (go) await sleepScene(pick(L.dreamLines), true);
+}
+/** 잠드는 장면: 화면이 천천히 덮이고 한 줄이 떴다가 깬다 (대화창을 덮개 밑에 두지 않는다) */
+async function sleepScene(text: string, heaven: boolean) {
+  busy = true;
+  const el = document.createElement('div');
+  el.className = 'sleep-cover' + (heaven ? ' heaven' : '');
+  el.innerHTML = '<p></p>';
+  el.querySelector('p')!.textContent = text;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  await new Promise((r) => setTimeout(r, 3400));
+  world?.heal(maxHp()); state.hp = maxHp(); save(state); renderHud();
+  el.classList.remove('show');
+  setTimeout(() => el.remove(), 900);
+  busy = false;
+  toast(t().slept, 'good');
 }
 /** 쌍둥이와 이야기 — 둘이 번갈아 떠든다. 가끔은 장난 */
 async function twinsTalk() {

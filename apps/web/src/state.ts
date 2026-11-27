@@ -127,6 +127,8 @@ export interface Save {
   homes?: { bkk?: boolean; seoul?: boolean };
   /** 35차 가구점에서 산 가구 (가진 집에 저절로 놓인다) */
   furn?: string[];
+  /** 47차: 천국 가구점에서 산 가구 (구름 위 내 오두막) */
+  hfurn?: string[];
   /** 31차 필드 보스: 나와 있는 자리·체력(alive) · 다시 나올 수 있는 때(due) · 지옥은 그날(day)에 쓰러졌는지(dead) */
   fb?: Record<string, { alive?: { zone: string; i: number; j: number; hp: number }; due?: number; day?: string; dead?: boolean }>;
   /** 31차: 염소대왕을 만난 횟수 (영혼) · 마지막으로 머문 때 · 이 기기에서 한 시간(초) */

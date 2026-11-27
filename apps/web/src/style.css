@@ -643,3 +643,10 @@ body.passing #hud, body.passing .stance, body.passing .quick-slot, body.passing 
 /* 45차 후속: 고급 무기 그림(96칸 벡터)은 점 그림처럼 깨뜨리지 않고 부드럽게 줄인다 */
 canvas[data-hd] { image-rendering: auto !important; }
 .menu-item canvas.icon[data-hd] { width: 40px; height: 40px; margin: -4px; } /* 목록에서는 조금 크게 (줄 높이는 그대로) */
+/* 47차 잠드는 장면 */
+.sleep-cover { position: fixed; inset: 0; z-index: 120; background: #0c0a10; opacity: 0; transition: opacity 0.9s ease; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.sleep-cover.heaven { background: #f4ecdc; }
+.sleep-cover.show { opacity: 1; pointer-events: auto; }
+.sleep-cover p { max-width: 80%; color: #d8d0c4; font-size: 15px; line-height: 1.7; text-align: center; opacity: 0; transition: opacity 1.2s ease 0.8s; }
+.sleep-cover.heaven p { color: #6a5a3a; }
+.sleep-cover.show p { opacity: 1; }

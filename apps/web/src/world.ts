@@ -266,6 +266,10 @@ interface Walker {
   fly?: { t: number; dur: number; h: number; spin: number; mine?: boolean };
   /** 46차 후속: 쓰러지는 모습 (가까이 · 중간 · 멀리 날아감 · 지옥 괴물만 두 동강) */
   deathStyle?: 'near' | 'mid' | 'far' | 'split';
+  /** 47차 쌍둥이 술래잡기: 술래인가 · 잠깐 내게 와서 노는 시간 */
+  tagIt?: boolean; tagNear?: number;
+  /** 47차 쓰레기장을 맡은 천사 */
+  dumpAngel?: boolean;
   gestT?: number; // 42차: 고유 동작까지 남은 시간
   watchT?: number; // 43차: 노을이 다시 멀찍이 따라붙기까지
   marion?: { left: number; dmg: [number, number]; said?: number }; // 43차 마리오네트: 남은 초 · 한 대 피해
@@ -370,6 +374,8 @@ export interface WorldHooks {
   heavenAct(what: 'officer' | 'yellowwing' | 'shop' | 'assault' | 'terrace' | 'taxi' | 'ceremony' | 'noeul'): void;
   /** 46차 천국 놀이기구 앞 (대관람차 · 회전목마 · 롤러코스터) */
   ride(k: number, att: string): void;
+  /** 47차 침대 곁에 섰다 (구름 위 오두막 · 현실의 집) */
+  bed(room: string): void;
   /** 46차 아큐버스(연인)와 데이트 장소에 머물렀다 */
   accDate(key: string, x: number, y: number): void;
   /** 35차 아큐버스에게 말을 건다 */
@@ -563,9 +569,11 @@ export class WorldScene {
   private wantZoom(): number {
     // 42차: 염소대왕의 방은 거인이 다 보이게 (휴대폰에서 당겨 보면 염소대왕이 화면 밖이었다)
     if (this.zone.interior?.kind === 'goatroom') return Math.min(1, this.zoomPref !== 'auto' ? Number(this.zoomPref) || 1 : 1);
+    const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    // 47차 후속: 휴대폰 · 태블릿은 실내에서 1.2배까지만 (당겨 보면 나가는 문이 화면 밖이라 누르기 힘들었다)
+    if (coarse && this.zone.interior) return Math.min(1.2, this.zoomPref !== 'auto' ? Math.max(1, Number(this.zoomPref) || 1) : 1.2);
     if (this.zoomPref !== 'auto') return Math.max(1, Math.min(2.6, Number(this.zoomPref) || 1));
     // 40차: 사람만 키우던 것(1.2배) 대신 화면 전체를 1.2배 더 당긴다 — PC 1.2 · 큰 화면 터치 1.55 · 휴대폰 1.9
-    const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
     if (!coarse) return 1.2;
     return Math.min(this.app.screen.width, this.app.screen.height) < 600 ? 1.9 : 1.55;
   }
@@ -1766,6 +1774,15 @@ export class WorldScene {
   }
   /** 43차: 천국 동물원의 지옥 우리 — 악마 · 괴물, 그리고 죄 지은 인간들 (우리 안을 서성이고, 가끔 철창 밖으로 한마디) */
   private setupZooCages() {
+    // 47차 과소비의 쓰레기장 관리 천사 · 돌아다니는 닭 한 마리
+    const hm = this.zone.heavenGen ? heavenMeta() : null;
+    if (hm?.dump) {
+      const d = hm.dump, a = this.makeWalker(this.npcLook('angel'), Math.floor((d.i0 + d.i1) / 2), d.j1 + 1, 'angel');
+      a.dumpAngel = true; a.wait = 1e9; a.speed = 0; a.dir = 'ne'; a.maxHp = a.hp = 99999;
+      this.giveWings(a, 0xe8e2d4);
+      this.walkers.push(a);
+    }
+    if (hm?.chicken) this.makeChicken(hm.chicken.i, hm.chicken.j);
     const cages = this.zone.heavenGen ? heavenMeta()?.cages ?? [] : [];
     const R = (a: number) => Math.floor(Math.random() * a);
     for (const c of cages) {
@@ -2506,6 +2523,38 @@ export class WorldScene {
       const tick = () => { if (h.destroyed) return; const q = (performance.now() - t0) / 1800; if (q < 0) { h.alpha = 0; requestAnimationFrame(tick); return; } if (q >= 1) { h.destroy(); return; } h.alpha = 1 - q; h.y = hy - 40 - q * 40; h.x += vx * 0.016; requestAnimationFrame(tick); };
       requestAnimationFrame(tick);
     }
+  }
+  // ───── 47차 천국의 닭 한 마리: 걷다 서서 모이를 쪼고, 가끔 푸드덕 ─────
+  private chicken: { s: Sprite; x: number; y: number; tx: number; ty: number; wait: number; peck: number; tex: Texture[] } | null = null;
+  private makeChicken(i: number, j: number) {
+    const tex = [0, 1].map((v) => { const pp = streetProp('chicken', v, 0); const tx = Texture.from(pp.canvas); tx.source.scaleMode = 'nearest'; return tx; });
+    const pp = streetProp('chicken', 0, 0);
+    const s = new Sprite(tex[0]); s.anchor.set(pp.ax, pp.ay); s.eventMode = 'none';
+    this.objects.addChild(s);
+    this.chicken = { s, x: i + 0.5, y: j + 0.5, tx: i + 0.5, ty: j + 0.5, wait: 1, peck: 0, tex };
+  }
+  private updateChicken(dt: number) {
+    const c = this.chicken; if (!c || c.s.destroyed) return;
+    const dx = c.tx - c.x, dy = c.ty - c.y, d = Math.hypot(dx, dy);
+    let hop = 0;
+    if (d < 0.05) {
+      c.wait -= dt;
+      c.peck += dt;
+      c.s.texture = c.tex[Math.floor(c.peck * 3) % 2]; // 쪼기
+      if (c.wait <= 0) {
+        for (let k = 0; k < 8; k++) { const ti = Math.floor(c.x + (Math.random() - 0.5) * 10), tj = Math.floor(c.y + (Math.random() - 0.5) * 10); if (walkable(this.zone, ti, tj)) { c.tx = ti + 0.5; c.ty = tj + 0.5; break; } }
+        c.wait = 2 + Math.random() * 5;
+      }
+    } else {
+      const st = Math.min(d, (d > 3 ? 1.1 : 0.7) * dt);
+      c.x += (dx / d) * st; c.y += (dy / d) * st;
+      c.s.texture = c.tex[0]; c.peck = 0;
+      hop = Math.abs(Math.sin(this.time * 14)) * 1.5;
+      const sdx = dx - dy; if (Math.abs(sdx) > 0.02) c.s.scale.x = sdx > 0 ? 1 : -1;
+    }
+    const [x, y] = iso(c.x, c.y);
+    c.s.position.set(x, y - hop);
+    c.s.zIndex = c.x + c.y + 0.49;
   }
   // ───── 46차 천국 동물원: 우리 안을 천천히 걷다 서다 한다 (가는 쪽을 바라본다 · 걸을 때 살짝 들썩) ─────
   private zooAnimals: { s: Sprite; x: number; y: number; tx: number; ty: number; wait: number; pen: [number, number]; sp: number; ph: number }[] = [];
@@ -3463,6 +3512,31 @@ export class WorldScene {
   private thinkTwin(w: Walker, moving: boolean, dt: number) {
     const p = this.player;
     if (!w.bubble && Math.random() < dt * 0.05) { const b = t().twinBark, sib = this.player.look.sex === 'f' ? '누나' : '형아'; this.bubble(w, b[Math.floor(Math.random() * b.length)].replaceAll('{sib}', sib)); }
+    // 47차: 둘이 술래잡기하며 뛰어논다 — 오빠(업이)가 먼저 술래, 잡으면 술래가 바뀐다. 가끔 내게 달려온다
+    const o = this.walkers.find((x) => x.twin && x !== w);
+    if (o && !w.tagNear) {
+      if (w.tagIt === undefined) w.tagIt = w.twin === 'boy';
+      w.speed = 2.3;
+      const d = Math.hypot(o.x - w.x, o.y - w.y);
+      w.wait -= dt;
+      if (w.tagIt && d < 0.9 && w.wait <= 0) {
+        w.tagIt = false; o.tagIt = true; o.wait = 1.2; w.wait = 0.4; w.path = []; o.path = [];
+        const L = t(); this.bubble(w, L.twinTag[Math.floor(Math.random() * L.twinTag.length)]); if (!o.bubble) this.bubble(o, L.twinCaught[Math.floor(Math.random() * L.twinCaught.length)]);
+        if (Math.random() < 0.25) { w.tagNear = 4; }
+        return;
+      }
+      if (w.wait > 0) return;
+      w.repathT -= dt;
+      if (w.repathT > 0 && moving) return;
+      w.repathT = w.tagIt ? 0.45 : 0.9;
+      let ti: number, tj: number;
+      if (w.tagIt) { ti = Math.floor(o.x); tj = Math.floor(o.y); }
+      else { const ax = w.x + (w.x - o.x) * 2 + (Math.random() - 0.5) * 4, ay = w.y + (w.y - o.y) * 2 + (Math.random() - 0.5) * 4; ti = Math.max(2, Math.min(this.zone.W - 3, Math.floor(ax))); tj = Math.max(5, Math.min(this.zone.H - 3, Math.floor(ay))); }
+      const path = findPath(this.zone, Math.floor(w.x), Math.floor(w.y), ti, tj);
+      if (path) w.path = path;
+      return;
+    }
+    if (w.tagNear) { w.tagNear -= dt; if (w.tagNear <= 0) w.tagNear = 0; w.speed = 1.5; }
     if (moving) return;
     w.wait -= dt;
     if (w.wait > 0) { if (Math.hypot(p.x - w.x, p.y - w.y) < 5) w.dir = dirFromTile(p.x - w.x, p.y - w.y, w.dir); return; }
@@ -3482,6 +3556,16 @@ export class WorldScene {
     const key = hit ? `${hit.kind}` : '';
     if (key && key !== this.hutAt) this.hooks.hutDoor(hit!.kind === 'hut' ? 'mine' : 'twins');
     this.hutAt = key;
+  }
+  private bedAt = '';
+  private checkBed() {
+    const info = this.zone.interior;
+    if (!info || (info.kind !== 'hhome' && info.kind !== 'myhome') || this.player.path.length) { if (!info) this.bedAt = ''; return; }
+    const pi = Math.floor(this.player.x), pj = Math.floor(this.player.y);
+    const bed = info.furn.find((f) => ['cbed', 'futon', 'vbed', 'kbed'].includes(f.kind) && pi >= f.i - 1 && pi <= f.i + f.w && pj >= f.j - 1 && pj <= f.j + f.d);
+    const key = bed ? 'bed' : '';
+    if (key && key !== this.bedAt) this.hooks.bed(info.kind);
+    this.bedAt = key;
   }
   private holdSeat() {
     const s = this.seat; if (!s) return;
@@ -6219,6 +6303,7 @@ export class WorldScene {
     if (w.kind === 'goat') { this.hooks.say(L.goatName, pd.kind === 'look' ? L.goatTag : L.goatTalk); return; }
     if (w.kind === 'goatking') { w.path = []; w.dir = this.player.x - w.x - (this.player.y - w.y) >= 0 ? 'e' : 'w'; if (pd.kind === 'look') this.hooks.say(L.gkName, L.gkLook); else this.hooks.goatKing(); return; }
     if (w.kind === 'changer') { w.path = []; if (pd.kind === 'look') this.hooks.say(L.xchName, L.xchSub); else this.hooks.changer(); return; }
+    if (w.dumpAngel) { const ls = pd.kind === 'look' ? [L.dumpLook] : L.dumpLines; this.hooks.say(this.npcName(w), ls[Math.floor(Math.random() * ls.length)]); return; } // 47차 쓰레기장 천사
     if (w.kind === 'angel' || w.kind === 'officer' || w.kind === 'yellowwing' || w.kind === 'noeul') {
       if (pd.kind === 'look') { this.hooks.say(this.npcName(w), this.npcSub(w)); return; }
       this.hooks.say(this.npcName(w), L.angelLines[Math.floor(Math.random() * L.angelLines.length)]);
@@ -6384,6 +6469,7 @@ export class WorldScene {
     if (w.preach !== undefined) return L.preachAngel;
     if (w.tail) return w.tail.kind === 'chef' ? L.chefName : w.tail.kind === 'accubus' ? L.accName : L.admirer;
     if (w.kind === 'officer') return L.officer;
+    if (w.dumpAngel) return L.dumpAngel;
     if (w.kind === 'angel') return L.angel;
     if (w.kind === 'passer' && this.realm === 'heaven') return L.soulPasser;
     return w.kind === 'suturer' ? L.suturer : L.npc[w.kind as 'passer' | 'thug'];
@@ -6429,6 +6515,7 @@ export class WorldScene {
     if (w.preach !== undefined) return this.nameOf(this.zone.buildings[w.preach]);
     if (w.tail) return w.tail.kind === 'chef' ? L.chefSub : w.tail.kind === 'accubus' ? L.accSub : L.admirerSub;
     if (w.kind === 'officer') return L.officerSub;
+    if (w.dumpAngel) return L.dumpAngelSub;
     if (w.kind === 'angel') return L.angelSub;
     if (w.kind === 'passer' && this.realm === 'heaven') return L.soulPasserSub;
     return w.kind === 'suturer' ? L.suturerSub : L.npcSub[w.kind as 'passer' | 'thug'];
@@ -8091,6 +8178,7 @@ export class WorldScene {
     this.updateKeys();
     this.holdSeat(); // 46차 예배 자리
     this.checkHutDoor(); // 46차 구름 위 오두막 문
+    this.checkBed(); // 47차 침대
     this.updateRide(dt); // 46차 놀이기구
     this.drawFx(dt);
     this.updateDoor(p);
@@ -8115,6 +8203,7 @@ export class WorldScene {
     this.updateFires(dt); // 46차
     if (this.zooAnimals.length) this.updateZoo(dt); // 46차
     this.updateDates(dt); // 46차 아큐버스 데이트
+    if (this.chicken) this.updateChicken(dt); // 47차 닭
     this.updateDollEyes(dt); // 43차
     this.updateArea(dt); // 44차
     this.updateLitPath(dt);
@@ -8171,6 +8260,7 @@ export class WorldScene {
     if (w.kind === 'caged') { this.thinkCaged(w, moving, dt); return; }
     if (w.tail && this.realm === 'heaven' && this.thinkTail(w, moving, dt)) return;
     if (w.kind === 'yellowwing' && this.ywFollow) { this.thinkYellowWing(w, moving, dt); return; }
+    if (w.dumpAngel) { if (!w.bubble && Math.random() < dt * 0.09 && Math.hypot(this.player.x - w.x, this.player.y - w.y) < 10) { const ls = t().dumpLines; this.bubble(w, ls[Math.floor(Math.random() * ls.length)]); } return; } // 47차: 한숨 쉬며 혼잣말
     if (w.kind === 'angel' && this.realm === 'heaven' && this.thinkAngel(w, moving, dt)) return;
     if (w.invader) {
       // 천국의 악마: 가까운 천사부터 (나를 친 자에게는 맞선다)
