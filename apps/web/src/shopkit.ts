@@ -1,3 +1,4 @@
+import { artUrl } from './art.ts';
 // 미리 구운 우주새 상점 안 (tools/sprite3d/shop.py): 방(낮·밤), 카운터, 앵무새 두 장면, 매달린 등
 import { Rectangle, Texture } from 'pixi.js';
 
@@ -10,9 +11,9 @@ function loadImg(src: string) {
 
 export const shopKitReady: Promise<ShopKit | null> = (async () => {
   try {
-    const meta: Record<string, number[]> = await fetch('./sprites/shop.json').then((r) => r.json());
+    const meta: Record<string, number[]> = await fetch(await artUrl('sprites/shop.json')).then((r) => r.json());
     const piece = async (name: string): Promise<ShopPiece> => {
-      const im = await loadImg(`./sprites/${name}.png`);
+      const im = await loadImg(await artUrl(`sprites/${name}.png`));
       const tex = Texture.from(im);
       tex.source.scaleMode = 'nearest';
       const [x, y, w, h] = meta[name];

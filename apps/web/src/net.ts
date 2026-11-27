@@ -211,7 +211,7 @@ function loopChannel(name: string, key: string) {
   return ch;
 }
 
-export function joinZone(zoneId: string, me: () => { info: RemoteInfo; pos: NetPos } | null, onPeer: (id: string, info: RemoteInfo | null, pos: NetPos | null) => void, onLeave: (id: string) => void, hooks?: PvpHooks, mobHooks?: MobHooks) {
+export function joinZone(zoneId: string, me: () => { info: RemoteInfo; pos: NetPos; alone?: boolean } | null, onPeer: (id: string, info: RemoteInfo | null, pos: NetPos | null) => void, onLeave: (id: string) => void, hooks?: PvpHooks, mobHooks?: MobHooks) {
   pvp = hooks ?? null;
   leaveZone();
   mob = mobHooks ?? null;
@@ -255,13 +255,23 @@ export function joinZone(zoneId: string, me: () => { info: RemoteInfo; pos: NetP
   ch.subscribe((status) => {
     if (status !== 'SUBSCRIBED') return;
     computeHost(); // 혼자면 내가 방장
+    // 42차: 위치를 0.2초마다 보내지 않는다 — 가는 곳(목적지) · 동작 · 체력 · 표시가 바뀔 때만, 걷는 동안은 3초마다 한 번 확인
+    //   (둘레 40칸에 아무도 없으면 6초마다). 멈추면 멈춘 자리를 한 번. 옛 판의 사람도 받아서 걸을 수 있다 (x·y가 함께 간다)
+    let lastSent = 0, lastKey = '', lastStill = '';
     const tick = () => {
       const m = me();
       if (!m) return;
-      const s = JSON.stringify(m.pos);
       const now = Date.now();
-      if (now - lastTrack > 6000) { lastTrack = now; ch.track({ ...m, since: joinedAt }); }
-      if (s !== lastPos) { lastPos = s; ch.send({ type: 'broadcast', event: 'p', payload: { id, pos: m.pos } }); }
+      if (now - lastTrack > 6000) { lastTrack = now; ch.track({ info: m.info, pos: m.pos, since: joinedAt }); }
+      const p = m.pos;
+      const key = JSON.stringify({ ...p, x: 0, y: 0, d: p.m ? 0 : p.d });
+      const still = p.m ? '' : `${p.x},${p.y},${p.d}`;
+      const beat = p.m ? (m.alone ? 6000 : 3000) : Infinity;
+      if (key !== lastKey || (still && still !== lastStill) || now - lastSent > beat) {
+        lastKey = key; lastStill = still; lastSent = now;
+        lastPos = JSON.stringify(p);
+        ch.send({ type: 'broadcast', event: 'p', payload: { id, pos: p } });
+      }
     };
     tick();
     timer = window.setInterval(tick, 200);

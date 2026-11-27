@@ -20,7 +20,7 @@ export function shoreLine(i: number) {
 export const PIER = { i0: 46, i1: 48, j0: 1 };
 
 /** 불다: 노란 고무 작업복(어부 기름옷)과 장화, 바짝 땋아 붙인 검은 콘로 머리 */
-export const BULDA_LOOK: Look = { sex: 'm', build: 2, skin: 2, hair: 5, hairColor: 0, top: 0, bottom: 0, cols: { 1: '#6a4228', 10: '#6a4228', 2: '#141010', 3: '#d8a41e', 9: '#d8a41e', 4: '#2a3430', 5: '#1a1e1c', 6: '#141010' } };
+export const BULDA_LOOK: Look = { sex: 'm', build: 2, skin: 2, hair: 5, hairColor: 0, top: 0, bottom: 0, outfit: 'bulda', cols: { 1: '#6a4228', 10: '#6a4228', 2: '#141010', 3: '#e0ae22', 9: '#2a2c30', 4: '#2a3430', 5: '#1a1e1c', 6: '#141010', 14: '#e0b84a' } }; // 42차: 전용 3D 몸 (콘로우 · 노란 비옷 · 금사슬 · 랩 한 소절)
 /** 가부좌한 완성자: 민머리(머리칼을 살빛으로), 잿빛·먹빛 승복 */
 export function monkLook(k: number): Look {
   const skin = [0, 1, 2, 1, 2][k % 5];

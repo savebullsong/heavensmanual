@@ -137,7 +137,8 @@ export type Stance = 'talk' | 'hostile' | 'all';
 /** name = 아이디(프로필·신고에 쓰는 열쇠), nick = 게임 속 이름(보이는 이름) */
 export interface RemoteInfo { name: string; nick?: string; look: Look; weapon: string | null; armor: string[]; member: boolean; hidden?: boolean }
 const bk = (w: { size?: number }) => (w.size ?? 1) * BODY_K;
-export interface NetPos { x: number; y: number; d: Dir; m: 0 | 1; a?: Anim; h?: number; c?: 1; k?: 1 }
+/** 42차: t = 가는 곳(길의 끝), v = 걷는 빠르기 — 위치를 0.2초마다 보내지 않고 목적지만 보낸다 (받는 쪽이 길을 찾아 걷게 한다) */
+export interface NetPos { x: number; y: number; d: Dir; m: 0 | 1; a?: Anim; h?: number; c?: 1; k?: 1; t?: [number, number]; v?: number }
 interface Walker {
   art?: Texture; // 관리자가 손본 도트 (서 있을 때 남서·남동쪽을 볼 때만 — 남동은 좌우를 뒤집는다)
   x: number; y: number; // 연속 격자 좌표 (타일 중심 = i + 0.5)
@@ -158,6 +159,7 @@ interface Walker {
   isPlayer: boolean;
   kind: 'player' | NpcKind | 'remote';
   rid?: string; rinfo?: RemoteInfo; rpos?: NetPos; // 다른 사람 (실시간)
+  rpath?: [number, number][]; rto?: string; // 42차: 다른 사람이 보낸 목적지까지 내가 찾은 길
   hitBy?: boolean; // 대식자를 이미 친 적이 있다 (악행은 한 번만)
   farT?: number;
   giveUp?: boolean; // 대식자: 쫓는 사람이 멀리 떨어져 있던 시간 (오래 도망치면 포기)
@@ -245,6 +247,7 @@ interface Walker {
   mirror?: { tx: number; ty: number; d: Dir; seen: number; an: number; mv: boolean };
   /** 42차: 죽은 뒤 건너가는 장면에 나오는 이 (세상이 멈춘 동안에도 움직인다) · 미끄러지듯 가는 곳 · 일어서는 중 · 땅속으로 가라앉은 깊이 */
   actor?: boolean; glide?: { tx: number; ty: number; v: number }; riseT?: number; sink?: number;
+  gestT?: number; // 42차: 고유 동작까지 남은 시간
   netActRef?: unknown; netActN?: number;
   barT: number;
   repathT: number;
@@ -3961,14 +3964,19 @@ export class WorldScene {
   /** 실시간: 내 위치 (다른 사람에게 보낼 것) */
   netPos(): NetPos {
     const p = this.player;
+    const end = p.path.length ? p.path[p.path.length - 1] : null;
     return {
       x: Math.round(p.x * 100) / 100, y: Math.round(p.y * 100) / 100, d: p.dir, m: p.path.length ? 1 : 0,
+      t: end ? [end[0] + 0.5, end[1] + 0.5] : undefined,
+      v: end ? Math.round(p.speed * (isDanger(p.hp, p.maxHp) ? DANGER_SPEED : 1) * 100) / 100 : undefined,
       a: p.act && p.act.anim !== 'fall' ? p.act.anim : undefined,
       h: Math.round((p.hp / p.maxHp) * 100) / 100,
       c: this.criminalT > 0 ? 1 : undefined,
       k: this.dead ? 1 : undefined,
     };
   }
+  /** 42차: 내 둘레 40칸 안에 다른 사람이 없다 (보내는 횟수를 더 줄인다) */
+  get netAlone() { const p = this.player; return !this.walkers.some((w) => w.kind === 'remote' && !w.lingerT && Math.hypot(w.x - p.x, w.y - p.y) < 40); }
   /** 실시간: 다른 사람 나타남·움직임 */
   // ───────────────────────── 42차: 죽은 뒤 건너가는 장면 ─────────────────────────
   // 세상이 멈추고(차·사람·괴물 모두 그 자리에) 쓰러진 몸과 장면에 나오는 이들만 움직인다. 회색으로 바래는 것·글·어둠은 main(passage.ts)이 맡는다
@@ -4174,26 +4182,6 @@ export class WorldScene {
     await tween(0.9, (k) => (b = k));
     await tween(0.8, (k) => { soul.alpha = 0.95 * k; glow.alpha = 0.9 * k; });
     await tween(2.6, (k) => { const y = sy - 190 * k * k, sw = Math.sin(k * 6) * 3; soul.position.set(sx + sw, y); glow.position.set(sx + sw, y); soul.alpha = 0.95 * (1 - k * 0.4); glow.alpha = 0.9 * (1 - k * 0.2); });
-  }
-  /** 천국의 문 앞으로 떠오르는 넋의 그림: 내 모습(서 있기)을 하얗게 바랜 한 장으로 */
-  soulPicture(): HTMLCanvasElement | null {
-    const p = this.player, cs = p.cs, f = cs ? frameOf(cs, 'idle', 'sw', 0) : null;
-    if (!f) return null;
-    try {
-      const s = new Sprite();
-      applyFrame(s, f, 1);
-      s.scale.set(Math.abs(s.scale.x), s.scale.y);
-      const src = this.app.renderer.extract.canvas({ target: s }) as HTMLCanvasElement;
-      s.destroy();
-      const c = document.createElement('canvas');
-      c.width = src.width; c.height = src.height;
-      const g = c.getContext('2d')!;
-      g.drawImage(src, 0, 0);
-      g.globalCompositeOperation = 'source-atop';
-      g.fillStyle = 'rgba(255,252,236,0.86)';
-      g.fillRect(0, 0, c.width, c.height);
-      return c;
-    } catch { return null; }
   }
   /** 염소대왕과 이야기하기 전에는 방을 나갈 수 없다: 판관석에서 한마디 */
   gkBlock() {
@@ -4474,7 +4462,13 @@ export class WorldScene {
       r.maxHp = 1;
       r.down = pos.k ? 999 : 0;
       r.lingerT = undefined;
-      if (Math.hypot(pos.x - r.x, pos.y - r.y) > 6) { r.x = pos.x; r.y = pos.y; }
+      if (Math.hypot(pos.x - r.x, pos.y - r.y) > 6) { r.x = pos.x; r.y = pos.y; r.rto = undefined; }
+      // 42차: 목적지가 새로 오면 내 쪽에서 길을 찾아 그 사람을 걷게 한다
+      const to = pos.m && pos.t ? `${pos.t[0]},${pos.t[1]}` : undefined;
+      if (to !== r.rto) {
+        r.rto = to;
+        r.rpath = pos.m && pos.t ? findPath(this.zone, Math.floor(r.x), Math.floor(r.y), Math.floor(pos.t[0]), Math.floor(pos.t[1])) ?? [[Math.floor(pos.t[0]), Math.floor(pos.t[1])]] : [];
+      }
     }
   }
 
@@ -6403,18 +6397,39 @@ export class WorldScene {
   private moveRemote(w: Walker, dt: number) {
     const rp = w.rpos;
     if (!rp) return;
-    const dx = rp.x - w.x, dy = rp.y - w.y, d = Math.hypot(dx, dy);
-    const moving = d > 0.04;
-    if (moving) {
-      const step = Math.min(d, (2.3 + d) * dt);
-      w.x += (dx / d) * step; w.y += (dy / d) * step;
-      w.dir = dirFromTile(dx, dy, w.dir);
-      w.anim += dt * 2.3 * 8.5;
-    } else { w.dir = rp.d; w.anim = 0; }
+    let moving = false;
+    if (rp.t && rp.m && w.rpath) {
+      // 42차: 받은 목적지까지 내가 찾은 길을 그 사람의 빠르기로 걷는다 (위치는 가끔 오는 확인으로만 맞춘다)
+      const v = rp.v ?? 2.3;
+      let left = v * dt;
+      while (left > 0 && w.rpath.length) {
+        const [ti, tj] = w.rpath[0], tx = ti + 0.5, ty = tj + 0.5;
+        const dx = tx - w.x, dy = ty - w.y, d = Math.hypot(dx, dy);
+        if (d < 0.02) { w.rpath.shift(); continue; }
+        const st = Math.min(d, left);
+        w.x += (dx / d) * st; w.y += (dy / d) * st; left -= st;
+        w.dir = dirFromTile(dx, dy, w.dir);
+        moving = true;
+      }
+      if (moving) w.anim += dt * v * 8.5;
+      else { w.dir = rp.d; w.anim = 0; }
+    } else {
+      const dx = rp.x - w.x, dy = rp.y - w.y, d = Math.hypot(dx, dy);
+      moving = d > 0.04;
+      if (moving) {
+        const step = Math.min(d, (2.3 + d) * dt);
+        w.x += (dx / d) * step; w.y += (dy / d) * step;
+        w.dir = dirFromTile(dx, dy, w.dir);
+        w.anim += dt * 2.3 * 8.5;
+      } else { w.dir = rp.d; w.anim = 0; }
+    }
     this.pose(w, moving, dt);
     const [sx, sy] = iso(w.x, w.y);
     w.sprite.position.set(sx, sy);
     w.sprite.zIndex = w.x + w.y;
+    // 42차 먼 사람 잔상: 40칸 넘게 떨어진 사람은 흐릿하게 (소식도 드물게 온다)
+    const far = Math.hypot(w.x - this.player.x, w.y - this.player.y) > 40;
+    w.sprite.alpha = far ? 0.35 : 1;
   }
 
   /** 지금 보여 줄 장면을 고른다: 한 번 재생하는 동작 → 쓰러져 있음 → 걷기 → 서 있기 */
@@ -6689,6 +6704,8 @@ export class WorldScene {
       } else if (!(w.isPlayer && this.dead)) this.fight(w, dt);
       if (w.sprite.destroyed) continue;
       const moving = w.mirror ? w.mirror.mv : w.down <= 0 && !(w.isPlayer && this.dead) && this.stepWalker(w, dt);
+      // 42차: 주요 인물의 고유 동작 (서 있을 때 가끔 한 번 — 장부에 적기 · 등불 들기 · 안경 고쳐 쓰기 · 랩 한 소절)
+      if (!w.isPlayer && !moving && !w.act && w.down <= 0 && w.cs?.counts.gest) { w.gestT = (w.gestT ?? 3 + Math.random() * 5) - dt; if (w.gestT <= 0) { w.act = { anim: 'gest', t: 0 }; w.gestT = 7 + Math.random() * 9; } }
       if (!w.isPlayer && w.down <= 0 && !w.mirror) this.think(w, moving, dt, nf);
       if (w.sprite.destroyed) continue;
       w.anim = moving ? w.anim + dt * (w.flee > 0 ? 1.9 : w.speed) * 8.5 : 0;

@@ -145,6 +145,22 @@ def walk2(t):
     P['upper_arm.R'] = [('X', -28 - 3 * s), ('Y', -14)]; P['upper_arm.L'] = [('X', -36 - 3 * s), ('Y', 24)]
     return P
 
+# ── 42차: 주요 인물의 고유 동작 (gest) — 서 있다가 가끔 한 번 ──
+def _g(**kw):
+    P = idle('u'); P.update({k.replace('__', '.'): v for k, v in kw.items()}); return P
+GEST = {
+    # 파샤르: 왼팔에 든 장부를 가슴께로 들어 깃펜으로 적는다 (펜 끝이 짧게 오간다)
+    'write': [_g(upper_arm__L=[('X', -38), ('Y', 14)], forearm__L=[('X', -84)], upper_arm__R=[('X', -30 - 4 * (k % 2)), ('Y', -10), ('Z', 6 * ((k % 3) - 1))], forearm__R=[('X', -92 + 6 * (k % 2))], hand__R=[('X', 10 * ((k + 1) % 2))], head=[('X', 14)])
+              for k in range(6)],
+    # 루엔: 등불을 천천히 들어 앞을 비춘다 (들었다가 내린다)
+    'lantern': [_g(upper_arm__L=[('X', -a), ('Y', 8)], forearm__L=[('X', -20 - a * 0.3)], head=[('X', -a * 0.08)]) for a in (20, 50, 80, 95, 80, 40)],
+    # 할아버지: 오른손으로 안경을 고쳐 쓴다 (고개를 살짝 숙였다 든다)
+    'glasses': [_g(upper_arm__R=[('X', -a), ('Y', -12)], forearm__R=[('X', -a * 1.45)], hand__R=[('X', -10)], head=[('X', 8 - a * 0.1)], spine=[('X', 6)]) for a in (20, 45, 62, 66, 60, 30)],
+    # 불다: 랩 한 소절 — 오른팔을 내리찍듯 박자를 타고 고개를 끄덕인다
+    'rap': [_g(upper_arm__R=[('X', -60 + 30 * (k % 2)), ('Y', -20)], forearm__R=[('X', -70 + 40 * (k % 2))], hand__R=[('X', 20 * (k % 2))],
+               upper_arm__L=[('X', -20), ('Y', 14)], forearm__L=[('X', -40)], head=[('X', 10 * (k % 2))], spine=[('Z', 6 * (1 if k % 4 < 2 else -1))])
+            for k in range(6)],
+}
 EXTRA = {'stab': STAB, 'heavy': HEAVY, 'sit': [sit()], 'lotus': [lotus()], 'idle2': [idle2()], 'walk2': [walk2(f / 8) for f in range(8)]}
 
 def anims(mode):

@@ -110,7 +110,7 @@ def idmode(keep):
 
 def frames_for(spec):
     A = _frames_for(spec)
-    for k in spec.get('extra', []): A[k] = poses.EXTRA[k]   # 16차: heavy(양손 무기) · sit(앉기)
+    for k in spec.get('extra', []): A[k] = poses.GEST[job['gest']] if k == 'gest' else poses.EXTRA[k]   # 16차: heavy(양손 무기) · sit(앉기) · 42차 gest(주요 인물의 고유 동작)
     st = job.get('stride')   # 37차: 끌리는 치마를 입은 몸은 보폭을 줄인다 (다리가 치맛자락 밖으로 나오지 않게)
     if st and spec['kind'] == 'base':
         for an in ('walk', 'idle'):

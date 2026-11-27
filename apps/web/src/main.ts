@@ -26,6 +26,7 @@ import { buildingName, hasBank } from './names.ts';
 import { bangkokClock, seoulClock } from './clock.ts';
 import { unlockAudio, isMuted, setMuted, plunge, chime } from './sfx.ts';
 import { hellPassage, heavenPassage, borderPassage, type Passage } from './passage.ts';
+import { artUrl } from './art.ts';
 import * as sfx from './sfx.ts';
 import { bgmMode, setBgmMode, setIndoor, type BgmMode } from './bgm.ts';
 import { applyDeed, karmaPoints, fmtKarma, armorClass, addSoulExp, judge, evilRatio, HELL_START, prayerAnswerChance, restRegenPerMinute, isDanger, DEED_TABLE, newStats, soulExpToNext, maxHp as maxHpFor, POINTS_PER_RANK, STAT_KEYS, STAT_MAX, type DeedKey, type StatKey } from '../../../packages/shared/src/rules.ts';
@@ -109,7 +110,7 @@ function loadZone(id: string): Promise<Zone> {
   if (!ALL_ZONES.includes(id)) id = homeZone();
   let p = zoneCache.get(id);
   if (!p) {
-    p = fetch(`zones/${id}.json`)
+    p = artUrl(`zones/${id}.json`).then((u) => fetch(u))
       .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
       .then((j) => { const z = decodeZone(j); designateHomes(z); markOwned(z); return z; }) // 35차: 아속·강남에 분양 중인 집과 가구점
       .catch(() => { zoneCache.delete(id); return sukhumvitTestZone(); });
@@ -794,7 +795,7 @@ function adminTeleport(to: number | 'back' | 'heaven' | 'bkk' | 'seoul' | 'goat'
 function joinNet(w: WorldScene) {
   w.myNetId = net.myId();
   // 천국은 같은 지도라도 다른 세계: 천국에 있는 사람끼리만 보인다
-  net.joinZone(w.realm === 'heaven' ? `${w.zone.id}~heaven` : w.zone.id, () => (scene === 'world' && world ? { info: myInfo(), pos: world.netPos() } : null), (id, info, pos) => w.upsertRemote(id, info, pos), (id) => w.removeRemote(id), {
+  net.joinZone(w.realm === 'heaven' ? `${w.zone.id}~heaven` : w.zone.id, () => (scene === 'world' && world ? { info: myInfo(), pos: world.netPos(), alone: world.netAlone } : null), (id, info, pos) => w.upsertRemote(id, info, pos), (id) => w.removeRemote(id), {
     hit: (from, dmg, crit, kind) => w.pvpHit(from, dmg, crit, kind),
     down: (victim, by, cash, crim) => w.pvpDown(victim, by, cash, crim),
   }, {
@@ -3685,7 +3686,7 @@ function showDeath(cause: 'car' | 'beaten' | 'hell') {
       save(state);
       const w = world;
       hud.hidden = true;
-      const pass = heavenPassage(async () => { if (w) { w.passageStart(); await w.soulRise(); } }, w?.soulPicture() ?? null, pick(L.passHeaven));
+      const pass = heavenPassage(app, async () => { if (w) { w.passageStart(); await w.soulRise(); } }, pick(L.passHeaven));
       void pass.covered.then(async () => {
         world?.revive(bodyLook());
         await enterWorld('door');

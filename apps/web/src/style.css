@@ -566,13 +566,24 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 .p-hell.dark .p-black { opacity: 1; }
 .p-hell.dark .p-line { opacity: 0; transition-duration: 1.6s; }
 .p-hell.lift .p-black, .p-hell.lift .p-vig { opacity: 0; transition: opacity 2.3s ease-out; }
-.p-heaven .p-gate { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; opacity: 0; transition: opacity 0.9s ease; }
-.p-heaven.show .p-gate { opacity: 1; }
+.p-heaven { perspective: 1400px; }
+.p-heaven.wait { background: transparent; }
+.p-heaven .p-light { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 50%, #ffffff 0%, #fffbea 30%, #fff2c8 60%, #f6dc9a 100%); opacity: 0; transition: opacity 0.6s ease; }
+.p-heaven.seam .p-light { opacity: 1; }
+.p-heaven .p-half { position: absolute; top: 0; height: 100%; width: 50%; opacity: 0; transition: transform 1.6s cubic-bezier(.55,0,.35,1), filter 1.6s ease, opacity 1.2s ease 0.5s; will-change: transform; }
+.p-heaven .p-half.l { left: 0; transform-origin: 0% 50%; }
+.p-heaven .p-half.r { right: 0; transform-origin: 100% 50%; }
+.p-heaven.seam .p-half { opacity: 1; transition: opacity 0.01s, transform 1.6s cubic-bezier(.55,0,.35,1), filter 1.6s ease; }
+.p-heaven.open .p-half.l { transform: rotateY(84deg) translateX(-10%); filter: brightness(1.8); opacity: 0; transition: transform 1.9s cubic-bezier(.6,0,.3,1), filter 1.9s ease-in, opacity 0.7s ease 1.2s; }
+.p-heaven.open .p-half.r { transform: rotateY(-84deg) translateX(10%); filter: brightness(1.8); opacity: 0; transition: transform 1.9s cubic-bezier(.6,0,.3,1), filter 1.9s ease-in, opacity 0.7s ease 1.2s; }
+.p-heaven .p-seam { position: absolute; top: -5%; bottom: -5%; left: 50%; width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 18px 6px #fff8e0, 0 0 60px 24px rgba(255,240,190,0.85), 0 0 160px 70px rgba(255,230,160,0.55); opacity: 0; transform: scaleY(0); transition: opacity 0.5s ease, transform 0.8s cubic-bezier(.2,.8,.2,1); }
+.p-heaven.seam .p-seam { opacity: 1; transform: scaleY(1); }
+.p-heaven.open .p-seam { width: 70%; margin-left: -35%; opacity: 0; transition: width 1.6s ease-in, margin-left 1.6s ease-in, opacity 1.2s ease-in 0.6s; }
 .p-heaven .p-white { position: absolute; inset: 0; background: #fffdf6; opacity: 0; transition: opacity 0.8s ease-in; }
 .p-heaven.white .p-white { opacity: 1; }
 .p-heaven .p-line { color: #6a5428; text-shadow: 0 0 12px rgba(255,236,180,0.9); }
 .p-heaven.text .p-line { opacity: 1; }
-.p-heaven.lift .p-white, .p-heaven.lift .p-gate { opacity: 0; transition: opacity 2s ease-out; }
+.p-heaven.lift .p-white, .p-heaven.lift .p-light { opacity: 0; transition: opacity 2s ease-out; }
 .p-heaven.lift .p-line { opacity: 0; transition-duration: 1.2s; }
 .p-border { background: #000; }
 .p-border .p-snap { position: absolute; inset: 0; width: 100%; height: 100%; transform-origin: 50% 50%; }

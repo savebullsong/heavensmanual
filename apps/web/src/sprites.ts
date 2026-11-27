@@ -1,3 +1,4 @@
+import { artUrl } from './art.ts';
 // 미리 구운 캐릭터 그림 (3D 인형 → 도트). tools/sprite3d 가 만든 층을 합치고 색을 입힌다.
 // 층: 몸(체형·차림·동작 묶음) + 머리카락 + 무기. 한 픽셀 = 구역 번호 × 16 + 음영 단계, 알파는 0 또는 255.
 import { Rectangle, Sprite, Texture } from 'pixi.js';
@@ -5,7 +6,7 @@ import { SKIN_COLORS, HAIR_COLORS, TOP_COLORS, BOTTOM_COLORS, HAIR_STYLES, AURA_
 
 /** 화면 기준 8방향. 대각선 넷은 모든 동작, 상하좌우 넷(s·e·n·w)은 서기·걷기만 구워져 있다 */
 export type Dir = 'se' | 'sw' | 'ne' | 'nw' | 's' | 'e' | 'n' | 'w';
-export type Anim = 'idle' | 'walk' | 'hit' | 'fall' | 'punch' | 'swing' | 'shoot' | 'heavy' | 'sit' | 'lotus' | 'idle2' | 'walk2' | 'stab';
+export type Anim = 'idle' | 'walk' | 'hit' | 'fall' | 'punch' | 'swing' | 'shoot' | 'heavy' | 'sit' | 'lotus' | 'idle2' | 'walk2' | 'stab' | 'gest'; // 42차 gest: 주요 인물의 고유 동작
 export type Mode = 'u' | 'm' | 'g' | 'w';
 export const DIRS: Dir[] = ['se', 'sw', 'ne', 'nw', 's', 'e', 'n', 'w'];
 /** 상하좌우로 굽지 않은 동작(공격·맞음·쓰러짐)을 보여 줄 때 쓸 가까운 대각선 */
@@ -99,7 +100,7 @@ const COSTUMES = new Set(['raincoat', 'patient', 'parrot', 'robber']); // 강도
 const COSTUME_BARE = new Set(['raincoat', 'patient', 'parrot']);
 
 /** 동작 속도 (초당 장면 수)와 맞히는 장면 */
-export const ANIM_FPS: Record<Anim, number> = { idle: 1, walk: 9, hit: 16, fall: 11, punch: 22, swing: 19, shoot: 16, heavy: 15, sit: 1, lotus: 1, idle2: 1, walk2: 9, stab: 20 };
+export const ANIM_FPS: Record<Anim, number> = { idle: 1, walk: 9, hit: 16, fall: 11, punch: 22, swing: 19, shoot: 16, heavy: 15, sit: 1, lotus: 1, idle2: 1, walk2: 9, stab: 20, gest: 6 };
 export const IMPACT: Partial<Record<Anim, number>> = { punch: 2, swing: 3, shoot: 1, heavy: 3, stab: 2 };
 /** 39차: 찌르는 무기 (단검 · 식칼 · 레이피어) — 휘두르지 않고 찌른다 */
 export const STABBERS = new Set(['dagger', 'knife', 'rapier']);
@@ -130,9 +131,10 @@ function loadLayer(key: string, dir = 'sprites'): Promise<Layer | null> {
   if (!p) {
     p = (async () => {
       try {
+        const [ju, pu] = await Promise.all([artUrl(`${dir}/${key}.json`), artUrl(`${dir}/${key}.png`)]); // 42차: 그림 캐시를 앱과 떼어 놓는다 (지문을 붙여 받는다)
         const [meta, img] = await Promise.all([
-          fetch(`./${dir}/${key}.json`).then((r) => (r.ok ? r.json() : null)),
-          new Promise<HTMLImageElement>((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = `./${dir}/${key}.png`; }),
+          fetch(ju).then((r) => (r.ok ? r.json() : null)),
+          new Promise<HTMLImageElement>((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = pu; }),
         ]);
         if (!meta) return null;
         const lp = Math.max(1, (meta._px as number[] | undefined)?.[0] ?? 1);
@@ -219,7 +221,7 @@ export function layerKeys(look: Look, weapon: string | null, armorIn: string[] =
   if (o === 'misshwang') return { base: 'b-hw-misshwang-w', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
   if (o === 'angelk') { const mk = look.sex === 'f' ? 'af' : 'an', wp = weapon === 'sword' ? 'sword' : null; return { base: `b-${mk}-angelk-${wp ? 'm' : 'u'}`, hair: null, weapon: wp ? `w-${mk}-${wp}` : null, armor: [] as { key: string; piece: string }[], mode: (wp ? 'm' : 'u') as Mode }; }
   // 42차: 지옥으로 데려가는 이들(판초 악마 · 저승사자) · 유내 세 시절 (서기·걷기 · 유내는 앉기도)
-  const D42: Record<string, string> = { ponchod: 'b-pd-ponchod-w', reaper: 'b-jr-reaper-w', yunae1: 'b-y1-yunae1-w', yunae2: 'b-y2-yunae2-w', yunae3: 'b-y3-yunae3-w' };
+  const D42: Record<string, string> = { ponchod: 'b-pd-ponchod-w', reaper: 'b-jr-reaper-w', yunae1: 'b-y1-yunae1-w', yunae2: 'b-y2-yunae2-w', yunae3: 'b-y3-yunae3-w', pashar: 'b-ps-pashar-w', luen: 'b-lu-luen-w', grandpa: 'b-gp-grandpa-w', bulda: 'b-bd-bulda-w' };
   if (D42[o as string]) return { base: D42[o as string], hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
   if (o === 'succubus') return { base: 'b-q-succubus-w', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
   if (o === 'accubus') return { base: `b-${look.sex === 'm' ? 'i' : 'j'}-accubus-w`, hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };

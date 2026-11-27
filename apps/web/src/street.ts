@@ -1,3 +1,4 @@
+import { artUrl } from './art.ts';
 // 미리 구운 거리 조각: 건물 면(1층·위층·난간), 지붕 타일, 바닥 타일, 차, 소품 (tools/sprite3d/street.py)
 // 건물 조각은 '구역 번호 × 16 + 음영'이라 건물마다 벽색·차양색·밤 창문 불빛을 따로 입힌다.
 import { Rectangle, Texture } from 'pixi.js';
@@ -13,8 +14,8 @@ const texCache = new Map<string, { tex: Texture; ax: number; ay: number }>();
 
 async function loadAtlas(name: string): Promise<Atlas> {
   const [meta, img] = await Promise.all([
-    fetch(`./sprites/${name}.json`).then((r) => r.json()),
-    new Promise<HTMLImageElement>((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = `./sprites/${name}.png`; }),
+    artUrl(`sprites/${name}.json`).then((u) => fetch(u)).then((r) => r.json()),
+    artUrl(`sprites/${name}.png`).then((u) => new Promise<HTMLImageElement>((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = u; })),
   ]);
   const c = document.createElement('canvas');
   c.width = img.width; c.height = img.height;

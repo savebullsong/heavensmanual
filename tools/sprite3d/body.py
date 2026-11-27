@@ -89,11 +89,16 @@ BODY = {'x': dict(h=1.28, shoulder=.22, hipw=.105, arm=1.4, leg=1.12),   # 변�
         'jr': dict(h=1.05, shoulder=.19, hipw=.094, arm=1.12, leg=1.02, stance=.05, legmass=1.15),
         'y1': dict(h=.84, shoulder=.15, hipw=.085, arm=.95, leg=.92, stance=.035, legmass=1.05),
         'y2': dict(h=.95, shoulder=.163, hipw=.09, arm=.99, leg=.95, stance=.04, legmass=1.12),
-        'y3': dict(h=.94, shoulder=.165, hipw=.094, arm=1.0, leg=.94, stance=.04, legmass=1.15)}
+        'y3': dict(h=.94, shoulder=.165, hipw=.094, arm=1.0, leg=.94, stance=.04, legmass=1.15),
+        # 42차 주요 인물: 파샤르(ps) · 루엔(lu) · 환생관 할아버지(gp) · 불다(bd)
+        'ps': dict(h=1.06, shoulder=.18, hipw=.09, arm=1.1, leg=1.04, stance=.05, legmass=1.05),
+        'lu': dict(h=.98, shoulder=.165, hipw=.09, arm=1.0, leg=.96, stance=.035, legmass=1.1),
+        'gp': dict(h=.93, shoulder=.17, hipw=.088, arm=1.0, leg=.92, stance=.05, legmass=.95),
+        'bd': dict(h=1.05, shoulder=.21, hipw=.1, arm=1.2, leg=1.02, stance=.06, legmass=1.3)}
 MONSTER_BW = {'x': None, 'a': .8, 'p': .68, 'y': 1.32, 's': .42, 'k': 1.7, 'b': 1.0, 'g': .42, 'o': 1.08, 'w': .95, 't': .5, 'r': 1.0,
-              'h': 1.45, 'u': .62, 'n': .8, 'l': 1.05, 'e': 1.3, 'v': .85, 'd': .42, 'z': 1.25, 'q': .9, 'j': .9, 'i': 1.0, 'hw': .95, 'an': 1.05, 'af': .95, 'pd': .82, 'jr': .95, 'y1': .86, 'y2': .92, 'y3': 1.0}
+              'h': 1.45, 'u': .62, 'n': .8, 'l': 1.05, 'e': 1.3, 'v': .85, 'd': .42, 'z': 1.25, 'q': .9, 'j': .9, 'i': 1.0, 'hw': .95, 'an': 1.05, 'af': .95, 'pd': .82, 'jr': .95, 'y1': .86, 'y2': .92, 'y3': 1.0, 'ps': .88, 'lu': .9, 'gp': .85, 'bd': 1.18}
 MONSTER_HK = {'x': 1.0, 'a': 1.05, 'p': .86, 'y': 1.12, 's': 1.0, 'k': 1.2, 'b': 1.0, 'g': 1.0, 'o': .9, 'w': 1.0, 't': 1.0, 'r': 1.0,
-              'h': 1.2, 'u': .9, 'n': 1.05, 'l': 1.0, 'e': 1.0, 'v': 1.0, 'd': 1.0, 'z': 1.1, 'q': 1.12, 'j': 1.12, 'i': 1.12, 'hw': 1.12, 'an': 1.1, 'af': 1.12, 'pd': 1.06, 'jr': 1.08, 'y1': 1.2, 'y2': 1.12, 'y3': 1.1}
+              'h': 1.2, 'u': .9, 'n': 1.05, 'l': 1.0, 'e': 1.0, 'v': 1.0, 'd': 1.0, 'z': 1.1, 'q': 1.12, 'j': 1.12, 'i': 1.12, 'hw': 1.12, 'an': 1.1, 'af': 1.12, 'pd': 1.06, 'jr': 1.08, 'y1': 1.2, 'y2': 1.12, 'y3': 1.1, 'ps': 1.08, 'lu': 1.1, 'gp': 1.1, 'bd': 1.08}
 BUILD = [.9, 1.0, 1.14]   # 마름 · 보통 · 건장 (뼈 위치는 같고 굵기만 다르다 → 머리·무기 층을 함께 쓴다)
 
 class Doll:
@@ -133,11 +138,18 @@ class Doll:
         P = Part(group + '.head')
         hc = V(0, -.005, 1.615)
         blob(P, hc, (.092 * s, .104 * s, .122 * s), skin, None)
+        # 42차: 사람(과 전용 몸)의 얼굴을 서큐버스 수준으로 — 눈을 조금 크게, 눈썹 · 입 · 턱선 (지옥 괴물은 그대로)
+        detail = face and (self.mkey is None or len(self.mkey) == 2)
         if face:
             for sx in (1, -1):
-                blob(P, V(sx * .034, -.093, 1.625), (.014 * s, .008 * s, .011 * s), eye, None, segs=8, rings=5)
+                blob(P, V(sx * .034, -.093, 1.625), ((.016 if detail else .014) * s, .009 * s, (.013 if detail else .011) * s), eye, None, segs=8, rings=5)
                 blob(P, V(sx * .092, .0, 1.61), (.013 * s, .022 * s, .028 * s), skin, None, segs=8, rings=5)
             blob(P, V(0, -.106, 1.595), (.012 * s, .012 * s, .02 * s), skin, None, segs=8, rings=5)
+        if detail:
+            blob(P, V(0, -.052, 1.548), (.056 * s, .056 * s, .046 * s), skin, None, segs=10, rings=7)       # 턱선
+            for sx in (1, -1):
+                limb(P, V(sx * .02, -.099, 1.65), V(sx * .052, -.091, 1.653), [(0, .006 * s, .005 * s), (1, .005 * s, .004 * s)], rmat('hair', .45, .5), None, segs=4)   # 눈썹
+            blob(P, V(0, -.1, 1.566), (.015 * s, .004 * s, .0035 * s), rmat('dark', .6, .2), None, segs=6, rings=3)   # 입
         ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': 1.0})
         return self.add(group, ob)
 
@@ -162,7 +174,7 @@ class Doll:
                     limb(P, sh + Vector((0, 0, .02)), end, [(0, r0, r0), (1, r0 * .92 * (1.15 if wide > 1 else 1), r0 * .92 * (1.15 if wide > 1 else 1))], sleeve_mat, None)
                 if sleeve > 1:
                     limb(P, el, el + (wr - el) * (sleeve - 1), [(0, .048 * am * wide, .048 * am * wide), (1, .042 * am * wide * (1.2 if cuff else 1), .042 * am * wide * (1.2 if cuff else 1))], sleeve_mat, None)
-                blob(P, sh + Vector((-sx * .015, 0, .0)), (.068 * am * wide, .062 * am * wide, .062 * am * wide), sleeve_mat, None, segs=10, rings=7)
+                blob(P, sh + Vector((-sx * .015, 0, .0)), (.062 * am * wide, .058 * am * wide, .058 * am * wide), sleeve_mat, None, segs=10, rings=7)   # 42차: 어깨가 풍선처럼 부풀던 것 줄임
             ob = finish(P); bind(ob, self.arm, autow(self.bones, ['spine', f'upper_arm.{k}', f'forearm.{k}'], power=5)); self.add(group, ob)
 
     def hands(self, group, mat=None):
@@ -171,6 +183,10 @@ class Doll:
             wr, hd = self.bones[f'forearm.{k}'][1], self.bones[f'hand.{k}'][1]
             P = Part(f'{group}.hand.{k}')
             blob(P, (wr + hd) / 2 + Vector((0, -.008, .01)), (.026 * am, .032 * am, .05 * am), skin, None, segs=10, rings=7)
+            if self.mkey is None or len(self.mkey) == 2:   # 42차: 엄지 (손이 덩어리로 보이지 않게)
+                sx = 1 if k == 'L' else -1
+                c = (wr + hd) / 2
+                limb(P, c + Vector((-sx * .012, -.02, .02)), c + Vector((-sx * .02, -.04, -.01)), [(0, .012 * am, .012 * am), (1, .008 * am, .008 * am)], skin, None, segs=6)
             ob = finish(P); bind(ob, self.arm, rigid(f'hand.{k}')); self.add(group, ob)
 
     def legs(self, group, mat, shoe_mat, bare_below=None, boot=False, foot=1.0):
@@ -1249,6 +1265,13 @@ class Doll:
                  cut=lambda co: (co.y < -.02 * s and co.z < 1.685 * s) or co.z < 1.555 * s or (co.z < 1.61 * s and co.y < .03 * s))
         elif style == 'short':
             blob(P, hc, R, hm, None, segs=16, rings=12, cut=lambda co: (co.y < -.025 * s and co.z < 1.672 * s) or co.z < 1.545 * s or (co.z < 1.60 * s and co.y < .03 * s))
+            # 42차: 정수리의 결 (짧은 머리털 다발) · 구레나룻 · 이마에 조금 내려온 앞머리
+            for k in range(7):
+                a = -1.2 + k * .4
+                blob(P, V(math.sin(a) * .06, -.02 + math.cos(a) * .03, 1.735), (.028 * s, .026 * s, .022 * s), hm, None, segs=8, rings=5)
+            for sx in (1, -1):
+                blob(P, V(sx * .088, -.03, 1.6), (.012 * s, .02 * s, .03 * s), hm, None, segs=6, rings=4)
+            blob(P, V(.015, -.085, 1.695), (.05 * s, .025 * s, .022 * s), hm, None, segs=8, rings=5)
         elif style == 'swept':
             blob(P, hc, R, hm, None, segs=16, rings=12, cut=lambda co: (co.y < -.025 * s and co.z < 1.665 * s) or co.z < 1.53 * s or (co.z < 1.59 * s and co.y < .03 * s))
             blob(P, V(-.02, -.06, 1.72), (.075 * s, .06 * s, .04 * s), hm, None, segs=12, rings=8)          # 앞으로 넘긴 앞머리
@@ -1256,15 +1279,29 @@ class Doll:
         elif style == 'bob':
             blob(P, hc + Vector((0, 0, -.01)), (R[0] * 1.08, R[1] * 1.06, R[2] * 1.02), hm, None, segs=16, rings=12,
                  cut=lambda co: (co.y < -.03 * s and co.z < 1.655 * s and abs(co.x) < .075 * s) or co.z < 1.53 * s)
+            # 42차: 턱선까지 내려오는 옆머리 · 일자 앞머리 · 뒤통수의 둥근 부피
+            for sx in (1, -1):
+                blob(P, V(sx * .094, -.008, 1.56), (.034 * s, .072 * s, .066 * s), hm, None, segs=8, rings=6)
+            blob(P, V(0, -.074, 1.7), (.078 * s, .034 * s, .03 * s), hm, None, segs=10, rings=6)
+            blob(P, V(0, .06, 1.6), (.09 * s, .06 * s, .08 * s), hm, None, segs=10, rings=7)
         elif style == 'long':
             blob(P, hc + Vector((0, -.002, 0)), (R[0] * 1.02, R[1], R[2]), hm, None, segs=16, rings=12,
                  cut=lambda co: (co.y < -.03 * s and co.z < 1.665 * s and abs(co.x) < .078 * s) or co.z < 1.50 * s or (co.y < -.06 * s and co.z < 1.58 * s))
-            limb(P, V(0, .045, 1.64), V(0, .075, 1.27), [(0, .102 * s, .075 * s), (.4, .108 * s, .062 * s), (.8, .098 * s, .042 * s), (1, .085 * s, .03 * s)], hm, None, segs=12)
+            # 42차: 등판을 두 갈래로 (끝이 갈라져 길이가 조금 다르다) · 어깨 앞으로 넘어온 가닥 · 비스듬한 앞머리
+            for sx, dz in ((1, 0.0), (-1, .04)):
+                limb(P, V(sx * .035, .05, 1.64), V(sx * .05, .085, 1.25 + dz), [(0, .07 * s, .07 * s), (.35, .072 * s, .055 * s), (.8, .06 * s, .036 * s), (1, .03 * s, .016 * s)], hm, None, segs=10)
+            for sx in (1, -1):
+                limb(P, V(sx * .085, -.03, 1.6), V(sx * .1, -.06, 1.4), [(0, .024 * s, .02 * s), (1, .02 * s, .014 * s)], hm, None, segs=6)
+            blob(P, V(-.03, -.07, 1.705), (.06 * s, .05 * s, .03 * s), hm, None, segs=10, rings=7)
         elif style == 'ponytail':
             blob(P, hc + Vector((0, .004, -.004)), (R[0] * .99, R[1] * .99, R[2] * .99), hm, None, segs=16, rings=12,
                  cut=lambda co: (co.y < -.025 * s and co.z < 1.675 * s) or co.z < 1.55 * s or (co.z < 1.61 * s and co.y < .02 * s))
             blob(P, V(0, .115, 1.66), (.035 * s, .03 * s, .035 * s), hm, None, segs=8, rings=6)
             limb(P, V(0, .13, 1.66), V(0, .16, 1.38), [(0, .04 * s, .035 * s), (.3, .05 * s, .04 * s), (1, .015 * s, .015 * s)], hm, None, segs=10)
+            # 42차: 앞머리 · 귀 옆으로 흘러내린 잔머리
+            blob(P, V(.01, -.074, 1.7), (.07 * s, .032 * s, .028 * s), hm, None, segs=10, rings=6)
+            for sx in (1, -1):
+                limb(P, V(sx * .085, -.04, 1.63), V(sx * .09, -.05, 1.53), [(0, .01 * s, .01 * s), (1, .005 * s, .005 * s)], hm, None, segs=4)
         ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': 1.0})
         return self.add(g, ob)
 

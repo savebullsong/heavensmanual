@@ -150,6 +150,9 @@ jobs.append({'sex': 'm', 'build': 1, 'monster': 'pd', 'occluder': 'ponchod', 'se
 jobs.append({'sex': 'm', 'build': 1, 'monster': 'jr', 'occluder': 'reaper', 'sets': [{'kind': 'base', 'outfit': 'reaper', 'mode': 'w'}], 'stride': .6, 'tag': 'pass42'})
 for mk, o, st in (('y1', 'yunae1', 1.0), ('y2', 'yunae2', .9), ('y3', 'yunae3', .72)):
     jobs.append({'sex': 'f', 'build': 1, 'monster': mk, 'occluder': o, 'sets': [{'kind': 'base', 'outfit': o, 'mode': 'w', 'extra': ['sit']}], 'stride': st, 'tag': 'yunae42'})
+# ── 42차: 주요 인물 전용 몸 + 고유 동작(gest) — 파샤르(장부에 적기) · 루엔(등불 들기) · 할아버지(안경 고쳐 쓰기) · 불다(랩 한 소절)
+for mk, sex, o, ge, st in (('ps', 'm', 'pashar', 'write', .8), ('lu', 'f', 'luen', 'lantern', .55), ('gp', 'm', 'grandpa', 'glasses', .85), ('bd', 'm', 'bulda', 'rap', 1.0)):
+    jobs.append({'sex': sex, 'build': 1, 'monster': mk, 'occluder': o, 'gest': ge, 'sets': [{'kind': 'base', 'outfit': o, 'mode': 'w', 'extra': ['gest']}], 'stride': st, 'tag': 'main42'})
 args = sys.argv[2:]
 # --scale2: 같은 크기의 인물을 픽셀 두 배로 (게임에서는 반으로 줄여 같은 크기, 더 섬세)
 if '--scale2' in args:
@@ -159,6 +162,21 @@ if '--scale2' in args:
 if '--dirs8' in args:
     args.remove('--dirs8')
     for j in jobs: j.update({'dirs': ['s', 'e', 'n', 'w'], 'only': ['idle', 'walk'], 'merge': True})
+# 42차 --body42: 사람(주인공·행인) 몸과 머리카락 층만 모두 다시 굽는다 (얼굴 · 손 · 어깨 · 머리 모양을 고쳤다). 방어구·무기·괴물은 그대로
+#   (장창 층은 2배가 아닌 채로 남아 있어 함께) · --sex=m / --sex=f 로 둘로 나눠 두 코어에서 따로 굽는다
+if '--body42' in args:
+    args.remove('--body42')
+    sx = next((a.split('=')[1] for a in args if a.startswith('--sex=')), None)
+    args = [a for a in args if not a.startswith('--sex=')]
+    keep = []
+    for k, j in enumerate(jobs):
+        if j.get('monster'): continue
+        if sx and j['sex'] != sx: continue
+        sets = [x for x in j['sets'] if x['kind'] in ('base', 'hair') or (x['kind'] == 'weapon' and x['weapon'] == 'spear')]
+        if not sets: continue
+        keep.append(dict(j, sets=sets, tag='body42', idx=k))
+    jobs = keep
+    print(f'body42: {len(jobs)} jobs, {sum(len(j["sets"]) for j in jobs)} sets', flush=True)
 only = args  # 번호나 태그로 일부만
 t0 = time.time()
 for k, j in enumerate(jobs):

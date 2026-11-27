@@ -1719,15 +1719,16 @@ const STAFF: Record<string, [string, string]> = {
 };
 /** 대부업자 베스크: 붉은 피부·대머리·아주 뚱뚱·금 장신구·장부 */
 /** 지옥 로비의 환생관 파샤르 (컨셉 아트: 잿빛 머리, 검은 망토 코트에 은 장식, 낡은 장부와 깃펜) */
-export const PASHAR_LOOK: Look = { sex: 'm', build: 0, skin: 0, hair: 1, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: '#e8d6c8', 10: '#e8d6c8', 2: '#9a9aa2', 3: '#1c1c22', 4: '#22222a', 9: '#1c1c22', 5: '#141418' } };
+export const PASHAR_LOOK: Look = { sex: 'm', build: 0, skin: 0, hair: 1, hairColor: 0, top: 0, bottom: 0, outfit: 'pashar', cols: { 1: '#e8d6c8', 2: '#9a9aa2', 3: '#1c1c22', 4: '#22222a', 5: '#141418', 10: '#e8e0cc', 13: '#4a2e1e', 14: '#c8ccd4' } }; // 42차: 전용 3D 몸 (장부에 적는 고유 동작)
 /** 천국의 환생관 루엔 (컨셉 아트: 길고 흰 머리, 흰 법의에 옅은 푸른 띠, 흰 날개, 등불) */
-export const LUEN_LOOK: Look = { sex: 'f', build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, cols: { 1: '#f2dccc', 10: '#f2dccc', 2: '#e8e6f2', 3: '#f8f6f2', 4: '#b8c4e2', 9: '#f8f6f2', 5: '#d8ccb0' } };
+export const LUEN_LOOK: Look = { sex: 'f', build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'luen', cols: { 1: '#f2dccc', 2: '#eceaf4', 3: '#f8f6f2', 4: '#f2f0ea', 5: '#d8ccb0', 9: '#b8cce8', 12: '#fff2b0', 14: '#d8c890' } }; // 42차: 전용 3D 몸 (등불을 드는 고유 동작)
 /** 24차: 환생관 할아버지 — 안경 쓴 아주 늙은 사람 (천국은 흰 옷, 지옥은 잿빛 외투). 그림은 관리자 'grandpa' 칸 */
 export function grandpaLook(hell: boolean): Look {
   const skin = '#e6c9ae';
-  return { sex: 'm', build: 0, skin: 0, hair: 1, hairColor: 0, top: 0, bottom: 0, cols: hell
-    ? { 1: skin, 10: skin, 2: '#e8e4dc', 3: '#3a3634', 9: '#3a3634', 4: '#2a2624', 5: '#141210' }
-    : { 1: skin, 10: skin, 2: '#f2efe8', 3: '#f2ede2', 9: '#f2ede2', 4: '#e8e2d4', 5: '#c8c0b0' } };
+  // 42차: 전용 3D 몸 (조금 구부정한 등 · 빈 정수리 · 짧은 흰 수염 · 안경 고쳐 쓰는 고유 동작)
+  return { sex: 'm', build: 0, skin: 0, hair: 1, hairColor: 0, top: 0, bottom: 0, outfit: 'grandpa', cols: hell
+    ? { 1: skin, 10: skin, 2: '#e8e4dc', 3: '#3a3634', 4: '#2a2624', 5: '#141210', 14: '#8a8680' }
+    : { 1: skin, 10: skin, 2: '#f2efe8', 3: '#f2ede2', 4: '#e8e2d4', 5: '#c8c0b0', 14: '#d8c890' } };
 }
 /** 40차: 유내 미용실의 지금 원장 (마흔 줄의 여자, 짧은 단발 · 검은 미용 가운 · 앞치마) */
 export const YSALON_LOOK: Look = { sex: 'f', build: 1, skin: 0, hair: 2, hairColor: 0, top: 0, bottom: 0, outfit: 'apron', cols: { 2: '#3a2620', 3: '#24212a', 9: '#24212a', 4: '#3a3638', 5: '#1e1a1a', 7: '#2e2a30' } };
