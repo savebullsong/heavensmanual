@@ -515,6 +515,8 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 .tembra-asm { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px; margin-bottom: 6px; border: 1px solid #5a3a24; border-radius: 8px; background: rgba(40, 18, 12, 0.55); }
 .tembra-asm .asm-title { color: #f2c84a; }
 .tembra-asm .cage-note { text-align: center; margin: 0; }
+.tembra-asm .asm-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.tembra-asm .asm-take[hidden] { display: none; }
 .asm-ring { position: relative; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, #3a1a10 0 30%, #1a0c08 31% 100%); box-shadow: inset 0 0 0 2px #6a4a2a; }
 .asm-ring i { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; transform: rotate(45deg); background: #1a1210; border: 1px solid #6a4a2a; }
 .asm-ring i.on { background: linear-gradient(135deg, #ffd08a, #c84a1a); border-color: #ffb04a; box-shadow: 0 0 6px rgba(255, 140, 60, 0.8); }

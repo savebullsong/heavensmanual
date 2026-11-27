@@ -3762,7 +3762,7 @@ function enhanceList(list: Element, redraw: () => void) {
   const asm = document.createElement('div');
   asm.className = 'tembra-asm';
   const filled = Math.min(12, state.tasm ?? 0);
-  asm.innerHTML = `<b class="asm-title"></b><p class="cage-note"></p><div class="asm-ring"></div><button class="primary asm-put"></button>`;
+  asm.innerHTML = `<b class="asm-title"></b><p class="cage-note"></p><div class="asm-ring"></div><div class="asm-btns"><button class="primary asm-put"></button><button class="asm-take"></button></div>`;
   asm.querySelector('.asm-title')!.textContent = L.asmTitle;
   asm.querySelector('.cage-note')!.textContent = L.asmLine.replace('{s}', String(sh)).replace('{t}', String(tem));
   const ring = asm.querySelector('.asm-ring') as HTMLElement;
@@ -3776,6 +3776,20 @@ function enhanceList(list: Element, redraw: () => void) {
     state.tasm = (state.tasm ?? 0) + 1;
     if (state.tasm >= 13) { state.tasm = 0; state.bag!.tembra = (state.bag!.tembra ?? 0) + 1; enhSay(L.tembraMade2, 'good'); sfx.chime(); }
     else { enhSay(L.asmFit.replace('{n}', String(state.tasm)).replace('{r}', String(13 - state.tasm)), 'info'); sfx.thud(sfx.spot(0, 0)); }
+    save(state); renderQuick();
+    redraw();
+  };
+  // 48차: 끼운 파편은 언제든 다시 뺄 수 있다 (열세 조각을 못 채웠을 때 · 팔거나 맡기려고)
+  const take = asm.querySelector('.asm-take') as HTMLButtonElement;
+  take.textContent = L.asmTake.replace('{n}', String(filled));
+  take.hidden = filled < 1;
+  take.onclick = () => {
+    const n = state.tasm ?? 0;
+    if (n < 1) return;
+    state.tasm = 0;
+    state.bag = state.bag ?? {};
+    state.bag.tshard = (state.bag.tshard ?? 0) + n;
+    enhSay(L.asmBack.replace('{n}', String(n)), 'info'); sfx.thud(sfx.spot(0, 0));
     save(state); renderQuick();
     redraw();
   };
