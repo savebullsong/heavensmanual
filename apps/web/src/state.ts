@@ -81,6 +81,8 @@ export interface Save {
   /** 지옥: 지금 층, 이번 지옥행에서 쓰러뜨린 층주, 노전(영혼에 붙어 다음 지옥행에도 남는다) */
   hell?: {
     floor: number; cleared: number[]; notes: number; met?: boolean;
+    /** 49차: 층마다 쓰러진 층주가 엘리베이터로 돌아오는 시각(ms) */
+    bossBack?: Record<number, number>;
     /** 지옥 은행에 맡긴 노전 (쓰러져도 남는다) */
     bank?: number;
     /** 속죄의 회당에 층마다 바친 노전 (다 차면 위층으로) */

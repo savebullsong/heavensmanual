@@ -47,3 +47,14 @@ header button { grid-column: 2; grid-row: 1; }
 
 /* 42차 대화문 미리 보기 */
 .lines-preview { max-height: 420px; overflow: auto; background: #120e0b; color: #e8dcc4; padding: 12px; border-radius: 6px; font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
+
+/* 49차 편지함 */
+.card.letters { max-width: 760px; margin: 14px auto; }
+.letter-list { display: flex; flex-direction: column; gap: 10px; }
+.letter-list .letter { border: 1px solid #4a3424; border-left: 3px solid #c8783a; border-radius: 6px; padding: 10px; background: #140e0a; display: flex; flex-direction: column; gap: 6px; }
+.letter-list .letter.answered { border-left-color: #6fa86a; }
+.letter-list .letter small { color: #b8a888; font-size: 12px; }
+.letter-list .letter .body { margin: 0; white-space: pre-wrap; line-height: 1.6; color: #eadfc8; }
+.letter-list .letter textarea { padding: 8px; background: #1d1510; border: 1px solid #5a4424; border-radius: 4px; color: #eadfc8; font: inherit; resize: vertical; }
+.letter-list .letter .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.letter-list .letter button.danger { color: #e08a7a; }

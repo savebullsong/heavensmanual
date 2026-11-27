@@ -263,7 +263,7 @@ export function hellZone(floor: number): Zone {
   const border = () => { for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { const d = edgeD(i, j); if (d < EDGE) set(i, j, 'block'); else if (d < EDGE + MOAT + (SEA ? Math.floor(hash2(i, j) * 2) : 0) && !(CITY && j < CITY && j >= EDGE && i >= EDGE && i < W - EDGE)) set(i, j, 'water'); } };
   border();
   // 자리: 마을 C · 위층 길 U(이 칸에 닿으면 올라간다) · 층주 B · 아래층 계단 D(남쪽 끝 계단 머리)
-  const VR = T === 'ash' ? 15 : T === 'swamp' ? 11 : 8;
+  const VR = T === 'ash' ? 15 : T === 'swamp' ? 11 : 11; // 49차: 3~5층 마을 8 → 11 (가게 사이가 비좁았다)
   const shape: 'round' | 'blob' | 'square' = T === 'ash' ? 'round' : T === 'swamp' ? 'blob' : 'square';
   const C = T === 'ash' ? { i: 84, j: 100 } : T === 'swamp' ? { i: sc(58), j: sc(62) } : { i: sc(54), j: sc(60) };
   const exit: 'alley' | 'ford' | 'ferry' = T === 'ash' ? 'alley' : T === 'swamp' ? 'ford' : 'ferry';
@@ -477,18 +477,19 @@ export function hellZone(floor: number): Zone {
   type Slot = [number, number, number, number, number, Building['cat'], HellBuildKind?, ('left' | 'right')?];
   // 17차: 들어갈 수 없는 집은 없앴다. 대신 층마다 다른 조형물 — 1층 재의 악마상(엎드려 비는 영혼들) · 2층 굶주린 아가리 · 3층 피의 저울
   const LAYOUT: Record<Theme, Slot[]> = {
-    ash: [[-1, -10, 2, 2, 58, 'ujusae', undefined, 'left'], [6, -9, 2, 2, 52, 'hbank', undefined, 'left'], [-10, -7, 3, 3, 64, 'atone', undefined, 'left'], [-11, 3, 3, 3, 150, 'generic', 'idol'],
+    ash: [[-1, -10, 2, 2, 58, 'ujusae', undefined, 'left'], [6, -10, 3, 3, 60, 'hbank', undefined, 'left'], [-10, -7, 3, 3, 64, 'atone', undefined, 'left'], [-11, 3, 3, 3, 150, 'generic', 'idol'],
       [5, 5, 2, 1, 30, 'generic', 'butcher'], [8, 4, 2, 1, 30, 'generic', 'butcher'], [-6, 9, 2, 1, 26, 'generic', 'stall'], [-2, 9, 2, 1, 26, 'generic', 'stall'], [9, -2, 1, 2, 26, 'generic', 'stall'], [2, 9, 2, 1, 26, 'generic', 'stall']],
-    swamp: [[-1, -7, 2, 2, 58, 'ujusae', undefined, 'left'], [4, -7, 2, 2, 50, 'hbank', undefined, 'left'], [-8, -5, 3, 2, 56, 'atone', undefined, 'left'], [-7, 2, 3, 3, 46, 'generic', 'idol'],
+    swamp: [[-1, -7, 2, 2, 58, 'ujusae', undefined, 'left'], [4, -8, 3, 3, 58, 'hbank', undefined, 'left'], [-8, -6, 3, 3, 60, 'atone', undefined, 'left'], [-7, 2, 3, 3, 46, 'generic', 'idol'],
       [-4, 6, 2, 1, 24, 'generic', 'stall'], [6, 0, 1, 2, 24, 'generic', 'stall']],
-    market: [[-1, -6, 2, 2, 58, 'ujusae', undefined, 'left'], [3, -6, 3, 2, 62, 'loan', undefined, 'left'], [-7, -6, 2, 2, 48, 'hbank', undefined, 'left'], [-7, 1, 2, 2, 46, 'atone', undefined, 'left'],
-      [3, 3, 2, 1, 26, 'generic', 'butcher'], [-3, 5, 2, 1, 22, 'generic', 'stall'], [5, -1, 1, 2, 22, 'generic', 'stall'], [-3, -2, 2, 2, 76, 'generic', 'idol']],
+    // 49차: 3~5층 마을을 넓히고(반지름 11) 은행 · 회당 · 대부소 · 조형물을 키웠다 (우주새 자리 그림 칸은 그대로 2×2)
+    market: [[-1, -9, 2, 2, 58, 'ujusae', undefined, 'left'], [4, -9, 4, 3, 70, 'loan', undefined, 'left'], [-9, -9, 3, 3, 60, 'hbank', undefined, 'left'], [-9, 2, 3, 3, 60, 'atone', undefined, 'left'],
+      [4, 4, 2, 1, 28, 'generic', 'butcher'], [-4, 7, 2, 1, 24, 'generic', 'stall'], [7, -2, 1, 2, 24, 'generic', 'stall'], [-4, -3, 3, 3, 84, 'generic', 'idol']],
     // 4층 용광로: 대부소 없이 · 쇠를 두드리는 대장간 노점 · 가운데 큰 모루 조형물
-    forge: [[-1, -6, 2, 2, 58, 'ujusae', undefined, 'left'], [4, -6, 2, 2, 48, 'hbank', undefined, 'left'], [-7, -6, 2, 2, 46, 'atone', undefined, 'left'],
-      [3, 3, 2, 1, 26, 'generic', 'butcher'], [-3, 5, 2, 1, 22, 'generic', 'stall'], [5, -1, 1, 2, 22, 'generic', 'stall'], [-7, 1, 1, 2, 22, 'generic', 'stall'], [-3, -2, 2, 2, 76, 'generic', 'idol']], // 44차: 칼드렉의 대장간은 서쪽 광산으로
+    forge: [[-1, -9, 2, 2, 58, 'ujusae', undefined, 'left'], [5, -9, 3, 3, 60, 'hbank', undefined, 'left'], [-9, -9, 3, 3, 60, 'atone', undefined, 'left'],
+      [4, 4, 2, 1, 28, 'generic', 'butcher'], [-4, 7, 2, 1, 24, 'generic', 'stall'], [7, -2, 1, 2, 24, 'generic', 'stall'], [-9, 2, 1, 2, 24, 'generic', 'stall'], [-4, -3, 3, 3, 84, 'generic', 'idol']], // 44차: 칼드렉의 대장간은 서쪽 광산으로
     // 43차 5층: 가운데 큰 가면 조형물 · 인형술사 마리의 작은 공방 (수백 개의 인형이 진열되었다)
-    mask: [[-1, -6, 2, 2, 58, 'ujusae', undefined, 'left'], [4, -6, 2, 2, 48, 'hbank', undefined, 'left'], [-7, -6, 2, 2, 46, 'atone', undefined, 'left'],
-      [3, 3, 2, 1, 26, 'generic', 'butcher'], [-3, 5, 2, 1, 22, 'generic', 'stall'], [5, -1, 1, 2, 22, 'generic', 'stall'], [-7, 1, 1, 2, 22, 'generic', 'stall'], [-3, -2, 2, 2, 90, 'generic', 'idol']], // 44차: 마리의 공방은 들판 구석에 숨었다
+    mask: [[-1, -9, 2, 2, 58, 'ujusae', undefined, 'left'], [5, -9, 3, 3, 60, 'hbank', undefined, 'left'], [-9, -9, 3, 3, 60, 'atone', undefined, 'left'],
+      [4, 4, 2, 1, 28, 'generic', 'butcher'], [-4, 7, 2, 1, 24, 'generic', 'stall'], [7, -2, 1, 2, 24, 'generic', 'stall'], [-9, 2, 1, 2, 24, 'generic', 'stall'], [-4, -3, 3, 3, 96, 'generic', 'idol']], // 44차: 마리의 공방은 들판 구석에 숨었다
   };
   let shop: Building | null = null;
   for (const [di, dj, w, d, h, cat, hk, sign] of LAYOUT[T]) {

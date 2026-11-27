@@ -851,3 +851,5 @@ from bodies44 import NEW44   # 44차: 4층 쇠모루지기 · 5층 가면파수�
 NEW.update(NEW44)
 from bodies48 import NEW48   # 48차: 필드 보스 넷 · 걷는 염소대왕
 NEW.update(NEW48)
+from bodies49 import NEW49   # 49차: 수쿰빗 필드 보스 둘
+NEW.update(NEW49)

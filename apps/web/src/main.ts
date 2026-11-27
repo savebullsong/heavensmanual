@@ -3,7 +3,7 @@
 import './canvasfix.ts'; // 29차: 맨 먼저 — 2D 캔버스를 메모리 쪽에
 import { Application } from 'pixi.js';
 import './style.css';
-import { WorldScene, type WorldHooks, type Stance, type RemoteInfo } from './world.ts';
+import { WorldScene, BOSS_BACK_S, type WorldHooks, type Stance, type RemoteInfo } from './world.ts';
 import { ShopRoom, type ShopTarget } from './shoproom.ts';
 import { Dialog } from './dialog.ts';
 import { openLookPanel, lookPanelInsets } from './lookpanel.ts';
@@ -542,7 +542,7 @@ async function boot() {
   setInterval(() => { snapPos(); state.played = (state.played ?? 0) + 4; state.seen = Date.now(); if (scene === 'world' && !document.hidden) ecoDay().t += 4; save(state); }, 4000);
   addEventListener('pagehide', () => { world?.payWorkSoFar(); snapPos(); save(state); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { world?.payWorkSoFar(); save(state); if (net.account()) void net.pushSave(state); } }); // 48차: 일하다 앱을 나가도 번 돈은 지갑에
-  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior(), store: (k: 'tools' | 'antique', n: string) => openStore(k, n), terrace: () => enterTerrace(), officer: () => talkToOfficer(), pasharTalk: () => talkToPashar(), cage: () => openCage(), parrot: () => talkToParrot(), hstore: (k: HellVendor) => openHellStore(k), smith: () => openSmith(), soul: () => renderSoul(), give: (k: string) => { addToBag(itemByKey(k)); save(state); }, regear: () => world?.setGear(gear()), eco: () => openEcoStats(), perf: (v: boolean) => setPerf(v), xchTalk: () => talkToChanger(), shopIn: () => enterShop(true), ferum: () => talkToFerum(), parrotFeed: (n: number) => { state.parrotFed = n; save(state); }, wearW: (n: number) => { for (let i = 0; i < n; i++) wear('weapon'); }, setDura: (k: string, n: number) => { (state.dura ??= {})[k] = n; save(state); }, duraMax: (k: string) => duraMax(itemByKey(k)), ysalon: () => talkToSalon(), besk: () => talkToBesk(), grandpa: (h: boolean) => talkToGrandpa(h), mari: () => talkToMari(), marion: (k: string) => useMarionette(k), bare: () => bareTrial(), svc: (k?: Sanct) => { svcForce = true; if (k) void svcGo(k); }, svcEnd: () => { if (svc) svc.end = Date.now(); }, home: () => flyHome(), ywTalk: () => talkToYellowWing(), prof: (p: Parameters<typeof profileCard>[0]) => profileCard(p), lifePick: () => chooseLife('system2', lifeLine({ soul: { rank: 5, exp: 0 }, realm: 'hell', hell: { floor: 3 } as typeof state.hell }), lifeLine(state)) }; // 개발용 확인 창구
+  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { letter: openLetter, atone: openAtone, shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior(), store: (k: 'tools' | 'antique', n: string) => openStore(k, n), terrace: () => enterTerrace(), officer: () => talkToOfficer(), pasharTalk: () => talkToPashar(), cage: () => openCage(), parrot: () => talkToParrot(), hstore: (k: HellVendor) => openHellStore(k), smith: () => openSmith(), soul: () => renderSoul(), give: (k: string) => { addToBag(itemByKey(k)); save(state); }, regear: () => world?.setGear(gear()), eco: () => openEcoStats(), perf: (v: boolean) => setPerf(v), xchTalk: () => talkToChanger(), shopIn: () => enterShop(true), ferum: () => talkToFerum(), parrotFeed: (n: number) => { state.parrotFed = n; save(state); }, wearW: (n: number) => { for (let i = 0; i < n; i++) wear('weapon'); }, setDura: (k: string, n: number) => { (state.dura ??= {})[k] = n; save(state); }, duraMax: (k: string) => duraMax(itemByKey(k)), ysalon: () => talkToSalon(), besk: () => talkToBesk(), grandpa: (h: boolean) => talkToGrandpa(h), mari: () => talkToMari(), marion: (k: string) => useMarionette(k), bare: () => bareTrial(), svc: (k?: Sanct) => { svcForce = true; if (k) void svcGo(k); }, svcEnd: () => { if (svc) svc.end = Date.now(); }, home: () => flyHome(), ywTalk: () => talkToYellowWing(), prof: (p: Parameters<typeof profileCard>[0]) => profileCard(p), lifePick: () => chooseLife('system2', lifeLine({ soul: { rank: 5, exp: 0 }, realm: 'hell', hell: { floor: 3 } as typeof state.hell }), lifeLine(state)) }; // 개발용 확인 창구
   if (perfOn()) setPerf(true); // 34차: 관리자가 켜 둔 성능 표시
 }
 
@@ -772,7 +772,7 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
   if (world && world.zone !== zone) { world.destroy(); world = null; net.leaveZone(); }
   if (how === 'fall') state.hp = maxHp();
   if (!world) {
-    world = new WorldScene(app, zone, bodyLook(), () => enterShop(true), hooks, state.hp ?? maxHp(), { realm: 'hell', bossDown: h.cleared.includes(f) });
+    world = new WorldScene(app, zone, bodyLook(), () => enterShop(true), hooks, state.hp ?? maxHp(), { realm: 'hell', bossDown: h.cleared.includes(f), bossIn: h.cleared.includes(f) ? Math.max(0, ((h.bossBack?.[f] ?? 0) - Date.now()) / 1000) : undefined }); // 49차: 쓰러진 층주는 30분 뒤 엘리베이터로 돌아온다
     app.stage.addChild(world.root);
   }
   const w = world;
@@ -943,6 +943,7 @@ function leaveShop() {
 }
 
 // ───────────────────────── 거리에서 오는 일 ─────────────────────────
+let regenGlowT = 0; // 49차: 체력 막대 차오름 빛
 const hooks: WorldHooks = {
   noShots() {
     const wi = state.equip?.weapon ? itemByKey(state.equip.weapon) : null;
@@ -1008,6 +1009,9 @@ const hooks: WorldHooks = {
     recordDeed(key, opt);
   },
   hp(hp, max) {
+    // 49차: 저절로 차는 중이면 체력 막대에 은은한 빛이 흐른다 (들판에서도 찬다는 것이 보이게)
+    const bar = document.querySelector('#hud .hpbar');
+    if (bar && hp > (state.hp ?? 0) && hp < max && hp - (state.hp ?? 0) < max * 0.02) { bar.classList.add('regen'); clearTimeout(regenGlowT); regenGlowT = window.setTimeout(() => bar.classList.remove('regen'), 1500); }
     state.hp = Math.max(0, hp);
     updateHpBar(hp, max);
     autoHealCheck(hp, max);
@@ -1176,7 +1180,9 @@ const hooks: WorldHooks = {
   },
   bossDown(floor, killer) {
     const h = hellState();
-    if (!h.cleared.includes(floor)) h.cleared.push(floor);
+    const first = !h.cleared.includes(floor);
+    if (first) h.cleared.push(floor);
+    (h.bossBack ??= {})[floor] = Date.now() + BOSS_BACK_S * 1000; // 49차
     save(state);
     // 44차: 그 층의 모두가 보는 큰 글 (몹을 나눠 보는 영혼들은 모두 같은 순간에) · 위층 길에 빛이 켜진다
     const L = t();
@@ -1187,7 +1193,7 @@ const hooks: WorldHooks = {
     el.querySelector('small')!.textContent = L.bossFallFloor.replace('{f}', String(floor));
     el.querySelector('h2')!.textContent = L.bossFallTitle.replace('{boss}이(가)', boss + iGa(boss)).replace('{boss}', boss);
     el.querySelector('.bf-by')!.textContent = killer === 'me' ? L.bossFallMe : killer ? L.bossFallBy.replace('{name}', killer) : L.bossFallSomeone;
-    el.querySelector('.bf-path')!.textContent = L.bossFallPath;
+    el.querySelector('.bf-path')!.textContent = first ? L.bossFallPath : L.bossFallAgain; // 49차: 다시 온 층주를 또 쓰러뜨리면 길 이야기 대신 돌아올 때를
     document.body.appendChild(el);
     requestAnimationFrame(() => el.classList.add('show'));
     setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 900); }, 5200);
@@ -1757,6 +1763,7 @@ function clerkTalk() {
   if (info.kind === 'loan') { talkToBesk(); return; } // 3층 피의 시장: 베스크 대부소
   if (info.kind === 'hbank') { openHellBank(); return; }
   if (info.kind === 'atone') { openAtone(); return; }
+  if (SANCT_ROOMS.includes(info.kind)) { openLetter('heaven', info.name); return; } // 49차: 천국 성소의 천사에게 말을 걸면 편지
   if ((info.kind === 'rebirth' || info.kind === 'terrace') && world?.clerkIsGrandpa) { talkToGrandpa(info.kind === 'rebirth'); return; }
   if (info.kind === 'rebirth') { talkToPashar(); return; }
   if (info.kind === 'terrace') { talkToOfficer(); return; }
@@ -1794,6 +1801,7 @@ function clerkTalk() {
       dd.donate++;
       recordDeed('donate100');
     } });
+    opts.push({ label: L.letterBtn, act: () => openLetter(world?.realm === 'heaven' ? 'heaven' : 'real', info.name) }); // 49차 편지
   } else if (info.kind === 'clinic') {
     const cost = 200;
     opts.push({ label: L.healBuy.replace('{n}', String(cost)), act: () => { if (pay(cost)) { healFull(); toast(L.treated, 'good'); } } });
@@ -5470,6 +5478,71 @@ function openHellBank() {
   panelAt(el);
 }
 
+/**
+ * 49차 편지: 현실·천국의 종교시설과 지옥 속죄의 회당에서 쓴다. 누가 읽는다고도, 답이 온다고도 말하지 않는다.
+ * 관리자가 답을 적어 두면 '보낸 편지'에서 그 편지 아래에 조용히 보일 뿐이다 (알림 없음)
+ */
+function openLetter(realm: 'real' | 'heaven' | 'hell', place: string) {
+  closeMenus();
+  document.querySelector('.store-panel')?.remove();
+  const L = t();
+  const el = document.createElement('div');
+  el.className = 'store-panel shop-menu letter-panel';
+  el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close">✕</button></div><p class="store-line"></p><div class="menu-tabs store-tabs"></div><div class="menu-list"></div>`;
+  el.querySelector('.menu-head b')!.textContent = L.letterTitle;
+  el.querySelector('.store-line')!.textContent = realm === 'hell' ? L.letterLineHell : realm === 'heaven' ? L.letterLineHeaven : L.letterLine;
+  (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
+  const list = el.querySelector('.menu-list')!;
+  const tabs = el.querySelector('.store-tabs')!;
+  let mode: 'write' | 'sent' = 'write';
+  const bW = document.createElement('button'), bS = document.createElement('button');
+  bW.textContent = L.letterTabWrite; bS.textContent = L.letterTabSent;
+  bW.onclick = () => { mode = 'write'; draw(); }; bS.onclick = () => { mode = 'sent'; draw(); };
+  tabs.append(bW, bS);
+  let draft = '';
+  const draw = () => {
+    list.innerHTML = '';
+    bW.classList.toggle('on', mode === 'write'); bS.classList.toggle('on', mode === 'sent');
+    if (mode === 'write') {
+      const ta = document.createElement('textarea');
+      ta.className = 'letter-text'; ta.maxLength = 1000; ta.rows = 8; ta.placeholder = L.letterPh; ta.value = draft;
+      const foot = document.createElement('div'); foot.className = 'letter-foot';
+      const cnt = document.createElement('span'); cnt.className = 'letter-count';
+      const send = document.createElement('button'); send.className = 'primary'; send.textContent = L.letterSend;
+      const upd = () => { draft = ta.value; cnt.textContent = `${ta.value.length} / 1000`; send.disabled = !ta.value.trim(); };
+      ta.oninput = upd; upd();
+      send.onclick = async () => {
+        const body = ta.value.trim();
+        if (!body) return;
+        send.disabled = true;
+        const r = await net.sendLetter(realm, place, body, lang());
+        if (r === 'ok') { draft = ''; toast(realm === 'hell' ? L.letterSentHell : L.letterSent, 'good'); sfx.thud(sfx.spot(0, 0)); mode = 'sent'; draw(); return; }
+        toast(r === 'wait' ? L.letterWait : L.letterFail);
+        send.disabled = false;
+      };
+      foot.append(cnt, send);
+      list.append(ta, foot);
+      setTimeout(() => ta.focus(), 50);
+      return;
+    }
+    const wait = document.createElement('p'); wait.className = 'bag-empty'; wait.textContent = '…'; list.appendChild(wait);
+    void net.myLetters().then((ls) => {
+      if (mode !== 'sent' || !el.isConnected) return;
+      list.innerHTML = '';
+      if (!ls.length) { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = L.letterNone; list.appendChild(p); return; }
+      for (const l of ls) {
+        const card = document.createElement('div'); card.className = 'letter-card';
+        const head = document.createElement('small'); head.textContent = `${new Date(l.at).toLocaleDateString(lang() === 'ko' ? 'ko-KR' : lang() === 'th' ? 'th-TH' : 'en-US')} · ${l.place || (l.realm === 'hell' ? L.letterPlaceHell : L.letterPlaceFaith)}`;
+        const body = document.createElement('p'); body.textContent = l.body;
+        card.append(head, body);
+        if (l.reply) { const r = document.createElement('p'); r.className = 'letter-reply'; r.textContent = l.reply; card.appendChild(r); }
+        list.appendChild(card);
+      }
+    });
+  };
+  draw();
+  panelAt(el);
+}
 /** 속죄의 회당: 층마다 바친 노전이 쌓인다. 목표(3층 31,000)를 채우면 위층으로 (1층은 지옥 로비 앞으로). 1,000닢마다 선행 */
 function openAtone() {
   closeMenus();
@@ -5518,6 +5591,8 @@ function openAtone() {
     const all = document.createElement('button'); all.textContent = L.atoneAllBtn; all.onclick = () => give(Math.floor(h.notes)); q.appendChild(all);
   };
   draw();
+  const lb = document.createElement('button'); lb.className = 'letter-open'; lb.textContent = L.letterBtnHell; lb.onclick = () => openLetter('hell', L.atoneTitle); // 49차
+  el.appendChild(lb);
   panelAt(el);
 }
 /** 속죄가 차서 올라간다: 2·3층은 위층 아래 계단 머리로, 1층은 골목 끝 지옥 로비 앞으로 (손들이 붙잡는다) */

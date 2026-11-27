@@ -43,6 +43,32 @@ export async function ecoSum(days: number): Promise<{ e: Record<string, number>;
   try { const { data, error } = await sb.rpc('hm_eco_sum', { p_token: a.token, p_days: days }); return error ? null : data; } catch { return null; }
 }
 
+/** 49차 편지: 종교시설 · 속죄의 회당에서 쓴 편지 (비회원은 기기 번호로) */
+export interface Letter { id: number; realm: string; place: string; body: string; at: string; reply?: string | null; replied_at?: string | null; lang?: string; guest?: boolean; who?: string }
+export async function sendLetter(realm: 'real' | 'heaven' | 'hell', place: string, body: string, lang: string): Promise<'ok' | 'wait' | 'bad' | 'net'> {
+  try {
+    const { data, error } = await sb.rpc('hm_letter_send', { p_token: account()?.token ?? '', p_guest: guestId(), p_realm: realm, p_place: place, p_body: body, p_lang: lang });
+    if (error) return 'net';
+    return data?.ok ? 'ok' : data?.error === 'wait' ? 'wait' : 'bad';
+  } catch { return 'net'; }
+}
+export async function myLetters(): Promise<Letter[]> {
+  try { const { data, error } = await sb.rpc('hm_letter_mine', { p_token: account()?.token ?? '', p_guest: guestId() }); return error ? [] : (data ?? []); } catch { return []; }
+}
+/** 관리자: 편지 목록 (최근 50통씩) · 답장 · 지우기 */
+export async function letterList(before?: number): Promise<Letter[] | null> {
+  const a = account(); if (!a) return null;
+  try { const { data, error } = await sb.rpc('hm_letter_list', { p_token: a.token, p_before: before ?? null }); return error ? null : data; } catch { return null; }
+}
+export async function letterReply(id: number, reply: string): Promise<boolean> {
+  const a = account(); if (!a) return false;
+  try { const { data, error } = await sb.rpc('hm_letter_reply', { p_token: a.token, p_id: id, p_reply: reply }); return !error && !!data; } catch { return false; }
+}
+export async function letterDelete(id: number): Promise<boolean> {
+  const a = account(); if (!a) return false;
+  try { const { data, error } = await sb.rpc('hm_letter_delete', { p_token: a.token, p_id: id }); return !error && !!data; } catch { return false; }
+}
+
 type Err = 'bad_id' | 'bad_pw' | 'taken' | 'bad' | 'wait' | 'net' | 'session';
 async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T | { error: Err }> {
   try {

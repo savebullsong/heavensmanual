@@ -4,7 +4,7 @@ import { artUrl } from './art.ts';
 import { Rectangle, Texture } from 'pixi.js';
 import { type Building, type Zone, tileAt, groundAt } from './zone.ts';
 import { TW, TH, iso, paintHill } from './gfx.ts';
-import { kindOf, mainPoi } from './names.ts';
+import { kindOf, mainPoi, hasBank } from './names.ts';
 
 export const GPX = 100, UPX = 52, PPX = 20; // 1층 · 위층 · 옥상 난간 높이 (px)
 
@@ -191,6 +191,7 @@ export function drawBuildingKit(b: Building, signText: string, night: boolean, l
     [x, y] = P(i, j1, roofZ); put(`p-${topKind}-L`, x, y);
   }
   g.putImageData(img, 0, 0);
+  if (kd === 'bank' || hasBank(b)) bankFacade(g, P, b, night); // 49차 은행 겉모습
   // 옥상 설비 (색 그대로)
   if (b.cat !== 'ujusae' && !temple && w >= 2 && d >= 2) {
     const items: [string, number, number][] = [];
@@ -255,6 +256,49 @@ function signColor(kd: string): string | null {
   ];
   for (const [ks, c] of G) if (ks.includes(kd)) return c;
   return SIGN_COLORS[kd] ?? null;
+}
+
+/**
+ * 49차 은행 겉모습: 간판 면 1층을 화강암 기둥과 높은 유리문 · 남색 처마 띠와 금줄로, 한쪽 끝에 불 켜진 ATM 두 대.
+ * (지붕 위는 그대로 — 거리의 다른 건물과 높이가 맞게)
+ */
+function bankFacade(g: CanvasRenderingContext2D, P: Proj, b: Building, night: boolean) {
+  const left = b.sign !== 'right';
+  const span = left ? b.w : b.d;
+  if (span < 2) return;
+  const i1 = b.i0 + b.w, j1 = b.j0 + b.d;
+  const A = (s: number, z: number) => (left ? P(b.i0 + s, j1, z) : P(i1, j1 - s, z));
+  const quad = (s0: number, s1: number, z0: number, z1: number, fill: string) => poly(g, [A(s0, z0), A(s1, z0), A(s1, z1), A(s0, z1)], fill);
+  const top = GPX - 24;
+  // 바탕: 짙은 유리 (안이 비친다)
+  quad(0.05, span - 0.05, 6, top, night ? '#2a3a4a' : '#3a5468');
+  if (night) quad(0.2, span - 0.2, 10, top - 6, 'rgba(255,236,190,0.35)');
+  // 화강암 기둥 (칸마다) · 받침돌
+  for (let k = 0; k <= span; k++) {
+    const s = Math.min(span - 0.09, Math.max(0.09, k));
+    quad(s - 0.09, s + 0.09, 0, top, '#d8d2c6');
+    quad(s + 0.05, s + 0.09, 0, top, '#b8b2a4');
+  }
+  quad(0, span, 0, 7, '#8a8478'); quad(0, span, 6, 7, '#a8a294');
+  // 가운데 두 짝 유리문: 놋쇠 틀 · 손잡이
+  const mid = span / 2;
+  quad(mid - 0.55, mid + 0.55, 6, top - 10, night ? '#ffe6b0' : '#5a7890');
+  quad(mid - 0.55, mid + 0.55, top - 12, top - 10, '#c9a23e');
+  quad(mid - 0.02, mid + 0.02, 6, top - 10, '#c9a23e');
+  quad(mid - 0.58, mid - 0.55, 6, top - 10, '#c9a23e'); quad(mid + 0.55, mid + 0.58, 6, top - 10, '#c9a23e');
+  quad(mid - 0.12, mid - 0.08, 26, 44, '#e8c860'); quad(mid + 0.08, mid + 0.12, 26, 44, '#e8c860');
+  // 처마 띠: 남색 · 위아래 금줄 (간판은 이 위에 붙는다)
+  quad(0, span, top, GPX, '#1e3a5c'); quad(0, span, top, top + 2, '#c9a23e'); quad(0, span, GPX - 2, GPX, '#c9a23e');
+  // ATM 두 대 (문에서 먼 쪽 끝 칸)
+  const as = span >= 3 ? span - 0.9 : 0.2;
+  for (const o of [0, 0.38]) {
+    const s0 = as + o - 0.18, s1 = as + o + 0.14;
+    if (s1 > span - 0.1 || s0 < 0.1) continue;
+    quad(s0, s1, 6, 52, '#5a6470');
+    quad(s0 + 0.04, s1 - 0.04, 30, 44, night ? '#8adcff' : '#6ab8d8');
+    quad(s0 + 0.04, s1 - 0.04, 22, 26, '#2a2a2a');
+    quad(s0, s1, 46, 52, '#c8302a');
+  }
 }
 
 /** 이름으로 종교를 가린다 (지도에는 종교 표시가 빠진 곳이 많다). 모르면 태국 사원(가장 흔함) */

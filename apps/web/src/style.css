@@ -183,6 +183,8 @@ button.primary:hover { background: #e0b437; }
 .hpbox { display: inline-flex; align-items: center; gap: 6px; }
 .hpbar { display: inline-block; width: 80px; height: 8px; background: #2a1d14; border: 1px solid #5a4424; border-radius: 2px; overflow: hidden; }
 .hpbar > i { display: block; height: 100%; width: 100%; background: linear-gradient(#7fdc7a, #4fa84a); transition: width 0.3s; }
+.hpbar.regen > i { background: linear-gradient(90deg, #4fa84a 0%, #a8f0a0 45%, #4fa84a 90%); background-size: 200% 100%; animation: hp-regen 1.2s linear infinite; } /* 49차: 저절로 차는 중 */
+@keyframes hp-regen { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 .hpbar.danger > i { background: linear-gradient(#ff6a5a, #c02a20); animation: dlg-blink 0.8s steps(2) infinite; }
 .hpnum { font-style: normal; font-variant-numeric: tabular-nums; min-width: 2.6em; }
 .hud-left .work { color: #e0b437; font-size: 12px; }
@@ -710,3 +712,13 @@ body:has(.bag-panel) .load-chip { display: none; }
 .move-pad[hidden] { display: none; }
 .move-pad .mp-knob { width: 46px; height: 46px; border-radius: 50%; background: rgba(224, 180, 55, 0.55); border: 2px solid #f2d27a; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); pointer-events: none; transition: transform 0.08s; }
 .move-pad.on .mp-knob { transition: none; background: rgba(242, 210, 122, 0.8); }
+
+/* 49차 편지 */
+.letter-panel .letter-text { width: 100%; box-sizing: border-box; padding: 10px; background: #160f0b; border: 1px solid #5a4424; border-radius: 6px; color: #eadfc8; font: inherit; font-size: 15px; line-height: 1.6; resize: vertical; min-height: 150px; }
+.letter-panel .letter-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
+.letter-panel .letter-count { font-size: 12px; color: #8a7a62; font-variant-numeric: tabular-nums; }
+.letter-panel .letter-card { padding: 8px 10px; border: 1px solid #4f3a28; border-radius: 6px; background: rgba(42, 31, 24, 0.75); margin-bottom: 8px; }
+.letter-panel .letter-card small { color: #8a7a62; font-size: 12px; }
+.letter-panel .letter-card p { margin: 4px 0 0; white-space: pre-wrap; line-height: 1.55; color: #eadfc8; }
+.letter-panel .letter-card .letter-reply { margin-top: 8px; padding-top: 6px; border-top: 1px dashed #5a4424; color: #d8c49a; font-style: italic; }
+.atone-panel .letter-open { margin: 8px 12px 12px; }

@@ -64,7 +64,7 @@ const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   'bld-hell-5': { name: '유황새 · 지옥 5층', where: '가면의 도시 마을 (분칠한 흰 벽·벽에 걸린 가면·흰 종이 등불) · 바닥 2×2칸' },
 };
 
-type Tab = 'portraits' | 'sprites' | 'chars' | 'lines';
+type Tab = 'portraits' | 'sprites' | 'chars' | 'lines' | 'letters';
 const isSprite = (s: PortraitSlot) => (SPRITE_SLOTS as readonly string[]).includes(s);
 
 /** 도트 칸의 지금 기본 그림 (게임이 구운 그림 그대로) */
@@ -175,18 +175,20 @@ async function loadOverrides() {
   }
 }
 
-async function showSlots(tab: Tab = location.hash === '#sprites' ? 'sprites' : location.hash === '#chars' ? 'chars' : location.hash === '#lines' ? 'lines' : 'portraits') {
+async function showSlots(tab: Tab = location.hash === '#sprites' ? 'sprites' : location.hash === '#chars' ? 'chars' : location.hash === '#lines' ? 'lines' : location.hash === '#letters' ? 'letters' : 'portraits') {
   await loadOverrides();
   root.innerHTML = '';
   const head = h('header');
   const tabs = h('nav', 'tabs');
-  for (const [k, label] of [['portraits', '인물 그림 (대화창)'], ['sprites', '도트 그림 (게임 속)'], ['chars', '관리자 캐릭터'], ['lines', '대화문']] as [Tab, string][]) {
+  for (const [k, label] of [['portraits', '인물 그림 (대화창)'], ['sprites', '도트 그림 (게임 속)'], ['chars', '관리자 캐릭터'], ['lines', '대화문'], ['letters', '편지']] as [Tab, string][]) {
     const b = h('button', k === tab ? 'tab on' : 'tab', label);
     b.onclick = () => { history.replaceState(null, '', `#${k}`); showSlots(k); };
     tabs.append(b);
   }
   head.append(h('h1', '', "Heaven's Manual 관리자"), tabs,
-    h('p', 'sub', tab === 'lines'
+    h('p', 'sub', tab === 'letters'
+      ? '현실·천국의 종교시설과 지옥 속죄의 회당에서 영혼들이 쓴 편지입니다. 답을 적으면 그 사람의 \'보낸 편지\' 아래에 조용히 보일 뿐, 게임은 답이 온다고 알리지 않습니다. 참고용으로 읽고 지워도 됩니다.'
+      : tab === 'lines'
       ? '게임 안의 말을 인물·몹별로 모은 글 파일입니다. 내려받을 때마다 지금 판의 글을 새로 모읍니다 (인물의 말이 바뀌면 파일도 바뀝니다). 고친 파일을 보내 주시면 그대로 반영합니다.'
       : tab === 'chars'
       ? '아이디를 넣으면 그 계정이 관리자 캐릭터가 됩니다. 게임 안 영혼 설정에서 투명해질 수 있습니다(몹이 알아보지 못하고 다른 사람에게 보이지 않음, 지도 확인용). 투명한 동안은 싸울 수 없고, 환생·죽음·돈은 다른 사람과 똑같은 절차를 따릅니다. 다음 접속(또는 새로고침)부터 적용됩니다.'
@@ -198,6 +200,7 @@ async function showSlots(tab: Tab = location.hash === '#sprites' ? 'sprites' : l
   head.appendChild(out);
   root.appendChild(head);
   if (tab === 'chars') { root.appendChild(adminChars()); return; }
+  if (tab === 'letters') { root.appendChild(adminLetters()); return; }
   if (tab === 'lines') { root.appendChild(linesCard()); return; }
   const grid = h('div', tab === 'sprites' ? 'grid dots' : 'grid');
   for (const slot of PORTRAIT_SLOTS) {
@@ -278,6 +281,73 @@ function adminChars() {
   };
   on.onclick = () => set(true);
   off.onclick = () => set(false);
+  void load();
+  return card;
+}
+
+/** 49차 편지함: 최근 50통씩 · 답 적기(빈 글로 저장하면 답 지움) · 지우기 */
+function adminLetters() {
+  const card = h('section', 'card letters');
+  const stat = h('p', 'status');
+  const list = h('div', 'letter-list');
+  const more = h('button', '', '더 지난 편지');
+  more.hidden = true;
+  card.append(stat, list, more);
+  const realmName: Record<string, string> = { real: '현실', heaven: '천국', hell: '지옥' };
+  let last: number | null = null;
+  const one = (l: { id: number; realm: string; place: string; body: string; lang?: string; at: string; reply?: string | null; replied_at?: string | null; guest?: boolean; who?: string }) => {
+    const box = h('article', 'letter' + (l.reply ? ' answered' : ''));
+    const meta = h('small', '', `#${l.id} · ${new Date(l.at).toLocaleString('ko-KR')} · ${realmName[l.realm] ?? l.realm}${l.place ? ' · ' + l.place : ''} · ${l.guest ? '비회원' : l.who || '회원'}${l.lang ? ' · ' + l.lang : ''}`);
+    const body = h('p', 'body', l.body);
+    const ta = h('textarea');
+    ta.rows = 3; ta.maxLength = 1000; ta.placeholder = '답 (그 사람의 보낸 편지 아래에 조용히 보입니다)'; ta.value = l.reply ?? '';
+    const row = h('div', 'actions');
+    const save = h('button', 'primary', l.reply ? '답 고치기' : '답 적기');
+    const del = h('button', 'danger', '지우기');
+    const st = h('span', 'muted', l.replied_at ? `답: ${new Date(l.replied_at).toLocaleString('ko-KR')}` : '');
+    row.append(save, del, st);
+    save.onclick = async () => {
+      save.disabled = true; st.textContent = '저장하는 중…';
+      try {
+        const r = await fetch('api/letters', { method: 'POST', headers: { 'x-admin-key': key, 'content-type': 'application/json' }, body: JSON.stringify({ id: l.id, reply: ta.value }) });
+        if (r.status === 401) { showLogin('다시 로그인해 주세요.'); return; }
+        const j = await r.json().catch(() => ({}));
+        st.textContent = j.ok ? (ta.value.trim() ? '답을 저장했습니다.' : '답을 지웠습니다.') : '저장하지 못했습니다.';
+        box.classList.toggle('answered', !!ta.value.trim());
+        save.textContent = ta.value.trim() ? '답 고치기' : '답 적기';
+      } catch { st.textContent = '서버에 연결할 수 없습니다.'; }
+      save.disabled = false;
+    };
+    del.onclick = async () => {
+      if (!confirm(`#${l.id} 편지를 지울까요? 되돌릴 수 없습니다.`)) return;
+      del.disabled = true;
+      try {
+        const r = await fetch('api/letters', { method: 'POST', headers: { 'x-admin-key': key, 'content-type': 'application/json' }, body: JSON.stringify({ id: l.id, del: true }) });
+        const j = await r.json().catch(() => ({}));
+        if (j.ok) box.remove(); else { st.textContent = '지우지 못했습니다.'; del.disabled = false; }
+      } catch { st.textContent = '서버에 연결할 수 없습니다.'; del.disabled = false; }
+    };
+    box.append(meta, body, ta, row);
+    return box;
+  };
+  const load = async () => {
+    more.disabled = true;
+    stat.textContent = '불러오는 중…';
+    try {
+      const r = await fetch(`api/letters${last ? `?before=${last}` : ''}`, { headers: { 'x-admin-key': key } });
+      if (r.status === 401) { showLogin('다시 로그인해 주세요.'); return; }
+      const j = await r.json();
+      if (j.error) { stat.textContent = '불러오지 못했습니다.'; return; }
+      const arr = j.letters ?? [];
+      stat.textContent = `모두 ${j.total ?? 0}통 · 답 없는 편지 ${j.open ?? 0}통`;
+      if (!arr.length && !last) list.append(h('p', 'muted', '아직 편지가 없습니다.'));
+      for (const l of arr) list.append(one(l));
+      last = arr.length ? arr[arr.length - 1].id : last;
+      more.hidden = arr.length < 50;
+    } catch { stat.textContent = '서버에 연결할 수 없습니다.'; }
+    more.disabled = false;
+  };
+  more.onclick = () => void load();
   void load();
   return card;
 }

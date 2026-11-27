@@ -248,6 +248,9 @@ function layerKeys0(look: Look, weapon: string | null, armorIn: string[] = []): 
     const mk = o === 'ash' ? 'a' : o === 'pret' ? 'p' : 's';
     return { base: `b-${mk}-${o}-${weapon ? 'm' : 'u'}`, hair: null, weapon: weapon ? `w-${mk}-${weapon}` : null, armor: [] as { key: string; piece: string }[], mode: (weapon ? 'm' : 'u') as Mode };
   }
+  // 49차 수쿰빗 필드 보스 전용 몸: 마피아 두목(권총을 쥔 자세 · 총은 그 몸에 맞춰 구운 층) · 방콕의 대식자(맨손 갈고리)
+  if ((o as string) === 'mafiaboss') return { base: 'b-mb-mafiaboss-g', hair: null, weapon: weapon ? 'w-mb-pistol' : null, armor: [] as { key: string; piece: string }[], mode: 'g' as Mode };
+  if ((o as string) === 'bkkeater') return { base: 'b-be-bkkeater-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
   const m16 = MON16[o as string];
   if (m16) {
     const [mk, body, md] = m16;
