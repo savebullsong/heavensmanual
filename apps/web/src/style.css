@@ -684,3 +684,12 @@ body:has(.bag-panel) .load-chip { display: none; }
 .f-prof .pick-row { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
 .f-prof .pick { padding: 3px 9px; font-size: 12px; border-radius: 12px; }
 .f-prof .pick.on { border-color: #e0b437; background: rgba(120, 90, 30, 0.6); color: #fff2c8; }
+/* 48차 세계 색: 가방·가게·장착 칸 — 왼쪽 띠와 옅은 바탕 (현실 쇳빛 파랑 · 천국 옅은 금 · 지옥 검붉음 · 세 세계 공용 보라) */
+.menu-item.w-real { box-shadow: inset 3px 0 0 #6f8aa3; }
+.menu-item.w-heaven { box-shadow: inset 3px 0 0 #e8d08a; background: linear-gradient(90deg, rgba(232, 208, 138, 0.13), rgba(42, 31, 24, 0.75) 45%); }
+.menu-item.w-hell { box-shadow: inset 3px 0 0 #a8332a; background: linear-gradient(90deg, rgba(168, 51, 42, 0.18), rgba(42, 31, 24, 0.75) 45%); }
+.menu-item.w-cross { box-shadow: inset 3px 0 0 #a888d8; background: linear-gradient(90deg, rgba(168, 136, 216, 0.15), rgba(42, 31, 24, 0.75) 45%); }
+.doll-slot.on.w-real { background-image: linear-gradient(to top, #6f8aa3 2px, transparent 2px); }
+.doll-slot.on.w-heaven { background-image: linear-gradient(to top, #e8d08a 2px, rgba(232, 208, 138, 0.1) 2px); }
+.doll-slot.on.w-hell { background-image: linear-gradient(to top, #a8332a 2px, rgba(168, 51, 42, 0.14) 2px); }
+.doll-slot.on.w-cross { background-image: linear-gradient(to top, #a888d8 2px, rgba(168, 136, 216, 0.12) 2px); }

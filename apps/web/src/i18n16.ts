@@ -1103,6 +1103,9 @@ export const more16 = {
     flightLine: ["창밖으로 구름이 지나간다. 구름 위에도 길이 있을 것 같다.", "창밖으로 구름이 지나간다. 아래 어딘가에 해바라기 밭이 있었다."],
     landed: ["서울에 내렸다. 공기가 차다.", "방콕에 내렸다. 숨이 턱 막히게 덥다."],
     // 47차 끝
+    // 48차 (자동)
+    weightTag: "무게 {n}",
+    // 48차 끝
   },
   th: {
     rankUpTitle: 'ระดับวิญญาณเพิ่มขึ้น',
@@ -2207,6 +2210,9 @@ export const more16 = {
     flightLine: ["เมฆลอยผ่านหน้าต่าง รู้สึกว่าบนเมฆก็มีถนน", "เมฆลอยผ่านหน้าต่าง ที่ไหนสักแห่งข้างล่างเคยมีทุ่งทานตะวัน"],
     landed: ["ถึงโซลแล้ว อากาศเย็น", "ถึงกรุงเทพฯ แล้ว ร้อนจนหายใจไม่ออก"],
     // 47차 끝
+    // 48차 (자동)
+    weightTag: "หนัก {n}",
+    // 48차 끝
   },
   en: {
     rankUpTitle: 'SOUL RANK UP',
@@ -3311,5 +3317,8 @@ export const more16 = {
     flightLine: ["Clouds drift past the window. It feels like there are roads up there too.", "Clouds drift past the window. Somewhere down there was a sunflower field."],
     landed: ["Landed in Seoul. The air is cold.", "Landed in Bangkok. The heat steals your breath."],
     // 47차 끝
+    // 48차 (자동)
+    weightTag: "wt {n}",
+    // 48차 끝
   },
 };

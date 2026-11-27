@@ -90,6 +90,9 @@ export interface ShopLabels {
 }
 
 export class ShopRoom {
+  /** 48차: 무게 — 상점 안에서도 무거우면 느리고 허리가 굽는다 */
+  load = { speed: 1, crawl: false };
+  setLoad(speed: number, crawl: boolean) { this.load = { speed, crawl }; }
   readonly root = new Container();
   private camera = new Container();
   private objects = new Container();
@@ -573,7 +576,7 @@ export class ShopRoom {
       const look = Math.min(3, this.path.length);
       for (let k = 0; k < look; k++) { ax += this.path[k][0] + 0.5; ay += this.path[k][1] + 0.5; }
       this.dir = dirFromTile(ax / look - this.px, ay / look - this.py, this.dir);
-      const step = SPEED * dt;
+      const step = SPEED * this.load.speed * dt;
       if (dist <= step) { this.px = tx; this.py = ty; this.path.shift(); } else { this.px += (dx / dist) * step; this.py += (dy / dist) * step; }
       moving = true;
     } else if (this.pending) {
@@ -582,9 +585,10 @@ export class ShopRoom {
       if (t === 'hwang') this.dir = 'ne';
       this.onArrive(t);
     }
-    this.anim = moving ? this.anim + dt * SPEED * 8.5 : 0;
+    this.anim = moving ? this.anim + dt * SPEED * 8.5 * Math.max(0.35, this.load.speed) : 0;
     this.player.visible = !!this.cs;
     if (this.cs) applyFrame(this.player, frameOf(this.cs, moving ? 'walk' : 'idle', this.dir, moving ? Math.floor(this.anim) % (this.cs.counts.walk ?? 8) : 0), BODY_K);
+    if (this.load.crawl) { this.player.rotation = (/e/.test(this.dir) ? 0.2 : /w/.test(this.dir) ? -0.2 : 0) + (moving ? Math.sin(this.anim * 1.6) * 0.04 : 0); this.player.scale.y *= 0.86; } else if (this.player.rotation) this.player.rotation = 0;
     const [sx, sy] = iso(this.px, this.py);
     const float = this.ghost ? -3 + Math.sin(this.time * 2.2) : 0;
     this.player.position.set(sx, sy + float);

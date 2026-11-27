@@ -3213,9 +3213,13 @@ function sellList(list: Element, hell: boolean, redraw: () => void) {
   }
 }
 
+/** 48차: 세계 색 — 현실(쇳빛 파랑) · 천국(옅은 금) · 지옥(검붉음) · 세 세계 공용(보라) */
+function worldTone(it: ItemDef) { return it.cross ? 'w-cross' : 'w-' + worldOf(it); }
+/** 48차: 무게 글씨 (거의 없으면 ≈0) */
+function weightText(it: ItemDef) { const w = itemWeight(it); return t().weightTag.replace('{n}', w < 0.1 ? '≈0' : w >= 10 || w % 1 === 0 ? String(Math.round(w * 10) / 10) : w.toFixed(1)); }
 function itemRow(it: ItemDef, right: string, onClick: () => void, dim = false) {
   const b = document.createElement('button');
-  b.className = 'menu-item' + (dim ? ' dim' : '');
+  b.className = 'menu-item ' + worldTone(it) + (dim ? ' dim' : '');
   const ic = iconFor(it);
   ic.className = 'icon';
   const nm = document.createElement('span');
@@ -3226,6 +3230,7 @@ function itemRow(it: ItemDef, right: string, onClick: () => void, dim = false) {
   ef.textContent = effectText(it, lang());
   // 23차: 화살·탄약은 가방에 따로 안 보이니 지금 가진 수를 함께
   if (it.note === 'arrows' || it.note === 'ammo' || it.note === 'rifleammo') ef.textContent += ' · ' + (it.note === 'arrows' ? t().haveArrows : it.note === 'rifleammo' ? t().haveRifle : t().haveAmmo).replace('{n}', String((it.note === 'arrows' ? state.arrows : it.note === 'rifleammo' ? state.rifle : state.ammo) ?? 0));
+  else ef.textContent = [ef.textContent, weightText(it)].filter(Boolean).join(' · '); // 48차: 모든 물건에 무게
   const pr = document.createElement('span');
   pr.className = 'price';
   pr.textContent = right;
@@ -3311,15 +3316,15 @@ function slotOf(k: string): Slot | undefined {
 }
 
 // ───────────────────────── 47차 무게 제한 ─────────────────────────
-// 들 수 있는 무게 = 30 + 힘 × 3 + 생명력 × 1.5 + 영격 × 0.5 (힘이 첫째, 생명력 둘째, 영격 셋째).
-// 처음 영혼(힘 4 · 생명력 4 · 영격 6)이면 51 — 장비를 다 차고(26~35) 소비품 한 가지 50개(15)까지는 든다.
+// 들 수 있는 무게 = 50 + 힘 × 3 + 생명력 × 1.5 + 영격 × 0.5 (힘이 첫째, 생명력 둘째, 영격 셋째). 48차에 기본 30 → 50.
+// 처음 영혼(힘 4 · 생명력 4 · 영격 6)이면 71 — 장비를 다 차고(26~35) 소비품 한 가지 50개(15)까지는 든다.
 // 넘으면 점점 느려지고 회복이 더뎌진다(1.5배까지). 그 너머는 기어가고 체력이 차지 않는다
 const ARMOR_W: Partial<Record<Slot, number>> = { head: 2.5, body: 7, hands: 1, legs: 3, shins: 1.5, feet: 2, offhand: 5 };
 function itemWeight(it: ItemDef | undefined): number {
   if (!it) return 0;
   if (it.note === 'ammo' || it.note === 'arrows' || it.note === 'rifleammo' || it.note === 'fuel') return 0;
   if (/^(diary|tshard|tembra|redseal|manettethread|parrotfeed)$/.test(it.key)) return 0.02; // 48차: 일기장·템브라 조각처럼 가벼운 것은 거의 무게가 없다
-  if (it.cat === 'goods') return it.use ? 0.2 : 0.3;
+  if (it.cat === 'goods') return it.heal ? 0.15 : it.use ? 0.2 : 0.3; // 48차: 먹고 바르는 것은 조금 더 가볍게
   const heavy = it.price >= (it.hell ? 20_000 : 100_000) ? 1.4 : it.price >= (it.hell ? 3_000 : 10_000) ? 1.15 : 1;
   if (it.cat === 'weapon') {
     const sp = it.sprite ?? it.key;
@@ -3335,7 +3340,7 @@ function itemWeight(it: ItemDef | undefined): number {
 }
 function loadCap() {
   const st = stats();
-  return Math.round((30 + st.str * 3 + st.vit * 1.5 + (state.soul?.rank ?? 1) * 0.5) * 10) / 10;
+  return Math.round((50 + st.str * 3 + st.vit * 1.5 + (state.soul?.rank ?? 1) * 0.5) * 10) / 10; // 48차: 기본 30 → 50 (장비 한 벌에 소비품 여러 가지를 들어도 눕지 않게)
 }
 function loadNow() {
   let w = 0;
@@ -3353,6 +3358,7 @@ let loadWas = 0;
 function applyLoad() {
   const e = loadEffect();
   world?.setLoad(e.speed, e.regen, e.crawl);
+  shop?.setLoad(e.speed, e.crawl); // 48차: 우주새·유황새 가게 안에서도
   const lvl = e.crawl ? 2 : e.r > 1 ? 1 : 0;
   if (lvl > loadWas) toast(lvl === 2 ? t().loadCrawl : t().loadHeavy, 'evil');
   loadWas = lvl;
@@ -3953,7 +3959,7 @@ function renderBag() {
       const cell = document.createElement('div');
       const k = equip[sl];
       const it = k ? itemByKey(k) : null;
-      cell.className = `doll-slot ds-${sl}` + (it ? ' on' : '') + (it && dollSel === sl ? ' sel' : '');
+      cell.className = `doll-slot ds-${sl}` + (it ? ' on ' + worldTone(it) : '') + (it && dollSel === sl ? ' sel' : '');
       const lb = document.createElement('small');
       lb.textContent = L.slotNames[sl];
       cell.appendChild(lb);
@@ -3997,7 +4003,7 @@ function renderBag() {
     if (selIt) {
       const more = effectText(selIt, lang(), true);
       const du = isGearItem(selIt) && dollSel !== 'ammo' && selIt.note !== 'fuel' ? L.duraShort.replace('{n}', String(duraOf(selIt.key))).replace('{m}', String(duraMax(selIt))) : '';
-      det.textContent = [du, more].filter(Boolean).join(' · ') || L.dollNoMore;
+      det.textContent = [du, more, selIt.note === 'arrows' || selIt.note === 'ammo' || selIt.note === 'rifleammo' || selIt.note === 'fuel' ? '' : weightText(selIt)].filter(Boolean).join(' · ') || L.dollNoMore;
       // 44차: 화살통의 다른 화살로 바꿔 걸기 (이 세계에서 쓸 수 있는 것만)
       if (dollSel === 'ammo' && selIt.note === 'arrows') {
         const others = Object.entries(state.quiver ?? {}).filter(([k, n]) => n > 0 && worldOk(itemByKey(k)));
