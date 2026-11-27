@@ -4754,7 +4754,7 @@ function svcTick() {
 }
 window.setInterval(svcTick, 1000);
 // 47차 무게: 짐이 바뀌면 곧 반영 (1초마다 셈 — 가볍다)
-{ const chip = document.createElement('div'); chip.className = 'load-chip'; chip.hidden = true; document.body.appendChild(chip); }
+{ const chip = document.createElement('button'); chip.className = 'load-chip'; chip.hidden = true; chip.addEventListener('click', () => toggleBag()); document.body.appendChild(chip); } // 48차: 누르면 가방 — 버리거나 맡길 것을 바로 고른다
 window.setInterval(() => { applyLoad(); applyPromo(); }, 1000); // 47차: 무게 · 홍보 말풍선 (새 장면에도 곧 붙는다)
 const SANCT_ROOMS = ['hchurch', 'htemple', 'hmosque'];
 async function svcEscort() {

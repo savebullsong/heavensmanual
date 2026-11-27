@@ -7766,7 +7766,6 @@ export class WorldScene {
     if (!w.act && downed) { anim = 'fall'; i = (cs.counts.fall ?? 1) - 1; }
     else if (!w.act && w.riseT && w.riseT > 0) { anim = 'fall'; i = Math.max(0, Math.min((cs.counts.fall ?? 1) - 1, Math.floor((w.riseT / 0.4) * (cs.counts.fall ?? 1)))); w.riseT -= dt; }
     else if (!w.act && w.still) { const sa: Anim = w.still === 'lotus' && cs.counts.lotus ? 'lotus' : 'sit'; if (w.still === 'lie' || !cs.counts[sa]) { anim = w.still === 'lie' ? 'fall' : 'idle'; i = w.still === 'lie' ? (cs.counts.fall ?? 1) - 1 : 0; } else { anim = sa; i = 0; } }
-    if (w.isPlayer && this.load.crawl && !w.act && !downed && cs.counts.fall) { anim = 'fall'; i = cs.counts.fall - 1; } // 47차: 짐이 너무 무거워 엎드려 기어간다
     if (anim === 'walk') i %= cs.counts.walk ?? 8;
     if (w.art && anim === 'idle' && (w.dir === 'sw' || w.dir === 'se') && this.poseArt(w, cs, w.art)) return;
     if (anim === 'punch' && w.act?.alt) {
@@ -8026,8 +8025,13 @@ export class WorldScene {
       if (!w.isPlayer && !moving && !w.act && w.down <= 0 && w.cs?.counts.gest) { w.gestT = (w.gestT ?? 3 + Math.random() * 5) - dt; if (w.gestT <= 0) { w.act = { anim: 'gest', t: 0 }; w.gestT = 7 + Math.random() * 9; } }
       if (!w.isPlayer && w.down <= 0 && !w.mirror) this.think(w, moving, dt, nf);
       if (w.sprite.destroyed) continue;
-      w.anim = moving ? w.anim + dt * (w.flee > 0 ? 1.9 : w.speed) * 8.5 : 0;
+      w.anim = moving ? w.anim + dt * (w.flee > 0 ? 1.9 : w.speed) * 8.5 * (w.isPlayer ? Math.max(0.35, this.load.speed) : 1) : 0; // 48차: 무거우면 발걸음도 느리다 (미끄러지지 않게)
       this.pose(w, moving, dt);
+      if (w.isPlayer && this.load.crawl && !w.act && w.down <= 0 && !this.dead && !w.fly) { // 48차: 누운 그림 대신 짐에 짓눌려 허리를 숙이고 끌듯이 걷는다
+        const lean = /e/.test(w.dir) ? 0.2 : /w/.test(w.dir) ? -0.2 : 0;
+        w.sprite.rotation = lean + (moving ? Math.sin(w.anim * 1.6) * 0.04 : 0);
+        w.sprite.scale.y *= 0.86;
+      }
       const [sx, sy] = iso(w.x, w.y);
       // 취객은 걸을 때 비틀거린다
       const sway = w.weak === 'drunk' && moving ? Math.sin(this.time * 3.1 + w.home[0]) * 2.2 : 0;
@@ -8049,7 +8053,7 @@ export class WorldScene {
           if (w.fly.mine) { this.shakeT = Math.max(this.shakeT, 0.12); this.shakeA = Math.max(this.shakeA, 3); } // 45차 후속: 내가 쓰러뜨린 몸이 떨어질 때만
           w.fly = undefined;
         }
-      } else if (w.sprite.rotation && w.down <= 0) w.sprite.rotation = 0;
+      } else if (w.sprite.rotation && w.down <= 0 && !(w.isPlayer && this.load.crawl && !w.act && !this.dead)) w.sprite.rotation = 0;
       w.sprite.position.set(sx + sway + lx, sy + ly - fy - (w.kind === 'goatking' ? GK_LIFT : 0)); // 32차: 염소대왕은 흑요석 단 위
       // 45차: 기술 있는 층주(1층 아쉬갈)는 불길을 두른다 — 성을 내면 더 크고 붉게, 둘레로 불티가 오른다
       if (w.mdef?.boss && BOSS_SK[w.mdef.key] && this.zone.hell) {
