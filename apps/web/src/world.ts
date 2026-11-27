@@ -6721,7 +6721,8 @@ export class WorldScene {
       w.sprite.position.set(sx + sway + lx, sy + ly - (w.kind === 'goatking' ? GK_LIFT : 0)); // 32차: 염소대왕은 흑요석 단 위
       if (w.squashT && w.squashT > 0) { const q = w.squashT / 0.13; w.sprite.scale.x *= 1 + 0.16 * q; w.sprite.scale.y *= 1 - 0.13 * q; w.squashT -= dt; }
       w.sprite.zIndex = w.down > 0 ? w.x + w.y - 0.3 : w.x + w.y + (w.kind === 'goatking' ? 7.4 : 0) + (w.zb ?? 0); // 32차: 옥좌는 단의 앞 모서리보다 앞에 (단 위에 앉아 있다)
-      if (w.glasses) { const fr = w.dir === 'ne' || w.dir === 'nw' || w.dir === 'n'; w.glasses.visible = !fr && w.down <= 0 && w.sprite.visible; w.glasses.position.set(sx + (w.dir === 'sw' || w.dir === 'w' ? -1.5 : w.dir === 'se' || w.dir === 'e' ? 1.5 : 0), sy - (w.sprite.height * w.sprite.anchor.y - 5.5)); w.glasses.zIndex = w.x + w.y + 0.004; }
+      // 42차: 할아버지 전용 몸은 머리가 몸 가운데에 있어 안경을 ±0.4만 민다 (사람 몸 때의 ±1.5는 안경이 얼굴 밖으로 나갔다)
+      if (w.glasses) { const fr = w.dir === 'ne' || w.dir === 'nw' || w.dir === 'n'; w.glasses.visible = !fr && w.down <= 0 && w.sprite.visible; w.glasses.position.set(sx + (w.dir === 'sw' || w.dir === 'w' ? -0.4 : w.dir === 'se' || w.dir === 'e' ? 0.4 : 0), sy - (w.sprite.height * w.sprite.anchor.y - 5.5)); w.glasses.zIndex = w.x + w.y + 0.004; }
       if (w.pack?.vend) {
         // 31차: 장사꾼 차림 — 왼쪽 아래(sw)·오른쪽 아래(se)만 본다 (그림은 sw 기준, se는 좌우 뒤집기)
         if (w.dir !== 'sw' && w.dir !== 'se') w.dir = this.player.x - w.x - (this.player.y - w.y) >= 0 ? 'se' : 'sw';

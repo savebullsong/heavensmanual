@@ -168,14 +168,20 @@ if '--body42' in args:
     args.remove('--body42')
     sx = next((a.split('=')[1] for a in args if a.startswith('--sex=')), None)
     args = [a for a in args if not a.startswith('--sex=')]
+    fr = int(next((a.split('=')[1] for a in args if a.startswith('--from=')), '0'))
+    args = [a for a in args if not a.startswith('--from=')]
     keep = []
     for k, j in enumerate(jobs):
         if j.get('monster'): continue
         if sx and j['sex'] != sx: continue
+        # 행인만 입는 옷(서울 계절옷 · 강도 · 마피아)은 그대로 두고, 40차 휘두르기 덮어쓰기는 이제 기본 굽기에 들어 있어 뺀다
+        if j.get('tag') in ('season39', 'g17') or str(j.get('tag', '')).startswith('swing40'): continue
         sets = [x for x in j['sets'] if x['kind'] in ('base', 'hair') or (x['kind'] == 'weapon' and x['weapon'] == 'spear')]
         if not sets: continue
-        keep.append(dict(j, sets=sets, tag='body42', idx=k))
-    jobs = keep
+        jj = dict(j, sets=sets, tag='body42', idx=k)
+        if j.get('tag') == 'swing39': jj['only'] = ['stab']   # 휘두르기는 기본 굽기에 이미 (찌르기만 덧붙인다)
+        keep.append(jj)
+    jobs = keep[fr:]
     print(f'body42: {len(jobs)} jobs, {sum(len(j["sets"]) for j in jobs)} sets', flush=True)
 only = args  # 번호나 태그로 일부만
 t0 = time.time()
