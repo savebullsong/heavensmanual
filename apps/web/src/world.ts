@@ -264,6 +264,8 @@ interface Walker {
   actor?: boolean; glide?: { tx: number; ty: number; v: number }; riseT?: number; sink?: number;
   /** 43차: 마지막 일격에 날아가는 중 (포물선 높이 · 회전) */
   fly?: { t: number; dur: number; h: number; spin: number; mine?: boolean };
+  /** 46차 후속: 쓰러지는 모습 (가까이 · 중간 · 멀리 날아감 · 지옥 괴물만 두 동강) */
+  deathStyle?: 'near' | 'mid' | 'far' | 'split';
   gestT?: number; // 42차: 고유 동작까지 남은 시간
   watchT?: number; // 43차: 노을이 다시 멀찍이 따라붙기까지
   marion?: { left: number; dmg: [number, number]; said?: number }; // 43차 마리오네트: 남은 초 · 한 대 피해
@@ -6907,10 +6909,18 @@ export class WorldScene {
         this.shakeT = Math.max(this.shakeT, mine ? 0.42 : 0.2); this.shakeA = Math.max(this.shakeA, mine ? (heavy ? 12 : 9) : 4);
       }
       const dx = w.x - by.x, dy = w.y - by.y, d = Math.hypot(dx, dy) || 1;
-      // 45차: 너무 멀리 날아갔다 — 24차(0.9칸)와 43차(2.2칸)의 가운데로
-      const far = heavy ? 0.6 : mine ? 1.55 : 0.8;
-      w.kb = { dx: (dx / d) * far, dy: (dy / d) * far, t: 0.33 };
-      w.fly = { t: 0, dur: 0.38, h: heavy ? 4 : mine ? 12 : 8, spin: (dx - dy >= 0 ? 1 : -1) * (heavy ? 0.1 : 0.4), mine: mine || w.isPlayer };
+      // 46차 후속: 쓰러지는 모습을 무작위로 — 가까이(0.5칸) · 중간(1.3칸) · 멀리(2.6칸, 높이 솟아 크게 돈다) · 두 동강(지옥 괴물만, 현실엔 없다)
+      // 큰 몸(층주 · 필드 보스 · 염소)과 나 자신은 예전처럼 조금만. 남이 쓰러뜨린 것은 조금 덜 날아간다
+      const canSplit = !!(this.zone.hell && w.mdef && !w.mdef.boss && !w.fb && !w.mirror && !(w.mdef.revive && !w.revived));
+      const r = Math.random();
+      const style: NonNullable<Walker['deathStyle']> = heavy || w.isPlayer ? 'near' : canSplit ? (r < 0.22 ? 'near' : r < 0.5 ? 'mid' : r < 0.72 ? 'far' : 'split') : r < 0.33 ? 'near' : r < 0.72 ? 'mid' : 'far';
+      w.deathStyle = style;
+      const k0 = mine ? 1 : 0.7;
+      const far = heavy ? 0.6 : w.isPlayer ? 0.9 : (style === 'near' ? 0.5 : style === 'mid' ? 1.3 : style === 'far' ? 2.6 : 0.25) * k0;
+      const hh = heavy ? 4 : w.isPlayer ? 8 : (style === 'near' ? 5 : style === 'mid' ? 11 : style === 'far' ? 22 : 2) * (mine ? 1 : 0.8);
+      const sp = heavy ? 0.1 : style === 'far' ? 0.9 + Math.random() * 0.5 : style === 'near' ? 0.25 : style === 'split' ? 0 : 0.45;
+      w.kb = { dx: (dx / d) * far, dy: (dy / d) * far, t: style === 'far' ? 0.5 : 0.33 };
+      w.fly = { t: 0, dur: style === 'far' ? 0.6 : style === 'near' ? 0.3 : 0.4, h: hh, spin: (dx - dy >= 0 ? 1 : -1) * sp, mine: mine || w.isPlayer };
       w.flashT = Math.max(w.flashT ?? 0, 0.07);
       this.splat(w, mine ? 16 : 9);
       const [sx, sy] = iso(w.x, w.y);
@@ -6963,7 +6973,7 @@ export class WorldScene {
     // 43차 인형병사: 처음 쓰러지면 보이지 않는 실이 끌어올려 한 번 더 선다 (보상은 두 번째에)
     if (w.mdef?.revive && !w.revived && !remoteKill) { w.revived = true; w.reviveUp = true; w.down = 2.2; this.float(w, t().puppetRise, '#e8e0d0'); return; }
     if (w.mdef) {
-      if (this.zone.hell && !w.mdef.boss && !w.fb && !w.mirror) this.splitDeath(w, by); // 45차: 지옥 괴물은 피를 뿜으며 두 동강 난다
+      if (w.deathStyle === 'split' && this.zone.hell) this.splitDeath(w, by); // 45차 → 46차 후속: 지옥 괴물은 가끔(넷에 하나쯤) 피를 뿜으며 두 동강 난다
       const f = this.zone.hell?.floor ?? 1;
       const mult = f * (w.mdef.boss ? 6 : w.elite ? 2 : 1); // 44차: 사나운 괴물은 두 배
       let share = 1;
