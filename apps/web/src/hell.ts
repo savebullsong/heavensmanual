@@ -653,8 +653,12 @@ export function hellZone(floor: number): Zone {
     for (const [a, b] of hotel.cells) props.push({ i: hotel.at[0] + a, j: hotel.at[1] + b, kind: 'mattress' });
     vendors.push({ i: hotel.at[0] - 1, j: hotel.at[1] + 1, kind: 'hotel' });
   }
-  const sucAt = freeSpot(3, VR - 3);
-  if (sucAt) vendors.push({ i: sucAt[0], j: sucAt[1], kind: 'succubus' });
+  // 46차: 서큐버스는 좌판 없이 작은 천막 앞에 선다 (천막은 한 칸 뒤 대각)
+  const sucAt = freeSpot(3, VR - 3, (i, j) => inV(i - 1, j - 1, 1) && !taken(i - 1, j - 1) && !taken(i - 1, j) && !taken(i, j - 1)) ?? freeSpot(3, VR - 3);
+  if (sucAt) {
+    vendors.push({ i: sucAt[0], j: sucAt[1], kind: 'succubus' });
+    if (inV(sucAt[0] - 1, sucAt[1] - 1, 1) && !taken(sucAt[0] - 1, sucAt[1] - 1)) props.push({ i: sucAt[0] - 1, j: sucAt[1] - 1, kind: 'tent' });
+  }
   // 앉거나 누운 영혼들: 모닥불 둘레와 좌판 앞, 담 밑 (1층 많이 · 깊을수록 지쳐 누운 이가 많다)
   const souls: { i: number; j: number; pose: 'sit' | 'lie' | 'stand'; d: number; pray?: boolean }[] = [];
   const idol = buildings.find((b) => b.hk === 'idol')!;

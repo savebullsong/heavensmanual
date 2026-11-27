@@ -45,35 +45,83 @@ function pen(w1: number, h1: number) {
 }
 type Pen = ReturnType<typeof pen>;
 
-/** 해골 하나 (cx, cy = 머리 가운데, s = 크기, f = 바라보는 쪽 -1/1) */
-function skull(p: Pen, cx: number, cy: number, s: number, f = 1, jawOpen = 0) {
-  const { E, R } = p;
-  E(cx, cy, 6 * s, 5.2 * s, BONE2);
-  E(cx - 0.8 * s * f, cy - 0.8 * s, 5.2 * s, 4.2 * s, BONE);
-  R(cx - 3.6 * s, cy + 3 * s, 7.2 * s, (2.6 + jawOpen) * s, BONE2); // 턱
-  for (let k = 0; k < 4; k++) R(cx - 3 * s + k * 1.8 * s, cy + 3 * s, Math.max(1, 0.7 * s), (1.2 + jawOpen) * s, HOLE); // 이 사이
-  E(cx - 2.2 * s + f * 0.6 * s, cy + 0.4 * s, 1.6 * s, 1.7 * s, HOLE);
-  E(cx + 2.2 * s + f * 0.6 * s, cy + 0.4 * s, 1.6 * s, 1.7 * s, HOLE);
-  R(cx + f * 0.5 * s - 0.5 * s, cy + 1.8 * s, Math.max(1, s), Math.max(1, 1.2 * s), HOLE); // 코
-  R(cx - 3 * s, cy - 3.6 * s, 2 * s, Math.max(1, s * 0.8), '#f4ecd8'); // 빛
-}
-/** 긴 뼈 (양 끝이 둥근 마디) */
-function bone(p: Pen, x0: number, y0: number, x1: number, y1: number, w: number) {
-  p.L(x0, y0, x1, y1, w, BONE2);
-  p.L(x0, y0 - w * 0.3, x1, y1 - w * 0.3, Math.max(1, w * 0.45), BONE);
-  for (const [x, y] of [[x0, y0], [x1, y1]]) { p.E(x - w * 0.45, y, w * 0.6, w * 0.6, BONE2); p.E(x + w * 0.45, y, w * 0.6, w * 0.6, BONE2); p.E(x - w * 0.5, y - w * 0.25, w * 0.35, w * 0.3, BONE); }
-}
-/** 갈비뼈 (가운데 등뼈 + 휘어진 갈비 넷) */
-function ribs(p: Pen, cx: number, cy: number, s: number) {
-  p.L(cx, cy - 8 * s, cx, cy + 8 * s, 1.6 * s, BONE2);
-  for (let k = 0; k < 4; k++) {
-    const y = cy - 6 * s + k * 3.6 * s, wd = (6 - Math.abs(k - 1.2) * 0.9) * s;
-    for (const sd of [-1, 1]) for (let t = 0; t <= 10; t++) { const a = t / 10; p.R(cx + sd * wd * Math.sin(a * Math.PI * 0.55), y + a * 3 * s, Math.max(1, 1.2 * s), Math.max(1, 1.2 * s), t < 3 ? BONE : BONE2); }
+/** 해골 하나 (cx, cy = 머리 가운데, s = 크기, f = 바라보는 쪽 -1/1) — 46차: 세 겹 명암 · 눈두덩 · 광대 · 이 한 대씩 · 금 간 자국 · 가끔 눈 속 불씨 */
+function skull(p: Pen, cx: number, cy: number, s: number, f = 1, jawOpen = 0, ember = false) {
+  const { E, R, L } = p;
+  const q = Math.max(1, s);
+  const sd = Math.abs(Math.sin(cx * 12.9898 + cy * 78.233) * 43758.5453) % 1; // 자리마다 다른 금
+  E(cx + 0.6 * s * f, cy + 0.4 * s, 6.2 * s, 5.4 * s, BONE3); // 그늘 진 뒤통수
+  E(cx, cy - 0.2 * s, 6 * s, 5.2 * s, BONE2);
+  E(cx - 0.9 * s * f, cy - 1 * s, 5 * s, 3.9 * s, BONE);
+  E(cx - 2.2 * s * f, cy - 2.4 * s, 2.2 * s, 1.4 * s, '#f4ecd8'); // 정수리 빛
+  // 관자놀이 우묵 · 눈두덩
+  E(cx + 4.4 * s * f, cy + 0.6 * s, 1.2 * s, 1.8 * s, BONE3);
+  R(cx - 4.2 * s, cy - 1 * s, 8.4 * s, Math.max(1, 0.7 * s), BONE2);
+  // 턱 (벌어지면 아래로)
+  R(cx - 3.4 * s + 0.4 * s * f, cy + (3 + jawOpen) * s, 6.8 * s, 2.6 * s, BONE3);
+  R(cx - 3 * s + 0.4 * s * f, cy + (3 + jawOpen) * s, 6 * s, 1.8 * s, BONE2);
+  R(cx - 3.8 * s, cy + 2.4 * s, 7.6 * s, 1.2 * s, BONE2); // 위턱
+  for (let k = 0; k < 5; k++) { R(cx - 3.2 * s + k * 1.5 * s, cy + 2.6 * s, Math.max(1, 0.9 * s), Math.max(1, 1.1 * s), k % 2 ? BONE : '#f0e8d4'); R(cx - 2.5 * s + k * 1.5 * s, cy + 2.6 * s, 1, Math.max(1, (1.4 + jawOpen) * s), HOLE); } // 이 한 대씩 · 사이
+  if (jawOpen > 0.4) R(cx - 2.6 * s, cy + 3.8 * s, 5.2 * s, jawOpen * s, HOLE);
+  // 눈구멍: 깊은 그늘 + 아래 가장자리 빛
+  for (const ex of [-2.3, 2.3]) {
+    const x = cx + ex * s + f * 0.6 * s, y = cy + 0.5 * s;
+    E(x, y, 1.8 * s, 1.9 * s, HOLE);
+    R(x - 1.4 * s, y + 1.6 * s, 2.8 * s, Math.max(1, 0.5 * s), BONE);
+    if (ember) { R(x - 0.5, y - 0.2, 1.4, 1.4, '#ff5a1a'); R(x - 0.2, y, 0.8, 0.8, '#ffd08a'); }
   }
+  E(cx + f * 4.2 * s, cy + 1.8 * s, 1.2 * s, 0.8 * s, BONE); // 광대
+  // 코: 거꾸로 선 하트 (구멍 둘)
+  R(cx + f * 0.6 * s - 0.9 * s, cy + 1.6 * s, Math.max(1, 0.8 * s), Math.max(1, 1.1 * s), HOLE);
+  R(cx + f * 0.6 * s + 0.1 * s, cy + 1.6 * s, Math.max(1, 0.8 * s), Math.max(1, 1.1 * s), HOLE);
+  // 금: 정수리에서 비스듬히
+  if (sd < 0.55 && s > 0.75) { const x0 = cx - 1 * s + sd * 4 * s, y0 = cy - 4.6 * s; L(x0, y0, x0 + 1.2 * s, y0 + 1.6 * s, 1, BONE3); L(x0 + 1.2 * s, y0 + 1.6 * s, x0 + 0.4 * s, y0 + 3 * s, 1, BONE3); }
+  if (sd > 0.8 && s > 0.9) R(cx - 4 * s, cy - 0.5 * s, q, q, '#6a5a44'); // 얼룩
+}
+/** 긴 뼈 (양 끝이 둥근 마디) — 46차: 위 빛 · 가운데 · 아래 그늘의 세 겹, 마디의 그늘, 잔금 */
+function bone(p: Pen, x0: number, y0: number, x1: number, y1: number, w: number) {
+  const len = Math.hypot(x1 - x0, y1 - y0) || 1, nx = -(y1 - y0) / len, ny = (x1 - x0) / len;
+  const sgn = ny < 0 ? -1 : 1; // 아래쪽 = 그늘
+  p.L(x0 + nx * sgn * w * 0.25, y0 + ny * sgn * w * 0.25, x1 + nx * sgn * w * 0.25, y1 + ny * sgn * w * 0.25, w, BONE3);
+  p.L(x0, y0, x1, y1, w * 0.9, BONE2);
+  p.L(x0 - nx * sgn * w * 0.25, y0 - ny * sgn * w * 0.25, x1 - nx * sgn * w * 0.25, y1 - ny * sgn * w * 0.25, Math.max(1, w * 0.4), BONE);
+  for (const [x, y] of [[x0, y0], [x1, y1]]) {
+    p.E(x - w * 0.45, y + w * 0.15, w * 0.62, w * 0.62, BONE3); p.E(x + w * 0.45, y + w * 0.15, w * 0.62, w * 0.62, BONE3);
+    p.E(x - w * 0.45, y, w * 0.58, w * 0.58, BONE2); p.E(x + w * 0.45, y, w * 0.58, w * 0.58, BONE2);
+    p.E(x - w * 0.5, y - w * 0.25, w * 0.32, w * 0.28, BONE); p.R(x - 0.5, y - w * 0.2, 1, Math.max(1, w * 0.5), BONE3); // 마디 사이 홈
+  }
+  if (len > 14 && w > 2) { const t = 0.35 + ((x0 * 7 + y1 * 3) % 10) / 30; p.R(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, 1, 1, BONE3); } // 잔금
+}
+/** 등뼈 마디 (x0,y0 → x1,y1 · 마디마다 가시돌기) */
+function spine(p: Pen, x0: number, y0: number, x1: number, y1: number, s: number) {
+  const n = Math.max(3, Math.round(Math.hypot(x1 - x0, y1 - y0) / (3 * s)));
+  for (let k = 0; k <= n; k++) {
+    const t = k / n, x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t;
+    p.E(x, y, 1.9 * s, 1.3 * s, BONE3); p.E(x - 0.3 * s, y - 0.3 * s, 1.5 * s, 1 * s, k % 2 ? BONE : BONE2);
+    p.R(x + 1.4 * s, y - 0.3 * s, Math.max(1, 1.4 * s), Math.max(1, 0.7 * s), BONE2); // 가시돌기
+  }
+}
+/** 갈비뼈 (가운데 등뼈 + 휘어진 갈비 다섯 · 복장뼈) */
+function ribs(p: Pen, cx: number, cy: number, s: number) {
+  spine(p, cx, cy - 9 * s, cx, cy + 9 * s, s * 0.85);
+  for (let k = 0; k < 5; k++) {
+    const y = cy - 7 * s + k * 3.2 * s, wd = (6.4 - Math.abs(k - 1.4) * 0.9) * s;
+    for (const sd of [-1, 1]) for (let t = 0; t <= 12; t++) {
+      const a = t / 12, x = cx + sd * wd * Math.sin(a * Math.PI * 0.62), yy = y + a * 3.4 * s + Math.sin(a * Math.PI) * 0.8 * s;
+      p.R(x, yy + 0.6 * s, Math.max(1, 1.3 * s), Math.max(1, 0.8 * s), BONE3);
+      p.R(x, yy, Math.max(1, 1.3 * s), Math.max(1, 1 * s), t < 4 ? BONE : BONE2);
+    }
+  }
+  p.L(cx, cy - 6 * s, cx, cy + 4 * s, Math.max(1, 1.2 * s), BONE2); p.R(cx - 0.5, cy - 6 * s, 1, 8 * s, BONE); // 복장뼈
+}
+/** 아래턱뼈 하나 (흩어진 뼈 사이) */
+function jaw(p: Pen, cx: number, cy: number, s: number) {
+  for (let t = 0; t <= 10; t++) { const a = (t / 10) * Math.PI; p.R(cx + Math.cos(a) * 4 * s, cy + Math.sin(a) * 2 * s, Math.max(1, 1.2 * s), Math.max(1, 1.2 * s), t % 3 ? BONE2 : BONE3); }
+  for (let k = 0; k < 4; k++) p.R(cx - 2.4 * s + k * 1.6 * s, cy + 0.6 * s, 1, Math.max(1, 0.8 * s), BONE);
 }
 
 const cache = new Map<string, HPic>();
-/** kind: crag(경계) · bones · skulls · stake · cauldron · cage · lantern · bonfire · wallfence(마을 울타리, o = 방향) · htree(지옥 나무, o = 종류) · rock(바위) · crack(땅의 용암 금·진흙 거품·핏물 웅덩이) */
+/** kind: tent(46차 서큐버스 천막) · crag(경계) · bones · skulls · stake · cauldron · cage · lantern · bonfire · wallfence(마을 울타리, o = 방향) · htree(지옥 나무, o = 종류) · rock(바위) · crack(땅의 용암 금·진흙 거품·핏물 웅덩이) */
 export function hellDecor(kind: string, theme: Theme, v: number, o = 0): HPic {
   const key = `${kind}-${theme}-${v}-${o}`;
   const hit = cache.get(key);
@@ -94,39 +142,72 @@ export function hellDecor(kind: string, theme: Theme, v: number, o = 0): HPic {
     p.finish([40, 28, 22]);
     out = { canvas: p.c, ax: 0.5, ay: 0.6, flat: true };
   } else if (kind === 'skulls') {
-    // 해골 더미 (아래 셋 · 가운데 둘 · 위 하나). 가끔 꼭대기에 녹은 초
-    const p = pen(36, 34);
-    p.E(36, 60, 30, 7, '#1a1210');
-    const rows: [number, number][] = [[3, 52], [2, 40], [1, 28]];
-    for (const [n, y] of rows) for (let k = 0; k < n; k++) {
-      const x = 36 + (k - (n - 1) / 2) * 15 + (r(n * 7 + k) - 0.5) * 3;
-      skull(p, x, y + (r(n * 9 + k) - 0.5) * 2, 1.05 + r(n + k * 3) * 0.2, r(k + n * 5) < 0.5 ? -1 : 1);
+    // 해골 더미 (46차: 넷 · 셋 · 둘 · 하나, 사이로 삐져나온 긴 뼈 · 떨어진 턱뼈 · 이빨 부스러기 · 층마다 이끼/핏물/그을음/가면). 가끔 꼭대기에 녹아내린 초
+    const p = pen(44, 44);
+    const cx = 44, by = 76;
+    p.E(cx, by + 6, 38, 9, '#1a1210');
+    bone(p, cx - 34, by - 2, cx - 14, by - 12, 2.4); bone(p, cx + 30, by + 2, cx + 12, by - 16, 2.6); // 뒤로 꽂힌 정강이뼈
+    if (r(3) < 0.6) bone(p, cx - 6, by - 40, cx - 20, by - 54, 2.2);
+    const rows: [number, number, number][] = [[4, by - 6, 1.15], [3, by - 18, 1.12], [2, by - 30, 1.08], [1, by - 42, 1.1]];
+    let n = 0;
+    for (const [m, y, sc] of rows) for (let k = 0; k < m; k++) {
+      const x = cx + (k - (m - 1) / 2) * 15 + (r(m * 7 + k) - 0.5) * 3;
+      skull(p, x, y + (r(m * 9 + k) - 0.5) * 2, sc + r(m + k * 3) * 0.18, r(k + m * 5) < 0.5 ? -1 : 1, r(k + m * 11) < 0.25 ? 1.2 : 0, (theme === 'forge' || theme === 'ash') && r(n++ + 70) < 0.18);
     }
+    jaw(p, cx - 22 + r(20) * 8, by + 4, 1.1); jaw(p, cx + 16 + r(21) * 6, by + 6, 0.9);
+    for (let k = 0; k < 7; k++) p.R(cx - 30 + r(k + 30) * 60, by + 2 + r(k + 40) * 6, 1.4, 1.4, k % 2 ? BONE : BONE2); // 이빨 · 부스러기
+    // 더미 위의 자국은 더미 모양(세모) 안에만
+    const onPile = (k: number): [number, number] => { const y = by - 4 - r(k + 60) * 40, hw = Math.max(4, 28 * (1 - (by - 4 - y) / 46)); return [cx - hw + r(k + 50) * hw * 2, y]; };
+    if (theme === 'swamp') for (let k = 0; k < 9; k++) { const [x, y] = onPile(k); p.E(x, y, 2.4, 1.4, k % 2 ? '#4a6a2a' : '#6a8a3a'); p.R(x, y + 1, 1, 3, '#3a5420'); }
+    if (theme === 'market') for (let k = 0; k < 6; k++) { const [x, y] = onPile(k); p.R(x, y, 1.5, 4 + r(k + 64) * 8, '#8a0e0a'); }
+    if (theme === 'forge') for (let k = 0; k < 8; k++) { const [x, y] = onPile(k); p.E(x, y, 2.6, 1.6, '#3a2e28'); }
+    if (theme === 'ash') for (let k = 0; k < 10; k++) { const [x, y] = onPile(k); p.R(x, y, 2, 1, '#9a948c'); }
     let glow: [number, number] | undefined;
-    if (v % 3 === 0) { p.R(34, 8, 5, 12, '#d8ccaa'); p.R(34, 8, 2, 12, '#efe6cc'); p.R(35, 2, 3, 6, '#ffc24a'); p.R(36, 0, 1, 3, '#fff0b0'); for (let k = 0; k < 4; k++) p.R(33 + k * 2, 19 + (k % 2) * 2, 2, 3, '#d8ccaa'); glow = [0, -26]; }
+    if (theme === 'mask' && v % 2 === 0) { const x = cx, y = by - 42; p.E(x, y, 6.4, 5.6, '#f4f0f8'); p.E(x - 2.2, y, 1.4, 1.2, HOLE); p.E(x + 2.2, y, 1.4, 1.2, HOLE); p.R(x - 2, y + 3, 4, 1, '#c84a6a'); p.R(x - 6, y - 1, 2, 1, '#8a6ac8'); } // 꼭대기 해골에 씌운 사기 가면
+    else if (v % 3 === 0) {
+      const wx = theme === 'market' ? ['#b8261e', '#e04a3a'] : ['#d8ccaa', '#efe6cc'];
+      for (const [dx, h] of [[0, 14], [-7, 8]] as [number, number][]) {
+        const x = cx + dx, y = by - 50;
+        p.R(x - 2, y - h, 5, h, wx[0]); p.R(x - 2, y - h, 2, h, wx[1]); p.R(x - 1, y - h - 6, 3, 6, '#ffc24a'); p.R(x, y - h - 8, 1, 3, '#fff0b0');
+        for (let k = 0; k < 4; k++) p.R(x - 3 + k * 2, y - 1 + (k % 2) * 3, 2, 4 + (k % 3) * 3, wx[0]); // 흘러내린 촛농
+      }
+      glow = [0, -38];
+    }
     p.finish();
-    out = { canvas: p.c, ax: 0.5, ay: 31 / 34, glow, glowTint: 0xffb04a };
+    out = { canvas: p.c, ax: 0.5, ay: (by + 4) / 88, glow, glowTint: 0xffb04a };
   } else if (kind === 'stake') {
-    // 꼬챙이에 꿰인 해골: 위가 뾰족한 검은 말뚝, 축 늘어진 몸 (시장은 핏자국)
+    // 꼬챙이에 꿰인 해골: 위가 뾰족한 검은 말뚝, 축 늘어진 몸 (46차: 등뼈 마디 · 골반 · 손가락뼈 · 묶은 밧줄 · 해진 넝마 · 시장은 핏자국)
     const p = pen(44, 100);
     const x = 44, base = 194, top = 22;
     p.E(x, base + 2, 22, 6, '#140c0a');
     p.poly([[x - 6, base], [x + 6, base], [x + 1.5, top], [x - 1.5, top]], '#2a1c16');
     p.poly([[x - 6, base], [x - 2, base], [x - 0.5, top + 6], [x - 1.5, top]], '#4a3628');
-    // 몸: 골반이 말뚝 중간에 꿰였다
+    for (let k = 0; k < 6; k++) p.R(x - 4 + k * 0.4, base - 20 - k * 22, 3, 1, '#1a100c'); // 나뭇결
+    // 밧줄: 말뚝 밑동을 감은 줄
+    for (let k = 0; k < 4; k++) p.L(x - 6, base - 34 + k * 3, x + 6, base - 36 + k * 3, 1.4, k % 2 ? '#7a6242' : '#9a7e56');
     const py = 104 + r(1) * 12, f = r(2) < 0.5 ? -1 : 1;
-    p.E(x, py, 9, 6, BONE2); p.E(x, py - 2, 7, 3, BONE); p.E(x - 3, py, 2.4, 2.4, HOLE); p.E(x + 3, py, 2.4, 2.4, HOLE);
-    p.L(x, py - 4, x + f * 8, py - 30, 3, BONE2); // 등뼈 (앞으로 꺾임)
+    // 골반: 날개 둘 · 구멍 둘
+    p.E(x, py + 1, 10, 6.5, BONE3); p.E(x, py - 1, 9, 5.5, BONE2); p.E(x - f * 2, py - 3, 6, 2.6, BONE);
+    p.E(x - 3.4, py + 1, 2.4, 2.4, HOLE); p.E(x + 3.4, py + 1, 2.4, 2.4, HOLE);
+    spine(p, x, py - 4, x + f * 8, py - 30, 1.05); // 등뼈 마디 (앞으로 꺾임)
     ribs(p, x + f * 6, py - 22, 1.05);
-    skull(p, x + f * 14, py - 32 + 5, 1.3, f, 1.2); // 고개가 떨어진 해골
+    skull(p, x + f * 14, py - 32 + 5, 1.3, f, 1.2, theme === 'forge' && r(5) < 0.5); // 고개가 떨어진 해골
     bone(p, x + f * 2, py - 28, x - f * 10, py - 8, 2.6); // 늘어진 팔
     bone(p, x - f * 10, py - 8, x - f * 12, py + 14, 2.2);
     bone(p, x + f * 10, py - 26, x + f * 18, py - 4, 2.4);
+    for (const [hx, hy] of [[x - f * 12, py + 14], [x + f * 18, py - 4]] as [number, number][]) for (let k = 0; k < 4; k++) p.L(hx - 1.5 + k, hy + 1, hx - 2 + k * 1.4, hy + 5 + (k % 2) * 2, 1, k % 2 ? BONE : BONE2); // 손가락뼈
     bone(p, x - 4, py + 4, x - 10, py + 30, 3); bone(p, x - 10, py + 30, x - 8, py + 56, 2.6); // 다리
     bone(p, x + 4, py + 4, x + 12, py + 28, 3); bone(p, x + 12, py + 28, x + 16, py + 52, 2.6);
+    p.E(x - 10, py + 30, 2.2, 2, BONE); p.E(x + 12, py + 28, 2.2, 2, BONE); // 무릎뼈
+    for (const [fx, fy] of [[x - 8, py + 56], [x + 16, py + 52]] as [number, number][]) { p.R(fx - 2, fy, 5, 2, BONE2); for (let k = 0; k < 3; k++) p.R(fx - 2 + k * 2, fy + 2, 1, 2, BONE); } // 발
+    // 해진 넝마 (허리에 걸린 천 조각)
+    const rag = theme === 'swamp' ? '#4a5038' : theme === 'market' ? '#5a2420' : theme === 'mask' ? '#6a6280' : '#4a423a';
+    for (let k = 0; k < 5; k++) p.poly([[x - 8 + k * 3.4, py + 3], [x - 5 + k * 3.4, py + 3], [x - 6 + k * 3.4 + (k % 2) * 2, py + 12 + (k % 3) * 5]], rag);
     p.R(x + 0.5, top - 4, 1, 8, '#4a3628'); // 몸을 뚫고 나온 끝
     if (theme === 'market') { for (let k = 0; k < 5; k++) p.R(x - 4 + r(k + 30) * 8, py + 6 + k * 14, 1.5, 6 + r(k + 35) * 10, '#7a0a0a'); p.E(x + 3, base, 12, 3, '#5a0606'); }
     if (theme === 'swamp') for (let k = 0; k < 6; k++) p.R(x - 6 + k * 2, py + 2 + (k % 3) * 2, 1, 10 + (k % 2) * 6, '#4a5a2a');
+    // 발치에 떨어진 뼈 · 턱
+    bone(p, x - 18, base - 2, x - 6, base - 6, 2); jaw(p, x + 14, base - 2, 1);
     p.finish();
     out = { canvas: p.c, ax: 0.5, ay: 97 / 100 };
   } else if (kind === 'cauldron') {
@@ -267,6 +348,61 @@ export function hellDecor(kind: string, theme: Theme, v: number, o = 0): HPic {
     p.E(cx + 40, by + 2, 12, 4, '#1a1210'); p.R(cx + 29, by - 14, 22, 15, '#4a3020'); p.R(cx + 29, by - 10, 22, 2, '#2a2a2e'); p.R(cx + 29, by - 4, 22, 2, '#2a2a2e'); p.E(cx + 40, by - 14, 11, 3, '#2a3a40'); p.E(cx + 38, by - 15, 4, 1, '#6a8a90');
     p.finish([22, 12, 8]);
     out = { canvas: p.c, ax: 0.5, ay: 122 / 192, glow: [0, -22], glowTint: 0xff6a2a };
+  } else if (kind === 'tent') {
+    // 46차 서큐버스의 작은 천막 (사람 키를 조금 넘는다): 줄무늬 원뿔 천막 · 묶어 젖힌 문 자락 속 분홍 불빛과 방석 · 술 달린 장식띠 · 뿔 꼭지 · 장대 등롱 · 흩어진 꽃잎
+    const K = 1.4;
+    const p = pen(68, 84);
+    const cx = 68, by = 146, rx = 40 * K, ry = 13 * K, top = by - 84 * K;
+    const F: Record<Theme, [string, string, string]> = { ash: ['#6a1a2e', '#4a1020', '#c8384e'], swamp: ['#4a2a5a', '#30183e', '#9a5ac8'], market: ['#8a1432', '#5e0a20', '#e83a5e'], forge: ['#5a1a1a', '#3a0e10', '#d84a2a'], mask: ['#5a4a7e', '#3a2e56', '#b8a2ea'] };
+    const [f1, f2, f3] = F[theme];
+    p.E(cx, by + 5, rx + 10, ry + 5, '#120a0c');
+    const N = 10;
+    for (let k = 0; k < N; k++) {
+      const a0 = Math.PI - (k / N) * Math.PI, a1 = Math.PI - ((k + 1) / N) * Math.PI;
+      const x0 = cx + Math.cos(a0) * rx, y0 = by + Math.sin(a0) * ry, x1 = cx + Math.cos(a1) * rx, y1 = by + Math.sin(a1) * ry;
+      const shade = k < N / 2 ? (k % 2 ? f1 : f3) : k % 2 ? f2 : f1;
+      p.poly([[cx, top], [x0, y0], [(x0 + x1) / 2, Math.max(y0, y1) + 3], [x1, y1]], shade);
+    }
+    for (let k = 1; k < N; k++) { const a0 = Math.PI - (k / N) * Math.PI; p.L(cx, top + 3, cx + Math.cos(a0) * rx, by + Math.sin(a0) * ry, 1, 'rgba(20,6,10,0.6)'); }
+    p.poly([[cx, top], [cx + rx, by], [cx + rx * 0.62, by + ry * 0.8]], 'rgba(10,2,6,0.35)');
+    p.poly([[cx, top], [cx - rx, by], [cx - rx * 0.7, by + ry * 0.7]], 'rgba(255,210,220,0.10)'); // 왼쪽 빛
+    // 문
+    const dy = by + ry - 3, dt = by - 46 * K;
+    p.poly([[cx, dt], [cx - 15 * K, dy], [cx + 15 * K, dy]], '#2a0612');
+    p.poly([[cx, dt + 8 * K], [cx - 12 * K, dy], [cx + 12 * K, dy]], '#a8264a');
+    p.poly([[cx, dt + 16 * K], [cx - 9 * K, dy], [cx + 9 * K, dy]], '#ff6a8e');
+    p.E(cx, dy - 8 * K, 7 * K, 6 * K, '#ffc2d2'); p.E(cx, dy - 9 * K, 3 * K, 3 * K, '#fff4f6');
+    p.E(cx - 6 * K, dy - 2 * K, 6 * K, 3 * K, '#d83a6a'); p.E(cx + 7 * K, dy - 1 * K, 5 * K, 3 * K, '#8a1a3e'); p.R(cx - 8 * K, dy - 4 * K, 4 * K, 1, '#ffd0de');
+    for (const sd of [-1, 1]) {
+      p.poly([[cx + sd * 2, dt - 2], [cx + sd * 17 * K, dy - 18 * K], [cx + sd * 18 * K, dy + 1], [cx + sd * 11 * K, dy]], sd < 0 ? f3 : f2);
+      p.L(cx + sd * 6 * K, dt + 14 * K, cx + sd * 14 * K, dy - 14 * K, 1, sd < 0 ? f1 : f1); // 자락 주름
+      p.L(cx + sd * 13 * K, dy - 20 * K, cx + sd * 18 * K, dy - 17 * K, 2.4, '#e8b84a'); p.E(cx + sd * 18 * K, dy - 15 * K, 2.6, 2.6, '#f8d86a'); p.R(cx + sd * 18 * K - 0.5, dy - 13 * K, 1, 6, '#e8b84a');
+    }
+    // 장식띠: 아래쪽 물결 술
+    for (let k = 0; k <= 20; k++) {
+      const a = Math.PI - (k / 20) * Math.PI, x = cx + Math.cos(a) * (rx - 1), y = by + Math.sin(a) * (ry - 1) - 14 * K;
+      if (Math.abs(x - cx) < 15 * K && y > dt + 20) continue;
+      p.E(x, y, 3.4, 2.8, '#2a0a14'); p.R(x - 0.5, y + 1, 1, 5, '#e8b84a'); p.R(x - 1, y + 6, 2, 2, '#f8d86a');
+    }
+    for (let k = 0; k <= 40; k++) { const a = Math.PI - (k / 40) * Math.PI, x = cx + Math.cos(a) * (rx - 1), y = by + Math.sin(a) * (ry - 1) - 16 * K; if (Math.abs(x - cx) < 15 * K && y > dt + 20) continue; p.R(x, y, 2, 2, '#c89a3a'); }
+    // 천에 수놓은 하트 · 박쥐 날개 무늬
+    for (const [hx, hy] of [[cx - 26 * K, by - 20 * K], [cx + 24 * K, by - 18 * K], [cx - 12 * K, by - 50 * K]] as [number, number][]) { p.E(hx - 1.6, hy, 2, 2, '#e8b84a'); p.E(hx + 1.6, hy, 2, 2, '#e8b84a'); p.poly([[hx - 3.4, hy + 0.6], [hx + 3.4, hy + 0.6], [hx, hy + 4.4]], '#e8b84a'); }
+    // 꼭지
+    p.E(cx, top + 4, 6, 3, '#c89a3a'); p.R(cx - 1, top - 8, 2, 10, '#8a6a2a');
+    for (const sd of [-1, 1]) { p.L(cx, top - 5, cx + sd * 6, top - 11, 2.4, '#e8dcc8'); p.L(cx + sd * 6, top - 11, cx + sd * 5, top - 17, 1.8, '#f4ecdc'); }
+    p.poly([[cx + 1, top - 8], [cx + 15, top - 4], [cx + 1, top]], f3);
+    // 장대 등롱
+    const lx = v % 3 === 0 ? cx - rx - 3 : cx + rx + 3, dir = lx < cx ? 1 : -1;
+    p.L(lx, by + 8, lx, by - 74, 2.8, '#2a1a1e'); p.L(lx, by - 74, lx + dir * 10, by - 79, 2.2, '#2a1a1e');
+    const hx = lx + dir * 10;
+    p.L(hx, by - 79, hx, by - 70, 1, '#4a3a3e'); p.R(hx - 5, by - 70, 10, 2, '#3a2a2e'); p.R(hx - 4, by - 68, 8, 12, '#ff4a7a'); p.R(hx - 1, by - 67, 2, 9, '#ffd0de'); p.R(hx - 5, by - 56, 10, 2, '#3a2a2e'); p.R(hx, by - 54, 1, 5, '#c89a3a');
+    // 문 앞 깔개 · 꽃잎
+    p.poly([[cx - 18 * K, by + ry + 2], [cx + 18 * K, by + ry + 2], [cx + 12 * K, by + ry + 9], [cx - 24 * K, by + ry + 9]], '#5a1028');
+    for (let k = 0; k < 9; k++) p.R(cx - 20 * K + k * 4.4 * K, by + ry + 5, 2, 2, k % 2 ? '#e8b84a' : '#a8264a');
+    for (let k = 0; k < 12; k++) p.R(cx - 28 * K + r(k + 60) * 56 * K, by + ry + 10 + r(k + 70) * 8, 2, 1, k % 3 ? '#c8143a' : '#ff6a8a');
+    p.finish([20, 6, 12]);
+    for (let k = 0; k < 4; k++) p.E(cx + 28 * K + r(k + 80) * 6, top + 36 - k * 9, 2.4 + k, 1.6 + k * 0.5, `rgba(220,180,200,${0.3 - k * 0.06})`); // 향 연기
+    out = { canvas: p.c, ax: 0.5, ay: (by + 3) / 168, glow: [0, -14], glowTint: 0x8a2a4a };
   } else if (kind === 'mattress') {
     // 22차 지옥호텔: 바깥 공터에 깔아 둔 낡은 매트리스 (얼룩·찢어진 솔기·삐져나온 짚). 층마다 때가 다르다
     const p = pen(64, 42);

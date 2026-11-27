@@ -10,7 +10,7 @@ import { openLookPanel, lookPanelInsets } from './lookpanel.ts';
 import { ITEMS, STORES, menuFor, itemByKey, iconFor, itemIcon, effectText, priceText, moneyText, setCurrency, wonify, wonRate, cashText, HELL_FOOD, type ItemDef, type ItemCat } from './items.ts';
 import * as net from './net.ts';
 import { preloadPortrait, type PortraitSlot } from './portraits.ts';
-import { sukhumvitTestZone, decodeZone, type Zone, type Building, type InteriorInfo } from './zone.ts';
+import { sukhumvitTestZone, decodeZone, walkable, type Zone, type Building, type InteriorInfo } from './zone.ts';
 import { streetReady } from './street.ts';
 import { ARRIVALS, rollArrival, arrivalLook, type Arrival, type Look, type Outfit } from './character.ts';
 import { t, lang, setLang, LANGS, type Lang } from './i18n.ts';
@@ -22,7 +22,7 @@ import { heavenZone, HEAVEN_ID, heavenPriceMul, heavenMeta } from './heavenworld
 import { designateHomes, HOME_PRICE, FURN, furnByKey, type FurnDef } from './home.ts';
 import { borderZone } from './border.ts';
 import { TWO, DOT3, setDot3 } from './sprites.ts';
-import { buildingName, hasBank } from './names.ts';
+import { buildingName, hasBank, nameSeoulBanks, bankName } from './names.ts';
 import { bangkokClock, seoulClock } from './clock.ts';
 import { unlockAudio, isMuted, setMuted, plunge, chime } from './sfx.ts';
 import { hellPassage, heavenPassage, borderPassage, type Passage } from './passage.ts';
@@ -148,7 +148,7 @@ function loadZone(id: string): Promise<Zone> {
   if (!p) {
     p = artUrl(`zones/${id}.json`).then((u) => fetch(u))
       .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
-      .then((j) => { const z = decodeZone(j); designateHomes(z); markOwned(z); return z; }) // 35차: 아속·강남에 분양 중인 집과 가구점
+      .then((j) => { const z = decodeZone(j); designateHomes(z); markOwned(z); nameSeoulBanks(z, (i, k) => walkable(z, i, k)); return z; }) // 35차: 아속·강남에 분양 중인 집과 가구점
       .catch(() => { zoneCache.delete(id); return sukhumvitTestZone(); });
     zoneCache.set(id, p);
   }
@@ -1218,7 +1218,7 @@ function enterInterior(k: number, out: { i: number; j: number }, chaser: { monst
   // 43차: 지금의 빈집으로 들어설 때 드물게, 뱃속의 어둠 (태어나자마자 죽었던 그때)
   if (b.cat === 'home' && age === 3 && Math.random() < 0.14) wombPending = true;
   if (b.cat === 'estate' && b.estate && !state.homes?.[b.estate]) { void talkToAgent(k, out); return; } // 35차: 아직 내 집이 아니면 분양 사무소 직원이 맞는다
-  openRoom(interiorZone(b, k, out, b.cat === 'estate' ? L0.myHomeName.replace('{name}', buildingName(b, lang())) : b.cat === 'loan' ? L0.beskHouse : b.cat === 'hbank' ? L0.hbankName : b.cat === 'atone' ? L0.atoneName : b.cat === 'rebirth' ? L0.rebirthName : b.cat === 'home' ? (age === 3 ? L0.homeName : L0.flashTag.replace('{place}', L0.yunaePlace[age])) : buildingName(b, lang()), b.cat === 'home' ? age : undefined, state.furn ?? []), chaser, work);
+  openRoom(interiorZone(b, k, out, b.cat === 'estate' ? L0.myHomeName.replace('{name}', buildingName(b, lang())) : b.cat === 'loan' ? L0.beskHouse : b.cat === 'hbank' ? L0.hbankName : b.cat === 'atone' ? L0.atoneName : b.cat === 'rebirth' ? L0.rebirthName : roomKindOf(b) === 'bank' && bankName(b, lang()) ? bankName(b, lang()) : b.cat === 'home' ? (age === 3 ? L0.homeName : L0.flashTag.replace('{place}', L0.yunaePlace[age])) : buildingName(b, lang()), b.cat === 'home' ? age : undefined, state.furn ?? []), chaser, work);
   // 40차 유내 미용실: 처음엔 꼭, 그다음엔 가끔 짧은 혼잣말
   if (b.yunae && !busy && (!state.ysSeen || Math.random() < 0.35)) {
     const first = !state.ysSeen;

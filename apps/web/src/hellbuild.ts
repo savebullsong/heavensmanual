@@ -41,10 +41,25 @@ function shade(hex: string, k: number) {
 }
 
 /** 작은 해골 (화면 기준 5×5 점) */
-function skull(cv: Cv, x: number, y: number, s = 1) {
+/** 46차: 작은 해골도 빛 · 그늘 · 이 · 콧구멍 (s ≥ 2 면 금 간 자국과 눈 속 불씨) */
+function skull(cv: Cv, x: number, y: number, s = 1, ember = false) {
   const { R } = cv;
-  R(x - 2 * s, y - 2 * s, 5 * s, 4 * s, BONE); R(x - 1 * s, y + 2 * s, 3 * s, 1 * s, BONE2);
+  R(x - 2 * s, y - 2 * s, 5 * s, 4 * s, BONE); R(x - 1.5 * s, y - 2.6 * s, 4 * s, Math.max(1, 0.6 * s), BONE);
+  R(x + 2 * s, y - 2 * s, Math.max(1, s), 4 * s, BONE2); R(x - 2 * s, y - 2 * s, Math.max(1, s), Math.max(1, s), '#f4ecd8'); // 그늘 · 빛
+  R(x - 1 * s, y + 2 * s, 3 * s, 1 * s, BONE2); if (s >= 2) for (let k = 0; k < 3; k++) R(x - 1 * s + k * s, y + 2 * s, 1, s, HOLE); // 턱 · 이 사이
   R(x - 1.5 * s, y - 0.5 * s, s, s, HOLE); R(x + 0.5 * s, y - 0.5 * s, s, s, HOLE); R(x, y + 1 * s, 1, 1, HOLE);
+  if (ember) { R(x - 1.5 * s + s / 2 - 0.5, y - 0.5 * s + s / 2 - 0.5, 1, 1, '#ff5a1a'); R(x + 0.5 * s + s / 2 - 0.5, y - 0.5 * s + s / 2 - 0.5, 1, 1, '#ff5a1a'); }
+  if (s >= 2) { R(x + 0.5 * s, y - 2.4 * s, 1, s, BONE3); R(x + s, y - 1.6 * s, 1, s * 0.6, BONE3); } // 금
+}
+/** 46차: 뿔 달린 짐승 해골 (뼈 무더기 · 뼈집의 장식) */
+function beastSkull(cv: Cv, x: number, y: number, s = 1, f = 1) {
+  const { R, line } = cv;
+  line([x - 2 * s * f, y - 2 * s], [x - 8 * s * f, y - 7 * s], 2 * s, BONE2); line([x - 8 * s * f, y - 7 * s], [x - 9 * s * f, y - 12 * s], 1.4 * s, BONE); // 뒤 뿔
+  R(x - 3 * s, y - 3 * s, 6 * s, 4 * s, BONE); R(x + 1 * s * f, y - 1 * s, 5 * s, 3 * s, BONE2); R(x + 5 * s * (f > 0 ? 1 : -1.4), y, 2 * s, 2 * s, BONE3); // 머리 · 길쭉한 주둥이
+  R(x - 1 * s, y - 2 * s, 2 * s, 2 * s, HOLE); R(x + 4 * s * f, y, Math.max(1, s), Math.max(1, s), HOLE);
+  for (let k = 0; k < 4; k++) R(x + (1 + k) * s * f, y + 2 * s, 1, Math.max(1, s * 0.8), '#f0e8d4'); // 이
+  line([x + 1 * s * f, y - 3 * s], [x + 6 * s * f, y - 8 * s], 2 * s, BONE2); line([x + 6 * s * f, y - 8 * s], [x + 5 * s * f, y - 13 * s], 1.4 * s, BONE); // 앞 뿔
+  R(x - 2 * s, y - 3 * s, Math.max(1, s), Math.max(1, s), '#f4ecd8');
 }
 
 /** 벽 두 면을 칠한다: col(face, u, z) → 색. face 0 = 왼쪽 앞면(y = j1), 1 = 오른쪽 앞면(x = i1) */
@@ -244,6 +259,7 @@ function bonehouse(b: Building, theme: Theme) {
     const [bx, by] = P(m + sd * 0.34, j1, 0);
     for (let t = 0; t < 14; t++) { const a = t / 13; R(bx + sd * Math.sin(a * 2.2) * 6 - 1, by - a * 26, 3 - a * 1.5, 2, a > 0.85 ? BONE : BONE2); }
   }
+  { const [sx, sy] = P(m, j1, 22); skull(cv, sx, sy, 2, true); for (const sd of [-1, 1]) { const [bx, by] = P(m + sd * 0.42, j1, 20); R(bx - 1, by, 2, 6, BONE2); R(bx - 2, by + 6, 4, 2, BONE); } } // 46차: 문 위의 해골 (눈 속 불씨) · 양옆 뼈 술
   // 지붕: 우진각 위에 씌운 가죽, 그 위를 지나는 갈비뼈
   const roofZ = Hw - 1;
   const rf = roundRoof(cv, b, roofZ, rise, ov, 0.4);
@@ -353,14 +369,21 @@ function bonepile(b: Building, theme: Theme) {
   { const [x, y] = P(ci, cj, 0); g.fillStyle = theme === 'market' ? '#3a0606' : '#1a120e'; g.beginPath(); g.ellipse(x, y, rad * 34, rad * 17, 0, 0, Math.PI * 2); g.fill(); }
   for (const it of items) {
     const [x, y] = P(it.x, it.y, it.z);
-    if (it.sk) { skull(cv, x, y, 1); continue; }
+    if (it.sk) { skull(cv, x, y, 1, hash(Math.round(x), 7, seed) < 0.1); continue; }
     const dx = Math.cos(it.a) * it.l, dy = Math.sin(it.a) * it.l * 0.5;
-    line([x - dx, y - dy], [x + dx, y + dy], 2, hash(Math.round(x), Math.round(y), seed) < 0.5 ? BONE2 : BONE3);
+    const kind = hash(Math.round(x * 3), Math.round(y * 5), seed);
+    if (kind < 0.06) { // 갈비 한 짝 (휘어진 살 넷)
+      for (let r2 = 0; r2 < 4; r2++) { g.strokeStyle = r2 % 2 ? BONE2 : BONE; g.lineWidth = 1; g.beginPath(); g.arc(x, y + r2 * 2, 4 - r2 * 0.4, Math.PI * 1.05, Math.PI * 1.95); g.stroke(); }
+      R(x - 0.5, y - 4, 1, 9, BONE3); continue;
+    }
+    line([x - dx, y - dy + 0.6], [x + dx, y + dy + 0.6], 2, BONE3); // 아래 그늘
+    line([x - dx, y - dy], [x + dx, y + dy], 2, hash(Math.round(x), Math.round(y), seed) < 0.5 ? BONE2 : BONE);
     line([x - dx, y - dy - 0.6], [x + dx, y + dy - 0.6], 1, BONE);
-    R(x - dx - 1, y - dy - 1, 2, 2, BONE); R(x + dx - 1, y + dy - 1, 2, 2, BONE);
+    for (const sg of [-1, 1]) { R(x + sg * dx - 1.5, y + sg * dy - 1, 3, 2, BONE); R(x + sg * dx - 1.5, y + sg * dy + 1, 3, 1, BONE3); R(x + sg * dx - 0.5, y + sg * dy - 1, 1, 1, BONE2); } // 마디 (가운데 홈)
   }
-  // 꼭대기의 큰 해골
-  { const [x, y] = P(ci, cj, Hm + 2); skull(cv, x, y, 2); }
+  // 꼭대기: 뿔 달린 짐승 해골 하나와 큰 해골 (눈 속 불씨)
+  { const [x, y] = P(ci - 0.5, cj + 0.3, Hm * 0.7); beastSkull(cv, x, y, 1.3, hash(1, 9, seed) < 0.5 ? 1 : -1); }
+  { const [x, y] = P(ci, cj, Hm + 2); skull(cv, x, y, 2, theme === 'forge' || theme === 'ash'); }
   finish();
   return { canvas: cv.c, x: cv.minX, y: cv.minY };
 }
@@ -435,29 +458,37 @@ function butcher(b: Building, theme: Theme) {
     R(x - 3, y - 3, 6, 1, '#e8d8c0');
   }
   { const [x, y] = P(i1 - 0.4, j1 - 0.2, tz); line([x - 8, y - 1], [x + 2, y - 4], 2, '#9aa0a8'); R(x + 2, y - 5, 3, 2, '#2a1a10'); }
+  { const [x, y] = P(i0 + 0.45, j1 - 0.35, tz); R(x - 4, y - 5, 8, 5, '#5a3a22'); R(x - 4, y - 6, 8, 1, '#8a6a42'); R(x + 3, y - 5, 1, 5, '#3a2416'); R(x - 1, y - 12, 5, 6, '#9aa0a8'); R(x - 1, y - 12, 5, 1, '#d0d4da'); R(x + 3, y - 15, 1, 4, '#3a2416'); R(x - 2, y - 3, 3, 1, '#7a0a0a'); } // 도마 덩이에 박힌 큰 칼
+  for (let k = 0; k < 5; k++) { const [x, y] = P(i0 + 0.2 + k * 0.18, j1 - 0.05, tz - 2); g.fillStyle = k % 2 ? '#8a3a2a' : '#7a2a1e'; g.beginPath(); g.ellipse(x, y + 1 + (k % 2), 2, 1.6, 0, 0, Math.PI * 2); g.fill(); } // 판 끝에 늘어뜨린 순대
   // 차양 기둥 넷
   const top = Hw;
-  for (const [x, y] of [[i0, j1], [i1, j1], [i1, j0], [i0, j0]] as const) { const [sx, sy] = P(x, y, 0); R(sx - 1, sy - top, 2, top, x === i0 && y === j0 ? '#1e140c' : '#3a2618'); }
-  // 가로대와 갈고리에 매단 고기 (뒤쪽 가로대)
-  line(P(i0, j0, top - 4), P(i1, j0, top - 4), 2, '#2a1a10');
-  for (let k = 0; k < Math.max(2, w * 2); k++) {
-    const [x, y] = P(i0 + 0.25 + k * ((w - 0.5) / Math.max(1, w * 2 - 1)), j0, top - 4);
-    R(x, y, 1, 4, '#8a8680');
-    const big = hash(k, 3, seed) < 0.4;
-    if (big) { // 갈비짝
-      g.fillStyle = '#7a1e18'; g.fillRect(Math.round(x) - 4, Math.round(y) + 4, 8, 16);
-      for (let r2 = 0; r2 < 5; r2++) R(x - 4, y + 6 + r2 * 3, 8, 1, '#e8d8c0');
-      R(x - 4, y + 4, 2, 16, '#a83a2a');
-    } else { g.fillStyle = hash(k, 4, seed) < 0.5 ? '#8a2a22' : '#6a1a16'; g.beginPath(); g.ellipse(x + 0.5, y + 11, 3.5, 7, 0, 0, Math.PI * 2); g.fill(); R(x - 1, y + 13, 2, 3, '#e8d8c0'); }
-    if (hash(k, 5, seed) < 0.6) R(x, y + 20, 1, 3 + Math.floor(hash(k, 6, seed) * 5), '#5a0606'); // 떨어지는 핏방울
-  }
+  const jm = j0 + Math.max(0.6, d * 0.5); // 46차: 차양은 뒤 절반만 — 앞 가로대에 매단 고기와 도마 위가 보이게
+  for (const [x, y] of [[i0, jm], [i1, jm], [i1, j0], [i0, j0]] as const) { const [sx, sy] = P(x, y, 0); R(sx - 1, sy - top, 2, top, x === i0 && y === j0 ? '#1e140c' : '#3a2618'); }
   // 누더기 차양 (구멍 난 천, 처진 가장자리)
   const ov = 0.12;
-  const roof = [P(i0 - ov, j0 - ov, top + 2), P(i1 + ov, j0 - ov, top + 2), P(i1 + ov, j1 + ov, top - 3), P(i0 - ov, j1 + ov, top - 3)];
+  const roof = [P(i0 - ov, j0 - ov, top + 2), P(i1 + ov, j0 - ov, top + 2), P(i1 + ov, jm + ov, top - 3), P(i0 - ov, jm + ov, top - 3)];
   poly(roof, cloth[0]);
-  for (let k = 0; k < 14; k++) { const [x, y] = P(i0 + hash(k, 1, seed) * w, j0 + hash(k, 2, seed) * d, top); R(x, y, 2 + Math.floor(hash(k, 7, seed) * 3), 1, k % 3 ? cloth[1] : '#2a1a10'); }
-  for (let k = 0; k <= w * 6; k++) { const [x, y] = P(i0 - ov + k / 6, j1 + ov, top - 3); R(x, y, 1, 2 + (k % 3) + (hash(k, 9, seed) < 0.2 ? 4 : 0), cloth[1]); }
-  for (let k = 0; k <= d * 6; k++) { const [x, y] = P(i1 + ov, j1 + ov - k / 6, top - 3); R(x, y, 1, 2 + (k % 2), shade(cloth[1], 0.8)); }
+  for (let k = 0; k < 14; k++) { const [x, y] = P(i0 + hash(k, 1, seed) * w, j0 + hash(k, 2, seed) * (jm - j0), top); R(x, y, 2 + Math.floor(hash(k, 7, seed) * 3), 1, k % 3 ? cloth[1] : '#2a1a10'); }
+  for (let k = 0; k <= w * 6; k++) { const [x, y] = P(i0 - ov + k / 6, jm + ov, top - 3); R(x, y, 1, 2 + (k % 3) + (hash(k, 9, seed) < 0.2 ? 4 : 0), cloth[1]); }
+  for (let k = 0; k <= (jm - j0) * 6; k++) { const [x, y] = P(i1 + ov, jm + ov - k / 6, top - 3); R(x, y, 1, 2 + (k % 2), shade(cloth[1], 0.8)); }
+  // 가로대와 갈고리에 매단 고기 (뒤쪽 가로대)
+  line(P(i0, jm, top - 4), P(i1, jm, top - 4), 2, '#2a1a10');
+  for (let k = 0; k < Math.max(2, w * 2); k++) {
+    const [x, y] = P(i0 + 0.25 + k * ((w - 0.5) / Math.max(1, w * 2 - 1)), jm, top - 4);
+    R(x, y, 1, 4, '#8a8680');
+    const big = hash(k, 3, seed) < 0.4;
+    R(x - 1, y + 3, 3, 1, '#8a8680'); R(x + 1, y + 4, 1, 2, '#8a8680'); // 갈고리
+    if (big) { // 갈비짝 (기름 · 갈비 마디 · 등뼈)
+      g.fillStyle = '#7a1e18'; g.fillRect(Math.round(x) - 4, Math.round(y) + 5, 8, 16);
+      R(x + 2, y + 5, 2, 16, '#5a1410'); R(x - 4, y + 5, 8, 2, '#e8d0b8');
+      for (let r2 = 0; r2 < 5; r2++) { R(x - 4, y + 8 + r2 * 3, 7, 1, '#e8d8c0'); R(x + 2, y + 8 + r2 * 3, 1, 1, '#b8a890'); }
+      R(x - 4, y + 5, 2, 16, '#a83a2a'); R(x - 3, y + 7, 1, 10, '#c84a3a');
+    } else { // 넓적다리 (껍질 · 기름 · 뼈 끝)
+      g.fillStyle = hash(k, 4, seed) < 0.5 ? '#8a2a22' : '#6a1a16'; g.beginPath(); g.ellipse(x + 0.5, y + 12, 3.5, 7, 0, 0, Math.PI * 2); g.fill();
+      R(x - 2, y + 9, 2, 5, '#c84a3a'); R(x + 2, y + 9, 1, 6, '#4a0e0c'); R(x - 1, y + 7, 3, 1, '#e8d0b8'); R(x - 1, y + 5, 2, 3, '#e8d8c0'); R(x - 2, y + 4, 4, 1, '#f0e8d4');
+    }
+    if (hash(k, 5, seed) < 0.6) R(x, y + 20, 1, 3 + Math.floor(hash(k, 6, seed) * 5), '#5a0606'); // 떨어지는 핏방울
+  }
   // 파리
   for (let k = 0; k < 8; k++) { const [x, y] = P(i0 + hash(k, 11, seed) * w, j0 + hash(k, 12, seed) * d, tz + 4 + hash(k, 13, seed) * 16); R(x, y, 1, 1, '#0a0606'); }
   finish();
@@ -478,6 +509,40 @@ function plank(cv: Cv, x0: number, y0: number, x1: number, y1: number, z0: numbe
   const { P, line } = cv;
   for (let z = z0 + 3; z < z1 - 1; z += 3) line(P(x0, y1, z), P(x1, y1, z), 1, '#3a2616'); // 널판 결
 }
+/** 46차 좌판 물건 하나 (화면 x, y = 물건 밑 가운데). 빛 · 그늘 · 테를 한 점씩 넣는다
+ *  0 병 · 1 항아리 · 2 작은 궤짝 · 3 천 두루마리 · 4 자루 · 5 해골 잔과 초 · 6 노전 무더기 · 7 초 묶음 · 8 눈알 사발 · 9 말린 풀 · 10 구슬 꿰미 · 11 놋 등잔 · 12 쥐포(말린 박쥐) */
+function ware(cv: Cv, x: number, y: number, t: number, c: string) {
+  const { R, line } = cv;
+  x = Math.round(x); y = Math.round(y);
+  switch (t % 13) {
+    case 0: R(x - 1, y - 6, 3, 6, c); R(x + 1, y - 6, 1, 6, shade(c, 0.65)); R(x - 1, y - 5, 1, 3, shade(c, 1.6)); R(x, y - 8, 1, 2, shade(c, 0.8)); R(x, y - 9, 1, 1, '#8a6a3a'); R(x - 1, y - 3, 3, 1, '#e8dcc0'); break;
+    case 1: R(x - 3, y - 5, 6, 5, c); R(x - 2, y - 6, 4, 1, c); R(x + 1, y - 5, 2, 5, shade(c, 0.72)); R(x - 2, y - 4, 1, 2, shade(c, 1.35)); R(x - 2, y - 7, 4, 1, shade(c, 0.55)); R(x - 3, y - 3, 6, 1, '#c8a860'); break;
+    case 2: R(x - 3, y - 4, 6, 4, '#7a5a3a'); R(x - 3, y - 5, 6, 1, '#9a7a52'); R(x + 2, y - 4, 1, 4, '#4e3420'); R(x - 1, y - 5, 1, 5, '#3a2616'); R(x - 3, y - 2, 5, 1, '#5a3e26'); break;
+    case 3: R(x - 4, y - 3, 8, 3, c); R(x - 4, y - 3, 8, 1, shade(c, 1.3)); R(x - 2, y - 3, 1, 3, shade(c, 0.65)); R(x + 1, y - 3, 1, 3, shade(c, 0.65)); R(x + 4, y - 3, 1, 3, shade(c, 1.45)); R(x + 4, y - 2, 1, 1, shade(c, 0.5)); break;
+    case 4: R(x - 3, y - 4, 6, 4, '#9a8a62'); R(x - 2, y - 5, 4, 1, '#9a8a62'); R(x + 1, y - 4, 2, 4, '#7a6a4a'); R(x - 1, y - 6, 2, 1, '#5a4a2a'); R(x - 1, y - 7, 2, 1, '#b8a87a'); R(x - 2, y - 3, 1, 1, '#b8a87a'); R(x + 3, y - 1, 1, 1, c); break;
+    case 5: skull(cv, x, y - 3, 1); R(x, y - 8, 1, 3, '#e8dcc0'); R(x, y - 9, 1, 1, '#ffc24a'); break;
+    case 6: R(x - 3, y - 2, 6, 2, '#a8822a'); R(x - 2, y - 3, 5, 1, '#c9a23e'); R(x - 1, y - 4, 3, 1, '#e8c86a'); R(x + 2, y - 1, 1, 1, '#6a4a12'); R(x - 3, y - 1, 1, 1, '#e8c86a'); break;
+    case 7: for (const [dx, h] of [[-2, 3], [0, 5], [2, 4]]) { R(x + dx, y - h, 1, h, '#e8dcc0'); R(x + dx, y - h - 1, 1, 1, '#ffb04a'); } R(x - 2, y - 1, 5, 1, '#c8b896'); break;
+    case 8: R(x - 3, y - 2, 6, 2, '#6a5a4a'); R(x - 2, y, 4, 1, '#4a3a2a'); for (const [dx, dy, iris] of [[-2, -4, '#3a6aa8'], [0, -4, '#a8281e'], [-1, -5, '#2a6a3a']] as const) { R(x + dx, y + dy, 2, 2, '#f0ece4'); R(x + dx + 1, y + dy + 1, 1, 1, iris); } break;
+    case 9: line([x - 3, y], [x + 3, y - 3], 2, '#4a6a2a'); R(x - 1, y - 2, 2, 2, '#c8a860'); R(x + 2, y - 4, 2, 1, '#6a8a3a'); R(x + 3, y - 3, 1, 1, '#8aa84a'); break;
+    case 10: for (let k = 0; k < 6; k++) R(x - 3 + k, y - 1 - Math.round(Math.sin((k / 5) * Math.PI) * 2), 1, 1, ['#c8281e', '#e8c86a', '#3a6aa8', '#e8e4dc', '#8a4a8a', '#4a8a4a'][k]); break;
+    case 11: R(x - 1, y - 5, 3, 4, '#c9a23e'); R(x, y - 4, 1, 2, '#ffd07a'); R(x - 1, y - 6, 3, 1, '#8a6a1a'); R(x - 2, y - 1, 5, 1, '#8a6a1a'); R(x + 1, y - 5, 1, 4, '#a8822a'); break;
+    default: R(x - 2, y - 3, 5, 2, '#5a4a40'); R(x - 3, y - 4, 2, 1, '#4a3a34'); R(x + 2, y - 4, 2, 1, '#4a3a34'); R(x - 1, y - 4, 1, 1, '#ff3a1a'); R(x + 1, y - 2, 1, 1, '#2a1e1a'); break;
+  }
+}
+/** 처마 끈에 매단 것 (x, y = 끈 끝) — 0 박 바가지 · 1 말린 박쥐 · 2 마늘 꿰미 · 3 작은 해골 · 4 풀 다발 */
+function hang(cv: Cv, x: number, y: number, t: number) {
+  const { R } = cv;
+  x = Math.round(x); y = Math.round(y);
+  R(x, y, 1, 3, '#2a1a10');
+  switch (t % 5) {
+    case 0: R(x - 2, y + 3, 4, 4, '#c8a050'); R(x - 1, y + 2, 2, 1, '#a88038'); R(x + 1, y + 3, 1, 4, '#8a6a2a'); R(x - 1, y + 4, 1, 1, '#e8c878'); break;
+    case 1: R(x - 1, y + 3, 2, 4, '#3a2e2a'); R(x - 4, y + 3, 3, 2, '#2a1e1a'); R(x + 1, y + 3, 3, 2, '#2a1e1a'); R(x - 4, y + 5, 1, 1, '#2a1e1a'); R(x + 3, y + 5, 1, 1, '#2a1e1a'); break;
+    case 2: for (let k = 0; k < 3; k++) { R(x - 1, y + 3 + k * 2, 3, 2, '#e8e0cc'); R(x + 1, y + 3 + k * 2, 1, 2, '#c8b896'); } break;
+    case 3: skull(cv, x, y + 5, 1); break;
+    default: R(x - 1, y + 3, 3, 1, '#c8a860'); for (let k = -1; k <= 1; k++) R(x + k, y + 4, 1, 4 + (k & 1), k ? '#5a7a32' : '#6a8a3a'); break;
+  }
+}
 /** 물장수: 나무 가판 위 항아리 · 뒤에 쇠테 두른 물통 둘 · 널빤지 지붕 · 물방울 간판 */
 function stallWater(b: Building, cv: Cv) {
   const { g, P, R, line } = cv;
@@ -493,13 +558,16 @@ function stallWater(b: Building, cv: Cv) {
   for (let k = 0; k < w * 2 + d; k++) {
     const [x, y] = P(i0 + 0.3 + (k / (w * 2 + d)) * (w - 0.5), j0 + 0.55 + (j1 - j0 - 0.6) / 2, 14);
     g.fillStyle = k % 2 ? '#8a4a2a' : '#7a3a22'; g.beginPath(); g.ellipse(x, y - 4, 3.5, 4.5, 0, 0, Math.PI * 2); g.fill();
-    R(x - 2, y - 9, 4, 2, '#5a2a16'); R(x - 1, y - 6, 1, 2, '#a86a42');
+    g.fillStyle = '#5a2a16'; g.beginPath(); g.ellipse(x + 1, y - 3, 2.5, 3.5, 0, -Math.PI / 2, Math.PI / 2); g.fill(); // 그늘 반쪽
+    R(x - 2, y - 9, 4, 2, '#5a2a16'); R(x - 1, y - 6, 1, 2, '#c88a5a'); R(x - 2, y - 2, 4, 1, '#6a3a1e'); R(x - 1, y - 10, 2, 1, '#2a4a4a'); // 빛 · 띠 · 물 비침
+    if (k % 3 === 0) R(x + 3, y - 1, 2, 1, '#2a4a5a'); // 흘린 물
   }
   { const [x, y] = P(i1 - 0.25, j1 - 0.3, 14); line([x - 6, y - 1], [x + 2, y - 6], 1.5, '#a8a49c'); g.fillStyle = '#8a8680'; g.beginPath(); g.ellipse(x + 3, y - 6, 2.5, 1.5, 0, 0, Math.PI * 2); g.fill(); } // 국자
   // 뒤쪽 반만 덮는 널빤지 차양 (앞의 항아리가 보이게)
   const hb = b.h + 6, hf = b.h, jm = j0 + Math.min(0.55, d * 0.45);
   for (const [x, y, hh] of [[i0, j0, hb], [i1, j0, hb]] as const) { const [sx, sy] = P(x, y, 0); R(sx - 1, sy - hh, 2, hh, '#3a2616'); }
   for (let k = 0; k < 5; k++) { const a = i0 - 0.1 + (k / 5) * (w + 0.2), bb = a + (w + 0.2) / 5; cv.poly([P(a, j0 - 0.1, hb + 1), P(bb, j0 - 0.1, hb + 1), P(bb, jm, hf - 1), P(a, jm, hf - 1)], k % 2 ? '#6a4a2e' : '#5a3e26'); }
+  for (let k = 0; k < Math.max(2, w * 2); k++) { const [x, y] = P(i0 + 0.25 + k * ((w - 0.5) / Math.max(1, w * 2 - 1)), jm, hf - 1); if (Math.abs(x - P(i0 + w / 2, jm, 0)[0]) > 8) hang(cv, x, y, k % 2 ? 0 : 4); } // 처마에 매단 박 바가지 · 풀
   { const [x, y] = P(i0 + w / 2, jm, hf - 1); R(x - 5, y, 1, 4, '#2a1a10'); R(x + 4, y, 1, 4, '#2a1a10'); R(x - 6, y + 4, 12, 9, '#7a5a3a'); R(x - 6, y + 4, 12, 1, '#9a7a52'); g.fillStyle = '#4a8aa8'; g.beginPath(); g.moveTo(x, y + 6); g.quadraticCurveTo(x + 3, y + 10, x, y + 11); g.quadraticCurveTo(x - 3, y + 10, x, y + 6); g.fill(); }
 }
 /** 장사꾼: 나무 진열대(병 · 궤짝 · 천 두루마리) · 한쪽 끝에 선반 달린 높은 나무 가판 · 바랜 줄무늬 차양 (장사꾼은 진열대 뒤에 선다) */
@@ -516,24 +584,25 @@ function stallTrader(b: Building, cv: Cv) {
       const t = (k + 0.5) / 3;
       const [x, y] = long ? P(sx0, sy0 + t * (sy1 - sy0), z) : P(sx0 + t * (sx1 - sx0), sy1, z);
       const c = goods[(k * 3 + z) % goods.length];
-      if ((k + z) % 3 === 0) { R(x - 1, y - 6, 3, 6, c); R(x, y - 7, 1, 1, '#2a1a10'); } else { R(x - 2, y - 4, 4, 4, c); R(x - 2, y - 4, 4, 1, shade(c, 1.25)); }
+      ware(cv, x, y, [0, 1, 11, 7, 0, 10, 1, 6, 0][(k * 3 + z) % 9], c);
     }
     cv.poly(long ? [P(sx0, sy0, z), P(sx0, sy1, z), P(sx0, sy1, z - 1.5), P(sx0, sy0, z - 1.5)] : [P(sx0, sy1, z), P(sx1, sy1, z), P(sx1, sy1, z - 1.5), P(sx0, sy1, z - 1.5)], '#a87a4e');
   }
   // 진열대
   const cx1 = long ? sx0 - 0.05 : i1 - 0.05, cy0 = long ? j0 + 0.15 : sy1 + 0.05;
   plank(cv, i0 + 0.05, cy0, cx1, j1 - 0.05, 0, 12);
-  for (let k = 0; k < 10; k++) {
+  for (let k = 0; k < 14; k++) {
     const u = hash(k, 7, i0), v = hash(k, 8, j0);
     const [x, y] = P(i0 + 0.2 + u * (cx1 - i0 - 0.35), cy0 + 0.15 + v * (j1 - cy0 - 0.3), 12);
     const c = goods[k % goods.length];
-    if (k % 3 === 0) { R(x - 3, y - 2, 6, 2, c); R(x - 3, y - 3, 6, 1, shade(c, 1.2)); } else if (k % 3 === 1) { R(x - 1, y - 5, 3, 5, c); } else { R(x - 2, y - 3, 4, 3, c); }
+    ware(cv, x, y, [3, 0, 2, 4, 6, 8, 3, 1, 9, 10, 5, 12][k % 12], c);
   }
-  const hb = b.h + 4, hf = b.h - 6;
-  for (const [x, y, hh] of [[i0, j1, hf], [i1, j1, hf], [i0, j0, hb]] as const) { const [px, py] = P(x, y, 0); R(px - 1, py - hh, 2, hh, '#3a2616'); }
+  const hb = b.h + 6, hf = b.h - 2, jm = j0 + Math.max(0.5, d * 0.45); // 46차: 차양은 뒤 절반만 (진열대 위 물건이 보이게)
+  for (const [x, y, hh] of [[i0, jm, hf], [i1, jm, hf], [i0, j0, hb]] as const) { const [px, py] = P(x, y, 0); R(px - 1, py - hh, 2, hh, '#3a2616'); }
   const nS = 6;
-  for (let k = 0; k < nS; k++) { const a = i0 - 0.1 + (k / nS) * (w + 0.2), bb = a + (w + 0.2) / nS; cv.poly([P(a, j0 - 0.05, hb), P(bb, j0 - 0.05, hb), P(bb, j1 + 0.2, hf - 1), P(a, j1 + 0.2, hf - 1)], k % 2 ? '#8a2a22' : '#c8b896'); }
-  for (let k = 0; k <= (w + 0.2) * 6; k++) { const [x, y] = P(i0 - 0.1 + k / 6, j1 + 0.2, hf - 1); R(x, y, 2, 2 + (k % 2), k % 2 ? '#8a2a22' : '#c8b896'); }
+  for (let k = 0; k < nS; k++) { const a = i0 - 0.1 + (k / nS) * (w + 0.2), bb = a + (w + 0.2) / nS; cv.poly([P(a, j0 - 0.05, hb), P(bb, j0 - 0.05, hb), P(bb, jm + 0.1, hf - 1), P(a, jm + 0.1, hf - 1)], k % 2 ? '#8a2a22' : '#c8b896'); }
+  for (let k = 0; k <= (w + 0.2) * 6; k++) { const [x, y] = P(i0 - 0.1 + k / 6, jm + 0.1, hf - 1); R(x, y, 2, 2 + (k % 2), k % 2 ? '#8a2a22' : '#c8b896'); }
+  for (let k = 0; k < w * 2 - 1; k++) { const [x, y] = P(i0 + 0.4 + k * 0.5, jm + 0.08, hf - 3); hang(cv, x, y, [2, 1, 4, 0][k % 4]); } // 차양 끝에 매단 마늘 꿰미 · 말린 박쥐 · 풀 다발
 }
 /** 넝마주이: 리어카 — 큰 바퀴 둘 · 앞으로 뻗은 손잡이 · 짐칸에 수북한 고물(녹슨 쇠 · 뼈 · 누더기 · 부러진 우산 · 깡통) */
 function stallCart(b: Building, cv: Cv) {
@@ -586,14 +655,15 @@ function stallCloth(b: Building, cv: Cv) {
   for (const [x, y] of [[x0, y1], [x1, y1]] as const) { const [cx, cy] = P(x, y, 3); g.fillStyle = BLUE_D; g.beginPath(); g.ellipse(cx, cy + 1, 3, 2, 0, 0, Math.PI * 2); g.fill(); R(cx - 1, cy + 2, 2, 3, BLUE_D); }
   // 위에 늘어놓은 약
   const liq = ['#6a9a3a', '#a8281e', '#c9a23e', '#5a7aa8', '#8a4a8a'];
-  for (let k = 0; k < Math.round((x1 - x0) * (y1 - y0) * 7); k++) {
+  for (let k = 0; k < Math.round((x1 - x0) * (y1 - y0) * 9); k++) {
     const u = hash(k, 5, i0), v = hash(k, 6, j0);
     const [x, y] = P(x0 + 0.15 + u * (x1 - x0 - 0.3), y0 + 0.15 + v * (y1 - y0 - 0.3), tz);
-    const t = k % 4;
-    if (t === 0) { R(x - 1, y - 6, 3, 6, liq[k % liq.length]); R(x - 1, y - 6, 1, 6, '#ffffff22'); R(x, y - 8, 1, 2, '#6a4a2a'); } // 약병
-    else if (t === 1) { line([x - 4, y], [x + 3, y - 2], 2, '#4a6a2a'); R(x - 1, y - 2, 2, 2, '#8a6a3a'); } // 말린 풀
-    else if (t === 2) { g.fillStyle = '#8a8274'; g.beginPath(); g.ellipse(x, y - 1, 4, 2, 0, 0, Math.PI * 2); g.fill(); line([x + 1, y - 2], [x + 4, y - 6], 1, '#6a6458'); } // 약사발
-    else { R(x - 3, y - 3, 6, 3, '#c8a860'); R(x - 1, y - 5, 2, 2, '#a8281e'); } // 약첩
+    const t = k % 6;
+    if (t === 0 || t === 4) ware(cv, x, y, 0, liq[k % liq.length]); // 약병
+    else if (t === 1) ware(cv, x, y, 9, '#4a6a2a'); // 말린 풀
+    else if (t === 2) { g.fillStyle = '#8a8274'; g.beginPath(); g.ellipse(x, y - 1, 4, 2, 0, 0, Math.PI * 2); g.fill(); R(x - 2, y - 2, 4, 1, '#3a5a2a'); line([x + 1, y - 2], [x + 4, y - 6], 1, '#6a6458'); } // 약사발 (빻은 풀)
+    else if (t === 5) ware(cv, x, y, 8, '#6a5a4a'); // 눈알 사발
+    else { R(x - 3, y - 3, 6, 3, '#c8a860'); R(x - 3, y - 3, 6, 1, '#e0c480'); R(x - 1, y - 5, 2, 2, '#a8281e'); R(x + 2, y - 3, 1, 3, '#a8904a'); } // 약첩
   }
 }
 /** 무기상: 낮은 나무 진열대(화살 묶음 · 쇠뇌) · 한쪽 끝에 나무 거치대(걸어 둔 활 · 기대 놓은 창 · 화살통) */
@@ -606,6 +676,8 @@ function stallArms(b: Building, cv: Cv) {
   const L = long ? w : d;
   for (let k = 0; k < L + 1; k++) { const t = (k + 0.5) / (L + 1); const [x, y] = long ? P(i0 + 0.2 + t * (w - 0.6), j0 + 0.5, 9) : P(i0 + 0.5, j0 + 0.2 + t * (d - 0.6), 9); for (let n = 0; n < 4; n++) line([x - 5, y - n], [x + 5, y - 2 - n], 1, '#c8b48a'); R(x - 1, y - 4, 2, 4, '#3a2616'); } // 화살 묶음
   { const [x, y] = P(i1 - 0.35, j1 - 0.3, 9); line([x - 6, y - 2], [x + 4, y - 4], 2, '#4e3420'); line([x - 2, y - 7], [x + 1, y + 2], 1.5, '#8a8680'); } // 쇠뇌
+  { const [x, y] = P(i0 + (long ? w * 0.55 : 0.6), j1 - (long ? 0.3 : d * 0.45), 9); R(x - 3, y - 4, 6, 4, '#6a6e76'); R(x - 2, y - 5, 4, 1, '#8a8e96'); R(x - 3, y - 2, 6, 1, '#3a3e46'); R(x - 1, y - 3, 1, 1, '#1a1a1e'); R(x + 1, y - 3, 1, 1, '#1a1a1e'); R(x + 2, y - 4, 1, 2, '#a8acb4'); } // 녹슨 투구
+  { const [x, y] = P(i0 + (long ? w * 0.3 : 0.45), j1 - (long ? 0.25 : d * 0.7), 9); line([x - 6, y], [x + 5, y - 3], 1.5, '#b8bec6'); R(x - 8, y, 3, 1, '#5a3a22'); R(x - 6, y - 2, 1, 4, '#8a6a2a'); R(x + 3, y - 3, 1, 1, '#e8ecf0'); } // 칼 한 자루
   // 끝의 거치대 (긴 좌판은 왼쪽 끝을 가로질러 · 세로 좌판은 뒤쪽 끝)
   const A = long ? P(i0 + 0.12, j0 + 0.05, 0) : P(i0 + 0.05, j0 + 0.12, 0), B = long ? P(i0 + 0.12, j1 - 0.05, 0) : P(i1 - 0.05, j0 + 0.12, 0);
   const up = (p: number[], z: number) => [p[0], p[1] - z] as [number, number];
@@ -648,24 +720,22 @@ function stall(b: Building, theme: Theme) {
     const [x, y] = P(i0 + 0.12 + (k / (w * 5)) * (w - 0.2), j0 + 0.35 + hash(k, 1, seed) * (d - 0.5), tz);
     const t = Math.floor(hash(k, 2, seed) * 5);
     const c = goods[Math.floor(hash(k, 3, seed) * goods.length)];
-    if (t === 0) skull(cv, x, y - 3, 1);
-    else if (t === 1) { R(x - 2, y - 6, 4, 6, c); R(x - 3, y - 7, 6, 1, shade(c, 0.7)); } // 항아리
-    else if (t === 2) { line([x - 4, y - 1], [x + 4, y - 3], 1.5, '#7a7670'); } // 녹슨 쇠
-    else if (t === 3) { R(x - 3, y - 2, 6, 2, c); R(x - 2, y - 3, 4, 1, shade(c, 1.2)); } // 개킨 누더기
-    else { R(x - 1, y - 4, 2, 4, '#e8d8c0'); R(x - 2, y - 5, 4, 1, '#c9a23e'); } // 뼈 잔
+    if (t === 2) { line([x - 4, y - 1], [x + 4, y - 3], 1.5, '#7a7670'); R(x - 1, y - 3, 2, 1, '#8a4a2a'); } // 녹슨 쇠 (녹 자국)
+    else ware(cv, x, y, [5, 1, 0, 3, 7, 4, 6, 12][(t + k) % 8], c);
   }
   // 기운 천막: 뒤쪽 기둥 둘이 높고 앞은 낮다, 천은 기운 조각
-  const hb = Hw, hf = Hw - 10;
-  for (const [x, y, hh] of [[i0, j0, hb], [i1, j0, hb], [i0, j1, hf], [i1, j1, hf]] as const) { const [sx, sy] = P(x, y, 0); R(sx - 1, sy - hh, 2, hh, '#2e2014'); }
+  const hb = Hw, hf = Hw - 4, jm = j0 + Math.max(0.5, d * 0.45); // 46차: 기운 천막은 뒤 절반만 (널판 위 물건이 보이게)
+  for (const [x, y, hh] of [[i0, j0, hb], [i1, j0, hb], [i0, jm, hf], [i1, jm, hf]] as const) { const [sx, sy] = P(x, y, 0); R(sx - 1, sy - hh, 2, hh, '#2e2014'); }
   const ov = 0.15;
   const nP = 4;
   for (let k = 0; k < nP; k++) {
     const a = i0 - ov + (k / nP) * (w + 2 * ov), bb = a + (w + 2 * ov) / nP;
-    poly([P(a, j0 - ov, hb + 1), P(bb, j0 - ov, hb + 1), P(bb, j1 + ov, hf - 2), P(a, j1 + ov, hf - 2)], cloth[Math.floor(hash(k, 4, seed) * 3)]);
+    poly([P(a, j0 - ov, hb + 1), P(bb, j0 - ov, hb + 1), P(bb, jm + ov, hf - 2), P(a, jm + ov, hf - 2)], cloth[Math.floor(hash(k, 4, seed) * 3)]);
+    const [sx, sy] = P(a + 0.1, j0 + 0.2, hb - 2); R(sx, sy, 3, 2, shade(cloth[Math.floor(hash(k, 4, seed) * 3)], 0.7)); // 기운 자국
   }
-  for (let k = 0; k <= (w + 2 * ov) * 5; k++) { const [x, y] = P(i0 - ov + k / 5, j1 + ov, hf - 2); R(x, y, 1, 1 + (k % 3), cloth[1]); }
+  for (let k = 0; k <= (w + 2 * ov) * 5; k++) { const [x, y] = P(i0 - ov + k / 5, jm + ov, hf - 2); R(x, y, 1, 1 + (k % 3), cloth[1]); }
   // 끈에 매단 물건 (앞 처마)
-  for (let k = 0; k < w * 2; k++) { const [x, y] = P(i0 + 0.3 + k * 0.5, j1 + ov * 0.6, hf - 2); R(x, y, 1, 5, '#2a1a10'); if (k % 2) skull(cv, x, y + 7, 1); else { R(x - 1, y + 5, 3, 5, goods[k % goods.length]); } }
+  for (let k = 0; k < w * 2; k++) { const [x, y] = P(i0 + 0.3 + k * 0.5, jm + ov * 0.6, hf - 2); hang(cv, x, y, [3, 1, 0, 2][k % 4]); }
   finish();
   return { canvas: cv.c, x: cv.minX, y: cv.minY };
 }

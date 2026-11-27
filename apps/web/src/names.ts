@@ -99,6 +99,32 @@ export function cuisineOf(b: Building): string | undefined {
   return ((b as B).pois ?? []).find((p) => (k === 'food' ? FOOD : CAFE).includes(p.t))?.c;
 }
 
+// 46차 서울 은행 간판: 체인 은행(이름을 숨긴 은행)과 이름 없는 은행에 이 세상에 없는 은행 이름을 단다 (실제 상표는 쓰지 않는다)
+const SEOUL_BANKS: [string, string, string][] = [
+  ['미리내은행', 'ธนาคารมีรีแน', 'Mirinae Bank'], ['가람은행', 'ธนาคารการัม', 'Garam Bank'], ['새날은행', 'ธนาคารแซนัล', 'Saenal Bank'],
+  ['다온은행', 'ธนาคารดาออน', 'Daon Bank'], ['누리은행', 'ธนาคารนูรี', 'Nuri Bank'], ['온새미은행', 'ธนาคารออนแซมี', 'Onsaemi Bank'],
+];
+export function nameSeoulBanks(z: { city?: string; buildings: Building[] }, walk: (i: number, j: number) => boolean) {
+  if (z.city !== 'seoul') return;
+  for (const b of z.buildings) {
+    // 간판이 없던 은행: 걸어서 닿는 앞면(+j 면 → +i 면)에 간판을 단다
+    if (!b.sign && mainPoi(b)?.t === 'bank') {
+      const okL = [0, 1, -1].some((d) => walk(b.i0 + Math.floor(b.w / 2) + d, b.j0 + b.d));
+      const okR = [0, 1, -1].some((d) => walk(b.i0 + b.w, b.j0 + Math.floor(b.d / 2) + d));
+      if (okL || okR) b.sign = okL ? 'left' : 'right';
+    }
+  }
+  for (const b of z.buildings) for (const p of (b as B).pois ?? []) {
+    if (p.t !== 'bank' || (p.n && !p.b)) continue;
+    const [ko, th, en] = SEOUL_BANKS[(((b.i0 * 73856093) ^ (b.j0 * 19349663)) >>> 0) % SEOUL_BANKS.length];
+    p.n = ko; p.nko = ko; p.nth = th; p.nen = en; delete p.b;
+  }
+}
+/** 46차: 건물에 든 은행의 이름 (은행이 대표 가게가 아니어도 — 호텔 1층 은행 같은) */
+export function bankName(b: Building, l: Lang): string {
+  const p = ((b as B).pois ?? []).find((q) => q.t === 'bank');
+  return p ? poiName(p, l) : '';
+}
 /** 은행이 들어 있는 건물 (저금·찾기) */
 export function hasBank(b: Building) {
   return ((b as B).pois ?? []).some((p) => p.t === 'bank');

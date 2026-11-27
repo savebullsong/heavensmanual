@@ -23,7 +23,7 @@ import { beyondOf } from './beyond.ts';
 import { drawBuildingKit, drawGroundKit, buildingTop, upperFloors, carSprite, propSprite, CAR_MODELS, CHUNK, kitOk, PPX } from './street.ts';
 import { t, lang } from './i18n.ts';
 import { bangkokClock, nightFactor } from './clock.ts';
-import { buildingName, buildingSub, interactive, canWork, hasBank, cuisineOf, storeOf, kindOf as bKindOf, mainPoi, type StoreKind } from './names.ts';
+import { buildingName, buildingSub, interactive, canWork, hasBank, bankName, cuisineOf, storeOf, kindOf as bKindOf, mainPoi, type StoreKind } from './names.ts';
 import * as sfx from './sfx.ts';
 import { MONSTERS, GUARDS, floorDef, GURMA_FULL, fordWob, type MonsterDef, type GuardDef, raidState, FIELD_BOSS, floorCurve } from './hell.ts';
 import { rollLoot, ITEMS, iconFor, moneyText } from './items.ts';
@@ -889,7 +889,7 @@ export class WorldScene {
     for (const p of this.zone.props) {
       const v = (p.i * 7 + p.j * 3) % 4;
       if (p.kind === 'torture') { this.addTorture(p.i, p.j, p.o ?? 0); continue; }
-      const decor = p.kind === 'fence' || p.kind === 'wall' || p.kind === 'crag' || p.kind === 'htree' || p.kind === 'rock' || p.kind === 'crack' || p.kind === 'dicetable' || p.kind === 'campfire' || p.kind === 'bones' || p.kind === 'skulls' || p.kind === 'stake' || p.kind === 'cauldron' || p.kind === 'cage' || p.kind === 'bonfire' || p.kind === 'junk' || p.kind === 'reeds' || p.kind === 'mattress' || p.kind === 'anvil' || p.kind === 'forge' || p.kind === 'maskpost' || (p.kind === 'lantern' && theme !== 'ash');
+      const decor = p.kind === 'fence' || p.kind === 'wall' || p.kind === 'crag' || p.kind === 'htree' || p.kind === 'rock' || p.kind === 'crack' || p.kind === 'dicetable' || p.kind === 'campfire' || p.kind === 'bones' || p.kind === 'skulls' || p.kind === 'stake' || p.kind === 'cauldron' || p.kind === 'cage' || p.kind === 'bonfire' || p.kind === 'junk' || p.kind === 'reeds' || p.kind === 'mattress' || p.kind === 'anvil' || p.kind === 'forge' || p.kind === 'maskpost' || p.kind === 'tent' || (p.kind === 'lantern' && theme !== 'ash');
       if (decor) {
         // 같은 그림이 되풀이되지 않게: 나무·바위·땅 자국은 24가지, 해골 더미·꼬챙이·철창·가마솥·뼈는 12가지
         const vv = Math.floor(((p.i * 73856093) ^ (p.j * 19349663)) >>> 0) % (p.kind === 'wall' ? 3 : p.kind === 'crag' ? 8 : p.kind === 'htree' || p.kind === 'rock' || p.kind === 'crack' ? 24 : p.kind === 'fence' ? 6 : 12);
@@ -908,10 +908,11 @@ export class WorldScene {
           const w = s.width, h = s.height, x0 = x - w * hp.ax, y0 = y - h * hp.ay;
           this.addTall(s, x0, y0, x0 + w, y0 + h);
         }
+        if (p.kind === 'bonfire' || p.kind === 'campfire' || p.kind === 'forge' || p.kind === 'anvil') this.addFire(x, y, p.kind, s.zIndex + 0.001); // 46차: 불꽃이 살아 움직인다
         if (hp.glow) {
           const glow = new Sprite(this.glowTex());
           glow.anchor.set(0.5);
-          glow.scale.set(p.kind === 'bonfire' ? 1.3 : p.kind === 'crag' ? 0.6 : p.kind === 'htree' ? 0.45 : 0.7);
+          glow.scale.set(p.kind === 'bonfire' ? 1.3 : p.kind === 'tent' ? 0.5 : p.kind === 'crag' ? 0.6 : p.kind === 'htree' ? 0.45 : 0.7);
           glow.tint = hp.glowTint ?? 0xff7a32;
           glow.position.set(x + hp.glow[0], y + hp.glow[1]);
           glow.blendMode = 'add';
@@ -2408,6 +2409,41 @@ export class WorldScene {
       if (e.blink > 0) continue;
       g.rect(e.x - 1 + e.o, e.y, 1, 1).fill(0x141014);
       g.rect(e.x + 1 + e.o, e.y, 1, 1).fill(0x141014);
+    }
+  }
+  // ───── 46차: 모닥불 · 화톳불 · 대장간 화덕의 불꽃이 살아 움직인다 (불 혀 · 불티) ─────
+  private liveFires: { g: Graphics; x: number; y: number; hw: number; base: number; top: number; n: number; seed: number; sparks: { x: number; y: number; vx: number; vy: number; life: number }[] }[] = [];
+  private addFire(x: number, y: number, kind: string, z: number) {
+    const spec = kind === 'bonfire' ? { hw: 15, base: 7, top: 50, n: 9 } : kind === 'campfire' ? { hw: 5.5, base: 4, top: 16, n: 5 } : kind === 'anvil' ? { hw: 3.6, base: 5, top: 12, n: 4 } : { hw: 6.5, base: 40, top: 51, n: 6 };
+    if (kind === 'anvil') x += 11; // 모루 옆 숯불 화로
+    const g = new Graphics(); g.blendMode = 'add'; g.zIndex = z; g.eventMode = 'none';
+    this.objects.addChild(g);
+    this.liveFires.push({ g, x, y, ...spec, seed: Math.random() * 10, sparks: [] });
+  }
+  private updateFires(dt: number) {
+    if (!this.liveFires.length) return;
+    const t0 = this.time;
+    const vx0 = -this.camera.x / this.zoom, vy0 = -this.camera.y / this.zoom, vw = this.app.screen.width / this.zoom, vh = this.app.screen.height / this.zoom;
+    for (const f of this.liveFires) {
+      if (f.g.destroyed) continue;
+      const g = f.g;
+      g.clear();
+      if (f.x < vx0 - 60 || f.x > vx0 + vw + 60 || f.y < vy0 - 80 || f.y > vy0 + vh + 80) { f.sparks.length = 0; continue; } // 화면 밖은 쉰다
+      const H = f.top - f.base, s0 = f.seed;
+      for (let n = 0; n < f.n; n++) {
+        const u = f.n === 1 ? 0 : n / (f.n - 1) * 2 - 1, dx = u * f.hw;
+        const edge = 1 - u * u * 0.65;
+        const hh = H * edge * (0.5 + 0.5 * Math.abs(Math.sin(t0 * (4.2 + n * 0.63) + n * 1.7 + s0)));
+        const sway = Math.sin(t0 * (5.1 + n * 0.4) + n + s0) * f.hw * 0.18;
+        const wd = Math.max(1.4, f.hw * 0.42 * edge);
+        const col = Math.abs(u) < 0.25 ? 0xffb43a : Math.abs(u) < 0.6 ? 0xff6a1a : 0xd8321a;
+        const bx = f.x + dx, by = f.y - f.base;
+        g.moveTo(bx - wd, by).quadraticCurveTo(bx - wd * 0.6 + sway * 0.5, by - hh * 0.55, bx + sway, by - hh).quadraticCurveTo(bx + wd * 0.6 + sway * 0.5, by - hh * 0.55, bx + wd, by).closePath().fill({ color: col, alpha: 0.55 });
+        if (Math.abs(u) < 0.5) g.moveTo(bx - wd * 0.45, by).quadraticCurveTo(bx + sway * 0.4, by - hh * 0.5, bx + sway * 0.7, by - hh * 0.7).quadraticCurveTo(bx + sway * 0.3, by - hh * 0.3, bx + wd * 0.45, by).closePath().fill({ color: 0xfff0b0, alpha: 0.5 });
+      }
+      if (Math.random() < dt * (f.n + 2)) f.sparks.push({ x: f.x + (Math.random() - 0.5) * f.hw * 1.4, y: f.y - f.base - H * 0.5, vx: (Math.random() - 0.5) * 12, vy: -30 - Math.random() * 35, life: 0.7 + Math.random() * 0.8 });
+      f.sparks = f.sparks.filter((p) => (p.life -= dt) > 0);
+      for (const p of f.sparks) { p.x += p.vx * dt + Math.sin(t0 * 7 + p.y) * 0.3; p.y += p.vy * dt; g.rect(Math.round(p.x), Math.round(p.y), 1.5, 1.5).fill({ color: p.life > 0.5 ? 0xffd26a : 0xff5a1a, alpha: Math.min(1, p.life * 1.6) }); }
     }
   }
   private setupChimney() {
@@ -5778,7 +5814,7 @@ export class WorldScene {
     const L = t();
     const b = k >= 0 ? this.zone.buildings[k] : null;
     const bank = !!b && (roomKindOf(b) === 'bank' || hasBank(b));
-    let name = k === -1 ? (this.zone.hell ? L.hellShop : L.shopLabel) : this.nameOf(b!);
+    let name = k === -1 ? (this.zone.hell ? L.hellShop : L.shopLabel) : bank && bankName(b!, lang()) ? bankName(b!, lang()) : this.nameOf(b!); // 46차: 은행이 든 건물은 은행 이름으로
     if (!name) return;
     if (name.length > 16) name = name.slice(0, 15) + '…';
     const o = new Container();
@@ -7847,6 +7883,7 @@ export class WorldScene {
     if (this.netRole !== 'guest') this.updateRaid(dt);
     this.updateGoatFx(dt); // 33차
     this.updateChimney(dt); // 34차
+    this.updateFires(dt); // 46차
     this.updateDollEyes(dt); // 43차
     this.updateArea(dt); // 44차
     this.updateLitPath(dt);
