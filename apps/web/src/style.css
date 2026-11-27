@@ -650,3 +650,10 @@ canvas[data-hd] { image-rendering: auto !important; }
 .sleep-cover p { max-width: 80%; color: #d8d0c4; font-size: 15px; line-height: 1.7; text-align: center; opacity: 0; transition: opacity 1.2s ease 0.8s; }
 .sleep-cover.heaven p { color: #6a5a3a; }
 .sleep-cover.show p { opacity: 1; }
+/* 47차 무게 */
+.load-chip { position: fixed; z-index: 14; left: 12px; top: 54px; padding: 3px 9px; border-radius: 10px; font-size: 12px; font-weight: 700; color: #ffe0c8; background: rgba(110, 50, 20, 0.75); border: 1px solid #e08a3a; pointer-events: none; }
+.load-chip.crawl { background: rgba(120, 20, 20, 0.8); border-color: #ff5a4a; }
+body:has(.bag-panel) .load-chip { display: none; }
+.bag-weight { margin: 2px 12px 6px; font-size: 12px; color: #cfc3a6; }
+.bag-weight.over { color: #ffb07a; }
+.bag-weight.crawl { color: #ff7a6a; font-weight: 700; }

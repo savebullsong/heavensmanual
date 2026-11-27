@@ -2413,8 +2413,11 @@ export class WorldScene {
   private ambushT = 0;
   private spawnGoat() {
     const p0 = this.player;
-    const spot = randomWalkTileNear(this.zone, Math.floor(p0.x), Math.floor(p0.y), 40, ['walk', 'soi', 'park']);
-    if (!spot || Math.hypot(spot[0] - p0.x, spot[1] - p0.y) < 12) return;
+    // 47차: 염소는 주인공의 집(서울 옛집 · 산 집) 앞에서도 나타난다 — 문 앞을 서성인다
+    const home = this.zone.buildings.find((b) => b.cat === 'home' || (b.cat === 'estate' && (b as { pois?: { t: string }[] }).pois?.[0]?.t === 'ownedhome'));
+    const hf = home && Math.random() < 0.35 ? this.frontOf(home) : null;
+    const spot = hf ? randomWalkTileNear(this.zone, hf[0], hf[1], 3, ['walk', 'soi', 'park', 'lot', 'cross']) ?? hf : randomWalkTileNear(this.zone, Math.floor(p0.x), Math.floor(p0.y), 40, ['walk', 'soi', 'park']);
+    if (!spot || (!hf && Math.hypot(spot[0] - p0.x, spot[1] - p0.y) < 12)) return;
     const w = this.makeWalker(this.npcLook('passer'), spot[0], spot[1], 'goat');
     w.dressId = -1; // 사람 옷을 입히지 않는다
     w.cs = goatCharSet();
@@ -4023,6 +4026,9 @@ export class WorldScene {
     this.bubble(w, hi[Math.floor(Math.random() * hi.length)]);
   }
   /** 45차: 정벌 중에는 쉬어도 체력이 차지 않는다 (만피로 가서 다 닳으면 끝) */
+  /** 47차 무게: 걷는 빠르기 · 회복 배수 · 기어감 */
+  private load = { speed: 1, regen: 1, crawl: false };
+  setLoad(speed: number, regen: number, crawl: boolean) { this.load = { speed, regen, crawl }; }
   private noRegen = false;
   setNoRegen(v: boolean) { this.noRegen = v; }
   summonMarionette(hp: number, dmg: [number, number], cols: Record<number, string>, secs: number): boolean {
@@ -7638,6 +7644,7 @@ export class WorldScene {
     if (!w.act && downed) { anim = 'fall'; i = (cs.counts.fall ?? 1) - 1; }
     else if (!w.act && w.riseT && w.riseT > 0) { anim = 'fall'; i = Math.max(0, Math.min((cs.counts.fall ?? 1) - 1, Math.floor((w.riseT / 0.4) * (cs.counts.fall ?? 1)))); w.riseT -= dt; }
     else if (!w.act && w.still) { const sa: Anim = w.still === 'lotus' && cs.counts.lotus ? 'lotus' : 'sit'; if (w.still === 'lie' || !cs.counts[sa]) { anim = w.still === 'lie' ? 'fall' : 'idle'; i = w.still === 'lie' ? (cs.counts.fall ?? 1) - 1 : 0; } else { anim = sa; i = 0; } }
+    if (w.isPlayer && this.load.crawl && !w.act && !downed && cs.counts.fall) { anim = 'fall'; i = cs.counts.fall - 1; } // 47차: 짐이 너무 무거워 엎드려 기어간다
     if (anim === 'walk') i %= cs.counts.walk ?? 8;
     if (w.art && anim === 'idle' && (w.dir === 'sw' || w.dir === 'se') && this.poseArt(w, cs, w.art)) return;
     if (anim === 'punch' && w.act?.alt) {
@@ -7788,6 +7795,7 @@ export class WorldScene {
     if (w.isPlayer && this.kite && w.act) speed *= 0.35; // 30차: 쏘는 동작 동안은 크게 느려진다 — 걸으며 쏘아도 무적이 아니게 (예전 0.8)
     if (w.flee > 0) speed = 1.9;
     if (w.isPlayer && isDanger(w.hp, w.maxHp)) speed *= DANGER_SPEED;
+    if (w.isPlayer) speed *= this.load.speed; // 47차 무게
     if (w.kind === 'thug' && w.pick && w.pick.flee > 0 && !w.target) speed = 2.0; // 35차 → 42차: 너무 빨라 잡을 수 없었다 — 나(2.3)보다 조금 느리게
     else if (w.kind === 'thug' && w.target) speed = w.weak ? 1.05 : w.gang === 'robber' ? 1.95 : w.gang === 'mafia' ? 1.75 : w.gang === 'boxer' ? 1.9 : w.gang === 'enforcer' ? 1.7 : w.gang === 'pickpocket' ? 2.1 : 1.6;
     else if (w.kind === 'thug' && w.stalk) speed = w.weak ? 0.85 : 1.3;
@@ -8076,7 +8084,7 @@ export class WorldScene {
     const resting = this.restAt(p.x, p.y);
     if (!this.dead && (resting || this.combatT > OUT_OF_COMBAT_S) && p.hp < p.maxHp) {
       const before = Math.floor(p.hp);
-      if (!this.noRegen) p.hp = Math.min(p.maxHp, p.hp + ((resting ? restRegenPerMinute(p.maxHp, this.stats.fai) : regenPerMinute(p.maxHp, this.stats.fai)) / 60) * dt);
+      if (!this.noRegen) p.hp = Math.min(p.maxHp, p.hp + ((resting ? restRegenPerMinute(p.maxHp, this.stats.fai) : regenPerMinute(p.maxHp, this.stats.fai)) / 60) * dt * this.load.regen); // 47차: 무거우면 회복이 더디다
       if (Math.floor(p.hp) !== before) this.hooks.hp(p.hp, p.maxHp);
     }
     if (this.criminalT > 0) this.criminalT -= dt;

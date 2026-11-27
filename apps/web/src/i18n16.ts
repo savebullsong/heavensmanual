@@ -1064,6 +1064,15 @@ export const more16 = {
     dumpAngelSub: "천국 제3매립지 관리",
     dumpLook: "날개 끝이 잿빛으로 바랬다. 뜯지도 않은 선물 상자 더미를 세고 있다.",
     dumpLines: ["…하아. 모든 게 낭비되고 있어.", "더 이상 쓰레기를 버릴 행성이 없어.", "공짜라서 다들 두 개씩 가져가. 하나는 여기로 오지.", "이 TV 아직 비닐도 안 뜯었네.", "천국에서 부족한 건 없어. 버릴 곳만 빼고.", "오늘도 산이 하나 더 생겼어. 내일은 두 개겠지.", "지상에서 하던 버릇은 죽어도 안 고쳐지나 봐.", "날개가 회색이 된 건 먼지 때문이야. 아마도.", "여기도 언젠가 천국이었어."],
+    loadHeavy: "짐이 무겁다 — 걸음이 느려지고 숨이 찬다",
+    loadCrawl: "짐에 깔려 기어간다 — 체력이 차지 않는다",
+    loadChip: "짐 {n}/{m}",
+    bagWeight: "무게 {n} / {m}",
+    loadHeavyShort: "무거움",
+    loadCrawlShort: "기어감",
+    diaryFrag: ["(금빛 잉크, 둥근 글씨) 우리가 만난 날, 너가 너무 예뻐서 할 말을 잃었어.", "(금빛 잉크, 둥근 글씨) 아마도 우린 같이 날아갈 수 있을 거야.", "(금빛 잉크, 둥근 글씨) 네 목덜미에 뽀뽀하고 품에 잠들 거야.", "(금빛 잉크, 둥근 글씨) 날개를 접으면 사람처럼 보인대. 그래서 매일 접고 다녔어.", "(금빛 잉크, 둥근 글씨) 오백 년은 길지 않아. 네가 한 번 숨 쉬는 동안이야.", "(금빛 잉크, 둥근 글씨) 천사는 사랑하면 안 된다. 그런데 아무도 이유를 적어 두지 않았다.", "(금빛 잉크, 둥근 글씨) 우주새라는 이름은 내가 지었어. 네가 새를 좋아했으니까.", "(꾹꾹 눌러 쓴 검은 글씨) 너에게 해서는 안 될 짓을 했어. 그것 때문에 아마도 너는 죽었을 거야.", "(꾹꾹 눌러 쓴 검은 글씨) 나는 너를 죽여서 아마 지옥에 갈 거야.", "(꾹꾹 눌러 쓴 검은 글씨) 같은 얼굴로 세 번 만났다. 너는 한 번도 알아보지 못했다.", "(꾹꾹 눌러 쓴 검은 글씨) 칼은 빨리 휘두를수록 덜 아프대. 베이는 사람이 아니라 베는 사람이.", "(꾹꾹 눌러 쓴 검은 글씨) 저울에 올리기 전에 이 장을 찢어 둔다. 누가 읽으면 안 되니까.", "(꾹꾹 눌러 쓴 검은 글씨) 그날 비가 왔다고 적어 둔다. 사실은 오지 않았다.", "(삐뚤빼뚤한 아이 글씨) 오늘 노을 언니가 칼을 닦다가 울었다. 우리는 못 본 척했다.", "(삐뚤빼뚤한 아이 글씨) 둘 중 누가 먼저 나왔는지 아무도 안 알려 줬다. 그래서 오빠라고 부르기로 했다.", "(삐뚤빼뚤한 아이 글씨) 우리 엄마 아빠는 어디 있어? 노을 언니는 대답 대신 머리를 빗겨 준다.", "(연필로 흐리게) … 나는 큰 선물을 받았다.", "(연필로 흐리게) 우리의 사랑의 결실이 생겼다.", "(연필로 흐리게) 네가 나를 엄마라고 불렀을 때, 나는 대답하지 못했다.", "(연필로 흐리게) 다음에 태어나면 내가 먼저 알아볼게. 약속은 못 해.", "(연필로 흐리게) 문 앞까지 갔다가 돌아왔다. 집이 아직 거기 있었다.", "(연필로 흐리게) 유리 바닥 아래로 별이 지나갔다. 침대는 아직 따뜻했다.", "(연필로 흐리게) 나는 너를 기다리는 일을 직업으로 삼았다.", "(연필로 흐리게) 이 장을 읽고 있다면, 너는 또 돌아온 거야.", "(노란 깃털이 끼워진 장) 해바라기씨는 껍질을 까서 줘야 해. 안 그러면 안 먹어. 너도 그랬지.", "(노란 깃털이 끼워진 장) 앵무새는 다 들었다. 그래서 말을 하지 않는 거야.", "(노란 깃털이 끼워진 장) 염소가 문 앞에 서 있었다. 들어오지도 가지도 않았다.", "(노란 깃털이 끼워진 장) 지옥 맨 아래에도 해는 뜬대. 아무도 본 적은 없지만.", "(노란 깃털이 끼워진 장) 깃털 한 개를 끼워 둔다. 노란색이다."],
+    adminCondo: "방콕 콘도 앞",
+    adminApt: "서울 아파트 앞",
     // 47차 끝
   },
   th: {
@@ -2130,6 +2139,15 @@ export const more16 = {
     dumpAngelSub: "ผู้ดูแลบ่อขยะที่ 3 แห่งสวรรค์",
     dumpLook: "ปลายปีกซีดเป็นสีเทา กำลังนับกองกล่องของขวัญที่ยังไม่แกะ",
     dumpLines: ["…เฮ้อ ทุกอย่างถูกทิ้งขว้าง", "ไม่มีดาวดวงไหนให้ทิ้งขยะอีกแล้ว", "ของฟรี ทุกคนก็เอาไปสองชิ้น อีกชิ้นมาจบที่นี่", "ทีวีเครื่องนี้ยังไม่ได้แกะพลาสติกเลย", "สวรรค์ไม่ขาดอะไร ยกเว้นที่ทิ้ง", "วันนี้มีภูเขาเพิ่มอีกลูก พรุ่งนี้คงสองลูก", "นิสัยจากโลกข้างล่าง ตายแล้วก็ไม่หาย", "ปีกเป็นสีเทาเพราะฝุ่น คงงั้น", "ที่นี่ก็เคยเป็นสวรรค์"],
+    loadHeavy: "ของหนักเกินไป — เดินช้าลงและหายใจหอบ",
+    loadCrawl: "ของหนักจนต้องคลาน — พลังชีวิตไม่ฟื้น",
+    loadChip: "สัมภาระ {n}/{m}",
+    bagWeight: "น้ำหนัก {n} / {m}",
+    loadHeavyShort: "หนัก",
+    loadCrawlShort: "คลาน",
+    diaryFrag: ["(หมึกสีทอง ลายมือกลมมน) วันที่เราเจอกัน เธอสวยจนฉันพูดไม่ออก", "(หมึกสีทอง ลายมือกลมมน) บางทีเราอาจจะบินไปด้วยกันได้", "(หมึกสีทอง ลายมือกลมมน) ฉันจะจูบต้นคอเธอแล้วหลับในอ้อมกอด", "(หมึกสีทอง ลายมือกลมมน) เขาว่าถ้าหุบปีกจะดูเหมือนคน ฉันเลยหุบปีกทุกวัน", "(หมึกสีทอง ลายมือกลมมน) ห้าร้อยปีไม่นานหรอก แค่เธอหายใจหนึ่งครั้ง", "(หมึกสีทอง ลายมือกลมมน) เทวดาห้ามรัก แต่ไม่มีใครเขียนเหตุผลไว้เลย", "(หมึกสีทอง ลายมือกลมมน) ชื่อ Cosmic Bird ฉันตั้งเอง เพราะเธอชอบนก", "(ลายมือดำกดหนัก) ฉันทำสิ่งที่ไม่ควรทำกับเธอ เพราะมัน เธอคงตายไปแล้ว", "(ลายมือดำกดหนัก) ฉันฆ่าเธอ คงต้องลงนรก", "(ลายมือดำกดหนัก) เจอกันสามครั้งด้วยใบหน้าเดิม เธอไม่เคยจำได้สักครั้ง", "(ลายมือดำกดหนัก) เขาว่ายิ่งฟันเร็วยิ่งเจ็บน้อย ไม่ใช่คนที่ถูกฟัน คนที่ฟันต่างหาก", "(ลายมือดำกดหนัก) ฉีกหน้านี้ไว้ก่อนจะวางบนตาชั่ง เพราะห้ามใครอ่าน", "(ลายมือดำกดหนัก) จดไว้ว่าวันนั้นฝนตก ความจริงไม่ได้ตก", "(ลายมือเด็กเบี้ยว ๆ) วันนี้พี่โนอึลร้องไห้ตอนเช็ดดาบ พวกเราแกล้งทำเป็นไม่เห็น", "(ลายมือเด็กเบี้ยว ๆ) ไม่มีใครบอกว่าใครเกิดก่อน เลยตกลงเรียกว่าพี่ชาย", "(ลายมือเด็กเบี้ยว ๆ) พ่อแม่เราอยู่ไหน พี่โนอึลไม่ตอบ แต่หวีผมให้แทน", "(ดินสอจาง ๆ) … ฉันได้รับของขวัญชิ้นใหญ่", "(ดินสอจาง ๆ) ผลแห่งความรักของเราเกิดขึ้นแล้ว", "(ดินสอจาง ๆ) ตอนที่เธอเรียกฉันว่าแม่ ฉันตอบไม่ได้", "(ดินสอจาง ๆ) เกิดใหม่ครั้งหน้าฉันจะจำเธอได้ก่อน สัญญาไม่ได้หรอก", "(ดินสอจาง ๆ) ไปจนถึงหน้าประตูแล้วก็เดินกลับ บ้านยังอยู่ที่เดิม", "(ดินสอจาง ๆ) ดาวลอยผ่านใต้พื้นกระจก เตียงยังอุ่นอยู่", "(ดินสอจาง ๆ) ฉันทำการรอเธอเป็นอาชีพ", "(ดินสอจาง ๆ) ถ้ากำลังอ่านหน้านี้ แปลว่าเธอกลับมาอีกแล้ว", "(หน้าที่มีขนนกสีเหลืองสอดไว้) เมล็ดทานตะวันต้องแกะเปลือกให้ ไม่งั้นไม่กิน เธอก็เหมือนกัน", "(หน้าที่มีขนนกสีเหลืองสอดไว้) นกแก้วได้ยินทุกอย่าง มันถึงไม่พูด", "(หน้าที่มีขนนกสีเหลืองสอดไว้) แพะยืนอยู่หน้าประตู ไม่เข้าไม่ไป", "(หน้าที่มีขนนกสีเหลืองสอดไว้) เขาว่าก้นนรกก็มีพระอาทิตย์ขึ้น แต่ไม่มีใครเคยเห็น", "(หน้าที่มีขนนกสีเหลืองสอดไว้) สอดขนนกไว้เส้นหนึ่ง สีเหลือง"],
+    adminCondo: "หน้าคอนโดกรุงเทพฯ",
+    adminApt: "หน้าอพาร์ตเมนต์โซล",
     // 47차 끝
   },
   en: {
@@ -3196,6 +3214,15 @@ export const more16 = {
     dumpAngelSub: "Keeper of Heaven Landfill No. 3",
     dumpLook: "The tips of her wings have faded to grey. She is counting piles of unopened gift boxes.",
     dumpLines: ["…Sigh. Everything is being wasted.", "There are no more planets to dump on.", "It's free, so everyone takes two. One of them ends up here.", "This TV still has the plastic on.", "Heaven lacks nothing. Except somewhere to throw things.", "Another mountain today. Two tomorrow, I suppose.", "Habits from down there survive death, it seems.", "My wings went grey from the dust. Probably.", "This place was heaven too, once."],
+    loadHeavy: "Too much to carry — you slow down and lose your breath",
+    loadCrawl: "Crushed by your load, you crawl — HP will not recover",
+    loadChip: "Load {n}/{m}",
+    bagWeight: "Weight {n} / {m}",
+    loadHeavyShort: "heavy",
+    loadCrawlShort: "crawling",
+    diaryFrag: ["(Gold ink, rounded hand) The day we met, you were so beautiful I lost my words.", "(Gold ink, rounded hand) Maybe we could fly away together.", "(Gold ink, rounded hand) I'll kiss the back of your neck and fall asleep in your arms.", "(Gold ink, rounded hand) They say if you fold your wings you look human. So I kept them folded every day.", "(Gold ink, rounded hand) Five hundred years is not long. It is one breath of yours.", "(Gold ink, rounded hand) Angels must not love. Nobody ever wrote down why.", "(Gold ink, rounded hand) I named it Cosmic Bird. Because you loved birds.", "(Black ink, pressed hard) I did something to you I never should have. That is probably why you died.", "(Black ink, pressed hard) I killed you, so I will probably go to hell.", "(Black ink, pressed hard) We met three times wearing the same face. You never once knew me.", "(Black ink, pressed hard) They say the faster you swing, the less it hurts. Not for the one cut. For the one cutting.", "(Black ink, pressed hard) I tear this page out before it goes on the scales. No one can read it.", "(Black ink, pressed hard) I am writing that it rained that day. It did not.", "(A child's crooked letters) Today Noeul cried while cleaning her sword. We pretended not to see.", "(A child's crooked letters) Nobody told us which of us came first. So we decided he is the big brother.", "(A child's crooked letters) Where are our mum and dad? Instead of answering, Noeul brushes our hair.", "(Faint pencil) … I was given a great gift.", "(Faint pencil) The fruit of our love has come.", "(Faint pencil) When you called me mother, I could not answer.", "(Faint pencil) Next life I will recognise you first. I can not promise.", "(Faint pencil) I went as far as the door and came back. The house was still there.", "(Faint pencil) Stars drifted under the glass floor. The bed was still warm.", "(Faint pencil) I made waiting for you my job.", "(Faint pencil) If you are reading this page, you have come back again.", "(A page with a yellow feather tucked in) Sunflower seeds have to be shelled first or it won't eat them. You were the same.", "(A page with a yellow feather tucked in) The parrot heard everything. That is why it does not talk.", "(A page with a yellow feather tucked in) The goat stood at the door. It neither came in nor left.", "(A page with a yellow feather tucked in) They say the sun rises even at the bottom of hell. Nobody has seen it.", "(A page with a yellow feather tucked in) I am tucking in one feather. It is yellow."],
+    adminCondo: "Bangkok condo",
+    adminApt: "Seoul apartment",
     // 47차 끝
   },
 };

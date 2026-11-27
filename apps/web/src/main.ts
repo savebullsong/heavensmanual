@@ -764,7 +764,7 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
  * 관리자: 지옥 n층 휴식 마을로 바로 옮겨 간다 (지도 확인용). 지옥 밖(현실·천국·귀신)에서 왔으면 그 세계를 적어 두고
  * '원래 세계로' 단추로 돌아간다 — 환생이 아니라 시찰에서 돌아오는 것이라 몸·돈·업은 그대로다
  */
-function adminTeleport(to: number | 'back' | 'heaven' | 'bkk' | 'seoul' | 'goat' | 'border' | 'terrace' | 'hlobby' | 'home') {
+function adminTeleport(to: number | 'back' | 'heaven' | 'bkk' | 'seoul' | 'goat' | 'border' | 'terrace' | 'hlobby' | 'home' | 'condo' | 'apt') {
   if (!net.account()?.admin || busy || dlg.isOpen) return;
   document.querySelector('.set-panel')?.remove();
   closeMenus();
@@ -811,6 +811,21 @@ function adminTeleport(to: number | 'back' | 'heaven' | 'bkk' | 'seoul' | 'goat'
       await enterWorld([h.i, h.j], 'seoul-gangnam');
       const k = world?.zone.buildings.findIndex((b) => b.cat === 'home') ?? -1;
       if (k >= 0) enterInterior(k, { i: h.i, j: h.j }, null, false);
+    });
+    return;
+  }
+  // 47차: 사는 집 매물 문 앞 — 방콕 아속 콘도 · 서울 역삼 아파트 (현실로)
+  if (to === 'condo' || to === 'apt') {
+    const city = to === 'condo' ? 'bkk' : 'seoul';
+    state.region = city;
+    if (realm() !== 'real') { setRealm('real'); delete state.adminTrip; }
+    save(state);
+    if (world) { world.destroy(); world = null; net.leaveZone(); }
+    const zid = city === 'bkk' ? 'bkk-asok' : 'seoul-gangnam';
+    void loadZone(zid).then(async (z) => {
+      const b = z.buildings.find((x) => x.cat === 'estate' && x.estate === city);
+      const at: [number, number] = b ? [b.i0 + Math.floor(b.w / 2), b.j0 + b.d + 1] : [z.door.i, z.door.j];
+      await enterWorld(at, zid);
     });
     return;
   }
@@ -3290,6 +3305,54 @@ function slotOf(k: string): Slot | undefined {
   return undefined;
 }
 
+// ───────────────────────── 47차 무게 제한 ─────────────────────────
+// 들 수 있는 무게 = 30 + 힘 × 3 + 생명력 × 1.5 + 영격 × 0.5 (힘이 첫째, 생명력 둘째, 영격 셋째).
+// 처음 영혼(힘 4 · 생명력 4 · 영격 6)이면 51 — 장비를 다 차고(26~35) 소비품 한 가지 50개(15)까지는 든다.
+// 넘으면 점점 느려지고 회복이 더뎌진다(1.5배까지). 그 너머는 기어가고 체력이 차지 않는다
+const ARMOR_W: Partial<Record<Slot, number>> = { head: 2.5, body: 7, hands: 1, legs: 3, shins: 1.5, feet: 2, offhand: 5 };
+function itemWeight(it: ItemDef | undefined): number {
+  if (!it) return 0;
+  if (it.note === 'ammo' || it.note === 'arrows' || it.note === 'rifleammo' || it.note === 'fuel') return 0;
+  if (it.cat === 'goods') return it.use ? 0.2 : 0.3;
+  const heavy = it.price >= (it.hell ? 20_000 : 100_000) ? 1.4 : it.price >= (it.hell ? 3_000 : 10_000) ? 1.15 : 1;
+  if (it.cat === 'weapon') {
+    const sp = it.sprite ?? it.key;
+    const base = it.two ? 8 : it.ranged ? (/rifle|sniper|matchlock|flamer/.test(sp) ? 7 : 3) : /dagger|knife|kitchen/.test(sp) ? 1.2 : /umbrella|whip/.test(sp) ? 1.5 : 4;
+    return Math.round(base * heavy * 10) / 10;
+  }
+  const slot = ARMOR_SLOT[it.sprite ?? it.key];
+  const sp = it.sprite ?? it.key;
+  let w = ARMOR_W[slot ?? 'body'] ?? 4;
+  if (slot === 'body' && /plate|hauberk|firesuit|combatcoat/.test(sp)) w = 11;
+  if (slot === 'offhand' && /riot/.test(it.key)) w = 9;
+  return Math.round(w * heavy * 10) / 10;
+}
+function loadCap() {
+  const st = stats();
+  return Math.round((30 + st.str * 3 + st.vit * 1.5 + (state.soul?.rank ?? 1) * 0.5) * 10) / 10;
+}
+function loadNow() {
+  let w = 0;
+  for (const [k, n] of Object.entries(state.bag ?? {})) if (n > 0) w += itemWeight(itemByKey(k)) * n;
+  return Math.round(w * 10) / 10;
+}
+/** 무게 비율 → 걷는 빠르기 · 회복 배수 · 기어감 */
+function loadEffect() {
+  const r = loadNow() / Math.max(1, loadCap());
+  if (r <= 1) return { r, speed: 1, regen: 1, crawl: false };
+  if (r <= 1.5) return { r, speed: 1 - (r - 1) * 1.2, regen: Math.max(0, 1 - (r - 1) * 1.6), crawl: false };
+  return { r, speed: 0.22, regen: 0, crawl: true };
+}
+let loadWas = 0;
+function applyLoad() {
+  const e = loadEffect();
+  world?.setLoad(e.speed, e.regen, e.crawl);
+  const lvl = e.crawl ? 2 : e.r > 1 ? 1 : 0;
+  if (lvl > loadWas) toast(lvl === 2 ? t().loadCrawl : t().loadHeavy, 'evil');
+  loadWas = lvl;
+  const chip = document.querySelector('.load-chip') as HTMLElement | null;
+  if (chip) { chip.hidden = e.r <= 1 || !world; chip.className = 'load-chip' + (e.crawl ? ' crawl' : e.r > 1 ? ' over' : ''); chip.textContent = t().loadChip.replace('{n}', String(Math.round(loadNow()))).replace('{m}', String(Math.round(loadCap()))); }
+}
 function addToBag(it: ItemDef) {
   if (it.note === 'ammo' || it.note === 'arrows' || it.note === 'rifleammo') { delete state.unloaded; ammoGear(); } // 새로 사면 다시 끼운다
   if (it.note === 'rifleammo') { state.rifle = (state.rifle ?? 0) + 10; return; }
@@ -3719,7 +3782,8 @@ async function readDiary(k: string) {
   save(state);
   busy = true;
   dlg.open({ name: '', monologue: true });
-  await dlg.say(pick(L.diaryRead));
+  // 47차: 일기장은 여러 사람이 쓴 조각 — 펼칠 때마다 다른 장이 나온다 (글씨가 다르다). 그다음 우주새로
+  await dlg.say(pick([...L.diaryFrag, ...L.diaryRead]));
   dlg.close();
   busy = false;
   if (world.zone.interior) dropInterior();
@@ -3747,6 +3811,8 @@ function renderBag() {
   close.textContent = '✕';
   close.onclick = () => el.remove();
   head.append(tabs, close);
+  // 47차: 짐 무게 (들 수 있는 만큼 · 넘으면 붉게)
+  { const e = loadEffect(); const wl = document.createElement('p'); wl.className = 'bag-weight' + (e.crawl ? ' crawl' : e.r > 1 ? ' over' : ''); wl.textContent = L.bagWeight.replace('{n}', String(loadNow())).replace('{m}', String(loadCap())) + (e.crawl ? ` · ${L.loadCrawlShort}` : e.r > 1 ? ` · ${L.loadHeavyShort}` : ''); head.after(wl); setTimeout(() => el.querySelector('.menu-head')?.after(wl), 0); }
   const info = document.createElement('div');
   info.className = 'bag-info';
   info.hidden = true; // 23차: 화살·탄약은 장비 몸 그림의 칸과 공격 버튼 위에만 (같은 것을 두 번 보이지 않게)
@@ -4682,6 +4748,9 @@ function svcTick() {
   else if (svcInWindow() && !busy && !dlg.isOpen && !world.seated && !svcGoing) void svcEscort();
 }
 window.setInterval(svcTick, 1000);
+// 47차 무게: 짐이 바뀌면 곧 반영 (1초마다 셈 — 가볍다)
+{ const chip = document.createElement('div'); chip.className = 'load-chip'; chip.hidden = true; document.body.appendChild(chip); }
+window.setInterval(applyLoad, 1000);
 const SANCT_ROOMS = ['hchurch', 'htemple', 'hmosque'];
 async function svcEscort() {
   if (!world || svcGoing) return;
@@ -5393,7 +5462,7 @@ function renderSettings() {
     ${matchMedia('(pointer: coarse)').matches ? '' : '<section class="set-sec set-keys"><h4 class="h-keys"></h4><div class="keys"></div><p class="note n-keys"></p></section>'}
     <section class="set-sec"><h4 class="h-lang"></h4><div class="seg s-lang wide"></div></section>
     <section class="set-sec set-acc"><h4 class="h-acc"></h4><div class="acc"></div></section>
-    ${net.account()?.admin ? `<section class="set-sec set-admin"><h4 class="h-admin"></h4><div class="set-row"><span class="lbl l-inv"></span><div class="seg s-inv"></div></div><div class="set-row"><span class="lbl l-tp"></span><div class="seg s-tp"></div></div><div class="set-row"><span class="lbl l-city"></span><div class="seg s-city"></div></div><div class="set-row"><span class="lbl l-dot3"></span><div class="seg s-dot3"></div></div><div class="set-row"><span class="lbl"></span><button class="tp-heaven"></button></div><div class="set-row"><span class="lbl l-worlds"></span><div class="tp-more"><button class="tp-home"></button><button class="tp-terrace"></button><button class="tp-hlobby"></button><button class="tp-goat"></button><button class="tp-border"></button></div></div><div class="set-row"><span class="lbl l-tools"></span><div class="tp-more"><button class="ad-eco"></button><button class="ad-perf"></button></div></div>${state.adminTrip && state.adminTrip !== realm() ? '<div class="set-row"><span class="lbl"></span><button class="tp-back"></button></div>' : ''}<p class="note n-admin"></p></section>` : ''}`;
+    ${net.account()?.admin ? `<section class="set-sec set-admin"><h4 class="h-admin"></h4><div class="set-row"><span class="lbl l-inv"></span><div class="seg s-inv"></div></div><div class="set-row"><span class="lbl l-tp"></span><div class="seg s-tp"></div></div><div class="set-row"><span class="lbl l-city"></span><div class="seg s-city"></div></div><div class="set-row"><span class="lbl l-dot3"></span><div class="seg s-dot3"></div></div><div class="set-row"><span class="lbl"></span><button class="tp-heaven"></button></div><div class="set-row"><span class="lbl l-worlds"></span><div class="tp-more"><button class="tp-home"></button><button class="tp-condo"></button><button class="tp-apt"></button><button class="tp-terrace"></button><button class="tp-hlobby"></button><button class="tp-goat"></button><button class="tp-border"></button></div></div><div class="set-row"><span class="lbl l-tools"></span><div class="tp-more"><button class="ad-eco"></button><button class="ad-perf"></button></div></div>${state.adminTrip && state.adminTrip !== realm() ? '<div class="set-row"><span class="lbl"></span><button class="tp-back"></button></div>' : ''}<p class="note n-admin"></p></section>` : ''}`;
   el.querySelector('.menu-head b')!.textContent = L.settings;
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
   el.querySelector('.set-sec h4')!.textContent = L.setSound;
@@ -5528,6 +5597,9 @@ function renderSettings() {
     const bp = el.querySelector('.ad-perf') as HTMLButtonElement; bp.textContent = perfOn() ? L.perfOff : L.perfOn; bp.onclick = () => { setPerf(!perfOn()); bp.textContent = perfOn() ? L.perfOff : L.perfOn; };
     const th = el.querySelector('.tp-home') as HTMLButtonElement;
     th.textContent = L.adminHome; th.onclick = () => adminTeleport('home');
+    // 47차: 방콕 콘도 · 서울 아파트(사는 집 매물) 문 앞으로
+    const tc = el.querySelector('.tp-condo') as HTMLButtonElement; tc.textContent = L.adminCondo; tc.onclick = () => adminTeleport('condo');
+    const ta = el.querySelector('.tp-apt') as HTMLButtonElement; ta.textContent = L.adminApt; ta.onclick = () => adminTeleport('apt');
   }
   document.body.appendChild(el);
   const hudBottom = document.getElementById('hud')?.getBoundingClientRect().bottom ?? 56;
