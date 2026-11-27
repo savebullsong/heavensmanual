@@ -498,6 +498,52 @@ function randomSoulLook(clean = false): Look {
 /** 싸울 상대 위의 마우스 커서: 칼끝이 왼쪽 위를 가리키는 작은 검 (칼끝이 누르는 자리) */
 const SWORD_CURSOR = `url("data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><g stroke="#140e0a" stroke-width="1.4" stroke-linejoin="round"><path d="M2 2 L6.5 3.2 L17 13.7 L13.7 17 L3.2 6.5 Z" fill="#e8e4dc"/><path d="M3.2 3.2 L15.4 15.4" stroke="#9aa3ad" stroke-width="1"/><path d="M13 19.6 L19.6 13 L21.4 14.8 L14.8 21.4 Z" fill="#c9a23e"/><path d="M17.2 17.2 L22.6 22.6" stroke-width="3.6" stroke="#140e0a"/><path d="M17.2 17.2 L22.6 22.6" stroke-width="2" stroke="#6b4429"/><circle cx="23.4" cy="23.4" r="1.9" fill="#c9a23e"/></g></svg>')}") 2 2, crosshair`;
 
+/** 46차 알림 화살표의 업종 그림 (가게 종류) */
+function pingKind(b: Building): string {
+  if (b.cat === 'hbank') return 'bank';
+  if (b.cat === 'loan') return 'coin';
+  if (b.cat === 'atone') return 'candle';
+  if (b.cat === 'rebirth') return 'spiral';
+  const rk = roomKindOf(b);
+  if (['temple', 'church', 'mosque', 'gurdwara'].includes(rk)) return 'worship';
+  if (rk === 'dojo') return 'gym';
+  if (rk === 'lobby') return 'hotel';
+  if (rk === 'dept') return 'bag';
+  if (rk === 'furnshop') return 'sofa';
+  if (rk === 'hardware') return 'tools';
+  if (rk === 'shop') { const k = bKindOf(b); return ['gift', 'antiques', 'jewelry', 'art', 'pawnbroker'].includes(k) ? 'blade' : ['hardware', 'car_repair', 'motorcycle_repair', 'bicycle', 'second_hand', 'doityourself', 'shop'].includes(k) ? 'tools' : 'shop'; }
+  return rk;
+}
+/** 12×12 안의 작은 그림 (가운데 0,0) */
+function pingIcon(g: Graphics, kind: string) {
+  const gold = 0xf2d27a, ln = (pts: number[], color: number, width = 1.6) => { g.moveTo(pts[0], pts[1]); for (let k = 2; k < pts.length; k += 2) g.lineTo(pts[k], pts[k + 1]); g.stroke({ color, width, cap: 'round', join: 'round' }); };
+  switch (kind) {
+    case 'bank': g.poly([-6, -2, 0, -6, 6, -2]).fill(gold); for (const x of [-4.5, -1.5, 1.5, 4.5]) g.rect(x - 0.8, -1, 1.6, 5).fill(gold); g.rect(-6, 4.5, 12, 1.6).fill(gold); break;
+    case 'coin': g.circle(0, 0, 5.2).fill(gold); g.circle(0, 0, 3.2).stroke({ color: 0x8a6a1a, width: 1 }); g.rect(-0.6, -2, 1.2, 4).fill(0x8a6a1a); break;
+    case 'gear': ln([-5, 5, 4, -4], 0xd8dce2, 2); ln([2, -5, 5, -2], 0xd8dce2, 1.4); ln([-6, 2, -2, 6], 0xb8863a, 2); g.circle(-5.4, 5.4, 1.2).fill(0xb8863a); break; // 칼
+    case 'blade': ln([-5, 5, 4, -4], 0xe8ecf0, 1.8); ln([-6, 2, -2, 6], gold, 1.8); g.circle(4.6, -4.6, 0.9).fill(0xffffff); break;
+    case 'tools': ln([-5, 5, 2, -2], 0xd8dce2, 2.2); g.circle(3.2, -3.2, 2.6).stroke({ color: 0xd8dce2, width: 1.6 }); g.rect(3.6, -6.4, 2.6, 2.6).fill(0x18120c); break; // 스패너
+    case 'mart': g.poly([-6, -2, 6, -2, 4.5, 5, -4.5, 5]).fill(0x7ac8f0); ln([-3.5, -2, -1, -6, 1, -6, 3.5, -2], 0x7ac8f0, 1.4); break;
+    case 'pharmacy': g.roundRect(-5.5, -2.5, 11, 5, 2.5).fill(0x7ad89a); g.rect(-0.4, -2.5, 0.8, 5).fill(0x18120c); break;
+    case 'clinic': g.rect(-1.8, -5.5, 3.6, 11).fill(0xff6a6a); g.rect(-5.5, -1.8, 11, 3.6).fill(0xff6a6a); break;
+    case 'food': g.poly([-6, -1, 6, -1, 4, 4, -4, 4]).fill(0xffa04a); ln([1, -2, 5, -6], 0xe8dcc0, 1.1); ln([3, -2, 6, -5], 0xe8dcc0, 1.1); break;
+    case 'cafe': g.roundRect(-5, -3, 8, 7, 2).fill(0xd8a878); g.circle(4, 0.5, 2).stroke({ color: 0xd8a878, width: 1.3 }); ln([-3, -5, -2, -6.5], 0xe8dcc0, 1); ln([0, -5, 1, -6.5], 0xe8dcc0, 1); break;
+    case 'bar': g.poly([-5, -5, 5, -5, 0, 1]).fill(0xff7ab8); g.rect(-0.6, 0.5, 1.2, 4).fill(0xff7ab8); g.rect(-3, 4.5, 6, 1.2).fill(0xff7ab8); break;
+    case 'salon': g.circle(-3, 3.5, 2).stroke({ color: 0xe8a8f0, width: 1.3 }); g.circle(3, 3.5, 2).stroke({ color: 0xe8a8f0, width: 1.3 }); ln([-2, 2, 4, -6], 0xe8a8f0, 1.3); ln([2, 2, -4, -6], 0xe8a8f0, 1.3); break;
+    case 'massage': for (const a of [-0.9, 0, 0.9]) g.ellipse(Math.sin(a) * 3.2, -Math.cos(a) * 2, 1.8, 4).fill(0xf0a8c8); g.rect(-5, 3.5, 10, 1.4).fill(0xf0a8c8); break; // 연꽃
+    case 'laundry': g.poly([-6, -3, -3, -5, 3, -5, 6, -3, 4, -1, 3, -2, 3, 5, -3, 5, -3, -2, -4, -1]).fill(0x9ad0f0); break;
+    case 'hotel': g.rect(-6, 0, 12, 3).fill(0xb8c8f0); g.rect(-6, -4, 1.6, 9).fill(0xb8c8f0); g.roundRect(-4, -2.5, 4, 2.5, 1).fill(0xe8ecf8); g.rect(4.6, 2, 1.4, 3).fill(0xb8c8f0); break;
+    case 'gym': g.rect(-3, -0.8, 6, 1.6).fill(0xd8dce2); g.rect(-6, -3.5, 2.2, 7).fill(0xd8dce2); g.rect(3.8, -3.5, 2.2, 7).fill(0xd8dce2); break;
+    case 'worship': g.poly([-6, -1, 0, -6, 6, -1]).fill(gold); g.rect(-4, -1, 8, 6).fill(0xe8dcc0); g.rect(-1, 1, 2, 4).fill(0x18120c); break;
+    case 'bag': g.roundRect(-5, -2, 10, 7.5, 1.5).fill(0xf0c86a); ln([-2.5, -2, -2.5, -4.5, 2.5, -4.5, 2.5, -2], 0xf0c86a, 1.3); break;
+    case 'sofa': g.roundRect(-6, -1, 12, 5, 1.5).fill(0xc8a07a); g.roundRect(-4.5, -4.5, 9, 4, 1.5).fill(0xa8805a); break;
+    case 'arcade': g.roundRect(-5.5, 0, 11, 5, 1.5).fill(0x9a8af0); g.rect(-0.7, -5, 1.4, 5).fill(0xe8ecf0); g.circle(0, -5, 1.8).fill(0xff5a5a); break;
+    case 'candle': g.rect(-1.5, -2, 3, 7).fill(0xe8dcc0); g.ellipse(0, -4, 1.4, 2.4).fill(0xffb04a); break;
+    case 'spiral': g.circle(0, 0, 5).stroke({ color: 0xb8a8f0, width: 1.3 }); g.circle(0.8, 0.6, 2.6).stroke({ color: 0xb8a8f0, width: 1.3 }); break;
+    case 'ysalon': case 'myhome': case 'home': g.poly([-6, 0, 0, -5.5, 6, 0]).fill(0xe0b437); g.rect(-4, 0, 8, 5).fill(0xe0b437); g.rect(-1, 2, 2, 3).fill(0x18120c); break;
+    default: g.rect(-5.5, -1, 11, 6).fill(0xe0b437); g.poly([-6.5, -1, -5, -5, 5, -5, 6.5, -1]).fill(0xc8381e); g.rect(-1.2, 1.5, 2.4, 3.5).fill(0x18120c); break; // 가게
+  }
+}
 export class WorldScene {
   /** 46차: 다음에 여는 성소가 예배 중인지 · 비워 둘 내 자리 */
   static svcNext: { on: boolean; seat: [number, number] | null } | null = null;
@@ -5821,12 +5867,16 @@ export class WorldScene {
     o.eventMode = 'none';
     const tx = new Text({ text: name, style: { fontFamily: 'system-ui, sans-serif', fontSize: 10, fontWeight: '800', fill: bank ? '#ffe9a8' : '#fff3d0' } });
     tx.anchor.set(0.5, 0.5);
-    const w = Math.ceil(tx.width) + 14;
+    const w = Math.ceil(tx.width) + 14 + 15; // 46차: 왼쪽에 업종 그림
+    tx.x = 7;
     const g = new Graphics();
     g.roundRect(-w / 2, -9, w, 18, 5).fill({ color: bank ? 0x14233a : 0x18120c, alpha: 0.92 }).stroke({ color: bank ? 0xf2d27a : 0xe0b437, width: 1.5 });
     g.poly([-5, 9, 5, 9, 0, 16]).fill({ color: bank ? 0xf2d27a : 0xe0b437 });
     g.poly([-3, 18, 3, 18, 0, 22]).fill({ color: bank ? 0xf2d27a : 0xe0b437, alpha: 0.7 });
-    o.addChild(g, tx);
+    const ic = new Graphics();
+    pingIcon(ic, k === -1 ? 'gear' : bank ? 'bank' : pingKind(b!));
+    ic.position.set(-w / 2 + 10, 0);
+    o.addChild(g, ic, tx);
     const [x, y0] = iso(at[0], at[1]);
     const y = y0 - 66;
     o.position.set(Math.round(x), y);

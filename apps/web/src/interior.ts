@@ -28,7 +28,7 @@ export function canEnter(b: Building) {
 }
 
 /** 17차: 우주새와 다른 무기를 파는 거리 상인 — 철물점·수리점(공구) · 백화점·쇼핑몰(주방칼·운동용품) */
-function streetSeller(b: Building): 'tools' | 'dept' | 'antique' | undefined {
+export function streetSeller(b: Building): 'tools' | 'dept' | 'antique' | undefined {
   const k = kindOf(b);
   // 26차: 이름 없는 가게(잡화점)도 공구·농기구를 판다 · 기념품·골동품·보석 가게는 진열장의 칼
   if (['hardware', 'car_repair', 'motorcycle_repair', 'bicycle', 'second_hand', 'doityourself', 'general', 'houseware', 'garden_centre'].includes(k)) return 'tools';

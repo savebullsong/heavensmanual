@@ -17,7 +17,7 @@ import { t, lang, setLang, LANGS, type Lang } from './i18n.ts';
 import { load, save, type Slot, type Stash } from './state.ts';
 import { hellZone, OPEN_FLOORS, floorDef, MONSTERS, GUARDS, TOLL, ATONE_GOAL, GURMA_FULL, setRaidForce, FLOORS, FIELD_BOSS } from './hell.ts';
 import type { HellVendor } from './zone.ts';
-import { interiorZone, roomKind as roomKindOf, canEnter, voidZone, drawFurn, setAdminVisit } from './interior.ts';
+import { interiorZone, roomKind as roomKindOf, canEnter, voidZone, drawFurn, setAdminVisit, streetSeller } from './interior.ts';
 import { heavenZone, HEAVEN_ID, heavenPriceMul, heavenMeta } from './heavenworld.ts';
 import { designateHomes, HOME_PRICE, FURN, furnByKey, type FurnDef } from './home.ts';
 import { borderZone } from './border.ts';
@@ -2648,25 +2648,22 @@ function sellable(hell: boolean) {
 // ───────────────────────── 21차: 미스 황에게 길 묻기 ─────────────────────────
 /** 거리에 나가면 그 건물 위에 표시 (미스 황이 알려 준 곳) */
 let pendingGuide: number | null = null;
-/** 우주새 문에서 가까운 은행 · 종교시설 · 병원·약국 · 마사지 · 편의점 · 헬스장 */
+/** 46차: 우주새 문에서 가까운 은행 · 철물점(수리) · 장비를 파는 곳(공구·마체테 가게 · 골동품 칼 가게)만 — 헬스장 · 편의점 · 마사지는 묻지 않아도 보인다 */
 async function nearbyPlaces() {
   const L = t();
   const z = await loadZone(homeZone());
   const d = z.door;
   const want: [string, (b: Building) => boolean][] = [
-    [L.placeTools, (b) => roomKindOf(b) === 'hardware'], // 38차: 무기 수리 — 큰길가 철물점
     [L.placeKinds.bank, (b) => hasBank(b)],
-    [L.placeKinds.worship, (b) => ['temple', 'church', 'mosque', 'gurdwara'].includes(roomKindOf(b))],
-    [L.placeKinds.clinic, (b) => ['clinic', 'pharmacy'].includes(roomKindOf(b))],
-    [L.placeKinds.massage, (b) => roomKindOf(b) === 'massage'],
-    [L.placeKinds.mart, (b) => roomKindOf(b) === 'mart'],
-    [L.placeKinds.gym, (b) => roomKindOf(b) === 'gym'],
+    [L.placeTools, (b) => roomKindOf(b) === 'hardware'], // 38차: 무기 수리 — 큰길가 철물점
+    [L.placeGear, (b) => streetSeller(b) === 'tools' && roomKindOf(b) !== 'hardware'],
+    [L.placeAntique, (b) => streetSeller(b) === 'antique'],
   ];
   const out: { label: string; name: string; k: number; dir: string; m: number }[] = [];
   for (const [label, test] of want) {
     let best = -1, bd = 1e9;
     z.buildings.forEach((b, k) => {
-      if (!canEnter(b) || !test(b)) return;
+      if (!canEnter(b) || !test(b) || out.some((o) => o.k === k)) return;
       const dd = Math.hypot(b.i0 + b.w / 2 - d.i, b.j0 + b.d / 2 - d.j);
       if (dd < bd) { bd = dd; best = k; }
     });
@@ -2677,7 +2674,7 @@ async function nearbyPlaces() {
     const ew = Math.abs(di) > 6 ? (di > 0 ? L.dirs.e : L.dirs.w) : '';
     const ns = Math.abs(dj) > 6 ? (dj > 0 ? L.dirs.s : L.dirs.n) : '';
     const dir = [ew, ns].filter(Boolean).join(L.dirs.and) || L.dirs.here;
-    out.push({ label, name: buildingName(b, lang()), k: best, dir, m: Math.max(10, Math.round(bd * 3 / 10) * 10) });
+    out.push({ label, name: (label === L.placeKinds.bank && bankName(b, lang())) || buildingName(b, lang()), k: best, dir, m: Math.max(10, Math.round(bd * 3 / 10) * 10) });
   }
   return out;
 }

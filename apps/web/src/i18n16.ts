@@ -1018,6 +1018,8 @@ export const more16 = {
     ywSubParent: "부모천사 · 천국의 안내 천사",
     noeulSubArch: "대천사 · 천국의 신앙 감시자",
     hutRestBtn: "들어가 쉰다",
+    placeGear: "공구·마체테 가게",
+    placeAntique: "골동품 칼 가게",
     // 46차 끝
   },
   th: {
@@ -2038,6 +2040,8 @@ export const more16 = {
     ywSubParent: "เทวดาผู้ปกครอง · ผู้นำทางแห่งสวรรค์",
     noeulSubArch: "อัครเทวดา · ผู้เฝ้าดูศรัทธาแห่งสวรรค์",
     hutRestBtn: "เข้าไปพัก",
+    placeGear: "ร้านเครื่องมือ·มีดพร้า",
+    placeAntique: "ร้านของเก่า·ดาบ",
     // 46차 끝
   },
   en: {
@@ -3058,6 +3062,8 @@ export const more16 = {
     ywSubParent: "Parent Angel · heaven's guide",
     noeulSubArch: "Archangel · Watcher of Faith",
     hutRestBtn: "Go in and rest",
+    placeGear: "Tools & machetes",
+    placeAntique: "Antiques & blades",
     // 46차 끝
   },
 };
