@@ -3960,6 +3960,14 @@ const quickBtn = document.createElement('button');
 quickBtn.className = 'quick-slot';
 quickBtn.hidden = true;
 document.body.appendChild(quickBtn);
+/** 46차 후속: 빠른 칸은 늘 조작 단추 줄의 왼쪽 옆에 (싸움 모드에서 '대상' 단추가 생기면 줍기 단추와 겹치던 것) */
+function placeQuick() {
+  const box = document.querySelector('.stance') as HTMLElement | null;
+  const r = box?.getBoundingClientRect();
+  if (!r || r.width < 1) { quickBtn.style.right = ''; return; } // 단추 줄이 숨어 있으면 CSS 자리대로 (고정 배치라 offsetParent 로는 알 수 없다)
+  quickBtn.style.right = `${Math.max(0, Math.round(window.innerWidth - r.left + 10))}px`;
+}
+window.addEventListener('resize', () => requestAnimationFrame(placeQuick));
 quickBtn.onclick = () => {
   const k = state.quick;
   if (!k || busy || dlg.isOpen) return;
@@ -5075,8 +5083,8 @@ function openSmith(title?: string, hello?: string, start?: 'repair' | 'enh', enh
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
   const list = el.querySelector('.menu-list')!;
   const tabs = el.querySelector('.store-tabs')!;
-  // 45차: 템브라나 파편을 들고 오면 강화 탭부터 (수리 탭이 먼저 열려 템브라를 어디에 쓰는지 몰랐다)
-  let mode: 'repair' | 'enh' = start ?? ((state.bag?.tembra ?? 0) > 0 || (state.bag?.tshard ?? 0) > 0 ? 'enh' : 'repair');
+  // 46차 후속: 대장장이에게 말을 걸면 언제나 수리 탭부터 (가방에서 템브라를 쓸 때만 강화부터)
+  let mode: 'repair' | 'enh' = start ?? 'repair';
   const bFix = document.createElement('button'), bEnh = document.createElement('button');
   bFix.textContent = L.tabRepair; bEnh.textContent = L.tabEnhance;
   bFix.onclick = () => { mode = 'repair'; draw(); }; bEnh.onclick = () => { mode = 'enh'; draw(); };
@@ -5800,6 +5808,7 @@ let stance: Stance = 'talk';
 const LOW_SVG = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><g class="tall"><rect x="4" y="3" width="8" height="18" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="9" width="7" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 7h2M7 11h2M7 15h2M16 13h1M16 17h1" stroke="currentColor" stroke-width="1.6"/></g><g class="short"><rect x="3" y="14" width="18" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 17.5h2M11 17.5h2M15 17.5h2" stroke="currentColor" stroke-width="1.6"/><path d="M12 3v7M9 7.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></g></svg>';
 const stanceBox = document.createElement('div');
 stanceBox.className = 'stance';
+{ const ro = new ResizeObserver(() => placeQuick()); ro.observe(stanceBox); } // 46차 후속: 단추 줄 폭이 바뀌면 빠른 칸도 따라 옮긴다
 // 38차: '1층으로 줄이기'는 영혼 설정으로 옮기고 그 자리는 줍기 단추. 손 단추는 돋보기 + '상호작용'
 const PICK_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 2.5v9m-3.5-3.5L12 11.5 15.5 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 12.5h16l-1.6 8H5.6z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="12" cy="16.3" r="1.6" fill="currentColor"/></svg>';
 const LENS_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M14.5 14.5 20 20" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>';
