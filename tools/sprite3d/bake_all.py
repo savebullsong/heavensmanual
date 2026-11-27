@@ -164,9 +164,15 @@ for mk, o in (('y1', 'yunae1'), ('y2', 'yunae2'), ('y3', 'yunae3')):
 for mk, o, mode, weapons in (('gm', 'maskfiend', 'm', ['rapier', 'saber']), ('ws', 'whisperer', 'u', []), ('ip', 'puppet', 'm', ['saber']),
                              ('mc', 'marcion', 'm', ['sealstaff']), ('mn', 'manette', 'u', [])):
     jobs.append({'sex': 'm', 'build': 1, 'monster': mk, 'occluder': o, 'sets': [{'kind': 'base', 'outfit': o, 'mode': mode}] + [{'kind': 'weapon', 'weapon': w} for w in weapons], 'tag': 'hell43'})
+# 44차: 층마다 다른 경비병 — 4층 쇠모루지기(쇠메) · 5층 가면파수꾼(장창)
+for mk, o, weapons in (('w4', 'anvilward', ['sledge']), ('w5', 'maskward', ['spear'])):
+    jobs.append({'sex': 'm', 'build': 1, 'monster': mk, 'occluder': o, 'sets': [{'kind': 'base', 'outfit': o, 'mode': 'm'}] + [{'kind': 'weapon', 'weapon': w} for w in weapons], 'tag': 'guard44'})
 # 43차: 서울·방콕 시민 모자 (보통 체형 하나로 모든 체형에, 머리카락 위)
 for sex in 'mf':
     jobs.append({'sex': sex, 'build': 1, 'sets': [{'kind': 'armor', 'piece': pc, 'mode': m, 'extra': ['stab'] if m == 'm' else []} for pc in ('cap', 'visor', 'ngob') for m in MODES], 'tag': 'hat43' + sex})
+# 44차: 멋있는 투구 넷 (통투구 · 뿔투구 · 해골 투구 · 5층 도자기 얼굴 투구)
+for sex in 'mf':
+    jobs.append({'sex': sex, 'build': 1, 'sets': [{'kind': 'armor', 'piece': pc, 'mode': m, 'extra': ['stab'] if m == 'm' else []} for pc in ('greathelm', 'hornhelm', 'skullhelm', 'maskhelm') for m in MODES], 'tag': 'helm44' + sex})
 args = sys.argv[2:]
 # --scale2: 같은 크기의 인물을 픽셀 두 배로 (게임에서는 반으로 줄여 같은 크기, 더 섬세)
 if '--scale2' in args:

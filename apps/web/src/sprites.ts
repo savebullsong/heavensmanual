@@ -104,8 +104,10 @@ export const TWO = new Set(['sledge', 'fireaxe', 'greatsword', 'maul', 'boltcutt
 const MON16: Record<string, [string, string, Mode]> = { ashgal: ['h', 'ashgal', 'm'], gurma: ['u', 'gurma', 'u'], cinder: ['n', 'cinder', 'm'], bloat: ['l', 'bloat', 'm'], glutton: ['e', 'glutton', 'm'], hawker: ['v', 'hawker', 'm'], debtor: ['d', 'debtor', 'm'], broker: ['k', 'besk', 'm'], forgeknight: ['z', 'forgeknight', 'm'], maskfiend: ['gm', 'maskfiend', 'm'], whisperer: ['ws', 'whisperer', 'u'], puppet: ['ip', 'puppet', 'm'], marcion: ['mc', 'marcion', 'm'], manette: ['mn', 'manette', 'u'] }; // 24차: 4층 층주 바르칸 · 25차 철갑마
 /** 방어구 겉모습: 그리는 순서와 색 (구역 3 = 본색, 구역 5 = 신발) */
 const ARMOR_ORDER = ['workpants', 'shinguard', 'boots', 'jacket', 'vest', 'trench', 'firesuit', 'combatcoat', 'hauberk', 'platecoat', 'gloves', 'shield']; // 40차: 긴 겉옷은 바지·신 위에, 장갑 아래에
-const ARMOR_COLOR: Record<string, string> = { cap: '#2a3a5a', visor: '#f2f0ea', ngob: '#c8a868', mask: '#262322', helmet: '#b0302a', jacket: '#4a5236', vest: '#3a3f46', gloves: '#d8cfb4', workpants: '#4a4536', shinguard: '#2b2f36', boots: '#3a2a1a', shield: '#7a4a2a', trench: '#8a6a44', firesuit: '#b8954a', combatcoat: '#4e5638', hauberk: '#5a1a16', platecoat: '#3a2a5a' };
+const ARMOR_COLOR: Record<string, string> = { greathelm: '#c83a1e', hornhelm: '#d8ccb0', skullhelm: '#d8ccb0', maskhelm: '#f2eee6', cap: '#2a3a5a', visor: '#f2f0ea', ngob: '#c8a868', mask: '#262322', helmet: '#b0302a', jacket: '#4a5236', vest: '#3a3f46', gloves: '#d8cfb4', workpants: '#4a4536', shinguard: '#2b2f36', boots: '#3a2a1a', shield: '#7a4a2a', trench: '#8a6a44', firesuit: '#b8954a', combatcoat: '#4e5638', hauberk: '#5a1a16', platecoat: '#3a2a5a' };
 const LONG_COATS = new Set(['trench', 'firesuit', 'combatcoat', 'hauberk', 'platecoat']);
+/** 44차 멋있는 투구 넷 (통투구 · 뿔투구 · 해골 투구 · 5층 도자기 얼굴 투구) — 머리카락 위, 보통 체형 하나로 */
+const HELMS = ['greathelm', 'hornhelm', 'skullhelm', 'maskhelm'];
 const PER_BUILD = new Set(['jacket', 'vest', 'workpants', 'trench', 'firesuit', 'combatcoat', 'hauberk', 'platecoat']);
 const COSTUMES = new Set(['raincoat', 'patient', 'parrot', 'robber']); // 강도: 복면이 머리를 덮는다
 /** 맨손 몸(u: 주먹질 장면)까지 구운 차림. 강도는 늘 무기를 들어 무기 자세(m) 몸만 있다 */
@@ -243,6 +245,8 @@ export function layerKeys(look: Look, weapon: string | null, armorIn: string[] =
   if (o === 'warden1') return { base: 'b-g-warden1-m', hair: null, weapon: 'w-g-knocker', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   if (o === 'warden2') return { base: 'b-o-warden2-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
   if (o === 'warden3') return { base: 'b-w-warden3-m', hair: null, weapon: 'w-w-sealstaff', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
+  if (o === 'warden4') return { base: 'b-w4-anvilward-m', hair: null, weapon: 'w-w4-sledge', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode }; // 44차 4층 쇠모루지기
+  if (o === 'warden5') return { base: 'b-w5-maskward-m', hair: null, weapon: 'w-w5-spear', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode }; // 44차 5층 가면파수꾼
   if (o === 'yak') return { base: 'b-y-yak-m', hair: null, weapon: weapon === null ? null : `w-y-${weapon ?? 'club'}`, armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };
   const child = !!look.child;
   const GUNS = ['pistol', 'bow', 'flamer', 'rifle'];
@@ -265,11 +269,11 @@ export function layerKeys(look: Look, weapon: string | null, armorIn: string[] =
   const arm: { key: string; piece: string; tint?: string }[] = [];
   if (mode !== 'w') {
     const ab = costume ? 1 : build;
-    for (const piece of [...ARMOR_ORDER, 'mask', 'helmet', 'cap', 'visor', 'ngob']) { // 25차: 검은 마스크 (헬멧 자리) · 43차 시민 모자 (서울 야구모자·아주머니 선캡 · 방콕 농 모자)
+    for (const piece of [...ARMOR_ORDER, 'mask', 'helmet', ...HELMS, 'cap', 'visor', 'ngob']) { // 25차: 검은 마스크 (헬멧 자리) · 43차 시민 모자 (서울 야구모자·아주머니 선캡 · 방콕 농 모자)
       if (!armor.includes(piece)) continue;
       if (piece === 'mask' && o === 'parrot') continue;
-      if ((piece === 'cap' || piece === 'visor' || piece === 'ngob') && (costume || armor.includes('helmet') || armor.includes('mask'))) continue; // 43차: 모자는 맨머리에만
-      if (piece === 'helmet' && costume && o !== 'patient') continue; // 우비 모자·앵무새 머리 위에는 헬멧을 씌우지 않는다
+      if ((piece === 'cap' || piece === 'visor' || piece === 'ngob') && (costume || armor.includes('helmet') || armor.includes('mask') || HELMS.some((h) => armor.includes(h)))) continue; // 43차: 모자는 맨머리에만
+      if ((piece === 'helmet' || HELMS.includes(piece)) && costume && o !== 'patient') continue; // 우비 모자·앵무새 머리 위에는 헬멧을 씌우지 않는다
       if (piece === 'shield' && (mode === 'g' || (!!w && TWO.has(w)))) continue; // 20차: 권총·활·양손 무기와는 방패를 들지 않는다
       arm.push({ key: `a-${sex}${PER_BUILD.has(piece) ? ab : 1}-${piece}-${mode}`, piece, ...(tints.has(piece) ? { tint: tints.get(piece) } : {}) });
     }
@@ -318,12 +322,13 @@ async function build0(look: Look, keys: ReturnType<typeof layerKeys>, P = PX, pr
   type Lay = { L: Layer | null; pal: Uint8ClampedArray[] };
   const armorLay = (k: number): Lay => {
     const piece = keys.armor[k].piece, p2 = pal.slice();
-    const col = keys.armor[k].tint ?? ARMOR_COLOR[piece];
+    const [col, metal] = (keys.armor[k].tint ?? ARMOR_COLOR[piece]).split(/(?=#)/); // 44차: '#본색#쇠빛'
     p2[3] = ramp(col); p2[5] = ramp(col);
+    if (metal) p2[14] = ramp(metal);
     return { L: arms[k], pal: p2 };
   };
   const order: Lay[] = [{ L: base, pal }];
-  const overHair = (p: string) => p === 'helmet' || p === 'mask' || p === 'cap' || p === 'visor' || p === 'ngob'; // 25차: 마스크도 머리카락 위에 · 43차 모자도
+  const overHair = (p: string) => p === 'helmet' || HELMS.includes(p) || p === 'mask' || p === 'cap' || p === 'visor' || p === 'ngob'; // 25차: 마스크도 머리카락 위에 · 43차 모자도
   keys.armor.forEach((a, k) => { if (!overHair(a.piece)) order.push(armorLay(k)); });
   order.push({ L: hair, pal });
   keys.armor.forEach((a, k) => { if (overHair(a.piece)) order.push(armorLay(k)); });

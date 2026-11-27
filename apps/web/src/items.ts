@@ -10,6 +10,8 @@ export interface ItemDef {
   atk?: number; // 공격력
   def?: number; // 방어력
   note?: 'rope' | 'needsAmmo' | 'ammo' | 'needsArrows' | 'arrows' | 'fuel' | 'needsRifle' | 'rifleammo';
+  /** 44차 화살 종류의 효과: pierce 꿰뚫기(층주·필드 보스·경비병에게 1.3배) · fire 불붙이기(3초 동안 타오른다) · slow 붙잡기(느려진다) · drain 거머리(준 피해의 2할을 되찾는다) */
+  arrowFx?: 'pierce' | 'fire' | 'slow' | 'drain';
   /** 26차: 쏘는 거리(칸, 없으면 5) · 쏘는 간격 배수 (저격총) */
   range?: number; rate?: number;
   /** 25차: 세계를 건너가도 봉인되지 않고 몸에 남는다 (마스크 팔이 소녀의 검은 마스크) */
@@ -37,6 +39,8 @@ export interface ItemDef {
   reach?: number; // 35차: 채찍·창 — 근접 무기지만 이만큼 떨어져서 때린다 (칸)
   /** 40차: 긴 겉옷의 천 색 (같은 그림을 물건마다 다른 색으로) */
   tint?: string;
+  /** 44차: 투구의 쇠 빛 (같은 모양 투구끼리도 다르게 — 늪 청동 · 그을린 검은 쇠) */
+  metal?: string;
   bloodFloor?: number; // 22차: 물장수가 파는 '그 층 괴물의 피' (그 층에서만 판다)
 }
 
@@ -105,6 +109,9 @@ export const ITEMS: ItemDef[] = [
   // 17차 활: 소리 없이 멀리서. 활과 화살이 공격력을 반씩 (민첩이 더해진다)
   { key: 'bow', cat: 'weapon', price: 2600, atk: 3, ranged: true, note: 'needsArrows', name: { ko: '사냥 활', th: 'ธนูล่าสัตว์', en: 'Hunting bow' } },
   { key: 'arrows', cat: 'weapon', price: 150, atk: 3, note: 'arrows', name: { ko: '화살 20대', th: 'ลูกธนู 20 ดอก', en: 'Arrows ×20' } },
+  // 44차 화살 종류 (현실): 철갑 화살 · 불화살
+  { key: 'steelarrows', cat: 'weapon', price: 600, atk: 6, note: 'arrows', arrowFx: 'pierce', icon: 'arrows', tint: '#9aa4b0', name: { ko: '철갑 화살 20대', th: 'ลูกธนูหัวเหล็ก 20 ดอก', en: 'Steel arrows ×20' } },
+  { key: 'firearrows', cat: 'weapon', price: 1200, atk: 4, note: 'arrows', arrowFx: 'fire', icon: 'arrows', tint: '#ff6a1a', name: { ko: '불화살 20대', th: 'ลูกธนูไฟ 20 ดอก', en: 'Fire arrows ×20' } },
   // 방어구
   { key: 'helmet', cat: 'armor', price: 690, def: 3, name: { ko: '헬멧', th: 'หมวกกันน็อก', en: 'Helmet' } },
   { key: 'shield', cat: 'armor', price: 3800, def: 4, name: { ko: '원형 방패', th: 'โล่กลม', en: 'Round shield' } }, // 20차: 왼팔에 (권총·활·양손 무기와는 못 든다)
@@ -154,7 +161,7 @@ export const ITEMS: ItemDef[] = [
   { key: 'hgreatsword', cat: 'weapon', price: 360, atk: 9, sale: [3, 4], hell: true, two: true, sprite: 'greatsword', name: { ko: '흑철 대검', th: 'ดาบใหญ่เหล็กดำ', en: 'Black-iron greatsword' } },
   { key: 'hblade', cat: 'weapon', price: 150, atk: 7, sale: [1], hell: true, sprite: 'arming', icon: 'arming', name: { ko: '망자의 한손검', th: 'ดาบมือเดียวของผู้ตาย', en: "Dead man's arming sword" } },
   { key: 'hshield', cat: 'armor', price: 120, def: 5, hell: true, sprite: 'shield', icon: 'shield', name: { ko: '쇠테 망자 방패', th: 'โล่ขอบเหล็กของผู้ตาย', en: "Dead man's iron-rim shield" } },
-  { key: 'hhelm', cat: 'armor', price: 45, def: 3, hell: true, sprite: 'helmet', icon: 'helmet', name: { ko: '그을린 투구', th: 'หมวกเกราะไหม้เกรียม', en: 'Scorched helm' } },
+  { key: 'hhelm', cat: 'armor', price: 45, def: 3, hell: true, sprite: 'hornhelm', icon: 'hornhelm', tint: '#d8ccb0', name: { ko: '그을린 투구', th: 'หมวกเกราะไหม้เกรียม', en: 'Scorched helm' } },
   { key: 'hvest', cat: 'armor', price: 150, def: 6, sale: [1, 2], hell: true, sprite: 'vest', icon: 'vest', name: { ko: '망자의 가죽 조끼', th: 'เสื้อหนังของผู้ตาย', en: 'Dead man’s leather vest' } },
   { key: 'hgloves', cat: 'armor', price: 20, def: 1, hell: true, sprite: 'gloves', icon: 'gloves', name: { ko: '사슬 장갑', th: 'ถุงมือโซ่', en: 'Chain gloves' } },
   { key: 'hpants', cat: 'armor', price: 40, def: 2, hell: true, sprite: 'workpants', icon: 'workpants', name: { ko: '꿰맨 망자 바지', th: 'กางเกงปะของผู้ตาย', en: 'Stitched dead-man trousers' } }, // 31차: 지옥에도 바지 (모든 층)
@@ -164,13 +171,19 @@ export const ITEMS: ItemDef[] = [
   { key: 'ashcake', cat: 'goods', price: 6, heal: 130, hell: true, icon: 'cake', name: { ko: '재떡', th: 'ขนมเถ้า', en: 'Ash cake' } },
   { key: 'hbandage', cat: 'goods', price: 8, heal: 150, hell: true, icon: 'bandage', name: { ko: '검은 붕대', th: 'ผ้าพันแผลสีดำ', en: 'Black bandage' } },
   // 30차 템브라: 지옥 어디서나 아주 드물게 떨어지는 파편 — 열세 개를 모으면 템브라가 된다 (지옥 대장간에서 지옥 장비 강화)
-  { key: 'tshard', cat: 'goods', price: 30, hell: true, store: 'drop', name: { ko: '템브라 파편', th: 'เศษเท็มบรา', en: 'Tembra Shard' } },
-  { key: 'tembra', cat: 'goods', price: 400, hell: true, store: 'drop', name: { ko: '템브라', th: 'เท็มบรา', en: 'Tembra' } },
+  { key: 'tshard', cat: 'goods', price: 1200, // 44차: 팔 때 480닢 (열세 개면 6,240 — 조립한 템브라가 더 값지다)
+    hell: true, store: 'drop', name: { ko: '템브라 파편', th: 'เศษเท็มบรา', en: 'Tembra Shard' } },
+  { key: 'tembra', cat: 'goods', price: 25000, // 44차: 칼드렉이 44,444닢에 팔고, 팔 때는 10,000닢
+    hell: true, store: 'drop', name: { ko: '템브라', th: 'เท็มบรา', en: 'Tembra' } },
   // 31차 필드 보스의 희귀 전리품 (설정집) — 지금은 귀한 재료로 비싸게 팔 수 있다 (제작은 나중에 대장간에서)
   { key: 'ashhide', cat: 'goods', price: 900, hell: true, store: 'drop', name: { ko: '재등의 가죽', th: 'หนังหลังเถ้า', en: 'Ashback hide' } },
   // 43차 5층 가면의 도시: 고유 물건 (그 층 괴물만) · 레이피어 '맨얼굴' (5층 무기상도 판다) · 필드 보스 마네트의 실
   { key: 'maskcandy', cat: 'goods', price: 30, heal: 620, hell: true, floor: 5, store: 'drop', icon: 'choco', name: { ko: '웃는 가면 사탕', th: 'ลูกอมหน้ากากยิ้ม', en: 'Smiling-mask candy' } },
   { key: 'porcelainmask', cat: 'armor', price: 300, def: 10, hell: true, floor: 5, store: 'drop', sprite: 'mask', icon: 'blackmask', tint: '#efe8dc', name: { ko: '도자기 가면', th: 'หน้ากากกระเบื้อง', en: 'Porcelain mask' } },
+  // 44차: 멋있는 투구 — 2층 늪뼈 뿔투구 · 3층 봉랍 기사 투구 (그 층 가게) · 5층 고유 방어구 도자기 얼굴 투구 (5층 가게에서만)
+  { key: 'boghornhelm', cat: 'armor', price: 150, def: 5, hell: true, sale: [2], sprite: 'hornhelm', icon: 'hornhelm', tint: '#a8b890', metal: '#5e6c4c', name: { ko: '늪뼈 뿔투구', th: 'หมวกเขากระดูกบึง', en: 'Bog-bone horned helm' } },
+  { key: 'waxknighthelm', cat: 'armor', price: 260, def: 6, hell: true, sale: [3], sprite: 'greathelm', icon: 'greathelm', tint: '#8a1a1a', metal: '#34302e', name: { ko: '봉랍 기사 투구', th: 'หมวกอัศวินตราครั่ง', en: 'Waxseal knight helm' } },
+  { key: 'maskhelm', cat: 'armor', price: 760, def: 8, hell: true, floor: 5, sale: [5], sprite: 'maskhelm', icon: 'maskhelm', tint: '#f2eee6', name: { ko: '도자기 얼굴 투구', th: 'หมวกหน้ากระเบื้อง', en: 'Porcelain-face helm' } },
   { key: 'bareface', cat: 'weapon', price: 680, atk: 11, hell: true, floor: 5, sale: [5], sprite: 'rapier', icon: 'rapier', name: { ko: '맨얼굴', th: 'ใบหน้าเปลือย', en: 'Bare Face' } },
   { key: 'manettethread', cat: 'goods', price: 1100, hell: true, store: 'drop', name: { ko: '마네트의 실', th: 'ด้ายของมาเนตต์', en: "Manette's thread" } },
   // 43차 5층 인형술사 마리의 마리오네트: 줄을 당기면 곁에서 3분 동안 함께 싸운다 (한 번에 하나 · 지옥에서만)
@@ -209,8 +222,8 @@ export const ITEMS: ItemDef[] = [
   { key: 'chainhook', cat: 'weapon', price: 270, atk: 8, hell: true, sale: [4], sprite: 'hook', icon: 'hook', name: { ko: '사슬 해골 갈고리', th: 'ขอโครงกระดูกโซ่', en: 'Chain-bone hook' } },
   { key: 'warhammer', cat: 'weapon', price: 500, atk: 9, two: true, hell: true, sale: [4], sprite: 'sledge', icon: 'sledge', name: { ko: '망치병의 쇠망치', th: 'ค้อนเหล็กทหารค้อน', en: "Hammerman's war hammer" } },
   { key: 'slagpants', cat: 'armor', price: 230, def: 5, hell: true, sale: [4], sprite: 'workpants', icon: 'workpants', name: { ko: '쇳물 가죽 바지', th: 'กางเกงหนังน้ำเหล็ก', en: 'Slag-leather trousers' } },
-  { key: 'ironhelm', cat: 'armor', price: 190, def: 5, hell: true, sale: [4], sprite: 'helmet', icon: 'helmet', name: { ko: '철갑 투구', th: 'หมวกเกราะเหล็ก', en: 'Ironclad helm' } },
-  { key: 'ashmask', cat: 'armor', price: 70, def: 4, hell: true, floor: 1, store: 'drop', sprite: 'helmet', icon: 'helmet', name: { ko: '재의 가면 투구', th: 'หมวกหน้ากากเถ้า', en: 'Ash-mask helm' } },
+  { key: 'ironhelm', cat: 'armor', price: 190, def: 5, hell: true, sale: [4], sprite: 'greathelm', icon: 'greathelm', tint: '#c83a1e', name: { ko: '철갑 투구', th: 'หมวกเกราะเหล็ก', en: 'Ironclad helm' } },
+  { key: 'ashmask', cat: 'armor', price: 70, def: 4, hell: true, floor: 1, store: 'drop', sprite: 'skullhelm', icon: 'skullhelm', tint: '#bcb4a4', name: { ko: '재의 가면 투구', th: 'หมวกหน้ากากเถ้า', en: 'Ash-mask helm' } },
   { key: 'cinderaxe', cat: 'weapon', price: 300, atk: 8, two: true, hell: true, floor: 1, store: 'drop', sprite: 'fireaxe', icon: 'fireaxe', name: { ko: '불씨 도끼', th: 'ขวานถ่านเพลิง', en: 'Ember axe' } },
   { key: 'bogroot', cat: 'goods', price: 14, heal: 260, hell: true, floor: 2, store: 'drop', icon: 'water', name: { ko: '늪 뿌리즙', th: 'น้ำรากหนองบึง', en: 'Bog-root sap' } },
   { key: 'mossboots', cat: 'armor', price: 90, def: 4, hell: true, floor: 2, store: 'drop', sprite: 'boots', icon: 'boots', name: { ko: '이끼 장화', th: 'รองเท้าบูทตะไคร่', en: 'Moss boots' } },
@@ -233,6 +246,11 @@ export const ITEMS: ItemDef[] = [
   { key: 'hlongbow', cat: 'weapon', price: 380, atk: 4, ranged: true, note: 'needsArrows', hell: true, store: 'harms', sprite: 'bow', icon: 'bow', name: { ko: '힘줄 장궁', th: 'ธนูยาวเอ็น', en: 'Sinew longbow' } },
   { key: 'hmatchlock', cat: 'weapon', price: 1600, atk: 9, ranged: true, note: 'needsAmmo', hell: true, store: 'harms', sprite: 'pistol', icon: 'pistol', name: { ko: '유황 화승총', th: 'ปืนคาบชุดกำมะถัน', en: 'Sulfur matchlock' } },
   { key: 'harrows', cat: 'weapon', price: 18, atk: 3, note: 'arrows', hell: true, store: 'harms', icon: 'arrows', name: { ko: '흑요석 화살 20대', th: 'ลูกธนูหินออบซิเดียน 20 ดอก', en: 'Obsidian arrows ×20' } },
+  // 44차 화살 종류 (지옥 무기상): 뼈 화살(꿰뚫기) · 유황 불화살(불) · 봉랍 화살(붙잡기) · 거머리 화살(되찾기)
+  { key: 'boneharrows', cat: 'weapon', price: 40, atk: 5, note: 'arrows', arrowFx: 'pierce', hell: true, store: 'harms', icon: 'arrows', tint: '#e8dcc0', name: { ko: '뼈 화살 20대', th: 'ลูกธนูกระดูก 20 ดอก', en: 'Bone arrows ×20' } },
+  { key: 'brimarrows', cat: 'weapon', price: 70, atk: 4, note: 'arrows', arrowFx: 'fire', hell: true, store: 'harms', icon: 'arrows', tint: '#ffb020', name: { ko: '유황 불화살 20대', th: 'ลูกธนูไฟกำมะถัน 20 ดอก', en: 'Brimstone arrows ×20' } },
+  { key: 'sealarrows', cat: 'weapon', price: 60, atk: 3, note: 'arrows', arrowFx: 'slow', hell: true, store: 'harms', icon: 'arrows', tint: '#c8281e', name: { ko: '봉랍 화살 20대', th: 'ลูกธนูตราครั่ง 20 ดอก', en: 'Waxseal arrows ×20' } },
+  { key: 'leecharrows', cat: 'weapon', price: 90, atk: 3, note: 'arrows', arrowFx: 'drain', hell: true, store: 'harms', icon: 'arrows', tint: '#6a8a3a', name: { ko: '거머리 화살 20대', th: 'ลูกธนูปลิง 20 ดอก', en: 'Leech arrows ×20' } },
   { key: 'hshot', cat: 'weapon', price: 150, note: 'ammo', hell: true, store: 'harms', icon: 'ammo', name: { ko: '유황 탄환 12발', th: 'กระสุนกำมะถัน 12 นัด', en: 'Sulfur shot ×12' } },
   { key: 'hjerky', cat: 'goods', price: 3, heal: 50, hell: true, store: 'hmeat', icon: 'chips', name: { ko: '말린 고기', th: 'เนื้อแห้ง', en: 'Dried meat' } },
   { key: 'hskewer', cat: 'goods', price: 5, heal: 100, hell: true, store: 'hmeat', icon: 'ricebox', name: { ko: '고기 꼬치', th: 'เนื้อเสียบไม้', en: 'Meat skewer' } },
@@ -373,6 +391,10 @@ export function effectText(it: ItemDef, l: Lang, skipStats = false): string {
   if (it.two) parts.push(E.two);
   if (it.ranged && it.key !== 'pistol' && it.note !== 'fuel' && it.note !== 'needsRifle') parts.push(E.ranged);
   if (it.note) parts.push(E[it.note]);
+  if (it.arrowFx) parts.push(({ pierce: { ko: '꿰뚫기: 층주·필드 보스·경비병에게 1.3배', th: 'ทะลวง: แรงขึ้น 1.3 เท่ากับเจ้าชั้น บอสสนาม และยาม', en: 'Pierce: ×1.3 vs floor lords, field bosses, guards' },
+    fire: { ko: '불붙이기: 3초 동안 타오른다', th: 'ติดไฟ: ไหม้ 3 วินาที', en: 'Ignite: burns for 3s' },
+    slow: { ko: '붙잡기: 2.5초 동안 느려진다', th: 'ตรึง: ช้าลง 2.5 วินาที', en: 'Bind: slows for 2.5s' },
+    drain: { ko: '거머리: 준 피해의 2할을 되찾는다', th: 'ปลิง: ดูดคืน 20% ของความเสียหาย', en: 'Leech: regain 20% of damage dealt' } } as Record<string, Record<Lang, string>>)[it.arrowFx][l]); // 44차
   if (it.steal) parts.push(E.steal.replace('{n}', String(Math.round(it.steal * 100))));
   if (it.cross) parts.push(E.cross);
   if (it.floor) parts.push(({ ko: '지옥 {n}층 고유', th: 'เฉพาะนรกชั้น {n}', en: 'Hell F{n} only' } as Record<Lang, string>)[l].replace('{n}', String(it.floor)));
@@ -697,7 +719,7 @@ export function itemIcon(key: string, tint?: string): HTMLCanvasElement {
       Ln(4, 16, 28, 16, 1, '#9a7a4a'); P([[28, 14], [31, 16], [28, 18]], '#c9ced6'); P([[3, 13], [6, 16], [3, 19]], '#c8382a');
       break;
     case 'arrows':
-      for (let k = 0; k < 4; k++) { const y = 8 + k * 5; Ln(4, y + 6, 26, y, 1, '#9a7a4a'); P([[26, y - 2], [30, y - 1], [27, y + 2]], '#c9ced6'); P([[3, y + 4], [6, y + 5], [4, y + 8]], '#c8382a'); }
+      for (let k = 0; k < 4; k++) { const y = 8 + k * 5; Ln(4, y + 6, 26, y, 1, '#9a7a4a'); P([[26, y - 2], [30, y - 1], [27, y + 2]], tint ?? '#c9ced6'); P([[3, y + 4], [6, y + 5], [4, y + 8]], '#c8382a'); }
       R(9, 22, 13, 8, '#6a4a2a'); R(9, 22, 13, 2, '#8a6238');
       break;
     case 'pickaxe':
@@ -713,6 +735,34 @@ export function itemIcon(key: string, tint?: string): HTMLCanvasElement {
       R(5, 16, 22, 12, '#4a5a3a'); R(5, 16, 22, 2, '#6a7a52'); R(7, 20, 18, 3, '#d8d2c4');
       for (let k = 0; k < 4; k++) { R(7 + k * 5, 6, 3, 10, '#c9963a'); R(7 + k * 5, 4, 3, 3, '#b0703a'); R(7 + k * 5, 6, 1, 10, '#e8c26a'); }
       break;
+    case 'greathelm': { // 44차 통투구: 납작한 윗면 · 십자 눈 틈 · 깃털 장식
+      const C = tint ?? '#c83a1e';
+      R(8, 9, 16, 19, '#5c636c'); R(8, 9, 3, 19, '#7c848e'); R(8, 7, 16, 3, '#4a5058');
+      R(10, 16, 12, 2, '#14161a'); R(15, 12, 2, 11, '#14161a');
+      for (let k = 0; k < 3; k++) { R(11 + k * 2, 21, 1, 1, '#14161a'); R(19 + k * 2 - 2, 21, 1, 1, '#14161a'); }
+      P([[14, 7], [18, 1], [26, 3], [24, 7], [18, 8]], C); P([[18, 1], [22, 1], [26, 3]], shade(C, 0.3));
+      break;
+    }
+    case 'hornhelm': { // 44차 뿔투구: 둥근 머리덮개 · 코가리개 · 양옆으로 휜 뿔
+      const C = tint ?? '#d8ccb0';
+      E(16, 18, 9, 8, '#5c636c'); E(14, 15, 4, 3, '#8a929c'); R(7, 19, 18, 2, '#2e323a'); R(15, 19, 2, 8, '#5c636c');
+      P([[8, 17], [3, 12], [2, 4], [5, 9], [9, 14]], C); P([[24, 17], [29, 12], [30, 4], [27, 9], [23, 14]], C);
+      P([[2, 4], [4, 5], [5, 9]], shade(C, -0.25)); P([[30, 4], [28, 5], [27, 9]], shade(C, -0.25));
+      break;
+    }
+    case 'skullhelm': { // 44차 해골 투구: 짐승 해골 · 깊은 눈구멍 · 윗니 · 작은 뿔
+      const C = tint ?? '#d8ccb0';
+      E(16, 15, 10, 9, C); E(16, 21, 6, 4, C); E(12, 15, 3, 3, '#14100e'); E(20, 15, 3, 3, '#14100e'); R(15, 19, 2, 2, '#14100e');
+      for (let k = 0; k < 5; k++) R(12 + k * 2, 24, 1, 3, '#f2ead8');
+      P([[9, 9], [6, 2], [10, 7]], '#2a2420'); P([[23, 9], [26, 2], [22, 7]], '#2a2420'); E(13, 11, 3, 2, shade(C, 0.25));
+      break;
+    }
+    case 'maskhelm': { // 44차 5층 도자기 얼굴 투구: 쇠 머리덮개 · 흰 얼굴판 · 칼날 볏 셋
+      const C = tint ?? '#f2eee6';
+      E(16, 16, 11, 11, '#5c636c'); E(16, 18, 8, 9, C); E(14, 15, 3, 1.2, '#14100e'); E(19, 15, 3, 1.2, '#14100e'); R(14, 22, 5, 1, '#14100e'); R(16, 9, 1, 18, shade(C, -0.25));
+      P([[11, 6], [9, 1], [13, 5]], '#8a929c'); P([[15, 5], [16, 0], [17, 5]], '#8a929c'); P([[21, 6], [23, 1], [19, 5]], '#8a929c');
+      break;
+    }
     case 'helmet':
       E(16, 16, 12, 11, '#2b2f36');
       g.clearRect(0, 22, 32, 10); R(5, 20, 22, 4, '#2b2f36');

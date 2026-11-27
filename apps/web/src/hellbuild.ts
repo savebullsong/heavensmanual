@@ -839,6 +839,8 @@ export function drawHellBuild(b: Building, kind: HellBuildKind, theme: Theme): {
   if (kind === 'smithy') return smithy(b);
   if (kind === 'maskhouse') return maskHouse(b);
   if (kind === 'puppetshop') return puppetShop(b);
+  if (kind === 'mineshaft') return mineShaft(b);
+  if (kind === 'puppetidol') return puppetIdol(b);
   if (kind === 'idol') return theme === 'ash' ? demonIdol(b) : theme === 'swamp' ? hungryMaw(b) : theme === 'forge' ? greatAnvil(b) : theme === 'mask' ? maskIdol(b) : bloodScale(b);
   if (kind === 'thatch') return thatch(b, theme);
   if (kind === 'prison') return prison(b, theme);
@@ -1060,6 +1062,87 @@ function maskIdol(b: Building) {
   // 받침 둘레의 작은 가면과 촛불
   for (let k = 0; k < 7; k++) { const [x, y] = P(i0 + 0.2 + k * (w - 0.4) / 6, j1 + 0.15, 0); E(x, y - 5, 3, 4, k % 3 === 1 ? '#d8b048' : k % 3 === 2 ? '#a82a3a' : '#f2eee6'); R(x - 2, y - 6, 1, 1, '#141014'); R(x + 1, y - 6, 1, 1, '#141014'); }
   for (let k = 0; k < 4; k++) { const [x, y] = P(i0 + 0.1 + hash(k, 5, i0) * w, j1 + 0.35, 0); R(x, y - 6, 2, 6, '#ece6da'); R(x, y - 8, 2, 2, '#ffd27a'); }
+  finish();
+  return { canvas: cv.c, x: cv.minX, y: cv.minY };
+}
+/** 44차 4층 광산 갱도 입구: 쇳물빛 바위 언덕을 파고 들어간 굴, 굵은 통나무 틀과 버팀목, 레일과 광석 수레, 입구 위 붉은 등 */
+function mineShaft(b: Building) {
+  const top = b.h + 20;
+  const cv = canvasFor(b, top, 16);
+  const { g, P, poly, R, line, finish } = cv;
+  const { i0, j0, w, d } = b, i1 = i0 + w, j1 = j0 + d;
+  const seed = i0 * 31 + j0 * 17;
+  // 바위 언덕: 울퉁불퉁한 덩어리 셋 (앞면 · 옆면 · 윗면)
+  const hill = (cx: number, cy: number, rx: number, h: number, col: string) => {
+    const [x, y] = P(cx, cy, 0);
+    g.fillStyle = col; g.beginPath(); g.moveTo(x - rx, y); g.quadraticCurveTo(x - rx * 0.7, y - h, x, y - h - 4); g.quadraticCurveTo(x + rx * 0.8, y - h * 0.9, x + rx, y); g.closePath(); g.fill();
+  };
+  hill(i0 + w * 0.3, j0 + d * 0.4, 58, b.h, '#3a3032');
+  hill(i0 + w * 0.75, j0 + d * 0.3, 48, b.h * 0.8, '#2e2628');
+  hill(i0 + w * 0.5, j0 + d * 0.8, 70, b.h * 0.55, '#463a3a');
+  for (let k = 0; k < 60; k++) { const [x, y] = P(i0 + hash(k, 1, seed) * w, j0 + hash(k, 2, seed) * d, hash(k, 3, seed) * b.h * 0.6); R(x, y, 2, 1, hash(k, 4, seed) < 0.15 ? '#ff7a1a' : '#5a4c4c'); } // 바위 결 · 쇳물빛 광맥
+  // 갱도 입구: 앞면 가운데 검은 굴 + 통나무 틀
+  const m = i0 + w / 2;
+  poly([P(m - 0.7, j1, 0), P(m + 0.7, j1, 0), P(m + 0.7, j1, 30), P(m - 0.7, j1, 30)], '#0a0606');
+  for (const x of [m - 0.78, m + 0.62]) poly([P(x, j1 + 0.02, 0), P(x + 0.16, j1 + 0.02, 0), P(x + 0.16, j1 + 0.02, 34), P(x, j1 + 0.02, 34)], '#6a4a2a');
+  poly([P(m - 0.9, j1 + 0.02, 30), P(m + 0.9, j1 + 0.02, 30), P(m + 0.9, j1 + 0.02, 36), P(m - 0.9, j1 + 0.02, 36)], '#7a5632');
+  for (let k = 0; k < 5; k++) { const [x, y] = P(m - 0.6 + k * 0.3, j1 + 0.03, 32); R(x, y, 1, 3, '#3a2a1a'); }
+  // 입구 위 붉은 등 · 레일 (굴에서 앞으로) · 광석 수레
+  { const [x, y] = P(m, j1 + 0.05, 42); R(x - 2, y, 5, 5, '#ff5a2a'); R(x - 1, y + 1, 3, 3, '#ffd08a'); line([x, y - 6], [x, y], 1, '#2a2020'); }
+  for (const dx of [-0.25, 0.25]) line(P(m + dx, j1, 0), P(m + dx, j1 + 1.2, 0), 1, '#8a8e96');
+  for (let k = 0; k < 6; k++) line(P(m - 0.35, j1 + k * 0.2, 0), P(m + 0.35, j1 + k * 0.2, 0), 1, '#4a3420');
+  { const cx = m + 0.6, cy = j1 + 0.55;
+    poly([P(cx - 0.3, cy - 0.2, 4), P(cx + 0.3, cy - 0.2, 4), P(cx + 0.3, cy + 0.2, 4), P(cx - 0.3, cy + 0.2, 4)], '#5a5e66');
+    poly([P(cx - 0.3, cy + 0.2, 4), P(cx + 0.3, cy + 0.2, 4), P(cx + 0.3, cy + 0.2, 14), P(cx - 0.3, cy + 0.2, 14)], '#3a3e46');
+    for (let k = 0; k < 7; k++) { const [x, y] = P(cx - 0.2 + hash(k, 7, seed) * 0.4, cy - 0.1 + hash(k, 8, seed) * 0.2, 16); R(x, y, 3, 2, k % 3 ? '#4a3a3a' : '#c8642a'); } }
+  void i1;
+  finish();
+  return { canvas: cv.c, x: cv.minX, y: cv.minY };
+}
+/** 44차 5층 마을 바깥 인형 조형물: 교수대처럼 높은 두 기둥 사이 거대한 마리오네트 십자 막대, 실에 매달려 고개를 꺾은 거인 나무 인형 (흰 얼굴 · 붉은 볼 · 깨진 금) */
+function puppetIdol(b: Building) {
+  const top = b.h + 30;
+  const cv = canvasFor(b, top, 20);
+  const { g, P, R, line, finish } = cv;
+  const { i0, j0, w, d } = b;
+  plinth(cv, b, 0, 8, 0.05, '#c8c2b8', '#a8a298', '#8a847a');
+  const cx0 = i0 + w / 2, cy0 = j0 + d / 2;
+  const [bx, by] = P(cx0, cy0, 8);
+  const H = b.h;
+  // 두 기둥과 가로대
+  for (const dx of [-1.15, 1.15]) { const [x, y] = P(cx0 + dx * 0.7, cy0 - dx * 0.7, 8); R(x - 3, y - H, 6, H, '#3a2a1e'); R(x - 3, y - H, 2, H, '#5a4230'); }
+  { const [xl, yl] = P(cx0 - 0.8, cy0 + 0.8, H + 8), [xr, yr] = P(cx0 + 0.8, cy0 - 0.8, H + 8); line([xl, yl], [xr, yr], 6, '#4a3424'); }
+  // 매달린 십자 막대
+  const cy = by - H + 6;
+  R(bx - 22, cy, 44, 4, '#6a4a2a'); R(bx - 2, cy - 10, 4, 24, '#6a4a2a');
+  // 인형: 머리(꺾인) · 몸통(붉은 외투) · 팔다리(나무 막대 · 공 관절)
+  const hy = cy + 34, sy = hy + 20;
+  const strings: [number, number][] = [];
+  const E = (x: number, y: number, rx: number, ry: number, col: string) => { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); g.fill(); };
+  // 몸통
+  g.fillStyle = '#a8281e'; g.beginPath(); g.moveTo(bx - 14, sy); g.lineTo(bx + 14, sy); g.lineTo(bx + 11, sy + 34); g.lineTo(bx - 11, sy + 34); g.closePath(); g.fill();
+  R(bx - 1, sy + 2, 2, 30, '#d8b048'); for (let k = 0; k < 4; k++) R(bx - 5, sy + 6 + k * 7, 2, 2, '#e0b437');
+  // 팔: 한쪽은 들리고 한쪽은 축 늘어졌다
+  line([bx - 14, sy + 3], [bx - 30, sy - 8], 4, '#b88a5a'); E(bx - 31, sy - 9, 4, 4, '#6a4a2a'); strings.push([bx - 31, sy - 12]);
+  line([bx + 14, sy + 3], [bx + 22, sy + 30], 4, '#b88a5a'); E(bx + 22, sy + 31, 4, 4, '#6a4a2a'); strings.push([bx + 22, sy + 28]);
+  // 다리: 땅에 닿지 않고 흔들린다
+  line([bx - 6, sy + 34], [bx - 10, sy + 62], 5, '#b88a5a'); line([bx + 6, sy + 34], [bx + 4, sy + 64], 5, '#b88a5a');
+  E(bx - 10, sy + 64, 5, 3, '#141014'); E(bx + 4, sy + 66, 5, 3, '#141014');
+  strings.push([bx - 8, sy + 46], [bx + 5, sy + 48]);
+  // 머리: 옆으로 꺾인 흰 얼굴 (그린 눈 · 붉은 볼 · 깨진 금) · 검은 모자
+  E(bx + 6, hy, 13, 15, '#efe8dc');
+  R(bx + 1, hy - 3, 3, 2, '#141014'); R(bx + 10, hy - 1, 3, 2, '#141014');
+  R(bx - 1, hy + 4, 3, 2, '#e07a7a'); R(bx + 13, hy + 6, 3, 2, '#e07a7a');
+  for (let k = 0; k < 6; k++) R(bx + 3 + k, hy + 9 + (k % 2), 1, 1, '#141014');
+  for (let k = 0; k < 8; k++) R(bx + 12 - k * 0.6, hy - 14 + k * 2, 1, 2, '#6a5a50'); // 금
+  R(bx - 6, hy - 22, 24, 8, '#141014'); R(bx - 9, hy - 15, 30, 3, '#141014');
+  strings.push([bx + 6, hy - 22]);
+  // 실: 십자 막대에서 내려온다
+  g.strokeStyle = '#ece8e0'; g.lineWidth = 1;
+  const ends: [number, number][] = [[bx - 22, cy + 2], [bx + 22, cy + 2], [bx - 12, cy + 2], [bx + 12, cy + 2], [bx, cy + 12]];
+  strings.forEach(([x, y], k) => { const [ex, ey] = ends[k % ends.length]; g.beginPath(); g.moveTo(ex, ey); g.lineTo(x, y); g.stroke(); });
+  // 받침 앞 작은 인형 공물 · 촛불
+  for (let k = 0; k < 5; k++) { const [x, y] = P(i0 + 0.3 + k * (w - 0.6) / 4, j0 + d + 0.2, 0); E(x, y - 6, 3, 3, '#efe8dc'); R(x - 2, y - 3, 4, 4, ['#a8281e', '#2a4a7a', '#d8b048'][k % 3]); R(x - 1, y - 7, 1, 1, '#141014'); R(x + 1, y - 7, 1, 1, '#141014'); }
   finish();
   return { canvas: cv.c, x: cv.minX, y: cv.minY };
 }

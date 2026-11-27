@@ -847,3 +847,5 @@ NEW.update({'pashar': pashar, 'luen': luen, 'grandpa': grandpa, 'bulda': bulda})
 # 43차: 황색날개 · 마스크 소녀 · 칼드렉 · 오볼로 · 노을 · 마리 · 5층 가면의 도시 · 유내 다시 (bodies43.py)
 from bodies43 import NEW43  # noqa: E402
 NEW.update(NEW43)
+from bodies44 import NEW44   # 44차: 4층 쇠모루지기 · 5층 가면파수꾼
+NEW.update(NEW44)

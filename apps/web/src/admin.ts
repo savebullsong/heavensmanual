@@ -27,6 +27,7 @@ const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   talus: { name: '탈루스', where: '지옥 2층 들판 · 뼈주사위 노름꾼' },
   grandpa: { name: '환생관 할아버지', where: '천국 환생의 테라스 · 지옥 로비 — 가끔 루엔·파샤르 대신 나오는 안경 쓴 아주 늙은 할아버지 (천국·지옥 같은 사람, 옷차림만 다름)' },
   bulda: { name: '불다', where: '경계의 해변 · 콘로 머리의 어부 겸 랩퍼 (붓다 아님)' },
+  noeul: { name: '노을', where: '천국 · 유내와 똑같이 생긴 장검의 천사, 천국의 신앙 감시자 (44차)' },
   maskgirl: { name: '마스크 팔이 소녀', where: '지옥 1층 · 휴식 마을 바깥을 맴도는 중립 상인 (검은 마스크 · 화염방사기)' },
   yunae: { name: '유내 · 공통', where: '서울 · 내 집 — 아래 나이별 칸이 비어 있을 때 쓰는 그림' },
   'yunae-teen': { name: '유내 · 10대', where: '서울 · 내 집 안 — 놀러 가자고 조르는 열몇 살' },
@@ -52,6 +53,7 @@ const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   'bld-hell-2': { name: '유황새 · 지옥 2층', where: '굶주림의 늪 마을 (진흙·이끼·판자 창) · 바닥 2×2칸' },
   'bld-hell-3': { name: '유황새 · 지옥 3층', where: '피의 시장 마을 (금 간 벽·봉랍·붉은 등롱) · 바닥 2×2칸' },
   'bld-hell-4': { name: '유황새 · 지옥 4층', where: '비명의 용광로 마을 (그을음·쇳물빛 실금·쇠사슬·찌꺼기 더미) · 바닥 2×2칸' },
+  'bld-hell-5': { name: '유황새 · 지옥 5층', where: '가면의 도시 마을 (분칠한 흰 벽·벽에 걸린 가면·흰 종이 등불) · 바닥 2×2칸' },
 };
 
 type Tab = 'portraits' | 'sprites' | 'chars' | 'lines';

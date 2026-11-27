@@ -10,7 +10,7 @@ HAIRS = ['short', 'swept', 'bob', 'long', 'ponytail', 'buzz']
 OUTFITS = ['casual', 'apron', 'raincoat', 'patient', 'parrot']
 MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'dagger', 'sword', 'needle', 'arming', 'umbrella', 'sickle', 'crowbar', 'wrench', 'machete', 'metalbat', 'saber', 'rapier', 'katana', 'whip']   # 35차 채찍 · 20차: arming = 한손검 · 26차 현실 무기
 TWO = ['sledge', 'fireaxe', 'greatsword', 'maul', 'boltcutter', 'spear']   # 35차 장창   # 16차 양손 무기 (heavy 동작) · 26차 볼트 커터
-ARMOR = ['helmet', 'cap', 'visor', 'ngob', 'jacket', 'vest', 'gloves', 'workpants', 'shinguard', 'boots', 'shield', 'mask', 'trench', 'firesuit', 'combatcoat', 'hauberk', 'platecoat']   # 40차: 긴 겉옷(무릎까지 덮는 큰 갑옷)   # 25차: 검은 마스크 (헬멧 자리)   # 20차: 왼팔의 둥근 방패
+ARMOR = ['helmet', 'cap', 'visor', 'ngob', 'greathelm', 'hornhelm', 'skullhelm', 'maskhelm', 'jacket', 'vest', 'gloves', 'workpants', 'shinguard', 'boots', 'shield', 'mask', 'trench', 'firesuit', 'combatcoat', 'hauberk', 'platecoat']   # 40차: 긴 겉옷(무릎까지 덮는 큰 갑옷)   # 25차: 검은 마스크 (헬멧 자리)   # 20차: 왼팔의 둥근 방패
 WEAPONS = MELEE + ['pistol']
 RANGED_G = ['pistol', 'shotgun', 'bow', 'flamer', 'rifle']   # 25차: 화염방사기   # 쏘는 자세(g)로 드는 것
 
@@ -106,11 +106,14 @@ BODY = {'x': dict(h=1.28, shoulder=.22, hipw=.105, arm=1.4, leg=1.12),   # 변�
         'ws': dict(h=1.02, shoulder=.18, hipw=.09, arm=1.35, leg=.95, stance=.07, legmass=.9),
         'ip': dict(h=1.0, shoulder=.19, hipw=.09, arm=1.0, leg=1.0, stance=.05),
         'mc': dict(h=1.28, shoulder=.26, hipw=.12, arm=1.5, leg=1.35, stance=.07, legmass=1.1),
-        'mn': dict(h=1.35, shoulder=.28, hipw=.13, arm=1.6, leg=1.4, stance=.08)}
+        'mn': dict(h=1.35, shoulder=.28, hipw=.13, arm=1.6, leg=1.4, stance=.08),
+        # 44차 경비병: 4층 쇠모루지기(w4) · 5층 가면파수꾼(w5)
+        'w4': dict(h=1.12, shoulder=.27, hipw=.12, arm=1.5, leg=1.25, stance=.08, legmass=1.3),
+        'w5': dict(h=1.15, shoulder=.17, hipw=.086, arm=1.05, leg=1.12, stance=.04, legmass=.9)}
 MONSTER_BW = {'x': None, 'a': .8, 'p': .68, 'y': 1.32, 's': .42, 'k': 1.7, 'b': 1.0, 'g': .42, 'o': 1.08, 'w': .95, 't': .5, 'r': 1.0,
-              'h': 1.45, 'u': .62, 'n': .8, 'l': 1.05, 'e': 1.3, 'v': .85, 'd': .42, 'z': 1.25, 'q': .9, 'j': .9, 'i': 1.0, 'hw': .95, 'an': 1.05, 'af': .95, 'pd': .82, 'jr': .95, 'y1': .86, 'y2': .92, 'y3': 1.0, 'ps': .88, 'lu': .9, 'gp': .85, 'bd': 1.18, 'yw': .95, 'mg': .82, 'kd': 1.5, 'ob': .9, 'no': .95, 'mr': .78, 'gm': .82, 'ws': .8, 'ip': 1.0, 'mc': 1.3, 'mn': 1.45}
+              'h': 1.45, 'u': .62, 'n': .8, 'l': 1.05, 'e': 1.3, 'v': .85, 'd': .42, 'z': 1.25, 'q': .9, 'j': .9, 'i': 1.0, 'hw': .95, 'an': 1.05, 'af': .95, 'pd': .82, 'jr': .95, 'y1': .86, 'y2': .92, 'y3': 1.0, 'ps': .88, 'lu': .9, 'gp': .85, 'bd': 1.18, 'yw': .95, 'mg': .82, 'kd': 1.5, 'ob': .9, 'no': .95, 'mr': .78, 'gm': .82, 'ws': .8, 'ip': 1.0, 'mc': 1.3, 'mn': 1.45, 'w4': 1.35, 'w5': .82}
 MONSTER_HK = {'x': 1.0, 'a': 1.05, 'p': .86, 'y': 1.12, 's': 1.0, 'k': 1.2, 'b': 1.0, 'g': 1.0, 'o': .9, 'w': 1.0, 't': 1.0, 'r': 1.0,
-              'h': 1.2, 'u': .9, 'n': 1.05, 'l': 1.0, 'e': 1.0, 'v': 1.0, 'd': 1.0, 'z': 1.1, 'q': 1.12, 'j': 1.12, 'i': 1.12, 'hw': 1.12, 'an': 1.1, 'af': 1.12, 'pd': 1.06, 'jr': 1.08, 'y1': 1.08, 'y2': 1.05, 'y3': 1.05, 'ps': 1.08, 'lu': 1.1, 'gp': 1.1, 'bd': 1.08, 'yw': 1.12, 'mg': 1.22, 'kd': .95, 'ob': 1.18, 'no': 1.12, 'mr': 1.08, 'gm': 1.0, 'ws': 1.0, 'ip': 1.05, 'mc': 1.05, 'mn': 1.1}
+              'h': 1.2, 'u': .9, 'n': 1.05, 'l': 1.0, 'e': 1.0, 'v': 1.0, 'd': 1.0, 'z': 1.1, 'q': 1.12, 'j': 1.12, 'i': 1.12, 'hw': 1.12, 'an': 1.1, 'af': 1.12, 'pd': 1.06, 'jr': 1.08, 'y1': 1.08, 'y2': 1.05, 'y3': 1.05, 'ps': 1.08, 'lu': 1.1, 'gp': 1.1, 'bd': 1.08, 'yw': 1.12, 'mg': 1.22, 'kd': .95, 'ob': 1.18, 'no': 1.12, 'mr': 1.08, 'gm': 1.0, 'ws': 1.0, 'ip': 1.05, 'mc': 1.05, 'mn': 1.1, 'w4': 1.0, 'w5': 1.0}
 BUILD = [.9, 1.0, 1.14]   # 마름 · 보통 · 건장 (뼈 위치는 같고 굵기만 다르다 → 머리·무기 층을 함께 쓴다)
 
 class Doll:
@@ -1148,6 +1151,61 @@ class Doll:
             blob(P, hc + Vector((0, .005, .02)), (.118 * s, .13 * s, .13 * s), main, None, segs=16, rings=12, cut=lambda co: co.z < 1.53 * s or (co.y < -.03 * s and co.z < 1.64 * s))
             blob(P, hc + Vector((0, -.1, .025)), (.085 * s, .03 * s, .045 * s), metal, None, segs=10, rings=6)
             ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
+            return
+        if piece in ('greathelm', 'hornhelm', 'skullhelm', 'maskhelm'):   # 44차: 멋있는 투구 넷 — 통투구 · 뿔투구 · 해골 투구 · 5층 도자기 얼굴 투구
+            P = Part(g)
+            hc = V(0, -.005, 1.615)
+            up, fw = Vector((0, -1, 0)), Vector((1, 0, 0))
+            if piece == 'greathelm':
+                # 위가 납작한 통투구: 머리를 통째로 덮고, 얼굴엔 십자 눈 틈 · 숨구멍, 정수리에 높은 깃털 장식(물든 색)
+                loft(P, [(hc + Vector((0, .0, -.105 * s)), up, fw, .118 * s, .128 * s), (hc + Vector((0, .0, .0)), up, fw, .126 * s, .136 * s),
+                         (hc + Vector((0, .0, .1 * s)), up, fw, .12 * s, .13 * s), (hc + Vector((0, .0, .13 * s)), up, fw, .1 * s, .11 * s)], metal, None, segs=18, caps=(False, True))
+                limb(P, hc + Vector((-.085 * s, -.132 * s, .03 * s)), hc + Vector((.085 * s, -.132 * s, .03 * s)), [(0, .011 * s, .006 * s), (1, .011 * s, .006 * s)], dark, None, segs=4)
+                limb(P, hc + Vector((0, -.135 * s, .07 * s)), hc + Vector((0, -.135 * s, -.07 * s)), [(0, .009 * s, .006 * s), (1, .009 * s, .006 * s)], dark, None, segs=4)
+                for k in range(6):
+                    for sx in (1, -1):
+                        blob(P, hc + Vector((sx * (.03 + (k % 3) * .02) * s, -.13 * s, (-.04 - (k // 3) * .025) * s)), (.005 * s, .004 * s, .005 * s), dark, None, segs=5, rings=3)
+                limb(P, hc + Vector((0, .0, .1 * s)), hc + Vector((0, .0, .145 * s)), [(0, .1 * s, .11 * s), (1, .1 * s, .11 * s)], dark, None, segs=16, caps=(False, False))   # 이마 띠
+                for k in range(7):   # 깃털 장식: 정수리에서 뒤로 흘러내린다
+                    t = k / 6
+                    blob(P, hc + Vector((0, (.02 + t * .2) * s, (.24 - t * t * .17) * s)), ((.034 - t * .012) * s, .06 * s, (.06 - t * .02) * s), main, None, segs=8, rings=5)
+            elif piece == 'hornhelm':
+                # 뿔투구: 둥근 쇠 머리덮개 · 코가리개 · 볼가리개, 양옆으로 휘어 올라간 큰 뿔 (물든 색)
+                blob(P, hc + Vector((0, .005, .03 * s)), (.122 * s, .134 * s, .12 * s), metal, None, segs=16, rings=12, cut=lambda co: co.z < 1.56 * s)
+                limb(P, hc + Vector((0, .0, .0)), hc + Vector((0, .0, .025 * s)), [(0, .123 * s, .135 * s), (1, .123 * s, .135 * s)], dark, None, segs=16, caps=(False, False))   # 테
+                limb(P, hc + Vector((0, -.13 * s, .02 * s)), hc + Vector((0, -.14 * s, -.06 * s)), [(0, .016 * s, .008 * s), (1, .012 * s, .006 * s)], metal, None, segs=5)   # 코가리개
+                for sx in (1, -1):
+                    blob(P, hc + Vector((sx * .1 * s, -.06 * s, -.06 * s)), (.03 * s, .05 * s, .06 * s), metal, None, segs=8, rings=6)   # 볼가리개
+                    pts = [hc + Vector((sx * (.11 + n * .03) * s, (.0 - n * .008) * s, (.05 + n * .012 + (n / 6) ** 2 * .1) * s)) for n in range(8)]
+                    for n in range(7):
+                        w0 = (.035 - n * .0045) * s
+                        limb(P, pts[n], pts[n + 1], [(0, w0, w0), (1, max(.003 * s, w0 * .85), max(.003 * s, w0 * .85))], main, None, segs=7)
+                for k in range(8):   # 징
+                    a = -math.pi * .9 + k * math.pi * .25
+                    blob(P, hc + Vector((math.cos(a) * .123 * s, math.sin(a) * .135 * s, .012 * s)), (.007 * s,) * 3, dark, None, segs=5, rings=3)
+            elif piece == 'skullhelm':
+                # 해골 투구: 커다란 짐승 해골을 머리에 뒤집어썼다 — 깊은 눈구멍 · 윗니 줄이 이마 아래로 · 작은 뿔 둘
+                blob(P, hc + Vector((0, -.01 * s, .03 * s)), (.13 * s, .145 * s, .13 * s), main, None, segs=16, rings=12, cut=lambda co: co.z < 1.53 * s)
+                blob(P, hc + Vector((0, -.12 * s, .0)), (.08 * s, .05 * s, .06 * s), main, None, segs=12, rings=8)   # 콧등
+                for sx in (1, -1):
+                    blob(P, hc + Vector((sx * .045 * s, -.135 * s, .035 * s)), (.026 * s, .014 * s, .022 * s), dark, None, segs=8, rings=5)   # 눈구멍
+                    pts = [hc + Vector((sx * (.08 + n * .02) * s, (.03 + n * .01) * s, (.1 + n * .03) * s)) for n in range(5)]
+                    for n in range(4):
+                        limb(P, pts[n], pts[n + 1], [(0, (.022 - n * .004) * s, (.022 - n * .004) * s), (1, (.018 - n * .004) * s, (.018 - n * .004) * s)], dark, None, segs=6)
+                for k in range(7):   # 윗니
+                    blob(P, hc + Vector(((k - 3) * .02 * s, -.155 * s, -.055 * s)), (.008 * s, .006 * s, .016 * s), main if k % 2 else dark, None, segs=5, rings=3)
+                blob(P, hc + Vector((0, -.15 * s, -.02 * s)), (.012 * s, .008 * s, .014 * s), dark, None, segs=6, rings=4)   # 콧구멍
+            else:
+                # 5층 도자기 얼굴 투구: 쇠 머리덮개 앞에 웃지도 울지도 않는 흰 얼굴판(물든 색 = 흰빛), 검은 눈 틈과 그린 입, 정수리의 칼날 볏 셋
+                blob(P, hc + Vector((0, .02 * s, .03 * s)), (.122 * s, .128 * s, .124 * s), metal, None, segs=16, rings=12, cut=lambda co: co.z < 1.52 * s)
+                blob(P, hc + Vector((0, -.1 * s, -.005 * s)), (.096 * s, .045 * s, .118 * s), main, None, segs=16, rings=12)   # 얼굴판
+                for sx in (1, -1):
+                    limb(P, hc + Vector((sx * .02 * s, -.142 * s, .03 * s)), hc + Vector((sx * .06 * s, -.135 * s, .036 * s)), [(0, .007 * s, .005 * s), (1, .006 * s, .004 * s)], dark, None, segs=4)
+                limb(P, hc + Vector((-.03 * s, -.142 * s, -.055 * s)), hc + Vector((.03 * s, -.142 * s, -.055 * s)), [(0, .004 * s, .003 * s), (1, .004 * s, .003 * s)], dark, None, segs=4)
+                limb(P, hc + Vector((0, -.12 * s, .12 * s)), hc + Vector((0, -.15 * s, -.1 * s)), [(0, .006 * s, .006 * s), (1, .006 * s, .006 * s)], dark, None, segs=4)   # 얼굴판 가운데 금
+                for k, dz in ((-1, .16), (0, .2), (1, .16)):
+                    limb(P, hc + Vector((k * .04 * s, .02 * s, .13 * s)), hc + Vector((k * .055 * s, .05 * s, dz * s + .05 * s)), [(0, .012 * s, .03 * s), (1, .002 * s, .004 * s)], metal, None, segs=5)
+            ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': 1.0}, subsurf=0); self.add(g, ob)
             return
         if piece in ('cap', 'visor', 'ngob'):   # 43차: 서울·방콕 시민을 가르는 모자 — 야구 모자 · 선캡 · 응옵(밀짚 삿갓)
             P = Part(g)

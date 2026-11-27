@@ -259,69 +259,104 @@ function frame(b: Building, top: number) {
   };
   return { c, g, Q, poly, box, x: minX, y: minY };
 }
-/** 천국 본청 — 43차: 현대식 마천루로. 흰 대리석 받침 위로 하늘빛 유리 탑이 세 번 물러서며 솟고, 흰 세로 핀 · 층마다 가는 띠 ·
- *  여기저기 금빛으로 켜진 창 · 물러선 자리마다 금 띠, 꼭대기는 유리 피라미드와 빛나는 바늘 첨탑 */
+/**
+ * 천국 본청 — 44차: 롯데타워처럼 하늘로 가늘어지는 초고층 (아직 들어가지 않는다 · 올려다볼 뿐).
+ * 흰 대리석 저층부(금 띠 · 유리 로비) 위로 은빛 유리 탑이 곧게 솟으며 점점 가늘어지고, 면 가운데 세로 주름 · 모서리로 모이는 가는 세로줄 ·
+ * 층마다 가는 띠 · 드문드문 켜진 금빛 창. 꼭대기 열에 하나는 갈라진 왕관 — 비어 있는 격자 사이로 하늘이 보이고, 맨 위에 빛나는 바늘 첨탑
+ */
 export function drawHeavenPalace(b: Building) {
-  const TOP = 860;
-  const f = frame(b, TOP + 190);
+  const TOP = 1320;
+  const f = frame(b, TOP + 150);
   const { g, Q, box, poly } = f;
   const cx = b.i0 + b.w / 2, cy = b.j0 + b.d / 2;
   const R0 = b.w / 2;
   const r = rnd(4242);
-  // 받침: 흰 대리석 기단 + 유리 로비 + 금 띠
-  box(cx - R0, cy - R0, cx + R0, cy + R0, 0, 52, '#fbf9f4', '#ebe5d9', '#dcd4c4');
-  box(cx - R0 - 0.1, cy - R0 - 0.1, cx + R0 + 0.1, cy + R0 + 0.1, 52, 58, '#f2d27a', '#d9b44a', '#c09a36');
+  // 저층부: 흰 대리석 기단 두 단 + 금 띠 + 유리 로비
+  box(cx - R0, cy - R0, cx + R0, cy + R0, 0, 46, '#fbf9f4', '#ebe5d9', '#dcd4c4');
+  box(cx - R0 - 0.1, cy - R0 - 0.1, cx + R0 + 0.1, cy + R0 + 0.1, 46, 52, '#f2d27a', '#d9b44a', '#c09a36');
   const glassFace = (pts: [number, number][], top: string, bottom: string) => {
     const ys = pts.map((p) => p[1]), y0 = Math.min(...ys), y1 = Math.max(...ys);
     const gr = g.createLinearGradient(0, y0, 0, y1); gr.addColorStop(0, top); gr.addColorStop(1, bottom);
     g.fillStyle = gr; g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (const p of pts.slice(1)) g.lineTo(p[0], p[1]); g.closePath(); g.fill();
   };
-  // 로비 유리 (앞 두 면)
-  glassFace([Q(cx - R0 + 1, cy + R0 + 0.01, 4), Q(cx + R0 - 1, cy + R0 + 0.01, 4), Q(cx + R0 - 1, cy + R0 + 0.01, 44), Q(cx - R0 + 1, cy + R0 + 0.01, 44)], '#fff6d8', '#f2e2b0');
-  glassFace([Q(cx + R0 + 0.01, cy - R0 + 1, 4), Q(cx + R0 + 0.01, cy + R0 - 1, 4), Q(cx + R0 + 0.01, cy + R0 - 1, 44), Q(cx + R0 + 0.01, cy - R0 + 1, 44)], '#f6e8c0', '#e2cc94');
-  const tiers = [{ r: R0 - 1.6, z0: 58, z1: 470 }, { r: R0 - 3.0, z0: 470, z1: 690 }, { r: R0 - 4.3, z0: 690, z1: TOP }];
-  for (const T of tiers) {
-    const x0 = cx - T.r, x1 = cx + T.r, y0 = cy - T.r, y1 = cy + T.r;
-    // 유리 두 면 (왼쪽 앞면은 밝게, 오른쪽 면은 조금 어둡게) + 윗면
-    glassFace([Q(x0, y1, T.z0), Q(x1, y1, T.z0), Q(x1, y1, T.z1), Q(x0, y1, T.z1)], '#eef6fc', '#c6d6e6');
-    glassFace([Q(x1, y0, T.z0), Q(x1, y1, T.z0), Q(x1, y1, T.z1), Q(x1, y0, T.z1)], '#d6e4f0', '#a8bccf');
-    poly([Q(x0, y0, T.z1), Q(x1, y0, T.z1), Q(x1, y1, T.z1), Q(x0, y1, T.z1)], '#fdfbf6');
-    // 층마다 가는 띠 + 여기저기 켜진 금빛 창
-    for (let z = T.z0 + 12; z < T.z1 - 4; z += 12) {
-      g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 1;
-      for (const [a, c2] of [[Q(x0, y1, z), Q(x1, y1, z)], [Q(x1, y0, z), Q(x1, y1, z)]] as const) { g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(c2[0], c2[1]); g.stroke(); }
-      const n = Math.round(T.r * 4);
+  glassFace([Q(cx - R0 + 1, cy + R0 + 0.01, 4), Q(cx + R0 - 1, cy + R0 + 0.01, 4), Q(cx + R0 - 1, cy + R0 + 0.01, 40), Q(cx - R0 + 1, cy + R0 + 0.01, 40)], '#fff6d8', '#f2e2b0');
+  glassFace([Q(cx + R0 + 0.01, cy - R0 + 1, 4), Q(cx + R0 + 0.01, cy + R0 - 1, 4), Q(cx + R0 + 0.01, cy + R0 - 1, 40), Q(cx + R0 + 0.01, cy - R0 + 1, 40)], '#f6e8c0', '#e2cc94');
+  box(cx - R0 + 1.2, cy - R0 + 1.2, cx + R0 - 1.2, cy + R0 - 1.2, 52, 96, '#fdfbf6', '#f4efe4', '#e4dccc'); // 둘째 단 (저층 상가)
+  for (let z = 60; z < 94; z += 9) { const a = Q(cx - R0 + 1.2, cy + R0 - 1.19, z), c2 = Q(cx + R0 - 1.2, cy + R0 - 1.19, z); g.strokeStyle = 'rgba(210,190,140,0.7)'; g.lineWidth = 1; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(c2[0], c2[1]); g.stroke(); }
+  // 탑: 반지름이 아래 6.2칸 → 꼭대기 1.3칸으로 부드럽게 가늘어진다
+  const Z0 = 96, ZC = TOP - 150; // 왕관이 시작하는 높이
+  const RA = R0 - 4.6, RB = 0.9;
+  const rr = (z: number) => RA - (RA - RB) * Math.pow(Math.max(0, z - Z0) / (TOP - Z0), 1.7); // 아래는 곧게, 위로 갈수록 빨리 가늘어진다
+  const step = 6;
+  for (let z = Z0; z < ZC; z += step) {
+    const a = rr(z), c2 = rr(z + step), t = (z - Z0) / (TOP - Z0);
+    const lt = Math.round(236 - t * 18), lb = Math.round(250 - t * 10);
+    poly([Q(cx - a, cy + a, z), Q(cx + a, cy + a, z), Q(cx + c2, cy + c2, z + step), Q(cx - c2, cy + c2, z + step)], `rgb(${lt},${lt + 8},${lb})`);
+    poly([Q(cx + a, cy - a, z), Q(cx + a, cy + a, z), Q(cx + c2, cy + c2, z + step), Q(cx + c2, cy - c2, z + step)], `rgb(${lt - 40},${lt - 26},${lb - 22})`);
+    // 층마다 가는 띠 · 드문드문 켜진 금빛 창
+    if (z % 12 === 0) {
+      g.strokeStyle = 'rgba(255,255,255,0.45)'; g.lineWidth = 1;
+      for (const [p0, p1] of [[Q(cx - a, cy + a, z), Q(cx + a, cy + a, z)], [Q(cx + a, cy - a, z), Q(cx + a, cy + a, z)]] as const) { g.beginPath(); g.moveTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); g.stroke(); }
+      const n = Math.max(4, Math.round(a * 5));
       for (let q = 0; q < n; q++) {
-        if (r() > 0.16) continue;
-        const t0 = q / n, t1 = (q + 0.8) / n;
-        const left = r() < 0.55;
-        const pts = left ? [Q(x0 + (x1 - x0) * t0, y1, z - 10), Q(x0 + (x1 - x0) * t1, y1, z - 10), Q(x0 + (x1 - x0) * t1, y1, z - 2), Q(x0 + (x1 - x0) * t0, y1, z - 2)]
-                         : [Q(x1, y0 + (y1 - y0) * t0, z - 10), Q(x1, y0 + (y1 - y0) * t1, z - 10), Q(x1, y0 + (y1 - y0) * t1, z - 2), Q(x1, y0 + (y1 - y0) * t0, z - 2)];
-        poly(pts as [number, number][], left ? '#ffe9a8' : '#f2d48a', 0.85);
+        if (r() > 0.12) continue;
+        const t0 = q / n, t1 = (q + 0.7) / n, left = r() < 0.55;
+        const pts = left ? [Q(cx - a + 2 * a * t0, cy + a, z + 2), Q(cx - a + 2 * a * t1, cy + a, z + 2), Q(cx - a + 2 * a * t1, cy + a, z + 9), Q(cx - a + 2 * a * t0, cy + a, z + 9)]
+                         : [Q(cx + a, cy - a + 2 * a * t0, z + 2), Q(cx + a, cy - a + 2 * a * t1, z + 2), Q(cx + a, cy - a + 2 * a * t1, z + 9), Q(cx + a, cy - a + 2 * a * t0, z + 9)];
+        poly(pts as [number, number][], left ? '#ffe9a8' : '#f2d48a', 0.8);
       }
     }
-    // 흰 세로 핀 (반 칸마다)
-    const nf = Math.round(T.r * 4);
-    for (let q = 0; q <= nf; q++) {
-      const x = x0 + (q / nf) * (x1 - x0), y = y0 + (q / nf) * (y1 - y0);
-      poly([Q(x - 0.05, y1 + 0.02, T.z0), Q(x + 0.05, y1 + 0.02, T.z0), Q(x + 0.05, y1 + 0.02, T.z1), Q(x - 0.05, y1 + 0.02, T.z1)], '#ffffff', 0.8);
-      poly([Q(x1 + 0.02, y - 0.05, T.z0), Q(x1 + 0.02, y + 0.05, T.z0), Q(x1 + 0.02, y + 0.05, T.z1), Q(x1 + 0.02, y - 0.05, T.z1)], '#f4f6f8', 0.7);
-    }
-    // 유리에 비친 하늘 (비스듬한 흰 빛줄기)
-    g.globalAlpha = 0.18; g.fillStyle = '#ffffff';
-    const a = Q(x0 + (x1 - x0) * 0.15, y1, T.z0 + (T.z1 - T.z0) * 0.25), b2 = Q(x0 + (x1 - x0) * 0.35, y1, T.z0 + (T.z1 - T.z0) * 0.25), c3 = Q(x0 + (x1 - x0) * 0.55, y1, T.z1 - 6), d = Q(x0 + (x1 - x0) * 0.35, y1, T.z1 - 6);
-    g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b2[0], b2[1]); g.lineTo(c3[0], c3[1]); g.lineTo(d[0], d[1]); g.closePath(); g.fill(); g.globalAlpha = 1;
-    // 물러선 자리의 금 띠
-    box(x0 - 0.08, y0 - 0.08, x1 + 0.08, y1 + 0.08, T.z1 - 5, T.z1, '#f2d27a', '#d9b44a', '#c09a36');
   }
-  // 꼭대기: 유리 피라미드 + 바늘 첨탑 + 빛
-  const L = tiers[2].r, apex = Q(cx, cy, TOP + 110);
-  poly([Q(cx - L, cy + L, TOP), Q(cx + L, cy + L, TOP), apex], '#e2eef8');
-  poly([Q(cx + L, cy - L, TOP), Q(cx + L, cy + L, TOP), apex], '#bccfe0');
-  g.fillStyle = '#fff4c0'; g.fillRect(Math.round(apex[0]) - 1.5, Math.round(apex[1]) - 80, 3, 80);
-  const glow = g.createRadialGradient(apex[0], apex[1] - 84, 1, apex[0], apex[1] - 84, 30);
+  // 위로 모이는 세로줄 (면마다 다섯) · 앞면 가운데 밝은 주름
+  const seam = (face: 0 | 1, u: number, col: string, wd: number, z1 = ZC) => {
+    g.strokeStyle = col; g.lineWidth = wd; g.beginPath();
+    for (let z = Z0; z <= z1; z += 12) { const a = rr(z); const p = face === 0 ? Q(cx - a + 2 * a * u, cy + a + 0.01, z) : Q(cx + a + 0.01, cy - a + 2 * a * u, z); if (z === Z0) g.moveTo(p[0], p[1]); else g.lineTo(p[0], p[1]); }
+    g.stroke();
+  };
+  for (const u of [0.12, 0.3, 0.7, 0.88]) { seam(0, u, 'rgba(255,255,255,0.5)', 1); seam(1, u, 'rgba(240,246,252,0.35)', 1); }
+  seam(0, 0.5, 'rgba(255,255,255,0.95)', 2); seam(1, 0.5, 'rgba(220,232,244,0.7)', 2);
+  seam(0, 0.0, 'rgba(255,255,255,0.8)', 1.5); // 앞 모서리의 빛
+  // 하늘이 비친 긴 빛줄기
+  g.globalAlpha = 0.16; g.fillStyle = '#ffffff';
+  { const z1 = Z0 + 120, z2 = ZC - 60; const a1 = rr(z1), a2 = rr(z2); const p = [Q(cx - a1 + 2 * a1 * 0.18, cy + a1, z1), Q(cx - a1 + 2 * a1 * 0.34, cy + a1, z1), Q(cx - a2 + 2 * a2 * 0.46, cy + a2, z2), Q(cx - a2 + 2 * a2 * 0.32, cy + a2, z2)];
+    g.beginPath(); g.moveTo(p[0][0], p[0][1]); for (const q of p.slice(1)) g.lineTo(q[0], q[1]); g.closePath(); g.fill(); }
+  g.globalAlpha = 1;
+  // 금 띠 둘 (전망층)
+  for (const zb of [Math.round(Z0 + (ZC - Z0) * 0.42), ZC - 6]) { // 옆 두 면만 (윗면을 칠하면 탑 한가운데 금빛 판이 생긴다)
+    const a = rr(zb) + 0.05, c2 = rr(zb + 5) + 0.05;
+    poly([Q(cx - a, cy + a, zb), Q(cx + a, cy + a, zb), Q(cx + c2, cy + c2, zb + 5), Q(cx - c2, cy + c2, zb + 5)], '#e8c45a');
+    poly([Q(cx + a, cy - a, zb), Q(cx + a, cy + a, zb), Q(cx + c2, cy + c2, zb + 5), Q(cx + c2, cy - c2, zb + 5)], '#c9a23e');
+  }
+  // 왕관: 갈라진 격자 — 가는 기둥과 엇갈린 사선 사이로 하늘이 비친다
+  const lat = (face: 0 | 1, col: string) => {
+    g.strokeStyle = col; g.lineWidth = 1.5;
+    for (let k = 0; k <= 8; k++) {
+      const u = k / 8;
+      g.beginPath();
+      for (let z = ZC; z <= TOP; z += 6) { const a = rr(z) * (1 - 0.35 * ((z - ZC) / (TOP - ZC))); const p = face === 0 ? Q(cx - a + 2 * a * u, cy + a, z) : Q(cx + a, cy - a + 2 * a * u, z); if (z === ZC) g.moveTo(p[0], p[1]); else g.lineTo(p[0], p[1]); }
+      g.stroke();
+    }
+    for (let k = 0; k < 6; k++) { // 사선
+      const zA = ZC + (k / 6) * (TOP - ZC), zB = ZC + ((k + 1) / 6) * (TOP - ZC);
+      for (const [u0, u1] of [[0, 1], [1, 0]] as const) {
+        const aA = rr(zA) * (1 - 0.35 * ((zA - ZC) / (TOP - ZC))), aB = rr(zB) * (1 - 0.35 * ((zB - ZC) / (TOP - ZC)));
+        const pA = face === 0 ? Q(cx - aA + 2 * aA * u0, cy + aA, zA) : Q(cx + aA, cy - aA + 2 * aA * u0, zA);
+        const pB = face === 0 ? Q(cx - aB + 2 * aB * u1, cy + aB, zB) : Q(cx + aB, cy - aB + 2 * aB * u1, zB);
+        g.beginPath(); g.moveTo(pA[0], pA[1]); g.lineTo(pB[0], pB[1]); g.stroke();
+      }
+    }
+  };
+  // 왕관 안쪽 (뒤 두 면이 비쳐 보이는 옅은 유리)
+  { const a0 = rr(ZC), a1 = rr(TOP) * 0.65;
+    poly([Q(cx - a0, cy - a0, ZC), Q(cx + a0, cy - a0, ZC), Q(cx + a1, cy - a1, TOP), Q(cx - a1, cy - a1, TOP)], '#eef4fa', 0.5);
+    poly([Q(cx - a0, cy - a0, ZC), Q(cx - a0, cy + a0, ZC), Q(cx - a1, cy + a1, TOP), Q(cx - a1, cy - a1, TOP)], '#e2ecf4', 0.5); }
+  lat(1, 'rgba(206,220,234,0.95)'); lat(0, 'rgba(250,252,255,0.95)');
+  // 꼭대기 바늘 첨탑과 빛
+  const apex = Q(cx, cy, TOP + 4);
+  g.fillStyle = '#fff4c0'; g.fillRect(Math.round(apex[0]) - 1.5, Math.round(apex[1]) - 110, 3, 110);
+  const glow = g.createRadialGradient(apex[0], apex[1] - 114, 1, apex[0], apex[1] - 114, 34);
   glow.addColorStop(0, 'rgba(255,250,220,1)'); glow.addColorStop(1, 'rgba(255,240,180,0)');
-  g.fillStyle = glow; g.beginPath(); g.arc(apex[0], apex[1] - 84, 30, 0, Math.PI * 2); g.fill();
+  g.fillStyle = glow; g.beginPath(); g.arc(apex[0], apex[1] - 114, 34, 0, Math.PI * 2); g.fill();
   return { canvas: f.c, x: f.x, y: f.y };
 }
 /** 놀이공원 탈것: 대관람차 · 회전목마 · 롤러코스터 */

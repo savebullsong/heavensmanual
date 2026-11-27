@@ -44,7 +44,7 @@ export const floorDef = (f: number) => FLOORS[Math.max(1, Math.min(FLOORS.length
  * 한 명 한 명이 그 층의 층주만큼 강하다 (누구든 칠 수 있다). 쓰러뜨려도 보상·카르마·영격은 없다.
  */
 export interface GuardDef {
-  key: string; body: 'warden1' | 'warden2' | 'warden3'; weapon: string | null;
+  key: string; body: 'warden1' | 'warden2' | 'warden3' | 'warden4' | 'warden5'; weapon: string | null; // 44차: 4층 쇠모루지기 · 5층 가면파수꾼 (층마다 겹치지 않게)
   name: Record<Lang, string>; line: Record<Lang, string>; look: Record<Lang, string>;
   cols: Record<number, string>; hp: number; dmg: [number, number]; atk: number; speed: number;
   /** push = 곤봉으로 내려쳐 밀어냄 · mud = 진흙 파문으로 느리게 · seal = 붉은 봉인 낙인 */
@@ -77,20 +77,20 @@ export const GUARDS: Record<string, GuardDef> = {
   },
   // 24차 4층: 모루지기 — 쇠 두건 아래 그을린 얼굴, 모루를 닮은 쇳덩이 곤봉으로 내려쳐 밀어낸다
   anvilward: {
-    key: 'anvilward', body: 'warden1', weapon: 'knocker',
+    key: 'anvilward', body: 'warden4', weapon: 'sledge',
     name: { ko: '모루지기', th: 'ผู้เฝ้าทั่ง', en: 'Anvil Warden' },
     line: { ko: '여기선 쇠만 두드린다. 사람은 아니다.', th: 'ที่นี่ตีแต่เหล็ก ไม่ตีคน', en: 'Here we strike iron. Not people.' },
-    look: { ko: '쇳물에 그을린 쇠 두건, 가슴에 박힌 모루 모양의 쇳덩이, 손에는 쇠똥이 엉겨 붙은 무거운 곤봉. 두건 틈으로 불티가 샌다.', th: 'ผ้าคลุมหัวเหล็กไหม้เกรียมจากน้ำเหล็ก ก้อนเหล็กรูปทั่งฝังที่อก ในมือคือกระบองหนักมีตะกรันติด ประกายไฟลอดออกจากรอยผ้า', en: 'An iron hood scorched by molten metal, an anvil-shaped lump of iron set in its chest, a heavy club crusted with slag. Sparks leak from the hood.' },
-    cols: { 1: '#3a3634', 3: '#2a2624', 4: '#1a1716', 10: '#5a524c', 14: '#8a7e6e', 15: '#060404', 12: '#ff8a1a', 6: '#ff8a1a' },
+    look: { ko: '눈구멍 한 줄만 뚫린 통 쇠투구(틈으로 쇳물빛), 어깨에 모루 모양 쇠 견갑, 가슴을 가로지른 쇠사슬, 무릎까지 오는 가죽 외투, 두 손으로 드는 큰 쇠메.', th: 'หมวกเหล็กทรงถังเจาะช่องตาแถวเดียว (แสงเหล็กหลอมลอดออกมา) เกราะไหล่รูปทั่ง โซ่พาดอก เสื้อหนังยาวถึงเข่า ค้อนเหล็กใหญ่สองมือ', en: "A bucket helm with one eye slit (molten light leaks through), anvil-shaped pauldrons, a chain across the chest, a knee-length leather coat and a two-handed iron sledge." },
+    cols: { 1: '#5a3a2a', 3: '#3a2a1e', 4: '#2a2420', 5: '#141010', 9: '#4a3a2a', 10: '#5a524c', 14: '#6a6e74', 15: '#1a1a1c', 12: '#ff7a1a', 6: '#ff7a1a' },
     hp: 5400, dmg: [34, 46], atk: 1.0, speed: 0.6, special: 'push', // 층주 바르칸만큼
   },
   // 43차 5층: 가면지기 — 흰 가면 · 검은 예복 · 가면을 꿴 인장 지팡이 (마을 안에서 칼을 빼면 봉인 낙인)
   maskward: {
-    key: 'maskward', body: 'warden3', weapon: 'sealstaff',
+    key: 'maskward', body: 'warden5', weapon: 'spear',
     name: { ko: '가면지기', th: 'ผู้เฝ้าหน้ากาก', en: 'Mask Warden' },
     line: { ko: '여기선 누구도 얼굴을 바꾸지 못한다. 칼도.', th: 'ที่นี่ไม่มีใครเปลี่ยนหน้าได้ มีดก็ด้วย', en: 'No one changes faces here. Not even blades.' },
-    look: { ko: '표정이 지워진 흰 가면, 목까지 채운 검은 예복, 끝에 작은 가면을 줄줄이 꿴 긴 지팡이. 가면 틈으로 숨소리만 샌다.', th: 'หน้ากากขาวไร้สีหน้า ชุดพิธีดำติดกระดุมถึงคอ ไม้เท้ายาวร้อยหน้ากากเล็กๆ ไว้ที่ปลาย มีเพียงเสียงลมหายใจลอดออกจากหน้ากาก', en: 'A blank white mask, a black formal coat buttoned to the throat, a long staff strung with little masks at its tip. Only breath escapes the mask.' },
-    cols: { 1: '#efe8dc', 3: '#141216', 4: '#0e0c10', 14: '#c8c4bc', 13: '#2a2430', 12: '#a82a3a', 6: '#e8e4dc', 15: '#08060a', 10: '#efe8dc' },
+    look: { ko: '금이 간 무표정 도자기 가면, 겹겹의 흰 주름 깃, 발목까지 오는 흰 연미 외투와 금 견장, 긴 장창. 등 뒤 높이 뜬 십자 막대에서 실이 내려와 어깨와 정수리에 이어진다.', th: 'หน้ากากกระเบื้องไร้สีหน้ามีรอยร้าว ปกจีบขาวซ้อนชั้น เสื้อหางยาวสีขาวถึงข้อเท้ากับอินทรธนูทอง หอกยาว เส้นด้ายห้อยจากไม้กางเขนที่ลอยสูงหลังหลังมาผูกไหล่และกลางหัว', en: "A cracked, expressionless porcelain mask, layered white ruff, ankle-length white tailcoat with gold epaulettes and a long spear. Strings drop from a cross-bar floating high behind it to its shoulders and crown." },
+    cols: { 1: '#e8dcd0', 3: '#ece6da', 4: '#2a2630', 5: '#141014', 9: '#f8f4ee', 10: '#f2eee6', 14: '#d8b048', 13: '#6a4a2a', 7: '#e8e0d0', 15: '#141014' },
     hp: 6400, dmg: [36, 50], atk: 1.0, speed: 0.6, special: 'seal', // 층주 마르시온만큼
   },
 };
@@ -217,8 +217,10 @@ export function hellZone(floor: number): Zone {
   const T = def.theme;
   const r = rng(floor * 7919 + 13);
   // 층 넓이: 1층(재의 문턱)은 1.6배로 넓다 — 층을 늘리기보다 한 층을 넓게 먼저. 개수는 넓이에 맞춰 늘린다
-  const S = floor === 1 ? 1.6 : 1, A = S * S;
+  // 44차: 2층부터도 넓게 (1.7배) — 괴물 수는 넓이와 상관없이 둘레에만 살아 있어 넓혀도 버벅이지 않는다. 대신 층 안을 구역으로 나눈다
+  const S = floor === 1 ? 1.6 : 1.7, A = S * S;
   const W = Math.round(104 * S), H = W;
+  const sc = (v: number) => Math.round(v * (T === 'ash' ? 1 : S)); // 1층 자리는 이미 넓힌 지도에 맞춰 적혀 있다
   const at2 = (i: number, j: number) => ({ i: Math.round(i * S), j: Math.round(j * S) });
   const tiles = new Uint8Array(W * H).fill(TI.lot);
   const at = (i: number, j: number) => (i < 0 || j < 0 || i >= W || j >= H ? -1 : tiles[j * W + i]);
@@ -236,15 +238,31 @@ export function hellZone(floor: number): Zone {
   // 자리: 마을 C · 위층 길 U(이 칸에 닿으면 올라간다) · 층주 B · 아래층 계단 D(남쪽 끝 계단 머리)
   const VR = T === 'ash' ? 15 : T === 'swamp' ? 11 : 8;
   const shape: 'round' | 'blob' | 'square' = T === 'ash' ? 'round' : T === 'swamp' ? 'blob' : 'square';
-  const C = T === 'ash' ? { i: 84, j: 100 } : T === 'swamp' ? { i: 58, j: 62 } : { i: 54, j: 60 };
+  const C = T === 'ash' ? { i: 84, j: 100 } : T === 'swamp' ? { i: sc(58), j: sc(62) } : { i: sc(54), j: sc(60) };
   const exit: 'alley' | 'ford' | 'ferry' = T === 'ash' ? 'alley' : T === 'swamp' ? 'ford' : 'ferry';
-  const U = T === 'ash' ? { i: 64, j: 8 } : T === 'swamp' ? { i: 40, j: 2 } : { i: 61, j: 10 };
-  const B = T === 'ash' ? { i: 65, j: 26 } : T === 'swamp' ? { i: 40, j: 23 } : { i: 47, j: 19 };
+  const U = T === 'ash' ? { i: 64, j: 8 } : T === 'swamp' ? { i: sc(40), j: 2 } : { i: sc(61), j: sc(10) };
+  const B = T === 'ash' ? { i: 65, j: 26 } : T === 'swamp' ? { i: sc(40), j: sc(23) } : { i: sc(47), j: sc(19) };
   const D = { i: Math.round(W * 0.68), j: H - EDGE - (SEA ? 9 : 4) };
-  const posts: [number, number][] = T === 'ash' ? [[62, 16], [67, 16]] : T === 'swamp' ? [[38, 15], [43, 15]] : [[U.i - 1, U.j], [U.i + 2, U.j]];
+  const posts: [number, number][] = T === 'ash' ? [[62, 16], [67, 16]] : T === 'swamp' ? [[sc(38), sc(15)], [sc(43), sc(15)]] : [[U.i - 1, U.j], [U.i + 2, U.j]];
   // 2층(굶주림의 늪): 마을과 내려가는 계단 사이 들판의 노름꾼 탈루스 자리
-  const TL = T === 'swamp' ? { i: 76, j: 76 } : null;
-  const keep = [{ ...C, r: VR + 5 }, { ...B, r: 7 }, { ...U, r: 5 }, { ...D, r: 5 }, ...(TL ? [{ ...TL, r: 5 }] : [])];
+  const TL = T === 'swamp' ? { i: sc(76), j: sc(80) } : null;
+  // ── 44차 구역: 들판(마을 · 필드 보스) / 깊은 들판(동쪽 · 센 괴물만) / 층주의 터(북쪽 · 층주와 위층 길) / 4층 광산(서쪽 · 칼드렉) ──
+  // 구역 사이는 벽(능선 · 깊은 늪 물길 · 무너진 담)으로 막고, 길이 지나는 고개로만 오간다
+  const LJ = B.j + 10; // 층주의 터를 막는 벽 (이 줄보다 북쪽이 층주의 터)
+  const DI = Math.round(W * 0.66), DJ = Math.round(H * 0.72); // 깊은 들판: i ≥ DI, LJ < j < DJ
+  const MINE = T === 'forge';
+  const MI = Math.round(W * 0.3), MJ = Math.round(H * 0.6); // 4층 광산: i ≤ MI, LJ < j < MJ
+  const DC = { i: Math.round((DI + W * 0.86) / 2), j: Math.round((LJ + DJ) / 2) }; // 깊은 들판 한가운데 (길이 닿는 곳)
+  const MC = { i: Math.round(W * 0.17), j: Math.round((LJ + MJ) / 2) }; // 광산 작업장
+  // 깊은 층(4층부터)은 마을이 둘: 깊은 들판 북쪽 끝, 층주의 터 벽 앞에 작은 둘째 마을 — 쓰러지면 가까운 마을에서 일어나니, 일부러 쓰러져 건너오는 영혼들도 있다
+  const OP = floor >= 4 ? { i: Math.round(W * 0.74), j: LJ + 9 } : null;
+  const OR = 5;
+  // 층계 대기소 (오기 전 · 온 뒤 — 영혼끼리 싸울 수 없는 보호구역): 위층 길 앞 · 아래층 계단 머리
+  const SU = T === 'ash' ? { i: U.i, j: CITY + 2 } : T === 'swamp' ? { i: U.i, j: U.j + 6 } : { i: U.i, j: U.j + 3 };
+  const SD = { i: D.i, j: D.j - 3 };
+  // 5층 인형술사 마리의 공방은 마을이 아니라 들판 서쪽 구석 골목에 숨어 있다 (비밀 인물은 숨어 있거나 들판을 돈다)
+  const PS = T === 'mask' ? { i: Math.round(W * 0.2), j: LJ + 12 } : null;
+  const keep = [{ ...C, r: VR + 5 }, { ...B, r: 7 }, { ...U, r: 5 }, { ...D, r: 5 }, ...(TL ? [{ ...TL, r: 5 }] : []), { ...DC, r: 4 }, ...(MINE ? [{ ...MC, r: 7 }] : []), ...(OP ? [{ ...OP, r: OR + 4 }] : []), { ...SU, r: 4 }, { ...SD, r: 4 }, ...(PS ? [{ ...PS, r: 4 }] : [])];
   const free = (i: number, j: number, m = 0) => keep.every((k) => Math.hypot(i - k.i, j - k.j) > k.r + m) && !(CITY && j < CITY + 4);
   // 지형
   if (T === 'ash') {
@@ -274,10 +292,10 @@ export function hellZone(floor: number): Zone {
     // 피의 시장: 11칸마다 골목, 몇몇 골목 가운데에 핏물 도랑
     for (let i = 6; i < W - 4; i += 11) for (let j = 4; j < H - 4; j++) { set(i, j, 'soi'); set(i + 1, j, 'soi'); }
     for (let j = 6; j < H - 4; j += 11) for (let i = 4; i < W - 4; i++) { set(i, j, 'soi'); set(i, j + 1, 'soi'); }
-    for (let i = 4; i < W - 4; i++) if (i % 5 !== 0 && free(i, 40, 1)) set(i, 40, 'water');
-    for (let j = 4; j < H - 4; j++) if (j % 5 !== 0 && free(62, j, 1)) set(62, j, 'water');
+    for (let i = 4; i < W - 4; i++) if (i % 5 !== 0 && free(i, sc(40), 1)) set(i, sc(40), 'water');
+    for (let j = 4; j < H - 4; j++) if (j % 5 !== 0 && free(sc(62), j, 1)) set(sc(62), j, 'water');
     // 피의 강: 시장 서쪽 도랑에서 시작해 층주의 자리 뒤(서쪽)를 돌아 북쪽 바다로 흘러 나간다
-    { const pts: [number, number][] = [[26, 40], [30, 32], [34, 26], [38, 20], [40, 12], [41, 2]];
+    { const pts: [number, number][] = ([[26, 40], [30, 32], [34, 26], [38, 20], [40, 12], [41, 2]] as [number, number][]).map(([a, b]) => [sc(a), b === 2 ? 2 : sc(b)]);
       for (let k = 0; k < pts.length - 1; k++) {
         const [a0, b0] = pts[k], [a1, b1] = pts[k + 1], n = Math.max(Math.abs(a1 - a0), Math.abs(b1 - b0)) * 2;
         for (let s2 = 0; s2 <= n; s2++) {
@@ -333,6 +351,16 @@ export function hellZone(floor: number): Zone {
       n++;
     }
   }
+  // 44차 구역 벽: 두 칸 두께. 1층 현무암 · 2층 깊은 늪 물길 · 3층부터 무너진 담. 길이 지나는 곳만 고개(틈)
+  const wallT: TileType = T === 'swamp' ? 'water' : 'block';
+  const wallAt = (i: number, j: number) => { if (i < 2 || j < 2 || i >= W - 2 || j >= H - 2 || !free(i, j, 1)) return; set(i, j, wallT); if (wallT === 'block') ridge.add(j * W + i); };
+  for (let i = 0; i < W; i++) for (const dj of [0, 1]) wallAt(i, LJ + dj + Math.round(Math.sin(i * 0.21 + floor) * 1.2)); // 층주의 터
+  for (let j = LJ; j < DJ; j++) for (const di of [0, 1]) wallAt(DI + di + Math.round(Math.sin(j * 0.25 + floor * 2) * 1.2), j); // 깊은 들판 서쪽
+  for (let i = DI; i < W; i++) for (const dj of [0, 1]) wallAt(i, DJ + dj + Math.round(Math.sin(i * 0.23 + floor * 3) * 1.2)); // 깊은 들판 남쪽
+  if (MINE) {
+    for (let j = LJ; j < MJ; j++) for (const di of [0, 1]) wallAt(MI + di + Math.round(Math.sin(j * 0.27) * 1.2), j);
+    for (let i = 0; i <= MI; i++) for (const dj of [0, 1]) wallAt(i, MJ + dj + Math.round(Math.sin(i * 0.19) * 1.2));
+  }
   const roadTiles = new Set<number>();
   // 길: 마을 문 ↔ 층주 ↔ 위층 길, 마을 문 ↔ 아래층 계단 (물 위는 다리, 산등성이는 고개로 뚫는다)
   const road = (a: { i: number; j: number }, b: { i: number; j: number }) => {
@@ -356,6 +384,11 @@ export function hellZone(floor: number): Zone {
   const gateFor = (t: { i: number; j: number }) => gates.reduce((a, g) => (Math.hypot(g.i - t.i, g.j - t.j) < Math.hypot(a.i - t.i, a.j - t.j) ? g : a));
   const approach = T === 'ash' ? { i: U.i, j: CITY + 5 } : T === 'swamp' ? { i: B.i, j: B.j + 3 } : U;
   road(gateFor(B), B); road(B, approach); road(gateFor(D), { i: D.i, j: D.j - 1 });
+  // 44차: 깊은 들판으로 (고개 둘: 마을 동쪽 문에서 · 아래층 계단 쪽에서) · 광산으로 · 둘째 마을에서 층주의 터로 (일부러 쓰러져 건너온 영혼들의 길)
+  road(gateFor(DC), DC); road({ i: D.i + 2, j: D.j - 6 }, { i: DC.i, j: DJ - 6 });
+  if (MINE) road(gateFor(MC), MC);
+  if (OP) { road(DC, { i: OP.i, j: OP.j + OR + 1 }); road({ i: OP.i, j: OP.j - OR - 1 }, { i: OP.i - 4, j: LJ - 4 }); }
+  if (PS) road(gateFor(PS), { i: PS.i + 1, j: PS.j + 3 });
   disc(B.i, B.j, 6, 'walk'); disc(D.i, D.j - 2, 2, 'walk');
   if (MK) for (let j = 3; j < U.j; j++) set(U.i, j, j < U.j - 1 ? 'cross' : 'walk'); // 나루터 부두 (널빤지)
 
@@ -389,7 +422,8 @@ export function hellZone(floor: number): Zone {
     const R0 = 0.74 + 0.08 * Math.sin(3 * a + ph[0]) + 0.05 * Math.sin(5 * a + ph[1]) + 0.035 * Math.sin(9 * a + ph[2]) + (vnoise(i * 0.09, j * 0.09, floor) - 0.5) * 0.18;
     return Math.min(0.9, R0) - dd;
   };
-  const vital: { i: number; j: number; r: number }[] = [{ i: C.i, j: C.j, r: VR + 7 }, { i: B.i, j: B.j, r: 9 }, { i: U.i, j: U.j, r: 6 }, { i: D.i, j: D.j, r: 6 }, ...(TL ? [{ i: TL.i, j: TL.j, r: 7 }] : [])];
+  const vital: { i: number; j: number; r: number }[] = [{ i: C.i, j: C.j, r: VR + 7 }, { i: B.i, j: B.j, r: 9 }, { i: U.i, j: U.j, r: 6 }, { i: D.i, j: D.j, r: 6 }, ...(TL ? [{ i: TL.i, j: TL.j, r: 7 }] : []),
+    { ...DC, r: 9 }, ...(MINE ? [{ ...MC, r: 10 }] : []), ...(OP ? [{ ...OP, r: OR + 6 }] : []), { ...SD, r: 5 }, ...(PS ? [{ ...PS, r: 5 }] : [])];
   const byRoad = (i: number, j: number, rad: number) => { for (let b2 = -rad; b2 <= rad; b2++) for (let a2 = -rad; a2 <= rad; a2++) if (roadTiles.has((j + b2) * W + i + a2)) return true; return false; };
   const landHold = (i: number, j: number) =>
     vital.some((v) => Math.hypot(i - v.i, j - v.j) <= v.r + (hash2(i, j) < 0.5 ? 0 : 1)) ||
@@ -424,12 +458,10 @@ export function hellZone(floor: number): Zone {
       [3, 3, 2, 1, 26, 'generic', 'butcher'], [-3, 5, 2, 1, 22, 'generic', 'stall'], [5, -1, 1, 2, 22, 'generic', 'stall'], [-3, -2, 2, 2, 76, 'generic', 'idol']],
     // 4층 용광로: 대부소 없이 · 쇠를 두드리는 대장간 노점 · 가운데 큰 모루 조형물
     forge: [[-1, -6, 2, 2, 58, 'ujusae', undefined, 'left'], [4, -6, 2, 2, 48, 'hbank', undefined, 'left'], [-7, -6, 2, 2, 46, 'atone', undefined, 'left'],
-      [3, 3, 2, 1, 26, 'generic', 'butcher'], [-3, 5, 2, 1, 22, 'generic', 'stall'], [5, -1, 1, 2, 22, 'generic', 'stall'], [-7, 1, 1, 2, 22, 'generic', 'stall'], [-3, -2, 2, 2, 76, 'generic', 'idol'],
-      [5, 3, 2, 2, 54, 'generic', 'smithy']], // 34차: 칼드렉의 낡은 대장간 (4층엔 이 대장장이 하나뿐)
+      [3, 3, 2, 1, 26, 'generic', 'butcher'], [-3, 5, 2, 1, 22, 'generic', 'stall'], [5, -1, 1, 2, 22, 'generic', 'stall'], [-7, 1, 1, 2, 22, 'generic', 'stall'], [-3, -2, 2, 2, 76, 'generic', 'idol']], // 44차: 칼드렉의 대장간은 서쪽 광산으로
     // 43차 5층: 가운데 큰 가면 조형물 · 인형술사 마리의 작은 공방 (수백 개의 인형이 진열되었다)
     mask: [[-1, -6, 2, 2, 58, 'ujusae', undefined, 'left'], [4, -6, 2, 2, 48, 'hbank', undefined, 'left'], [-7, -6, 2, 2, 46, 'atone', undefined, 'left'],
-      [3, 3, 2, 1, 26, 'generic', 'butcher'], [-3, 5, 2, 1, 22, 'generic', 'stall'], [5, -1, 1, 2, 22, 'generic', 'stall'], [-7, 1, 1, 2, 22, 'generic', 'stall'], [-3, -2, 2, 2, 90, 'generic', 'idol'],
-      [5, 3, 2, 2, 50, 'generic', 'puppetshop']],
+      [3, 3, 2, 1, 26, 'generic', 'butcher'], [-3, 5, 2, 1, 22, 'generic', 'stall'], [5, -1, 1, 2, 22, 'generic', 'stall'], [-7, 1, 1, 2, 22, 'generic', 'stall'], [-3, -2, 2, 2, 90, 'generic', 'idol']], // 44차: 마리의 공방은 들판 구석에 숨었다
   };
   let shop: Building | null = null;
   for (const [di, dj, w, d, h, cat, hk, sign] of LAYOUT[T]) {
@@ -437,6 +469,13 @@ export function hellZone(floor: number): Zone {
     if (cat === 'ujusae') shop = b;
   }
   const door = { i: shop!.i0 + 1, j: shop!.j0 + shop!.d };
+  // 44차: 마을 밖 건물 — 4층 광산 작업장(칼드렉의 대장간 · 갱도 입구) · 5층 숨은 인형 공방 · 5층 마을 바깥 인형 조형물
+  if (MINE) {
+    buildings.push({ i0: MC.i - 1, j0: MC.j - 1, w: 2, d: 2, h: 54, cat: 'generic', color: '#3a2a2a', hk: 'smithy' });
+    buildings.push({ i0: MC.i - 6, j0: MC.j - 6, w: 4, d: 3, h: 70, cat: 'generic', color: '#3a2a2a', hk: 'mineshaft' });
+  }
+  if (PS) buildings.push({ i0: PS.i, j0: PS.j, w: 2, d: 2, h: 50, cat: 'generic', color: '#3a2a2a', hk: 'puppetshop' });
+  if (T === 'mask') buildings.push({ i0: C.i - VR - 7, j0: C.j + 3, w: 3, d: 3, h: 150, cat: 'generic', color: '#3a2a2a', hk: 'puppetidol' });
   // 장사꾼은 좌판 앞(마을 쪽)에 선다
   // 22차: 장사꾼은 종류마다 한 명 (겹치던 고깃간·넝마를 정리) — 고깃간 좌판에 고깃간 하나, 나머지 좌판엔 물장수·넝마·약장수·장사꾼·무기상 차례로.
   // 좌판이 모자란 층은 뒤에서 빈 땅에 자리를 편다
@@ -466,6 +505,11 @@ export function hellZone(floor: number): Zone {
       i += w + (r() < 0.35 ? 1 : 0);
     }
   }
+  // 44차: 층계 대기소 바닥(돌 광장) · 광산 작업장 마당 · 숨은 공방 앞 · 둘째 마을 바닥
+  disc(SU.i, SU.j, 3, 'walk'); disc(SD.i, SD.j, 3, 'walk');
+  if (MINE) { disc(MC.i, MC.j + 2, 4, 'soi'); disc(MC.i - 4, MC.j - 2, 2, 'soi'); }
+  if (PS) disc(PS.i + 1, PS.j + 3, 2, 'soi');
+  if (OP) for (let j = OP.j - OR; j <= OP.j + OR; j++) for (let i = OP.i - OR; i <= OP.i + OR; i++) set(i, j, Math.abs(i - OP.i) <= 1 || Math.abs(j - OP.j) <= 1 ? 'walk' : 'lot');
   for (const b of buildings) for (let j = b.j0; j < b.j0 + b.d; j++) for (let i = b.i0; i < b.i0 + b.w; i++) set(i, j, 'block');
   const occupied = (i0: number, j0: number, w: number, d: number) => {
     for (let j = j0 - 1; j <= j0 + d; j++) for (let i = i0 - 1; i <= i0 + w; i++) {
@@ -616,6 +660,20 @@ export function hellZone(floor: number): Zone {
     const pose = T === 'swamp' ? (roll < 0.25 ? 'sit' : roll < 0.85 ? 'lie' : 'stand') : T === 'market' ? (roll < 0.25 ? 'sit' : roll < 0.4 ? 'lie' : 'stand') : roll < 0.5 ? 'sit' : roll < 0.75 ? 'lie' : 'stand';
     souls.push({ i, j, pose, d: Math.floor(r() * 4) });
   }
+  // 44차: 층계 대기소 네 귀퉁이 등불 · 둘째 마을(울타리 · 모닥불 · 약장수 · 물장수 · 지친 영혼) · 광산 작업장(바위 · 화톳불)
+  for (const q of [SU, SD]) for (const [a, b2] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) if ([TI.lot, TI.park, TI.walk, TI.soi].includes(at(q.i + a, q.j + b2)) && !buildings.some((o) => q.i + a >= o.i0 - 1 && q.i + a <= o.i0 + o.w && q.j + b2 >= o.j0 - 1 && q.j + b2 <= o.j0 + o.d)) props.push({ i: q.i + a, j: q.j + b2, kind: 'lantern' });
+  if (OP) {
+    for (let j = OP.j - OR; j <= OP.j + OR; j++) for (let i = OP.i - OR; i <= OP.i + OR; i++) {
+      const edgeI = Math.abs(i - OP.i) === OR, edgeJ = Math.abs(j - OP.j) === OR;
+      if (!edgeI && !edgeJ) continue;
+      if ((edgeJ && Math.abs(i - OP.i) <= 1) || (edgeI && Math.abs(j - OP.j) <= 1)) continue; // 네 문
+      props.push({ i, j, kind: 'fence', o: edgeI && edgeJ ? 2 : edgeI ? 1 : 0 });
+    }
+    props.push({ i: OP.i + 2, j: OP.j + 2, kind: 'bonfire' });
+    vendors.push({ i: OP.i - 2, j: OP.j - 2, kind: 'medic' }, { i: OP.i + 3, j: OP.j - 2, kind: 'water' });
+    for (const [a, b2, pose] of [[-3, 2, 'sit'], [2, 4, 'lie'], [4, 1, 'sit']] as [number, number, 'sit' | 'lie'][]) souls.push({ i: OP.i + a, j: OP.j + b2, pose, d: Math.floor(r() * 4) });
+  }
+  if (MINE) for (const [a, b2, k] of [[3, -2, 'rock'], [-3, 3, 'rock'], [4, 4, 'bonfire'], [-6, 1, 'rock'], [-2, -4, 'rock']] as [number, number, Prop['kind']][]) { const i = MC.i + a, j = MC.j + b2; if (at(i, j) !== TI.block && at(i, j) !== TI.water) props.push({ i, j, kind: k }); }
   const empty = (i: number, j: number) => (at(i, j) === TI.lot || at(i, j) === TI.park) && free(i, j) && !buildings.some((b) => i >= b.i0 - 1 && i <= b.i0 + b.w && j >= b.j0 - 1 && j <= b.j0 + b.d) && !props.some((p) => Math.abs(p.i - i) + Math.abs(p.j - j) < 2);
   const scatter = (kind: Prop['kind'], n: number) => { for (let k = 0, t = 0; k < n && t < n * 30; t++) { const i = 4 + Math.floor(r() * (W - 8)), j = 4 + Math.floor(r() * (H - 8)); if (empty(i, j)) { props.push({ i, j, kind }); k++; } } };
   const scatterO = (kind: Prop['kind'], n: number, o: (k: number) => number, sep = 0) => {
@@ -712,12 +770,17 @@ export function hellZone(floor: number): Zone {
   for (let t = 0; spawns.length < 60 * A && t < 9000; t++) {
     const i = 4 + Math.floor(r() * (W - 8)), j = 4 + Math.floor(r() * (H - 8));
     const tt = at(i, j);
-    if (reach[j * W + i] && (tt === TI.lot || tt === TI.park || tt === TI.walk || tt === TI.soi) && Math.hypot(i - C.i, j - C.j) > VR + 8 && Math.hypot(i - B.i, j - B.j) > 8 && (!TL || Math.hypot(i - TL.i, j - TL.j) > 14) && Math.hypot(i - D.i, j - D.j) > 6 && !(CITY && j < CITY + 2)) spawns.push([i, j]);
+    if (reach[j * W + i] && (tt === TI.lot || tt === TI.park || tt === TI.walk || tt === TI.soi) && Math.hypot(i - C.i, j - C.j) > VR + 8 && Math.hypot(i - B.i, j - B.j) > 8 && (!TL || Math.hypot(i - TL.i, j - TL.j) > 14) && Math.hypot(i - D.i, j - D.j) > 6 && !(CITY && j < CITY + 2) && Math.hypot(i - SU.i, j - SU.j) > 8 && Math.hypot(i - SD.i, j - SD.j) > 8 && (!OP || Math.hypot(i - OP.i, j - OP.j) > OR + 7) && (!MINE || Math.hypot(i - MC.i, j - MC.j) > 10) && (!PS || Math.hypot(i - PS.i, j - PS.j) > 6)) spawns.push([i, j]);
   }
   void ring;
+  // 44차 구역 표 (칸마다): 0 들판 · 1 깊은 들판 · 2 층주의 터 · 3 광산
+  const region = new Uint8Array(W * H);
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) region[j * W + i] = j <= LJ + 1 ? 2 : i >= DI && j < DJ ? 1 : MINE && i <= MI && j < MJ ? 3 : 0;
+  const villages = [{ i: C.i, j: C.j, r: VR }, ...(OP ? [{ i: OP.i, j: OP.j, r: OR }] : [])];
+  const safes: { i: number; j: number; r: number; kind: 'stairUp' | 'stairDown' | 'mine' }[] = [{ ...SU, r: 4, kind: 'stairUp' }, { ...SD, r: 4, kind: 'stairDown' }, ...(MINE ? [{ ...MC, r: 5, kind: 'mine' as const }] : [])];
   const z = finalize({
     id: `hell-${floor}`, W, H, tiles, buildings, props, lanes: [], door, spawn: door,
-    hell: { floor, rest: { i: C.i, j: C.j, r: VR }, up: U, down: D, boss: B, talus: TL ?? undefined, spawns, exit, shape, souls, vendors, posts },
+    hell: { floor, rest: { i: C.i, j: C.j, r: VR }, up: U, down: D, boss: B, talus: TL ?? undefined, spawns, exit, shape, souls, vendors, posts, region, villages, safes },
   });
   cache.set(floor, z);
   return z;

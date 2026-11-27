@@ -59,6 +59,15 @@ export function drawYuhwang(b: Building, floor: number): { canvas: HTMLCanvasEle
       const [x0, y0] = onL ? P(i0 + t * w, j1, z) : P(i1, j0 + t * d, z);
       dot(x0, y0, 2 + Math.floor(r() * 3), 1 + Math.floor(r() * 2), r() < 0.5 ? '#4a6a2a' : '#5a7a34', 0.7);
     }
+  } else if (floor === 5) {
+    // 44차 5층 가면의 도시: 분칠한 듯 하얗게 바랜 벽 · 밑동에 번진 먹물
+    qL(i0, i1, 0, TOP, '#efe8dc', 0.38); qR(j0, j1, 0, TOP, '#d8d0c4', 0.38);
+    qL(i0, i1, 0, 8, '#1a1620', 0.55); qR(j0, j1, 0, 8, '#141018', 0.55);
+    for (let k = 0; k < 10; k++) {
+      const onL = k % 2 === 0, t = r(), len = 6 + r() * 18, z0 = 10 + r() * 30;
+      const [x0, y0] = onL ? P(i0 + 0.05 + t * (w - 0.1), j1, z0) : P(i1, j0 + 0.05 + t * (d - 0.1), z0);
+      dot(x0, y0, 1, len, '#1a1620', 0.35);
+    }
   } else if (floor >= 4) {
     // 29차 4층 비명의 용광로: 쇳가루 그을음 띠 + 벽 틈으로 새는 쇳물빛 실금
     qL(i0, i1, 0, 12, '#1a1210', 0.7); qR(j0, j1, 0, 12, '#140e0c', 0.7);
@@ -88,12 +97,12 @@ export function drawYuhwang(b: Building, floor: number): { canvas: HTMLCanvasEle
     }
   }
   // 층이 깊을수록 전체가 어둡고 칙칙하다
-  g.fillStyle = floor === 1 ? 'rgba(30,20,16,0.12)' : floor === 2 ? 'rgba(20,26,10,0.22)' : floor >= 4 ? 'rgba(34,14,6,0.3)' : 'rgba(40,8,6,0.28)';
+  g.fillStyle = floor === 1 ? 'rgba(30,20,16,0.12)' : floor === 2 ? 'rgba(20,26,10,0.22)' : floor === 5 ? 'rgba(24,20,30,0.14)' : floor >= 4 ? 'rgba(34,14,6,0.3)' : 'rgba(40,8,6,0.28)';
   g.fillRect(0, 0, W, H);
   g.restore();
   // 빛바랜 색: 층이 깊을수록 색이 빠지고 그 층의 빛(재·늪·피)으로 물든다
   {
-    const [sat, tr, tg, tb, dim] = floor === 1 ? [0.5, 1.05, 0.95, 0.88, 0.86] : floor === 2 ? [0.35, 0.92, 1.0, 0.72, 0.74] : floor >= 4 ? [0.3, 1.1, 0.86, 0.72, 0.68] : [0.4, 1.12, 0.78, 0.7, 0.72];
+    const [sat, tr, tg, tb, dim] = floor === 1 ? [0.5, 1.05, 0.95, 0.88, 0.86] : floor === 2 ? [0.35, 0.92, 1.0, 0.72, 0.74] : floor === 5 ? [0.25, 1.02, 1.0, 1.02, 0.95] : floor >= 4 ? [0.3, 1.1, 0.86, 0.72, 0.68] : [0.4, 1.12, 0.78, 0.7, 0.72];
     const im = g.getImageData(0, 0, W, H), D = im.data;
     for (let k = 0; k < D.length; k += 4) {
       if (!D[k + 3]) continue;
@@ -136,6 +145,20 @@ export function drawYuhwang(b: Building, floor: number): { canvas: HTMLCanvasEle
       for (let s = 0; s < 6; s++) line([x0 + s - 3, y0], [x0 + s * 1.6 - 1, y0 - 20 - r() * 8], s % 2 ? '#8a8a4a' : '#6a6a34', 1);
     }
     g.fillStyle = 'rgba(40,38,20,0.75)'; { const [x0, y0] = P(i0 + 0.7, j1 + 0.25, 0); g.beginPath(); g.ellipse(x0, y0, 14, 4, 0, 0, Math.PI * 2); g.fill(); }
+  } else if (floor === 5) {
+    // 44차 5층: 벽마다 걸린 가면들 (웃는 것 · 우는 것 · 금빛 · 붉은 것) · 문 옆 흰 종이 등불 (그린 웃음)
+    const masks: [number, number, boolean][] = [[i0 + 0.3, 62, true], [i0 + 1.0, 70, true], [i0 + 1.65, 58, true], [j0 + 0.4, 66, false], [j0 + 1.2, 74, false], [j0 + 1.7, 52, false]];
+    masks.forEach(([x, z, onL], k) => {
+      const [mx, my] = onL ? P(x, j1 + 0.02, z) : P(i1 + 0.02, x, z);
+      const col = ['#f2eee6', '#d8b048', '#f2eee6', '#a82a3a', '#f2eee6', '#d8b048'][k];
+      g.fillStyle = col; g.beginPath(); g.ellipse(mx, my, 3.4, 4.2, 0, 0, Math.PI * 2); g.fill();
+      dot(mx - 2, my - 1, 1, 1, '#141014'); dot(mx + 1, my - 1, 1, 1, '#141014');
+      if (k % 2) { dot(mx - 1, my + 2, 3, 1, '#141014'); } else { dot(mx - 2, my + 1, 1, 1, '#141014'); dot(mx - 1, my + 2, 3, 1, '#141014'); dot(mx + 2, my + 1, 1, 1, '#141014'); }
+    });
+    const [lx, ly] = P(i0 + w / 2 + 0.72, j1 + 0.12, 46);
+    for (let k = 0; k < 4; k++) dot(lx, ly - 10 + k * 2.5, 1, 2, '#3a3632');
+    g.fillStyle = '#f4f0e6'; g.beginPath(); g.ellipse(lx + 0.5, ly + 4, 4.5, 5.5, 0, 0, Math.PI * 2); g.fill();
+    dot(lx - 2, ly + 3, 1, 1, '#141014'); dot(lx + 2, ly + 3, 1, 1, '#141014'); dot(lx - 1, ly + 6, 3, 1, '#a82a3a');
   } else if (floor >= 4) {
     // 29차 4층: 문 옆에 식어 가는 쇳물 찌꺼기 더미 · 처마에 늘어진 쇠사슬 · 진열창 위 쇠판
     for (const [x, y] of [[i0 + 0.35, j1 + 0.25], [i1 + 0.22, j0 + 0.5]] as const) {

@@ -22,6 +22,8 @@ export interface Save {
   /** 화살 (활) */
   arrows?: number;
   arrowKey?: string; // 24차: 시위에 건 화살 종류 (마지막에 산 화살)
+  /** 44차 화살통: 시위에 걸지 않은 다른 화살 종류 (종류 → 개수) */
+  quiver?: Record<string, number>;
   hp?: number;
   /** 이번 생의 선행·악행 (천국·지옥 심판은 이번 생으로) */
   deeds?: { good: number; evil: number };
@@ -101,6 +103,10 @@ export interface Save {
   flamer?: { d: string; used: number };
   /** 베스크에게 진 빚 (노전). 0이 되면 미납귀가 돌아간다 */
   debt?: number;
+  /** 44차: 최근에 빌린 것 (1분 안이면 원금만 돌려주고 없던 일로) */
+  loans?: { n: number; at: number }[];
+  /** 44차: 쌓인 빚을 한 번 지웠다 */
+  debtReset44?: boolean;
   /** 세계마다 우주새에 봉인된 물건 — 그 세계의 우주새에서 되찾는다 */
   vault?: Partial<Record<'real' | 'hell', Stash>>;
   /** 30차 내구도: 쓰고 있는 장비(열쇠)마다 남은 내구도 — 없으면 새것 */

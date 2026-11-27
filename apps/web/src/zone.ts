@@ -28,7 +28,7 @@ export interface Building {
   yunae?: boolean; // 40차: 서울 달동네의 '유내 미용실' (지금은 다른 사람이 한다)
 }
 /** 지옥: 초가집 · 감옥 · 뼈집 · 대형 짐승 시체 · 뼈 무더기 · 내장 더미 */
-export type HellBuildKind = 'thatch' | 'prison' | 'bonehouse' | 'carcass' | 'bonepile' | 'guts' | 'butcher' | 'stall' | 'burnt' | 'idol' | 'smithy' | 'maskhouse' | 'puppetshop'; // 34차 smithy = 4층 칼드렉의 대장간 · 43차 5층: 안과 밖이 다른 집 · 인형술사 마리의 공방
+export type HellBuildKind = 'thatch' | 'prison' | 'bonehouse' | 'carcass' | 'bonepile' | 'guts' | 'butcher' | 'stall' | 'burnt' | 'idol' | 'smithy' | 'maskhouse' | 'puppetshop' | 'mineshaft' | 'puppetidol'; // 34차 smithy = 4층 칼드렉의 대장간 · 43차 5층: 안과 밖이 다른 집 · 인형술사 마리의 공방
 /** fence o: 0 = i 방향, 1 = j 방향, 2 = 모서리 기둥 */
 export interface Prop { i: number; j: number; kind: 'tree' | 'lamp' | 'pillar' | 'cart' | 'fence' | 'pole' | 'spirit' | 'moto' | 'plant' | 'bin' | 'stools' | 'pushcart' | HellDecorKind | 'sunbed' | 'parasol' | 'giraffe' | 'elephant' | 'lion' | 'zebra' | 'flamingo' | 'panda' | 'fountain' | 'balloons' | 'icecream'; o?: number }
 /** 지옥 소품: 경계 바위·성벽, 뼈, 해골 더미, 꼬챙이, 가마솥, 철창, 마을 불빛, 고문 장면(움직임) */
@@ -101,6 +101,12 @@ export interface HellInfo {
   vendors: { i: number; j: number; kind: HellVendor }[];
   /** 문지기(경비병) 둘이 서는 곳 — 위층 길 들머리 */
   posts: [number, number][];
+  /** 44차 구역 (칸마다): 0 들판(마을 · 필드 보스) · 1 깊은 들판(센 괴물) · 2 층주의 터 · 3 광산(4층) */
+  region?: Uint8Array;
+  /** 44차 마을들 (첫째가 rest · 깊은 층엔 둘째 마을). 쓰러지면 가장 가까운 마을에서 일어난다 */
+  villages?: { i: number; j: number; r: number }[];
+  /** 44차 보호구역: 층계 대기소(위층 길 앞 · 아래층 계단 머리) · 광산 작업장 — 괴물이 못 들어오고 영혼끼리 싸울 수 없다 */
+  safes?: { i: number; j: number; r: number; kind: 'stairUp' | 'stairDown' | 'mine' }[];
 }
 
 /** 22차: 지옥 마을 장사꾼 — 고깃간 · 물장수 · 넝마 · 약장수 · 장사꾼 · 무기상 · 지옥호텔 지배인 · 서큐버스 (층마다 한 명씩) */

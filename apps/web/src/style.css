@@ -606,3 +606,25 @@ body.passing #hud, body.passing .stance, body.passing .quick-slot, body.passing 
 .womb { position: fixed; inset: 0; z-index: 60; pointer-events: none; opacity: 0; transition: opacity .9s ease; background: radial-gradient(ellipse at 50% 55%, #3a0c0c 0%, #1a0404 45%, #050101 100%); }
 .womb.on { opacity: 1; animation: wombBreath 1.8s ease-in-out infinite; }
 @keyframes wombBreath { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
+
+/* 44차: 템브라 결과 글 (대장간 창 맨 위) */
+.enh-result { margin: 4px 0 8px; padding: 8px 10px; border-radius: 8px; font-weight: 600; line-height: 1.4; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); }
+.enh-result.good { color: #f2d27a; border-color: rgba(242, 210, 122, 0.45); background: rgba(242, 210, 122, 0.1); }
+.enh-result.evil { color: #f08a7a; border-color: rgba(240, 138, 122, 0.45); background: rgba(240, 138, 122, 0.1); }
+.enh-result.info { color: #e8e0cf; }
+
+/* 44차: 층주가 쓰러졌다 — 그 층의 모두가 보는 화면 가운데 큰 글 */
+.boss-fall { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: 0; transition: opacity .6s ease; background: radial-gradient(ellipse at center, rgba(255, 214, 120, 0.22), rgba(0, 0, 0, 0) 60%); }
+.boss-fall.show { opacity: 1; }
+.boss-fall .bf-box { text-align: center; padding: 18px 28px; transform: scale(0.82); transition: transform .9s cubic-bezier(.2, 1.4, .4, 1); text-shadow: 0 2px 0 #000, 0 0 18px rgba(255, 200, 90, 0.65); }
+.boss-fall.show .bf-box { transform: scale(1); }
+.boss-fall small { display: block; color: #e8d8b0; letter-spacing: .35em; font-size: 13px; margin-bottom: 6px; }
+.boss-fall h2 { margin: 0; color: #ffd27a; font-size: clamp(26px, 6vw, 48px); font-weight: 800; letter-spacing: .04em; }
+.boss-fall .bf-by { margin: 10px 0 4px; color: #fff6dc; font-size: clamp(14px, 3.4vw, 19px); font-weight: 600; }
+.boss-fall .bf-path { margin: 0; color: #f2e2b0; font-size: clamp(12px, 3vw, 15px); opacity: .9; }
+
+/* 44차 화살통: 다른 화살로 바꿔 걸기 */
+.quiver-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.quiver-row small { width: 100%; opacity: .75; }
+.quiver-row button { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .18); background: rgba(255, 255, 255, .06); color: inherit; font-size: 12px; }
+.quiver-row .icon { width: 20px; height: 20px; image-rendering: pixelated; }

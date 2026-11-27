@@ -7,7 +7,7 @@ import type { Building } from './zone.ts';
 const hash = (a: number, b: number, c = 0) => { let h = (a * 374761393 + b * 668265263 + c * 2147483647) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 const shade = (hex: string, k: number) => { const n = parseInt(hex.slice(1), 16); const f = (v: number) => Math.max(0, Math.min(255, Math.round(v * k))).toString(16).padStart(2, '0'); return `#${f(n >> 16)}${f((n >> 8) & 255)}${f(n & 255)}`; };
 
-export function drawDalHouse(b: Building, night: boolean, home = false, salon = false): { canvas: HTMLCanvasElement; x: number; y: number } {
+export function drawDalHouse(b: Building, night: boolean, home = false, salon = false, snow = false): { canvas: HTMLCanvasElement; x: number; y: number } {
   const { i0, j0, w, d } = b;
   const i1 = i0 + w, j1 = j0 + d;
   const wallH = 34, roofH = 16 + Math.min(w, d) * 3;
@@ -73,6 +73,18 @@ export function drawDalHouse(b: Building, night: boolean, home = false, salon = 
     const x = i0 - ov + (w + ov * 2) * t;
     const [ax, ay] = P(x, j1 + ov, wallH - 2), [bx, by] = P(x, jm, ridge);
     g.strokeStyle = shade(roof, 0.8); g.lineWidth = 1; g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke();
+  }
+  // 44차 서울 겨울: 함석지붕에 소복이 쌓인 눈 (골 사이로 지붕 색이 조금 비치고) · 처마 끝 고드름
+  if (snow) {
+    g.save();
+    g.beginPath(); { const q = [P(i0 - ov, j1 + ov, wallH - 2), P(i1 + ov, j1 + ov, wallH - 2), P(i1 + ov, jm, ridge), P(i0 - ov, jm, ridge)]; g.moveTo(q[0][0], q[0][1]); for (const p of q.slice(1)) g.lineTo(p[0], p[1]); g.closePath(); }
+    g.clip();
+    poly([P(i0 - ov, j1 + ov - 0.05, wallH + 1), P(i1 + ov, j1 + ov - 0.05, wallH + 1), P(i1 + ov, jm, ridge + 2), P(i0 - ov, jm, ridge + 2)], '#eef2f6');
+    for (let t = 0; t <= 1.001; t += 1 / (w * 4)) { const x = i0 - ov + (w + ov * 2) * t; const [ax, ay] = P(x, j1 + ov, wallH - 2), [bx, by] = P(x, jm, ridge); g.strokeStyle = 'rgba(176,192,210,0.55)'; g.lineWidth = 1; g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke(); }
+    for (let k = 0; k < w * 3; k++) { const [x, y] = P(i0 + hash(seed, 60 + k) * w, j1 - hash(seed, 70 + k) * d * 0.45, wallH + roofH * 0.35); g.fillStyle = hash(seed, 80 + k) < 0.4 ? shade(roof, 0.9) : '#d6e0ea'; g.beginPath(); g.ellipse(x, y, 4, 1.5, 0, 0, Math.PI * 2); g.fill(); }
+    g.restore();
+    poly([P(i1 + ov, j0 - ov, wallH - 2), P(i1 + ov, jm, ridge), P(i1 + ov, jm + 0.15, ridge - 3), P(i1 + ov, j0 - ov + 0.15, wallH - 1)], '#c9d4e0'); // 옆 지붕 끝에 얹힌 눈
+    for (let k = 0; k < w * 3; k++) { const [x, y] = P(i0 - ov + (k + 0.5) * (w + ov * 2) / (w * 3), j1 + ov, wallH - 2); const len = 2 + Math.floor(hash(seed, 90 + k) * 5); R(x, y, 1, len, '#dfeaf4'); if (len > 4) R(x, y, 1, 2, '#ffffff'); }
   }
   // 40차 유내 미용실 간판: 처마 끝에 내건 분홍 판 (지붕보다 앞)
   if (salon) {
