@@ -20,7 +20,7 @@ export interface ItemDef {
   /** 25차: 쓴 세계(현실·지옥)에서 훔치기 확률이 오른다 (0.02 = 2%) */
   steal?: number;
   name: Record<Lang, string>;
-  store?: 'puppet' | 'antique' | 'maskgirl' | 'mart' | 'pharmacy' | 'food' | 'cafe' | 'talus' | 'hmeat' | 'tools' | 'dept' | 'hjunk' | 'drop' | 'hwater' | 'hmed' | 'harms' | 'heaven'; // 22차: 지옥 물장수 · 약장수 · 무기상 // drop = 어디서도 팔지 않는다 (괴물이 떨어뜨릴 뿐) // 우주새가 아니라 거리 가게(철물점·백화점) · 지옥 탈루스·고깃간·넝마장수에서 파는 것
+  store?: 'puppet' | 'antique' | 'maskgirl' | 'mart' | 'pharmacy' | 'food' | 'cafe' | 'talus' | 'hmeat' | 'tools' | 'dept' | 'hjunk' | 'drop' | 'hwater' | 'hmed' | 'harms' | 'heaven' | 'yw'; // 22차: 지옥 물장수 · 약장수 · 무기상 // drop = 어디서도 팔지 않는다 (괴물이 떨어뜨릴 뿐) // 우주새가 아니라 거리 가게(철물점·백화점) · 지옥 탈루스·고깃간·넝마장수에서 파는 것
   now?: boolean; // 가게에서 바로 먹는다 (가방에 넣지 않음)
   hell?: boolean; // 지옥의 우주새(황혼)에서만, 노전으로 판다
   /** 45차 천국의 물건: 천국(과 노을과의 지옥 정벌)에서만 쓴다 · 현실·지옥에서 팔리지 않는다 · 환생하면 사라진다 */
@@ -197,6 +197,15 @@ export const ITEMS: ItemDef[] = [
   { key: 'hvplate', cat: 'armor', price: 15000, def: 7, heaven: true, store: 'heaven', sprite: 'platecoat', icon: 'platecoat', tint: '#ece6d6', metal: '#e8d8a0', name: { ko: '순백 판금 겉옷', th: 'เสื้อเกราะขาวบริสุทธิ์', en: 'Pure-white platecoat' } },
   { key: 'hvhelm', cat: 'armor', price: 6000, def: 4, heaven: true, store: 'heaven', sprite: 'greathelm', icon: 'greathelm', tint: '#e8c050', metal: '#ece6d6', name: { ko: '새벽빛 투구', th: 'หมวกแสงรุ่งอรุณ', en: 'Dawnlight helm' } },
   { key: 'hvshield', cat: 'armor', price: 9000, def: 4, heaven: true, store: 'heaven', sprite: 'shield', icon: 'shield', tint: '#ece6d6', metal: '#d8b050', name: { ko: '날개 문장 방패', th: 'โล่ตราปีก', en: 'Winged shield' } },
+  // 48차 황색날개의 가게 (천국 돈 · 천국에서만 쓰고 입는다) — 칼은 팔지 않는다. 먹을 것 · 바를 것 · 흰 옷
+  { key: 'manna', cat: 'goods', price: 40, heal: 90, heaven: true, store: 'yw', icon: 'croissant', name: { ko: '만나', th: 'มานา', en: 'Manna' } },
+  { key: 'milkhoney', cat: 'goods', price: 30, heal: 60, heaven: true, store: 'yw', icon: 'lassi', name: { ko: '젖과 꿀', th: 'นมกับน้ำผึ้ง', en: 'Milk and honey' } },
+  { key: 'cloudcake', cat: 'goods', price: 90, heal: 140, heaven: true, store: 'yw', icon: 'cake', name: { ko: '구름 케이크', th: 'เค้กก้อนเมฆ', en: 'Cloud cake' } },
+  { key: 'featherbalm', cat: 'goods', price: 150, heal: 220, heaven: true, store: 'yw', icon: 'bandage', tint: '#f6f0dc', name: { ko: '깃털 연고', th: 'ขี้ผึ้งขนนก', en: 'Feather balm' } },
+  { key: 'lifefruit', cat: 'goods', price: 300, heal: 420, heaven: true, store: 'yw', icon: 'donut', name: { ko: '생명나무 열매', th: 'ผลจากต้นไม้แห่งชีวิต', en: 'Fruit of the tree of life' } },
+  { key: 'hvrobe', cat: 'armor', price: 1200, def: 2, heaven: true, store: 'yw', sprite: 'trench', icon: 'trench', tint: '#f4f0e6', name: { ko: '흰 세마포 겉옷', th: 'เสื้อคลุมป่านขาว', en: 'White linen robe' } },
+  { key: 'hvgloves', cat: 'armor', price: 300, def: 1, heaven: true, store: 'yw', sprite: 'gloves', icon: 'gloves', tint: '#f8f4ea', name: { ko: '비단 장갑', th: 'ถุงมือไหม', en: 'Silk gloves' } },
+  { key: 'hvsandals', cat: 'armor', price: 400, def: 1, heaven: true, store: 'yw', sprite: 'boots', icon: 'boots', tint: '#e8c870', name: { ko: '금실 샌들', th: 'รองเท้าสานด้ายทอง', en: 'Gold-thread sandals' } },
   { key: 'bareface', cat: 'weapon', price: 38_000, atk: 11, hell: true, floor: 5, sale: [5], sprite: 'rapier', icon: 'rapier', name: { ko: '맨얼굴', th: 'ใบหน้าเปลือย', en: 'Bare Face' } },
   { key: 'manettethread', cat: 'goods', price: 1100, hell: true, store: 'drop', name: { ko: '마네트의 실', th: 'ด้ายของมาเนตต์', en: "Manette's thread" } },
   // 43차 5층 인형술사 마리의 마리오네트: 줄을 당기면 곁에서 3분 동안 함께 싸운다 (한 번에 하나 · 지옥에서만)

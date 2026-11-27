@@ -537,6 +537,15 @@ function pingKind(b: Building): string {
 function pingIcon(g: Graphics, kind: string) {
   const gold = 0xf2d27a, ln = (pts: number[], color: number, width = 1.6) => { g.moveTo(pts[0], pts[1]); for (let k = 2; k < pts.length; k += 2) g.lineTo(pts[k], pts[k + 1]); g.stroke({ color, width, cap: 'round', join: 'round' }); };
   switch (kind) {
+    case 'bird': // 48차: 유황앵무 — 흰 몸 · 노란 볏 · 검은 부리
+      g.ellipse(0.6, 1.6, 3.6, 4.2).fill(0xf6f4ee); g.poly([2.6, 3, 6, 6, 3.4, 5.6]).fill(0xe8e4da); g.circle(-1.6, -2.4, 2.8).fill(0xf6f4ee);
+      g.poly([-2.6, -4.6, -4.4, -7.4, -1.8, -5.4, -1.2, -8, 0, -5, 1.6, -7.2, 0.8, -4]).fill(0xf2d24a);
+      g.poly([-4.2, -2.8, -6, -1.6, -4.2, -1]).fill(0x2a2620); g.circle(-2, -2.8, 0.6).fill(0x18120c); break;
+    case 'phoenix': // 48차: 불사조 — 펼친 불 날개 · 불꽃 꼬리
+      g.poly([0, -1, -6.5, -6, -5, -1.5, -6.5, 0.5, -2, 1.2]).fill(0xff7a2a); g.poly([0, -1, 6.5, -6, 5, -1.5, 6.5, 0.5, 2, 1.2]).fill(0xff7a2a);
+      g.poly([0, -1, -4.5, -4.6, -3, -1]).fill(0xffd25a); g.poly([0, -1, 4.5, -4.6, 3, -1]).fill(0xffd25a);
+      g.ellipse(0, 0.6, 1.8, 2.8).fill(0xffb03a); g.circle(0, -2.6, 1.5).fill(0xffd25a);
+      g.poly([-1.4, 3, 0, 6.8, 1.4, 3]).fill(0xe8381e); g.poly([-2.8, 2.6, -2.4, 6, -0.6, 3.4]).fill(0xff7a2a); g.poly([2.8, 2.6, 2.4, 6, 0.6, 3.4]).fill(0xff7a2a); break;
     case 'bank': g.poly([-6, -2, 0, -6, 6, -2]).fill(gold); for (const x of [-4.5, -1.5, 1.5, 4.5]) g.rect(x - 0.8, -1, 1.6, 5).fill(gold); g.rect(-6, 4.5, 12, 1.6).fill(gold); break;
     case 'coin': g.circle(0, 0, 5.2).fill(gold); g.circle(0, 0, 3.2).stroke({ color: 0x8a6a1a, width: 1 }); g.rect(-0.6, -2, 1.2, 4).fill(0x8a6a1a); break;
     case 'gear': ln([-5, 5, 4, -4], 0xd8dce2, 2); ln([2, -5, 5, -2], 0xd8dce2, 1.4); ln([-6, 2, -2, 6], 0xb8863a, 2); g.circle(-5.4, 5.4, 1.2).fill(0xb8863a); break; // 칼
@@ -6158,7 +6167,7 @@ export class WorldScene {
     const L = t();
     const b = k >= 0 ? this.zone.buildings[k] : null;
     const bank = !!b && (roomKindOf(b) === 'bank' || hasBank(b));
-    let name = k === -1 ? (this.zone.hell ? L.hellShop : L.shopLabel) : bank && bankName(b!, lang()) ? bankName(b!, lang()) : this.nameOf(b!); // 46차: 은행이 든 건물은 은행 이름으로
+    let name = k === -1 ? (this.zone.hell ? L.hellShop : this.realm === 'heaven' ? L.ywShopName : L.shopLabel) : bank && bankName(b!, lang()) ? bankName(b!, lang()) : this.nameOf(b!); // 46차: 은행이 든 건물은 은행 이름으로
     if (!name) return;
     if (name.length > 16) name = name.slice(0, 15) + '…';
     const o = new Container();
@@ -6172,7 +6181,7 @@ export class WorldScene {
     g.poly([-5, 9, 5, 9, 0, 16]).fill({ color: bank ? 0xf2d27a : 0xe0b437 });
     g.poly([-3, 18, 3, 18, 0, 22]).fill({ color: bank ? 0xf2d27a : 0xe0b437, alpha: 0.7 });
     const ic = new Graphics();
-    pingIcon(ic, k === -1 ? 'gear' : bank ? 'bank' : pingKind(b!));
+    pingIcon(ic, k === -1 ? (this.zone.hell ? 'phoenix' : 'bird') : bank ? 'bank' : pingKind(b!)); // 48차: 우주새(본디 동물 가게) = 새 · 지옥 유황새 = 불사조
     ic.position.set(-w / 2 + 10, 0);
     o.addChild(g, ic, tx);
     const [x, y0] = iso(at[0], at[1]);

@@ -567,7 +567,7 @@ function enterShop(fromStreet: boolean) {
   closeMenus();
   world?.stop();
   if (world) world.root.visible = false;
-  { const r = realm(); shop.setRealm(r === 'heaven' || r === 'border' ? 'real' : r); }
+  { const r = realm(); shop.setRealm(r === 'border' ? 'real' : r); } // 48차: 천국 = 황색날개의 가게
   shop.setLabels(shopLabels());
   shop.setGoat(realm() === 'real' && Math.random() < 0.16); // 24차: 가끔 가게 안에 염소 (안에서는 들이받지 않는다)
   if (inHell()) preloadPortrait('hwanghon');
@@ -2438,7 +2438,7 @@ function onShopArrive(target: ShopTarget) {
   if (busy) return;
   if (realm() === 'ghost' && target !== 'door') { ghostParrot(); return; }
   if (target === 'hwang') talkToHwang();
-  else if (target === 'cage') openCage();
+  else if (target === 'cage') { if (realm() === 'heaven') npcSay(t().parrot, pick(t().ywCageLines)); else openCage(); } // 48차: 천국에는 맡길 것이 없다
   else if (target === 'door') goOut();
 }
 
@@ -2470,9 +2470,11 @@ async function talkToHwang() {
   shop.lock(true);
   const L = t();
   const hell = inHell();
+  const heaven = realm() === 'heaven'; // 48차: 천국의 같은 가게는 황색날개가 연다
   const money = () => (hell ? hellState().notes : state.wallet ?? 0);
-  dlg.open({ name: hell ? L.hwanghon : L.clerk, portrait: hell ? 'hwanghon' : 'miss-hwang' });
-  if (!talkedThisVisit && state.grudge) {
+  dlg.open({ name: heaven ? L.yellowWing : hell ? L.hwanghon : L.clerk, portrait: heaven ? 'yellow-wing' : hell ? 'hwanghon' : 'miss-hwang' });
+  if (heaven) { if (!talkedThisVisit) await dlg.say(pick(L.ywShopGreet)); }
+  else if (!talkedThisVisit && state.grudge) {
     // 20차: 지난번에 훔쳐 간 손님
     state.grudge = false;
     save(state);
@@ -2497,7 +2499,7 @@ async function talkToHwang() {
   // 물건 고르기 → (소비품은 수량) → 사고 나면 한마디 뒤 다시 목록. '나가기'나 빈 곳을 누르면 말없이 끝
   let tab: ShopTab = 'goods';
   for (;;) {
-    const picked = await pickItem(hell, tab);
+    const picked = await pickItem(hell, tab, heaven);
     if (!picked) break;
     tab = picked.tab;
     if (picked.ask === 'work') { for (const line of L.hwangWork) await dlg.say(line); continue; }
@@ -2543,14 +2545,14 @@ async function talkToHwang() {
       await dlg.say(L.sold.replace('{item}', name).replace('{n}', String(n)).replace('{p}', priceText(unit * n, hell)));
       continue;
     }
-    if (money() < it.price) { await dlg.say(hell ? L.hwNoMoney : L.noMoney); continue; }
+    if (money() < it.price) { await dlg.say(heaven ? L.ywShopNoMoney : hell ? L.hwNoMoney : L.noMoney); continue; }
     // 회복하는 물건은 몇 개 살지 고른다
     const most = Math.min(it.cat === 'weapon' || it.cat === 'armor' ? 9 : 99, Math.floor(money() / it.price));
     const n = needsConfirm(it) ? await askQty(it, it.price, most, 'buy') : 1; // 29차: 장비도 한 번 더 (누르자마자 돈이 사라지지 않게)
     if (n <= 0) continue;
     if (n === 1) {
       // 지옥에서 무기를 사는 건 당연한 일: '그걸로 뭘 하시려고요'는 현실에서만
-      const line = it.cat === 'weapon' ? (hell ? L.pickGoods : L.pickWeapon) : it.cat === 'armor' ? L.pickArmor : L.pickGoods;
+      const line = heaven ? (it.cat === 'armor' ? L.ywShopPickArmor : L.ywShopPickGoods) : it.cat === 'weapon' ? (hell ? L.pickGoods : L.pickWeapon) : it.cat === 'armor' ? L.pickArmor : L.pickGoods;
       await dlg.say(line.replace('{item}', name).replace('{iyo}', iyo(name)));
     }
     if (hell) hellState().notes -= it.price * n;
@@ -3033,9 +3035,9 @@ function returnedGhost() {
   return Date.now() - state.seen > RETURN_AWAY && state.played < RETURN_PLAYED;
 }
 
-function pickItem(hell: boolean, start: ShopTab): Promise<{ it: ItemDef; sell: boolean; tab: ShopTab; steal?: boolean; ask?: 'dir' | 'work' } | null> {
+function pickItem(hell: boolean, start: ShopTab, heaven = false): Promise<{ it: ItemDef; sell: boolean; tab: ShopTab; steal?: boolean; ask?: 'dir' | 'work' } | null> {
   const L = t();
-  const cats: ShopTab[] = hell ? ['goods', 'weapon', 'armor', 'sell'] : ['goods', 'weapon', 'armor', 'sell', 'ask']; // 무기와 방어구도 처음부터 · 팔기 · 21차 묻기(현실)
+  const cats: ShopTab[] = heaven ? ['goods', 'armor', 'sell'] : hell ? ['goods', 'weapon', 'armor', 'sell'] : ['goods', 'weapon', 'armor', 'sell', 'ask']; // 무기와 방어구도 처음부터 · 팔기 · 21차 묻기(현실) · 48차 천국(황색날개): 칼은 없다
   let cat: ShopTab = start;
   return new Promise((resolve) => {
     const el = document.createElement('div');
@@ -3096,6 +3098,7 @@ function pickItem(hell: boolean, start: ShopTab): Promise<{ it: ItemDef; sell: b
         }
         return;
       }
+      if (heaven) { for (const it of ITEMS.filter((x) => x.cat === cat && x.store === 'yw')) list.appendChild(itemRow(it, priceText(it.price, false), () => done({ it, sell: false, tab: cat }), money < it.price)); return; } // 48차: 천국에서는 훔치지 않는다
       const shelf = ITEMS.filter((x) => x.cat === cat && !x.store && !!x.hell === hell && onSale(x)); // 31차: 층 장비는 그 층에서만
       for (const it of shelf) list.appendChild(withSteal(itemRow(it, priceText(it.price, hell), () => done({ it, sell: false, tab: cat }), money < it.price), it, it.price, shelf.map((x) => ({ it: x, price: x.price })), () => done({ it, sell: false, tab: cat, steal: true })));
     };
@@ -3216,7 +3219,7 @@ function sellList(list: Element, hell: boolean, redraw: () => void) {
 /** 48차: 세계 색 — 현실(쇳빛 파랑) · 천국(옅은 금) · 지옥(검붉음) · 세 세계 공용(보라) */
 function worldTone(it: ItemDef) { return it.cross ? 'w-cross' : 'w-' + worldOf(it); }
 /** 48차: 무게 글씨 (거의 없으면 ≈0) */
-function weightText(it: ItemDef) { const w = itemWeight(it); return t().weightTag.replace('{n}', w < 0.1 ? '≈0' : w >= 10 || w % 1 === 0 ? String(Math.round(w * 10) / 10) : w.toFixed(1)); }
+function weightText(it: ItemDef) { const w = itemWeight(it); return t().weightTag.replace('{n}', w < 0.1 ? '≈0' : w < 1 ? String(Math.round(w * 100) / 100) : String(Math.round(w * 10) / 10)); }
 function itemRow(it: ItemDef, right: string, onClick: () => void, dim = false) {
   const b = document.createElement('button');
   b.className = 'menu-item ' + worldTone(it) + (dim ? ' dim' : '');
@@ -4320,7 +4323,7 @@ function heavenAct(what: 'officer' | 'yellowwing' | 'shop' | 'assault' | 'terrac
   else if (what === 'ceremony') talkToPreacher();
   else if (what === 'officer') talkToOfficer();
   else if (what === 'yellowwing') talkToYellowWing();
-  else if (what === 'shop') npcSay(t().shopLabel, t().heavenShopEmpty);
+  else if (what === 'shop') enterShop(true); // 48차: 천국에서도 문이 열린다 — 황색날개의 가게
   else heavenAssault();
 }
 /**
@@ -4454,6 +4457,40 @@ function pickN<T>(a: readonly T[], n: number): T[] {
  * 처음 온 영혼 곁을 따라다니며 규칙을 일러 준다 (종교행사는 필수 · 사람이 천사를 사랑하면 벌은 천사가). 환생을 물으면 의아해하며 말린다. 루엔이 어디 있는지 알려 준다
  */
 const HEAVEN_GIFTS = ['water', 'cola', 'choco', 'chips', 'bandage'];
+/** 48차: 황색날개의 가게 — 길 위에서도 펼친다 (사기 · 팔기, 천국 돈) */
+async function ywShopLoop() {
+  const L = t();
+  await dlg.say(pick(L.ywShopGreet));
+  let tab: ShopTab = 'goods';
+  for (;;) {
+    const picked = await pickItem(false, tab, true);
+    if (!picked) break;
+    tab = picked.tab;
+    const it = picked.it, name = it.name[lang()];
+    if (picked.sell) {
+      const unit = sellPrice(it), have = sellFree(it.key);
+      if (have <= 0) continue;
+      const n = have > 1 ? await askQty(it, unit, have, 'sell') : 1;
+      if (n <= 0 || sellFree(it.key) < n) continue;
+      state.bag![it.key] = (state.bag![it.key] ?? 0) - n;
+      state.wallet = (state.wallet ?? 0) + unit * n;
+      ecoLog('earn', 'sell', unit * n);
+      save(state); renderHud(); renderQuick();
+      await dlg.say(L.sold.replace('{item}', name).replace('{n}', String(n)).replace('{p}', priceText(unit * n, false)));
+      continue;
+    }
+    if ((state.wallet ?? 0) < it.price) { await dlg.say(L.ywShopNoMoney); continue; }
+    const most = Math.min(it.cat === 'armor' ? 9 : 99, Math.floor((state.wallet ?? 0) / it.price));
+    const n = needsConfirm(it) ? await askQty(it, it.price, most, 'buy') : 1;
+    if (n <= 0) continue;
+    if (n === 1) await dlg.say((it.cat === 'armor' ? L.ywShopPickArmor : L.ywShopPickGoods).replace('{item}', name).replace('{iyo}', iyo(name)));
+    state.wallet = (state.wallet ?? 0) - it.price * n;
+    ecoLog('spend', 'shop', it.price * n);
+    for (let k = 0; k < n; k++) addToBag(it);
+    save(state); renderHud(); renderQuick();
+    await dlg.say(n > 1 ? L.boughtN.replace('{item}', name).replace('{n}', String(n)) : L.bought.replace('{item}', name));
+  }
+}
 async function talkToYellowWing() {
   const L = t();
   let jealous = false;
@@ -4469,7 +4506,7 @@ async function talkToYellowWing() {
     const M = L.ywMenu;
     const M2 = L.ywMenu2;
     const isle = world?.zone.interior?.kind === 'cloudisle';
-    const opts: [string, string][] = isle ? [['back', M2.back], ['praise', M2.praise], ['present', M2.present], ['angels', M2.angels]] : [['home', M2.home], ['praise', M2.praise], ['present', M2.present], ['rebirth', M.rebirth], ['luen', M.luen], ['rules', M.rules], ['angels', M2.angels], ['gift', M.gift]];
+    const opts: [string, string][] = isle ? [['shop', L.ywShopOpen], ['back', M2.back], ['praise', M2.praise], ['present', M2.present], ['angels', M2.angels]] : [['shop', L.ywShopOpen], ['home', M2.home], ['praise', M2.praise], ['present', M2.present], ['rebirth', M.rebirth], ['luen', M.luen], ['rules', M.rules], ['angels', M2.angels], ['gift', M.gift]]; // 48차: 황색날개는 어디서든 가게를 연다
     if (!isle) opts.push(state.heaven?.ywLost ? ['follow', M.follow] : ['alone', M.alone]);
     opts.push(['bye', M.bye]);
     const c = opts[await dlg.choose(opts.map((o) => o[1]))]?.[0] ?? 'bye';
@@ -4495,6 +4532,7 @@ async function talkToYellowWing() {
       }
       continue;
     }
+    if (c === 'shop') { await ywShopLoop(); continue; }
     if (c === 'angels') { for (const line of L.ywAngels) await dlg.say(line); continue; }
     if (c === 'home') {
       for (const line of state.heaven?.homeSeen ? [L.ywHomeGo] : L.ywHomeFirst) await dlg.say(line);
@@ -4623,8 +4661,37 @@ function openHeavenArmory() {
   el.querySelector('.store-line')!.textContent = L.noeulArmoryLine;
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
   const list = el.querySelector('.menu-list')!;
+  // 48차: 천국에서 산 것은 천국에서 판다 — 노을의 무기고에도 '팔기'
+  let selling = false;
+  const tabs = document.createElement('div'); tabs.className = 'menu-tabs';
+  el.querySelector('.menu-head')!.prepend(tabs);
+  el.querySelector('.menu-head b')!.remove();
   const draw = () => {
     list.innerHTML = '';
+    tabs.innerHTML = '';
+    for (const [v, label] of [[false, L.noeulArmory], [true, L.tabSell]] as const) { const b = document.createElement('button'); b.textContent = label; b.className = (selling === v ? 'on' : '') + (v ? ' sell' : ''); b.onclick = () => { selling = v; draw(); }; tabs.appendChild(b); }
+    if (selling) {
+      const mine = sellable(false);
+      if (!mine.length) { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = L.sellNothing; list.appendChild(p); }
+      for (const it of mine) {
+        if (sellFree(it.key) <= 0) continue;
+        const unit = sellPrice(it);
+        const row = itemRow(it, `×${sellFree(it.key)} · ${priceText(unit, false)}`, async () => {
+          const have = sellFree(it.key); if (have <= 0) return;
+          const n = have > 1 ? await askQty(it, unit, have, 'sell') : 1;
+          if (n <= 0 || sellFree(it.key) < n) return;
+          state.bag![it.key] = (state.bag![it.key] ?? 0) - n;
+          state.wallet = (state.wallet ?? 0) + unit * n;
+          ecoLog('earn', 'sell', unit * n);
+          save(state); renderHud(); renderQuick();
+          toast(L.sold.replace('{item}', it.name[lang()]).replace('{n}', String(n)).replace('{p}', priceText(unit * n, false)), 'good');
+          draw();
+        });
+        const tag = document.createElement('span'); tag.className = 'act'; tag.textContent = L.sellBtn; row.appendChild(tag); row.classList.add('has-act');
+        list.appendChild(row);
+      }
+      return;
+    }
     for (const it of ITEMS.filter((x) => x.store === 'heaven')) {
       const row = itemRow(it, priceText(it.price, false), async () => {
         if ((state.wallet ?? 0) < it.price) { toast(L.noMoney); return; }
@@ -5819,7 +5886,7 @@ function hellAreaText(key: string, floor: number): { name: string; sub: string }
 function placeName() {
   const L = t();
   const r = realm();
-  if (scene === 'shop') return r === 'hell' ? L.hellShop : L.shopLabel;
+  if (scene === 'shop') return r === 'hell' ? L.hellShop : r === 'heaven' ? L.ywShopName : L.shopLabel;
   if (world?.zone.interior) return world.zone.interior.name;
   if (r === 'hell') { const f = hellState().floor; return hellAreaLabel ?? L.hellPlace.replace('{n}', String(f)).replace('{name}', floorDef(f).name[lang()]); }
   const z = L.zones[world?.zone.id ?? ''] ?? '';

@@ -1105,6 +1105,13 @@ export const more16 = {
     // 47차 끝
     // 48차 (자동)
     weightTag: "무게 {n}",
+    ywShopOpen: "가게 열어 줘요",
+    ywShopGreet: ["어서 오세요. 앉을 자리는 없지만 물건은 다 좋은 거예요.", "천국에도 가게는 있어요. 다들 갖고 싶은 게 하나쯤은 남아 있거든요.", "골라 보세요. 칼은 없어요. 여기선 쓸 일이 없잖아요.", "오셨네요. 만나가 오늘 아침에 막 내려왔어요."],
+    ywShopNoMoney: "조금 모자라네요. 은행에 가면 꺼내 쓸 수 있어요. 여기선 아무도 세지 않아요.",
+    ywShopPickGoods: "{item}{iyo}? 천천히 드세요.",
+    ywShopPickArmor: "{item}{iyo}? 잘 어울리실 거예요. 여기서만 입을 수 있는 건 아시죠?",
+    ywCageLines: ["......", "여긴 맡길 게 없어.", "천국에선 아무것도 안 잃어버려. 그러니 맡아 둘 것도 없지."],
+    ywShopName: "황색날개의 가게",
     // 48차 끝
   },
   th: {
@@ -2212,6 +2219,13 @@ export const more16 = {
     // 47차 끝
     // 48차 (자동)
     weightTag: "หนัก {n}",
+    ywShopOpen: "เปิดร้านให้หน่อย",
+    ywShopGreet: ["เชิญค่ะ ที่นั่งไม่มี แต่ของดีทุกชิ้น", "สวรรค์ก็มีร้านค่ะ ทุกคนยังมีอะไรสักอย่างที่อยากได้", "เลือกดูได้เลยค่ะ ไม่มีดาบนะ ที่นี่ไม่ต้องใช้", "มาแล้วเหรอคะ มานาเพิ่งลงมาเมื่อเช้านี้เอง"],
+    ywShopNoMoney: "ขาดไปนิดค่ะ ไปธนาคารเบิกได้เลย ที่นี่ไม่มีใครนับหรอก",
+    ywShopPickGoods: "{item} เหรอคะ ค่อย ๆ ทานนะคะ",
+    ywShopPickArmor: "{item} เหรอคะ ต้องเข้ากับคุณแน่ รู้ใช่ไหมคะว่าใส่ได้แค่ที่นี่",
+    ywCageLines: ["......", "ที่นี่ไม่มีอะไรให้ฝาก", "บนสวรรค์ไม่มีอะไรหาย เลยไม่มีอะไรต้องฝาก"],
+    ywShopName: "ร้านของปีกเหลือง",
     // 48차 끝
   },
   en: {
@@ -3319,6 +3333,13 @@ export const more16 = {
     // 47차 끝
     // 48차 (자동)
     weightTag: "wt {n}",
+    ywShopOpen: "Open your shop for me",
+    ywShopGreet: ["Welcome. There's nowhere to sit, but everything here is good.", "Heaven has shops too. Everyone still wants something.", "Have a look. No blades — you won't need them here.", "You came. The manna only fell this morning."],
+    ywShopNoMoney: "A little short. The bank will give you more. Nobody counts here.",
+    ywShopPickGoods: "{item}? Take your time with it.",
+    ywShopPickArmor: "{item}? It'll suit you. You know it can only be worn here?",
+    ywCageLines: ["......", "Nothing to keep here.", "Nothing gets lost in heaven. So there is nothing to keep."],
+    ywShopName: "Yellow Wing's shop",
     // 48차 끝
   },
 };

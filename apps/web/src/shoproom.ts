@@ -5,9 +5,10 @@ import { parrotPixels, type Look } from './character.ts';
 import { goatIdleCanvas } from './goat.ts';
 import { toCanvas } from './raster.ts';
 import { iso } from './gfx.ts';
-import { MISS_HWANG, HWANGHON, charSet, frameOf, applyFrame, BODY_K, artDensity, dirFromTile, turnedDir, auraFor, makeAuraSprite, type CharSet, type Dir, type Frame } from './sprites.ts';
+import { MISS_HWANG, HWANGHON, YELLOW_WING_LOOK, charSet, frameOf, applyFrame, BODY_K, artDensity, dirFromTile, turnedDir, auraFor, makeAuraSprite, type CharSet, type Dir, type Frame } from './sprites.ts';
 import { RW, RD, COUNTER, ROOM_BOUNDS, PARROT_PERCH, CAGE, drawCage, drawRoomBackground, drawCounterPieces, drawLamp, nightFactor } from './shopgfx.ts';
 import { bangkokClock } from './clock.ts';
+import { wingTexture } from './heavengfx.ts';
 import { shopKitReady, counterStrips, type ShopKit } from './shopkit.ts';
 
 export { MISS_HWANG };
@@ -185,11 +186,15 @@ export class ShopRoom {
     this.hwang = new Sprite();
     // 관리자가 손본 도트 그림이 있으면 그것을, 없으면 구운 그림을 쓴다
     // 관리자 그림은 구운 그림과 크기가 같으니 발 기준점도 그대로 쓴다
-    this.dressKeeper(false);
+    this.dressKeeper('real');
     const [hx, hy] = iso(HWANG.x, HWANG.y);
     this.hwang.position.set(hx, hy);
     this.hwang.zIndex = HWANG.x + HWANG.y;
     this.objects.addChild(this.hwang);
+    // 48차: 천국에서는 황색날개가 카운터 뒤에 — 금빛 날개를 등에 단다
+    this.kWings = new Sprite(wingTexture(0xf2c42a));
+    this.kWings.anchor.set(0.5, 0.62); this.kWings.scale.set(0.5 * BODY_K); this.kWings.position.set(hx, hy - 27 * BODY_K); this.kWings.zIndex = HWANG.x + HWANG.y - 0.002; this.kWings.visible = false;
+    this.objects.addChild(this.kWings);
     // 카운터 끝 횃대 위의 앵무새
     this.parrotTex = [tex(toCanvas(parrotPixels(false), 16, 18)), tex(toCanvas(parrotPixels(true), 16, 18))];
     this.parrot = new Sprite(this.parrotTex[0]);
@@ -313,12 +318,15 @@ export class ShopRoom {
 
   /** 카운터 뒤의 사람: 현실은 미스 황(관리자가 손본 도트가 있으면 그것), 지옥은 검은 레이스의 황혼 */
   private keeperId = 0;
-  private keeperHell: boolean | null = null;
-  private dressKeeper(hell: boolean) {
-    if (this.keeperHell === hell) return;
-    this.keeperHell = hell;
+  private keeperKind: 'real' | 'hell' | 'heaven' | null = null;
+  private kWings!: Sprite;
+  private dressKeeper(kind: 'real' | 'hell' | 'heaven') {
+    if (this.keeperKind === kind) return;
+    this.keeperKind = kind;
     const id = ++this.keeperId;
-    Promise.all([charSet(hell ? HWANGHON : MISS_HWANG, null, [], true), portraitUrl(hell ? 'sprite-hwanghon' : 'sprite-miss-hwang')]).then(async ([cs, u]) => {
+    if (this.kWings) this.kWings.visible = kind === 'heaven';
+    const look = kind === 'hell' ? HWANGHON : kind === 'heaven' ? YELLOW_WING_LOOK : MISS_HWANG;
+    Promise.all([charSet(look, null, [], true), kind === 'heaven' ? Promise.resolve(null) : portraitUrl(kind === 'hell' ? 'sprite-hwanghon' : 'sprite-miss-hwang')]).then(async ([cs, u]) => {
       if (id !== this.keeperId) return;
       const f = frameOf(cs, 'idle', 'sw', 0);
       applyFrame(this.hwang, f, BODY_K);
@@ -349,8 +357,8 @@ export class ShopRoom {
     this.cage.position.set(d.x, d.y);
   }
   /** 세계마다 같은 가게, 다른 빛: 귀신에게는 잿빛, 지옥에서는 황혼의 붉은 가게 */
-  setRealm(r: 'real' | 'ghost' | 'hell') {
-    this.dressKeeper(r === 'hell');
+  setRealm(r: 'real' | 'ghost' | 'hell' | 'heaven') {
+    this.dressKeeper(r === 'hell' ? 'hell' : r === 'heaven' ? 'heaven' : 'real');
     const wasHell = this.hellOn;
     this.hellOn = hellRoom = r === 'hell';
     if (wasHell !== this.hellOn) this.redrawCage();
@@ -360,6 +368,7 @@ export class ShopRoom {
     if (r === 'real') { this.camera.filters = []; this.setGhost(false); return; }
     const cm = new ColorMatrixFilter();
     if (r === 'ghost') cm.desaturate();
+    else if (r === 'heaven') cm.matrix = [0.78, 0.1, 0.06, 0, 0.2, 0.06, 0.8, 0.06, 0, 0.2, 0.04, 0.08, 0.74, 0, 0.2, 0, 0, 0, 1, 0]; // 48차: 황색날개의 가게 — 같은 방이 크림빛으로 환하다
     else cm.matrix = [0.95, 0.25, 0.05, 0, 0.04, 0.1, 0.42, 0.04, 0, 0, 0.06, 0.12, 0.3, 0, 0.01, 0, 0, 0, 1, 0];
     this.camera.filters = [cm];
     this.setGhost(r === 'ghost');
