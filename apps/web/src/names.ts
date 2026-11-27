@@ -144,14 +144,32 @@ export function storeOf(b: Building): StoreKind | null {
   return null;
 }
 
-/** 47차 명소 건물 표시: 표지판(터미널 21 · 엠포리움) 둘레의 가장 큰 건물, 이름이 엠쿼티어인 건물 → 겉을 명소답게 그린다 */
-export function tagLandmarks(z: { buildings: Building[]; origin?: { i: number; j: number }; city?: string }, marks: { key: string; i: number; j: number }[]) {
+/**
+ * 47차 → 48차 명소 건물: 터미널 21은 표지판 둘레의 가장 큰 건물.
+ * 프롬퐁(사용자: '북쪽 엠쿼티어, 남쪽 엠포리움 — 나나 플라자에서 여기까지가 가장 붐비는 번화가')은
+ * 지도 자료가 10칸씩 잘게 쪼갠 덩어리를 실제 건물 하나로 합친다 (전체 지도 칸 기준)
+ */
+const MALLS: { key: 'emquartier' | 'emqtower' | 'emporium'; i0: number; j0: number; w: number; d: number; poi: { t: string; n: string; nth: string } }[] = [
+  { key: 'emqtower', i0: 926, j0: 464, w: 40, d: 20, poi: { t: 'mall', n: 'EmQuartier', nth: 'เอ็มควอเทียร์' } }, // 뒤 동 · 헬릭스
+  { key: 'emquartier', i0: 926, j0: 484, w: 20, d: 10, poi: { t: 'mall', n: 'EmQuartier', nth: 'เอ็มควอเทียร์' } }, // 앞 동 · 큰 화면
+  { key: 'emporium', i0: 924, j0: 508, w: 30, d: 20, poi: { t: 'department_store', n: 'Emporium', nth: 'เอ็มโพเรียม' } }, // 대로 남쪽 · 엠쿼티어 맞은편
+];
+export function tagLandmarks(z: { W: number; H: number; buildings: Building[]; blocked?: Uint8Array; tiles?: Uint8Array; origin?: { i: number; j: number }; city?: string }, marks: { key: string; i: number; j: number }[]) {
   if (z.city === 'seoul') return;
   const o = z.origin ?? { i: 0, j: 0 };
-  const eq = marks.find((m) => m.key === 'emquartier');
-  if (eq) for (const b of z.buildings) if (((b as B).pois ?? []).some((p) => /EmQuartier/i.test(p.n ?? '')) && Math.hypot(b.i0 + b.w / 2 - (eq.i - o.i), b.j0 + b.d / 2 - (eq.j - o.j)) < 16 && b.d > 2) (b as Building & { lmk?: string }).lmk = 'emquartier';
+  for (const m of MALLS) {
+    const i0 = m.i0 - o.i, j0 = m.j0 - o.j, i1 = i0 + m.w, j1 = j0 + m.d;
+    if (i1 <= 0 || j1 <= 0 || i0 >= z.W || j0 >= z.H) continue;
+    const parts = z.buildings.filter((b) => { const cx = b.i0 + b.w / 2, cy = b.j0 + b.d / 2; return cx >= i0 && cx < i1 && cy >= j0 && cy < j1 && b.cat !== 'ujusae' && b.cat !== 'home' && b.cat !== 'estate'; });
+    if (!parts.length) continue;
+    const pois = [m.poi, ...parts.flatMap((b) => ((b as B).pois ?? []).filter((p) => p.n !== m.poi.n && !/EmQuartier|Emporium/i.test(p.n ?? '')))];
+    const mall = { i0, j0, w: m.w, d: m.d, h: Math.max(...parts.map((b) => b.h)), cat: 'shop', color: parts[0].color, pois, lmk: m.key } as unknown as Building;
+    z.buildings = z.buildings.filter((b) => !parts.includes(b));
+    z.buildings.push(mall);
+    if (z.blocked) for (let j = Math.max(0, j0); j < Math.min(z.H, j1); j++) for (let i = Math.max(0, i0); i < Math.min(z.W, i1); i++) z.blocked[j * z.W + i] = 1;
+  }
   for (const m of marks) {
-    if (m.key !== 't21' && m.key !== 'emporium') continue;
+    if (m.key !== 't21') continue;
     const li = m.i - o.i, lj = m.j - o.j;
     let best: Building | null = null, area = 0;
     for (const b of z.buildings) {

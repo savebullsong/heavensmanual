@@ -3318,6 +3318,7 @@ const ARMOR_W: Partial<Record<Slot, number>> = { head: 2.5, body: 7, hands: 1, l
 function itemWeight(it: ItemDef | undefined): number {
   if (!it) return 0;
   if (it.note === 'ammo' || it.note === 'arrows' || it.note === 'rifleammo' || it.note === 'fuel') return 0;
+  if (/^(diary|tshard|tembra|redseal|manettethread|parrotfeed)$/.test(it.key)) return 0.02; // 48차: 일기장·템브라 조각처럼 가벼운 것은 거의 무게가 없다
   if (it.cat === 'goods') return it.use ? 0.2 : 0.3;
   const heavy = it.price >= (it.hell ? 20_000 : 100_000) ? 1.4 : it.price >= (it.hell ? 3_000 : 10_000) ? 1.15 : 1;
   if (it.cat === 'weapon') {

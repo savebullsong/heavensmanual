@@ -32,7 +32,7 @@ import { SKIN_COLORS } from './character.ts';
 import { weatherHell } from './hellweather.ts';
 import { drawHellGround, hellGroundJob, type GroundJob, drawHellStructure, hellTint, hellProp, liquidInside, bloodLavaTile } from './hellgfx.ts';
 import { drawCosmicBird, drawCosmicBirdHeaven, COSMIC_TOP } from './ujusae.ts';
-import { SOI_SIGNS, SOI_ALIAS, BTS_STATIONS, LANDMARKS, soiSignCanvas, stationCanvas, neonGateCanvas, billboardCanvas, helixCanvas, fountainCanvas, parkSignCanvas, landmarkBuildingCanvas, type Pic, type LandmarkBuild } from './landmarks.ts';
+import { SOI_SIGNS, SOI_ALIAS, BTS_STATIONS, LANDMARKS, soiSignCanvas, stationCanvas, neonGateCanvas, billboardCanvas, helixCanvas, fountainCanvas, parkSignCanvas, landmarkBuildingCanvas, landmarkTop, type Pic, type LandmarkBuild } from './landmarks.ts';
 import { drawYuhwang } from './yuhwang.ts';
 import { drawLoanHouse, LOAN_TOP } from './loanhouse.ts';
 import { portraitUrl, type PortraitSlot } from './portraits.ts';
@@ -925,10 +925,11 @@ export class WorldScene {
       else if (lm.kind === 'billboard') { pic = billboardCanvas(lm.text!, lm.sub!, lm.key === 't21' ? 't21' : 'emporium', false); glowAt(i, j, 0, -64, lm.key === 't21' ? 0xbfe0ff : 0xffd77a, 0.9); }
       else if (lm.kind === 'helix') { pic = helixCanvas(false); glowAt(i, j, 0, -90, 0xffe7a8, 1.2); }
       else if (lm.kind === 'fountain') pic = fountainCanvas();
+      else if (lm.kind === 'spot') pic = null as unknown as Pic; // 48차: 건물 자체가 명소 — 그림 없이 이름만
       else pic = parkSignCanvas(lm.text!, lm.sub!);
-      put(pic, i, j, 0.5, lm.kind === 'fountain' ? 0.2 : 0.9);
+      if (pic) put(pic, i, j, 0.5, lm.kind === 'fountain' ? 0.2 : 0.9);
       const nm = L.landmarks[lm.key as keyof typeof L.landmarks];
-      if (nm) this.landmarkSpots.push({ i, j, r: lm.kind === 'fountain' ? 7 : 3, name: nm[0], sub: nm[1], t: 0 });
+      if (nm) this.landmarkSpots.push({ i, j, r: lm.kind === 'fountain' ? 7 : lm.kind === 'spot' ? 9 : 3, name: nm[0], sub: nm[1], t: 0 });
     }
   }
   /** 명소 가까이 가면 이름을 한 번 띄운다 (같은 곳은 1분에 한 번) */
@@ -1265,7 +1266,7 @@ export class WorldScene {
     const base = tex(art && k ? art : d.canvas);
     const W = d.canvas.width, H = d.canvas.height;
     const parts = this.strips(base, d.x, d.y, b.i0, b.j0, b.w, b.d, -0.2, k === 2 ? 2 : 1);
-    const top = lmk && this.realm === 'real' ? Math.max(b.h, lmk === 't21' ? 190 : lmk === 'emporium' ? 150 : 120) + 40 : dal ? 34 + 16 + Math.min(b.w, b.d) * 3 : b.cat === 'palace' ? 1440 : b.cat === 'attraction' ? b.h + 30 : b.cat === 'sanct' ? (SANCT_TOP[(b as { att?: string }).att ?? 'church'] ?? 260) + 20 : this.realm === 'heaven' && b.cat === 'shop' ? b.h + 30 : b.cat === 'ujusae' ? COSMIC_TOP : b.cat === 'loan' ? LOAN_TOP : b.cat === 'hbank' ? b.h + 6 : b.cat === 'atone' ? b.h + 46 : b.cat === 'rebirth' ? b.h + 4 : hellTheme ? b.h : kitOk ? buildingTop(b, this.low) : buildingHeight(b.h);
+    const top = lmk && this.realm === 'real' ? landmarkTop(b.h, lmk) + 40 : dal ? 34 + 16 + Math.min(b.w, b.d) * 3 : b.cat === 'palace' ? 1440 : b.cat === 'attraction' ? b.h + 30 : b.cat === 'sanct' ? (SANCT_TOP[(b as { att?: string }).att ?? 'church'] ?? 260) + 20 : this.realm === 'heaven' && b.cat === 'shop' ? b.h + 30 : b.cat === 'ujusae' ? COSMIC_TOP : b.cat === 'loan' ? LOAN_TOP : b.cat === 'hbank' ? b.h + 6 : b.cat === 'atone' ? b.h + 46 : b.cat === 'rebirth' ? b.h + 4 : hellTheme ? b.h : kitOk ? buildingTop(b, this.low) : buildingHeight(b.h);
     const [lx] = iso(b.i0 + b.w / 2, b.j0 + b.d / 2);
     // 22차: 벽이 있는 자리(투명 여백 판정)는 처음 필요할 때 만든다 — 건물을 세울 때마다 픽셀 전체를 읽던 비용을 뺐다
     return { parts, base, x: d.x, y: d.y, w: W, h: H, top, lx, ly: (b.i0 + b.j0) * (TH / 2) - top + 4, cv: d.canvas, b };

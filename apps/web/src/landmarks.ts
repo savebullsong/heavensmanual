@@ -20,14 +20,14 @@ export const BTS_STATIONS: Station[] = [
   { key: 'phromphong', th: 'พร้อมพงษ์', en: 'Phrom Phong', i: 910, len: 36 },
 ];
 
-export type LandmarkKind = 'neonGate' | 'billboard' | 'helix' | 'fountain' | 'parkSign';
+export type LandmarkKind = 'neonGate' | 'billboard' | 'helix' | 'fountain' | 'parkSign' | 'spot';
 export interface Landmark { key: string; kind: LandmarkKind; i: number; j: number; text?: string; sub?: string }
 export const LANDMARKS: Landmark[] = [
   { key: 'nanaPlaza', kind: 'neonGate', i: 237, j: 501, text: 'NANA PLAZA', sub: 'ENTERTAINMENT' },
   { key: 'cowboy', kind: 'neonGate', i: 581, j: 451, text: 'SOI COWBOY', sub: 'ซอยคาวบอย' },
   { key: 't21', kind: 'billboard', i: 573, j: 470, text: 'TERMINAL 21', sub: 'DEPARTURE · ASOK' },
-  { key: 'emquartier', kind: 'helix', i: 948, j: 490 },
-  { key: 'emporium', kind: 'billboard', i: 905, j: 506, text: 'EMPORIUM', sub: 'PHROM PHONG' },
+  { key: 'emquartier', kind: 'spot', i: 936, j: 495 }, // 48차: 프롬퐁 북쪽 — 건물 자체를 그린다 (예전 나선 탑·광고탑은 뺐다)
+  { key: 'emporium', kind: 'spot', i: 938, j: 507 }, // 48차: 프롬퐁 남쪽 — 엠쿼티어 맞은편
   { key: 'benchasiri', kind: 'fountain', i: 889, j: 544 },
   { key: 'benchasiriSign', kind: 'parkSign', i: 879, j: 508, text: 'BENCHASIRI PARK', sub: 'สวนเบญจสิริ' },
 ];
@@ -273,10 +273,10 @@ export function parkSignCanvas(text: string, sub: string): Pic {
 // ───────────────────────── 47차 명소 리모델링: 건물 자체를 명소답게 ─────────────────────────
 // 터미널 21(공항 터미널 콘셉트 — 유리 커튼월 · 출발 안내판 띠 · 비행기 · 'DEPARTURE' 차양) · 엠포리움(크림색 석재 · 금빛 세로 지느러미 · 유리 아트리움)
 // · 엠쿼티어(유리 상자 · 나선형 녹색 테라스 '헬릭스'). 건물 칸(i0, j0, w, d)과 높이(h)는 지도 그대로 쓰고 겉만 바꾼다
-export type LandmarkBuild = 't21' | 'emporium' | 'emquartier';
+export type LandmarkBuild = 't21' | 'emporium' | 'emquartier' | 'emqtower';
 export function landmarkBuildingCanvas(b: { i0: number; j0: number; w: number; d: number; h: number }, key: LandmarkBuild, night: boolean): { canvas: HTMLCanvasElement; x: number; y: number } {
   const { i0, j0, w, d } = b, i1 = i0 + w, j1 = j0 + d;
-  const H = Math.max(b.h, key === 't21' ? 190 : key === 'emporium' ? 150 : 120);
+  const H = landmarkTop(b.h, key);
   const minX = (i0 - j1) * (TW / 2) - 12, maxX = (i1 - j0) * (TW / 2) + 12;
   const minY = (i0 + j0) * (TH / 2) - H - 40, maxY = (i1 + j1) * (TH / 2) + 8;
   const c = document.createElement('canvas');
@@ -314,31 +314,168 @@ export function landmarkBuildingCanvas(b: { i0: number; j0: number; w: number; d
     poly([P(i0 + w * 0.3, j1, 22), P(i0 + w * 0.7, j1, 22), P(i0 + w * 0.7, j1 + 0.8, 20), P(i0 + w * 0.3, j1 + 0.8, 20)], '#2a2e36');
     text('DEPARTURE', i0 + w / 2, 27, 7, '#f2c84a', 'S');
     bandS(2, 16, night ? '#fff0c0' : '#a8c8e0', i0 + w * 0.35, i0 + w * 0.65);
-  } else if (key === 'emporium') {
-    box(i0, i1, j0, j1, 0, 22, '#e6dccb', '#d8ccb6', '#c4b8a2');
-    box(i0 + 0.15, i1 - 0.15, j0 + 0.15, j1 - 0.15, 22, H - 18, '#efe6d6', '#e2d6c0', '#cfc2aa');
-    for (let a = i0 + 0.5; a < i1 - 0.2; a += 0.7) { lineS(a, 22, H - 18, '#c9a23e', 2); }
-    for (let a = j0 + 0.5; a < j1 - 0.2; a += 0.7) { lineE(a, 22, H - 18, '#a8822e', 2); }
-    for (let z = 34; z < H - 24; z += 16) { bandS(z, z + 7, night ? 'rgba(255,233,168,0.55)' : 'rgba(150,180,200,0.45)'); bandE(z, z + 7, night ? 'rgba(255,220,150,0.45)' : 'rgba(120,150,170,0.45)'); }
-    box(i0, i1, j0, j1, H - 18, H, '#f6f0e4', '#c9a23e', '#a8822e');
-    text('EMPORIUM', i0 + w / 2, H - 9, Math.min(16, w * 1.9), '#fffbf0', 'S');
-    // 유리 아트리움 입구 · 화분
-    poly([P(i0 + w * 0.3, j1, 0), P(i0 + w * 0.7, j1, 0), P(i0 + w * 0.7, j1, 34), P(i0 + w * 0.5, j1, 44), P(i0 + w * 0.3, j1, 34)], night ? '#ffe9a8' : '#b8d4e6');
-    for (let a = i0 + w * 0.34; a < i0 + w * 0.68; a += 0.35) lineS(a, 0, 34, '#8a9aa6');
-    for (const a of [i0 + w * 0.22, i0 + w * 0.78]) { const [x, y] = P(a, j1 + 0.4, 0); g.fillStyle = '#6a5a4a'; g.fillRect(x - 4, y - 8, 8, 8); g.fillStyle = '#3a7a3a'; g.beginPath(); g.ellipse(x, y - 14, 8, 8, 0, 0, Math.PI * 2); g.fill(); }
   } else {
-    // 엠쿼티어: 유리 상자 위로 나선처럼 감긴 녹색 테라스 (헬릭스)
-    box(i0, i1, j0, j1, 0, H - 10, '#b8d0dc', '#7a9aae', '#6a8a9e');
-    for (let z = 12; z < H - 14; z += 10) { bandS(z, z + 1.2, '#4a6a7e'); bandE(z, z + 1.2, '#3e5e72'); }
-    for (let n = 0; n < 7; n++) {
-      const z = 16 + n * ((H - 30) / 7), s0 = (n / 7) % 1;
-      bandS(z, z + 4, '#4a8a3a', i0 + w * s0 * 0.6, i0 + w * (0.4 + s0 * 0.6)); bandS(z + 4, z + 6, '#6aaa4a', i0 + w * s0 * 0.6, i0 + w * (0.4 + s0 * 0.6));
-      bandE(z + 5, z + 9, '#3e7a32', j0 + d * (1 - s0) * 0.5, j0 + d * (0.5 + (1 - s0) * 0.5));
-    }
-    box(i0, i1, j0, j1, H - 10, H, '#e8eef2', '#d0d8de', '#b8c2ca');
-    text('EmQuartier', i0 + w / 2, H - 22, Math.min(14, w * 1.6), '#ffffff', 'S');
-    if (night) for (let k = 0; k < 18; k++) { const a = i0 + 0.4 + ((k * 31) % 23) / 23 * (w - 0.8), z = 14 + ((k * 17) % 29) / 29 * (H - 40); bandS(z, z + 5, 'rgba(255,233,168,0.6)', a, a + 0.4); }
+    mallFacade(g, P, poly, text, { i0, i1, j0, j1, w, d, H }, key, night);
   }
   void glow;
   return { canvas: c, x: minX, y: minY };
+}
+
+/** 48차: 명소 건물 높이 (그림 위쪽 여백 계산에도 쓴다) */
+export function landmarkTop(h: number, key: LandmarkBuild) {
+  return key === 't21' ? Math.max(h, 190) : key === 'emporium' ? 118 : key === 'emquartier' ? 124 : key === 'emqtower' ? 176 : Math.max(h, 120);
+}
+
+type PFn = (i: number, j: number, z: number) => Pt;
+type Foot = [number, number][];
+/** 앞 모서리(남동)가 둥근 바닥: 북서 → 북동 → 동쪽 면 → 둥근 모서리 → 남쪽 면 */
+function roundFoot(i0: number, i1: number, j0: number, j1: number, r: number, n = 7, corner: 'se' | 'ne' = 'se'): Foot {
+  if (corner === 'ne') {
+    const f: Foot = [[i0, j0], [i1 - r, j0]];
+    for (let k = 1; k < n; k++) { const a = -Math.PI / 2 + (k / n) * (Math.PI / 2); f.push([i1 - r + Math.cos(a) * r, j0 + r + Math.sin(a) * r]); }
+    f.push([i1, j0 + r], [i1, j1], [i0, j1]);
+    return f;
+  }
+  const f: Foot = [[i0, j0], [i1, j0], [i1, j1 - r]];
+  for (let k = 1; k < n; k++) { const a = (k / n) * (Math.PI / 2); f.push([i1 - r + Math.cos(a) * r, j1 - r + Math.sin(a) * r]); }
+  f.push([i1 - r, j1], [i0, j1]);
+  return f;
+}
+const hex = (c: string) => [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)];
+const mix = (a: string, b: string, t: number) => { const x = hex(a), y = hex(b); return `rgb(${x.map((v, k) => Math.round(v + (y[k] - v) * t)).join(',')})`; };
+/** 바닥 다각형을 z0~z1로 세운 보이는 면들 (보는 쪽 = +i+j). col(t): t = 0 동쪽 면 … 1 남쪽 면 */
+function faces(foot: Foot) {
+  const out: { a: [number, number]; b: [number, number]; t: number }[] = [];
+  for (let k = 0; k < foot.length; k++) {
+    const a = foot[k], b = foot[(k + 1) % foot.length];
+    const nx = b[1] - a[1], ny = -(b[0] - a[0]);
+    if (nx + ny <= 1e-6) continue;
+    out.push({ a, b, t: Math.max(0, Math.min(1, ny / (Math.abs(nx) + Math.abs(ny)))) });
+  }
+  return out;
+}
+function prism(P: PFn, poly: (p: Pt[], f: string | CanvasGradient) => void, foot: Foot, z0: number, z1: number, south: string, east: string, top?: string) {
+  for (const f of faces(foot)) poly([P(f.a[0], f.a[1], z0), P(f.b[0], f.b[1], z0), P(f.b[0], f.b[1], z1), P(f.a[0], f.a[1], z1)], mix(east, south, f.t));
+  if (top) poly(foot.map(([i, j]) => P(i, j, z1)), top);
+}
+/** 보이는 면 위에 세로줄 (유리 칸) — 면 길이를 따라 step 칸마다 */
+function mullions(g: CanvasRenderingContext2D, P: PFn, foot: Foot, z0: number, z1: number, step: number, col: string, wd = 1) {
+  g.strokeStyle = col; g.lineWidth = wd;
+  for (const f of faces(foot)) {
+    const L = Math.hypot(f.b[0] - f.a[0], f.b[1] - f.a[1]);
+    for (let u = step; u < L - 0.05; u += step) { const q = u / L, i = f.a[0] + (f.b[0] - f.a[0]) * q, j = f.a[1] + (f.b[1] - f.a[1]) * q; const p0 = P(i, j, z0), p1 = P(i, j, z1); g.beginPath(); g.moveTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); g.stroke(); }
+    const p0 = P(f.b[0], f.b[1], z0), p1 = P(f.b[0], f.b[1], z1); g.beginPath(); g.moveTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); g.stroke();
+  }
+}
+/** 보이는 면들을 한 덩어리 클립으로 (큰 화면 · 그림을 면에 입힐 때) */
+function clipFaces(g: CanvasRenderingContext2D, P: PFn, foot: Foot, z0: number, z1: number) {
+  g.beginPath();
+  for (const f of faces(foot)) { const q = [P(f.a[0], f.a[1], z0), P(f.b[0], f.b[1], z0), P(f.b[0], f.b[1], z1), P(f.a[0], f.a[1], z1)]; g.moveTo(q[0][0], q[0][1]); for (const p of q.slice(1)) g.lineTo(p[0], p[1]); g.closePath(); }
+  g.clip();
+}
+
+/**
+ * 48차 프롬퐁의 두 쇼핑몰 (사용자 사진 기준)
+ * · 엠포리움(남쪽): 흰 곡면 외벽에 가는 초록 줄, 금빛 E와 EMPORIUM, 아래 두 층은 불 켜진 유리 진열창, 모서리에 금빛 격자 상자, 옥상 수영장과 야자수
+ * · 엠쿼티어(북쪽) 앞 동: 둥근 모서리를 감싸는 거대한 화면, 위 흰 띠에 동그란 e 표시와 EmQuartier
+ * · 엠쿼티어 뒤 동: 유리 몸통, 동쪽 끝은 층층이 돌아 오르는 흰 테라스와 초록 화단 (헬릭스)
+ */
+function mallFacade(g: CanvasRenderingContext2D, P: PFn, poly: (p: Pt[], f: string | CanvasGradient) => void, text: (s: string, a: number, z: number, size: number, col: string, face: 'S' | 'E') => void, b: { i0: number; i1: number; j0: number; j1: number; w: number; d: number; H: number }, key: LandmarkBuild, night: boolean) {
+  const { i0, i1, j0, j1, w, d, H } = b;
+  const warm = night ? '#ffe3a0' : '#c9dbe4';
+  if (key === 'emporium') {
+    // 대로(북쪽)는 화면 뒤쪽이라 보이지 않는다 — 대로와 소이 24가 만나는 북동 모서리를 둥글게, 이름은 소이 쪽(동쪽) 면에 크게
+    const r = Math.min(8, d * 0.4);
+    const foot = roundFoot(i0, i1, j0, j1, r, 8, 'ne');
+    const inner = roundFoot(i0 + 0.4, i1 - 0.4, j0 + 0.4, j1 - 0.4, r - 0.4, 8, 'ne');
+    prism(P, poly, inner, 0, 30, night ? '#f4d892' : '#a9c3cf', night ? '#e2bc72' : '#9ab6c4');
+    mullions(g, P, inner, 0, 30, 1.6, night ? 'rgba(120,90,40,0.6)' : 'rgba(70,90,100,0.6)');
+    prism(P, poly, foot, 14, 16, '#f3efe6', '#e2ddd2');
+    prism(P, poly, foot, 30, H - 8, '#f2efe8', '#faf8f3', '#ece8e0');
+    for (const z of [44, 58, 74, 92]) prism(P, poly, foot, z, z + 1.6, '#3f7a52', '#3a7a4e');
+    // 옥상: 나무 갑판 · 수영장 · 야자수 · 유리 난간
+    poly(roundFoot(i0 + 1, i1 - 1, j0 + 1, j1 - 1, r - 1, 8, 'ne').map(([i, j]) => P(i, j, H - 7.9)), night ? '#9a8a6e' : '#c9b48e');
+    poly([P(i0 + w * 0.3, j0 + d * 0.3, H - 7.6), P(i1 - r - 2, j0 + d * 0.3, H - 7.6), P(i1 - r - 2, j0 + d * 0.66, H - 7.6), P(i0 + w * 0.3, j0 + d * 0.66, H - 7.6)], night ? '#3ad0e8' : '#5ac8e0');
+    g.strokeStyle = night ? 'rgba(70,55,35,0.35)' : 'rgba(120,95,60,0.35)'; g.lineWidth = 1;
+    for (let a = i0 + 1.6; a < i1 - 1; a += 0.8) { const p0 = P(a, j0 + 1, H - 7.9), p1 = P(a, j1 - 1, H - 7.9); g.beginPath(); g.moveTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); g.stroke(); }
+    // 수영장 둘레 흰 선베드 · 파라솔
+    for (let k = 0; k < 6; k++) { const a = i0 + w * 0.32 + k * ((w * 0.62 - r - 2) / 6); const [x, y] = P(a, j0 + d * 0.72, H - 7.6); g.fillStyle = '#f6f4ee'; g.fillRect(x - 4, y - 2, 8, 3); if (k % 2 === 0) { g.fillStyle = '#e8e0d0'; g.fillRect(x, y - 14, 1, 12); g.fillStyle = k % 4 ? '#f4f0e6' : '#3f7a52'; g.beginPath(); g.ellipse(x, y - 14, 8, 3, 0, 0, Math.PI * 2); g.fill(); } }
+    for (let k = 0; k < 10; k++) {
+      const edge = k < 6, a = edge ? i0 + 2 + k * ((w - r - 4) / 5) : i0 + 2 + (k - 6) * 0.2;
+      const [x, y] = P(a, edge ? j1 - 2 - (k % 2) * 1.4 : j0 + 3 + (k - 6) * (d - 6) / 3, H - 8);
+      g.strokeStyle = '#7a5a3a'; g.lineWidth = 3; g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + 3, y - 18, x + 2, y - 34); g.stroke();
+      g.fillStyle = k % 2 ? '#3f8a3a' : '#2f7a36';
+      for (let q = 0; q < 7; q++) { const ang = (q / 7) * Math.PI * 2; g.beginPath(); g.ellipse(x + 2 + Math.cos(ang) * 10, y - 34 + Math.sin(ang) * 4 + 3, 12, 3.2, ang, 0, Math.PI * 2); g.fill(); }
+    }
+    prism(P, poly, roundFoot(i0 + 0.2, i1 - 0.2, j0 + 0.2, j1 - 0.2, r - 0.2, 8, 'ne'), H - 8, H, 'rgba(200,230,236,0.8)', 'rgba(214,238,244,0.85)');
+    // 금빛 E와 EMPORIUM (동쪽 면, 대로 가까이)
+    { const [x, y] = P(i1, j0 + r + 3.2, 76);
+      g.save(); g.translate(x, y); g.transform(1, -0.5, 0, 1, 0, 0);
+      if (night) { g.shadowColor = '#ffd77a'; g.shadowBlur = 10; }
+      g.fillStyle = '#c9a23e'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.font = 'italic 700 40px Georgia, "Times New Roman", serif'; g.fillText('E', 0, -9);
+      g.font = '600 11px Georgia, "Times New Roman", serif'; g.fillText('EMPORIUM', 0, 18);
+      g.restore(); }
+    // 모서리 곁 금빛 격자 상자 (밤엔 환하다)
+    { const a0 = j0 + r + 9, a1 = j0 + r + 14;
+      const box2: Foot = [[i1 - 0.4, a0], [i1 + 0.6, a0], [i1 + 0.6, a1], [i1 - 0.4, a1]];
+      prism(P, poly, box2, 2, 32, night ? '#ffd76a' : '#e8c87a', night ? '#ffe08a' : '#f0d48e', night ? '#fff0b0' : '#f4e2a8');
+      g.save(); clipFaces(g, P, box2, 2, 32);
+      g.strokeStyle = night ? 'rgba(160,110,30,0.8)' : 'rgba(140,100,40,0.7)'; g.lineWidth = 1;
+      const [xa, ya] = P(i1 + 0.6, a0, 32);
+      for (let x = xa - 50; x < xa + 70; x += 5) { g.beginPath(); g.moveTo(x, ya - 30); g.lineTo(x + 40, ya + 70); g.stroke(); g.beginPath(); g.moveTo(x + 40, ya - 30); g.lineTo(x, ya + 70); g.stroke(); }
+      g.restore(); }
+    // 입구 차양 (동쪽 면)
+    poly([P(i1, j0 + r + 1, 31), P(i1, j0 + r + 7, 31), P(i1 + 0.9, j0 + r + 7, 29), P(i1 + 0.9, j0 + r + 1, 29)], '#2a2a2a');
+    return;
+  }
+  if (key === 'emquartier') {
+    const r = Math.min(4.5, d * 0.45);
+    const foot = roundFoot(i0, i1, j0, j1, r);
+    prism(P, poly, roundFoot(i0 + 0.3, i1 - 0.3, j0 + 0.3, j1 - 0.3, r - 0.3), 0, 32, night ? '#f2dc9a' : '#a8c0cc', night ? '#d0b070' : '#88a0ae');
+    mullions(g, P, roundFoot(i0 + 0.3, i1 - 0.3, j0 + 0.3, j1 - 0.3, r - 0.3), 0, 32, 1.4, 'rgba(60,70,80,0.55)');
+    prism(P, poly, foot, 32, 36, '#e8eaec', '#c6cacd');
+    // 둥근 모서리를 감싸는 큰 화면: 테두리 → 하늘빛 광고 (구름 사이 흰 날개 한 짝 — 천국은 생각보다 가깝다)
+    const S0 = 38, S1 = H - 24;
+    prism(P, poly, foot, S0 - 2, S1 + 2, '#17191d', '#101215');
+    g.save(); clipFaces(g, P, foot, S0, S1);
+    { const [xa, ya] = P(i0, j1, S1), [xb, yb] = P(i1, j0 + d * 0.2, S0);
+      const gr = g.createLinearGradient(xa, ya, xb, yb);
+      gr.addColorStop(0, night ? '#2a6ad8' : '#3a7ae0'); gr.addColorStop(0.55, night ? '#7ac0f8' : '#8ad0ff'); gr.addColorStop(1, '#f8e8b0');
+      g.fillStyle = gr; g.fillRect(Math.min(xa, xb) - 20, Math.min(ya, yb) - 120, Math.abs(xb - xa) + 40, Math.abs(yb - ya) + 240);
+      for (let k = 0; k < 9; k++) { const [cx, cy] = P(i0 + 1 + k * (w / 8), j1, S0 + 8 + (k % 3) * 9); g.fillStyle = 'rgba(255,255,255,0.75)'; g.beginPath(); g.ellipse(cx, cy, 14, 5, 0.46, 0, Math.PI * 2); g.fill(); }
+      const [wx, wy] = P(i0 + w * 0.36, j1, (S0 + S1) / 2);
+      g.translate(wx, wy); g.transform(1, 0.5, 0, 1, 0, 0);
+      g.fillStyle = '#ffffff';
+      for (let k = 0; k < 7; k++) { g.beginPath(); g.ellipse(-4 + k * 5, -2 + k * 2.4, 4, 17 - k * 1.3, -0.5 + k * 0.08, 0, Math.PI * 2); g.fill(); }
+      g.fillStyle = 'rgba(255,240,200,0.9)'; g.font = '700 7px "Noto Sans Thai", Tahoma, sans-serif'; g.textAlign = 'left'; g.fillText('สวรรค์อยู่ใกล้กว่าที่คิด', 30, 10); }
+    g.restore();
+    // 위 흰 띠: 동그란 e 표시와 이름
+    prism(P, poly, foot, S1 + 2, H, '#f2f3f4', '#cfd3d6', '#e6e8ea');
+    { const [x, y] = P(i0 + (w - r) * 0.42, j1, S1 + 12);
+      g.save(); g.translate(x, y); g.transform(1, 0.5, 0, 1, 0, 0);
+      g.strokeStyle = '#8a8e92'; g.lineWidth = 1.4; g.beginPath(); g.arc(-26, 0, 7, 0, Math.PI * 2); g.stroke();
+      g.fillStyle = '#5a5e62'; g.font = '700 9px Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('e', -26, 0.5);
+      g.font = '600 10px Georgia, serif'; g.textAlign = 'left'; g.fillText('EmQuartier', -14, 1);
+      g.restore(); }
+    return;
+  }
+  // 엠쿼티어 뒤 동 (헬릭스)
+  const foot: Foot = [[i0, j0], [i1, j0], [i1, j1], [i0, j1]];
+  prism(P, poly, foot, 0, H - 10, night ? '#6a84a0' : '#9ab4c6', night ? '#4a6480' : '#6a889c', '#dfe5ea');
+  for (let z = 14; z < H - 14; z += 11) prism(P, poly, foot, z, z + 1.2, '#4a6478', '#3a5266');
+  mullions(g, P, foot, 0, H - 10, 1.2, 'rgba(40,60,75,0.35)');
+  if (night) for (let k = 0; k < 30; k++) { const a = i0 + 0.5 + ((k * 31) % 37) / 37 * (w * 0.55), z = 16 + ((k * 17) % 29) / 29 * (H - 50); poly([P(a, j1, z), P(a + 0.6, j1, z), P(a + 0.6, j1, z + 6), P(a, j1, z + 6)], 'rgba(255,233,168,0.6)'); }
+  // 헬릭스: 동쪽 14칸 — 층마다 조금씩 돌아가며 내민 흰 테라스와 화단
+  const hx0 = i1 - Math.min(16, w * 0.4);
+  const N = Math.floor((H - 24) / 13);
+  for (let n = 0; n < N; n++) {
+    const z = 10 + n * 13, sh = (n % 4) / 4;
+    const a0 = hx0 + (i1 - hx0) * sh * 0.5, b0 = j0 + d * (0.5 - sh * 0.4);
+    const slab: Foot = [[a0, j0 + 0.5], [i1 + 0.9, j0 + 0.5], [i1 + 0.9, b0], [i1 - 0.2, j1 + 0.9], [a0, j1 + 0.9]];
+    prism(P, poly, slab, z, z + 3, '#f4f4f0', '#d8d8d2', '#eeeeea');
+    prism(P, poly, slab.map(([i, j]) => [i, j] as [number, number]), z + 3, z + 6, night ? '#3a7a3a' : '#4f9a42', night ? '#2a6a2e' : '#3e8436');
+    for (let k = 0; k < 4; k++) { const [x, y] = P(a0 + 1 + k * ((i1 - a0) / 4), j1 + 0.9, z + 6); g.fillStyle = k % 2 ? '#f2b8c8' : '#f2d24a'; g.fillRect(x, y - 2, 2, 2); }
+  }
+  void text;
 }
