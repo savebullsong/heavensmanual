@@ -3,6 +3,7 @@
 import { Hound } from './hound.ts';
 import { shuttleCanvas, flameCanvas } from './shipgfx.ts';
 import { goatCharSet } from './goat.ts';
+import { dogCharSet, type DogCoat } from './dog.ts';
 import { packFor, PACK_FOOT } from './maskgear.ts';
 import { vendorGear, hasVendorGear, VGEAR_FOOT } from './vendorgear.ts';
 import { drawDalHouse } from './dalgfx.ts';
@@ -133,7 +134,7 @@ function tex(c: HTMLCanvasElement): Texture {
   return tx;
 }
 
-export type NpcKind = 'passer' | 'thug' | 'suturer' | 'monster' | 'pashar' | 'clerk' | 'angel' | 'yellowwing' | 'officer' | 'guard' | 'talus' | 'soul' | 'vendor' | 'fighter' | 'elder' | 'sleeper' | 'goat' | 'maskgirl' | 'yunae' | 'goatking' | 'changer' | 'noeul' | 'mari' | 'marionette' | 'caged';
+export type NpcKind = 'passer' | 'thug' | 'suturer' | 'monster' | 'pashar' | 'clerk' | 'angel' | 'yellowwing' | 'officer' | 'guard' | 'talus' | 'soul' | 'vendor' | 'fighter' | 'elder' | 'sleeper' | 'goat' | 'maskgirl' | 'yunae' | 'goatking' | 'changer' | 'noeul' | 'mari' | 'marionette' | 'caged' | 'dog';
 export type Realm = 'real' | 'ghost' | 'hell' | 'heaven' | 'border'; // 24차: border = 경계의 해변 (귀신 대신)
 export type Stance = 'talk' | 'hostile' | 'all';
 /** name = 아이디(프로필·신고에 쓰는 열쇠), nick = 게임 속 이름(보이는 이름) */
@@ -185,13 +186,15 @@ interface Walker {
   voice?: number; // 사람마다 다른 목소리·타격음 높낮이
   stalk?: number; // 불량배: 시비 걸며 다가오는 중 (초)
   weak?: 'drunk' | 'shade'; // 잡기 쉬운 적: 현실의 취객 · 천국의 그림자
-  gang?: 'robber' | 'mafia' | 'pickpocket' | 'boxer' | 'enforcer'; // 17차: 불량배보다 센 적 (강도 · 마피아) · 35차 소매치기 · 무에타이 파이터(방콕) · 행동대장(서울)
+  gang?: 'robber' | 'mafia' | 'pickpocket' | 'boxer' | 'enforcer' | 'collector'; // 48차 사채 수금원 // 17차: 불량배보다 센 적 (강도 · 마피아) · 35차 소매치기 · 무에타이 파이터(방콕) · 행동대장(서울)
   /** 35차 소매치기: 훔친 돈과 달아나는 남은 시간 */
   pick?: { stolen: number; flee: number };
   wings?: Sprite; // 천사·황색날개의 날개
   aggroCool?: number;
   /** 48차: 고문하던 괴물 — 맞기 전까지는 덤비지 않는다 */
   untilHit?: boolean;
+  /** 48차 들개 무리 번호 */
+  dogPack?: number;
   mdef?: MonsterDef; // 지옥 괴물
   gdef?: GuardDef; // 휴식 마을 경비병
   post?: number; // 경비병 번호 (순찰로)
@@ -770,6 +773,7 @@ export class WorldScene {
       for (let n = 0; n < this.streetHostiles(); n++) this.spawnNpc('thug');
       if (this.realm === 'real') { this.setupStreetLife(decProps); for (let n = 0; n < 10; n++) this.spawnNpc('passer'); } // 19차: 사람이 더 북적이게 · 42차: 시민을 더
       if (this.realm === 'real' && Math.random() < 0.7) this.spawnGoat(); // 24차: 떠도는 염소 (구역마다 있을 수도, 없을 수도)
+      if (this.realm === 'real' && Math.random() < 0.75) this.spawnDogs(); // 48차: 들개 무리
       this.setupAirportStop(); // 47차 공항 가는 정류장
       if (this.realm === 'real' && this.zone.home) this.placeYunae();
       if (this.realm === 'real' && this.zone.city !== 'seoul') this.spawnFieldBosses(); // 31차: 수쿰빗 필드 보스
@@ -1492,6 +1496,8 @@ export class WorldScene {
     // 35차: 소매치기는 눈에 띄지 않는 평범한 차림(모자·작은 가방) · 무에타이 파이터는 민소매와 반바지 · 행동대장은 짧은 머리에 검은 양복
     if (gang === 'pickpocket') return { sex: Math.random() < 0.6 ? 'm' : 'f', build: r(2), skin: r(3), hair: [0, 1, 5][r(3)], hairColor: r(2), top: 0, bottom: 0, cols: { 3: pick(['#8a8478', '#6a7078', '#a09a8c', '#5a5e52']), 4: pick(['#3a3c40', '#4a4438', '#2e3440']), 5: '#2a2622' } };
     if (gang === 'boxer') return { sex: 'm', build: 2, skin: 1 + r(2), hair: 5, hairColor: 0, top: 0, bottom: 0, cols: { 3: pick(['#c8282a', '#2a48c0', '#e8e4dc']), 4: pick(['#c8282a', '#1a1a1e', '#2a48c0', '#d8a83a']), 5: '#3a2a20' } };
+    // 48차 사채 수금원: 잿빛 정장에 단추를 푼 흰 셔츠, 금 목걸이 · 넥타이 없이 · 손에 장부 대신 쇠파이프
+    if (gang === 'collector') return { sex: Math.random() < 0.8 ? 'm' : 'f', build: 1 + r(2), skin: r(3), hair: [5, 0][r(2)], hairColor: 0, top: 0, bottom: 0, outfit: 'mafia', cols: { 3: pick(['#5a5e64', '#6a6258', '#4a4e56']), 4: pick(['#3a3c42', '#4a443c']), 5: '#1a1816', 10: '#ece8e0', 12: '#ece8e0', 14: '#e0b84a', 15: '#2a2622' } };
     if (gang === 'enforcer') return { sex: 'm', build: 2, skin: r(2), hair: 5, hairColor: 0, top: 0, bottom: 0, outfit: 'mafia', cols: { 3: '#121216', 4: '#121216', 5: '#0a0a0a', 10: '#f2f0ea', 12: '#121216', 14: '#c9a23e', 15: '#08080a' } };
     if (gang === 'mafia') return { sex: Math.random() < 0.65 ? 'm' : 'f', build: 1, skin: r(3), hair: Math.random() < 0.5 ? 0 : 3, hairColor: 0, top: 0, bottom: 0, outfit: 'mafia', cols: { 3: pick(['#16181c', '#1e1a24', '#2a2a2e', '#f0ece4']), 4: '#14161a', 5: '#0e0c0c', 10: '#f2f0ea', 12: pick(['#a8202a', '#7a1a1a', '#c9a23e']), 14: '#d9b44a', 15: '#08080a' } };
     if (kind === 'thug') return { sex: Math.random() < 0.85 ? 'm' : 'f', build: 1 + r(2), skin: r(3), hair: [0, 5, 1][r(3)], hairColor: r(2), top: 4, bottom: 3 };
@@ -1573,7 +1579,7 @@ export class WorldScene {
   private makeGang(w: Walker, gang: Walker['gang']) {
     w.gang = gang;
     if (w.kind !== 'thug' || w.weak) return;
-    w.maxHp = w.hp = gang === 'mafia' ? 520 : gang === 'robber' ? 320 : gang === 'enforcer' ? 640 : gang === 'boxer' ? 440 : gang === 'pickpocket' ? 110 : 150;
+    w.maxHp = w.hp = gang === 'mafia' ? 520 : gang === 'robber' ? 320 : gang === 'enforcer' ? 640 : gang === 'boxer' ? 440 : gang === 'pickpocket' ? 110 : gang === 'collector' ? 400 : 150;
   }
   /**
    * 21차 거리의 위험도: 우주새가 있는 아속(시작)은 취객·불량배뿐 — 우주새 문에서 멀어질수록 강도가 가끔 섞인다.
@@ -1638,6 +1644,7 @@ export class WorldScene {
     const seoul = this.zone.id.startsWith('seoul');
     const r0 = Math.random();
     if (r0 < (this.zone.shop === false ? 0.06 : 0.05)) return { gang: 'pickpocket' }; // 42차: 소매치기는 가끔만
+    if (r0 > 0.93 && this.hooks.cash() > 100) return { gang: 'collector' }; // 48차: 사채 수금원 — 돈 냄새를 맡고 온다 (어디서나 가끔)
     if (r0 < (this.gangZone() ? 0.3 : 0.2)) return { gang: seoul ? 'enforcer' : 'boxer' };
     // 23차: 끝 구역(나나 · 프롬퐁)은 마피아만 — 무리 지어 덤빈다
     if (this.gangZone()) return { gang: 'mafia' };
@@ -2463,6 +2470,70 @@ export class WorldScene {
     w.size = 1.35;
     w.home = [spot[0], spot[1]];
     this.walkers.push(w);
+  }
+  /**
+   * 48차 들개 무리: 골목 끝 · 공터 · 큰길 뒤편을 셋에서 다섯이 떼 지어 돈다 (밤에는 더 사납다).
+   * 하나가 나를 보거나 맞으면 무리 전체가 덤빈다. 다치면 깨갱 달아나고, 둘 이하로 줄면 남은 것도 달아난다. 나보다 조금 느려 도망칠 수는 있다
+   */
+  private dogT = -1;
+  private packN = 0;
+  private spawnDogs() {
+    const p0 = this.player;
+    let spot: [number, number] | null = null;
+    for (let n = 0; n < 30 && !spot; n++) {
+      const s0 = randomWalkTileNear(this.zone, Math.floor(p0.x), Math.floor(p0.y), 45, ['soi', 'lot', 'park', 'walk']);
+      if (s0 && Math.hypot(s0[0] - p0.x, s0[1] - p0.y) > 16 && !this.inSafe(s0[0], s0[1])) spot = s0;
+    }
+    if (!spot) { this.dogT = 60; return; }
+    const id = ++this.packN, n = 3 + Math.floor(Math.random() * 3);
+    for (let k = 0; k < n; k++) {
+      const at = randomWalkTileNear(this.zone, spot[0], spot[1], 2, ['soi', 'lot', 'park', 'walk', 'cross']) ?? spot;
+      const w = this.makeWalker(this.npcLook('passer'), at[0], at[1], 'dog');
+      w.dressId = -1;
+      w.cs = dogCharSet(Math.floor(Math.random() * 4) as DogCoat);
+      w.maxHp = w.hp = 130 + Math.floor(Math.random() * 40);
+      w.speed = 0.9;
+      w.size = 1.2;
+      w.home = [spot[0], spot[1]];
+      w.dogPack = id;
+      w.wait = Math.random() * 3;
+      this.walkers.push(w);
+    }
+  }
+  private packOf(w: Walker) { return this.walkers.filter((x) => x.kind === 'dog' && x.dogPack === w.dogPack && x.down <= 0); }
+  private thinkDog(w: Walker, moving: boolean, dt: number) {
+    const p = this.player;
+    const d = Math.hypot(p.x - w.x, p.y - w.y);
+    const L = t();
+    if (w.flee > 0) {
+      if (d > 15 || w.flee < 0.3) { this.removeWalker(w); if (!this.walkers.some((x) => x.kind === 'dog' && x.down <= 0)) this.dogT = 150 + Math.random() * 120; return; }
+      if (!w.path.length) { const ax = w.x + (w.x - p.x) * 3, ay = w.y + (w.y - p.y) * 3; const to = this.nearestWalkable(Math.floor(ax), Math.floor(ay)); if (to) w.path = findPath(this.zone, Math.floor(w.x), Math.floor(w.y), to[0], to[1]) ?? []; }
+      w.flee = Math.max(0.31, w.flee - dt);
+      return;
+    }
+    if (w.target) {
+      // 무리가 둘 이하로 줄면 꼬리를 말고 달아난다
+      if (this.packOf(w).length <= 2 && Math.random() < dt * 0.6) { w.flee = 9; w.target = null; w.path = []; this.bubble(w, L.dogYelp[Math.floor(Math.random() * L.dogYelp.length)]); }
+      else if (!w.bubble && Math.random() < dt * 0.25) this.bubble(w, L.dogBark[Math.floor(Math.random() * L.dogBark.length)]);
+      return;
+    }
+    const hidden = this.dead || this.invisible || !!this.zone.interior || !!this.working?.on;
+    const notice = this.night === 1 ? 8 : 6;
+    if (!hidden && d < notice && !this.inSafe(p.x, p.y) && Math.random() < dt * (this.night === 1 ? 2 : 1.1)) {
+      for (const x of this.packOf(w)) { x.target = p; x.repathT = 0; x.firstBy ??= x; }
+      this.bubble(w, L.dogGrowl[Math.floor(Math.random() * L.dogGrowl.length)]);
+      return;
+    }
+    // 무리 지어 어슬렁 — 우두머리(가장 먼저 난 것)를 느슨하게 따라간다
+    w.wait -= dt;
+    if (!moving && w.wait <= 0) {
+      const lead = this.packOf(w)[0];
+      const c = lead && lead !== w ? [Math.floor(lead.x), Math.floor(lead.y)] : w.home;
+      const to = randomWalkTileNear(this.zone, c[0], c[1], lead && lead !== w ? 2 : 9);
+      if (to) w.path = findPath(this.zone, Math.floor(w.x), Math.floor(w.y), to[0], to[1]) ?? [];
+      w.wait = 1.5 + Math.random() * 3.5;
+      if (lead === w && Math.random() < 0.3) w.home = [to?.[0] ?? w.home[0], to?.[1] ?? w.home[1]];
+    }
   }
   /** 25차 마스크 팔이 소녀: 휴식 마을 울타리 바깥, 몇 칸 떨어진 고리 위를 천천히 돈다 */
   private maskGirlSpot(): [number, number] | null {
@@ -3334,6 +3405,7 @@ export class WorldScene {
     if (gang === 'pickpocket') return r < 0.35 ? 'knife' : null;
     if (gang === 'boxer') return null; // 맨몸: 팔꿈치·무릎·발차기
     if (gang === 'enforcer') return r < 0.45 ? 'metalbat' : r < 0.75 ? 'dagger' : 'pipe';
+    if (gang === 'collector') return r < 0.5 ? 'pipe' : r < 0.8 ? 'bat' : 'knife';
     if (this.realm === 'real' && this.zone.shop !== false && !this.zone.interior) return r < 0.6 ? 'bat' : r < 0.8 ? 'pipe' : null; // 21차: 시작 구역 불량배는 야구배트를 자주 든다 (쓰러뜨리면 떨어뜨린다)
     return [null, 'bat', 'pipe', 'knife', 'bat', null][Math.floor(r * 6)];
   }
@@ -5867,7 +5939,7 @@ export class WorldScene {
   private isFoe(w: Walker) {
     if (w.kind === 'remote') return this.recentAttacker(w.rid) || !!w.rpos?.c;
     if (w.gdef) return w.target === this.player;
-    return w.kind === 'thug' || w.kind === 'goat' || w.kind === 'suturer' || (!!w.mdef && !w.asleep) || w.target === this.player;
+    return w.kind === 'thug' || w.kind === 'goat' || w.kind === 'dog' || w.kind === 'suturer' || (!!w.mdef && !w.asleep) || w.target === this.player;
   }
   private onHover(gx: number, gy: number) {
     const w = this.walkerAt(gx, gy);
@@ -5890,7 +5962,7 @@ export class WorldScene {
     const L = t();
     const [sx, sy] = iso(w.x, w.y);
     const opts: { label: string; danger?: boolean; act: () => void }[] = [];
-    if (w.kind === 'thug' || w.kind === 'goat' || w.kind === 'suturer' || (w.mdef && !w.asleep) || w.gdef) opts.push({ label: L.act.attack, act: () => this.attack(w) });
+    if (w.kind === 'thug' || w.kind === 'goat' || w.kind === 'dog' || w.kind === 'suturer' || (w.mdef && !w.asleep) || w.gdef) opts.push({ label: L.act.attack, act: () => this.attack(w) });
     if (w.mdef?.key === 'gurma') opts.push({ label: w.asleep ? L.act.look : L.gurmaFeedBtn, act: () => this.approach(w, 'talk') });
     if (!w.mdef) opts.push({ label: L.act.talk, act: () => this.approach(w, 'talk') });
     opts.push({ label: L.act.look, act: () => this.approach(w, 'look') });
@@ -5902,7 +5974,7 @@ export class WorldScene {
     if (w.isPlayer || w.down > 0 || w.kind === 'remote' || w.invader) return false;
     if (w.kind === 'clerk') return true;
     if (w.mdef && w.mdef.key !== 'gurma') return false;
-    if (w.kind === 'thug' || w.kind === 'goat' || w.kind === 'suturer') return false;
+    if (w.kind === 'thug' || w.kind === 'goat' || w.kind === 'dog' || w.kind === 'suturer') return false;
     return !this.isFoe(w);
   }
   /** 36차: 손 태세에서 내 곁(1.9칸)의 말을 걸 수 있는 사람 하나 — 머리 위에 말풍선. 마지막으로 누른 사람이 먼저 */
@@ -6452,6 +6524,7 @@ export class WorldScene {
     if (w.kind === 'noeul' && pd.kind === 'talk') { w.path = []; w.wait = 8; w.watchT = 40; w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); this.hooks.heavenAct('noeul'); return; }
     if (w.kind === 'yellowwing' && pd.kind === 'talk') { w.path = []; w.wait = 6; w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); this.hooks.heavenAct('yellowwing'); return; }
     if (w.kind === 'goat') { this.hooks.say(L.goatName, pd.kind === 'look' ? L.goatTag : L.goatTalk); return; }
+    if (w.kind === 'dog') { this.hooks.say(L.dogName, pd.kind === 'look' ? L.dogLook : L.dogGrowl[0]); return; }
     if (w.kind === 'goatking') { w.path = []; w.dir = this.player.x - w.x - (this.player.y - w.y) >= 0 ? 'e' : 'w'; if (pd.kind === 'look') this.hooks.say(L.gkName, L.gkLook); else this.hooks.goatKing(); return; }
     if (w.kind === 'changer') { w.path = []; if (pd.kind === 'look') this.hooks.say(L.xchName, L.xchSub); else this.hooks.changer(); return; }
     if (w.dumpAngel) { const ls = pd.kind === 'look' ? [L.dumpLook] : L.dumpLines; this.hooks.say(this.npcName(w), ls[Math.floor(Math.random() * ls.length)]); return; } // 47차 쓰레기장 천사
@@ -6588,6 +6661,7 @@ export class WorldScene {
     if (w.kind === 'yunae') return L.yunae;
     if (w.cards) return L.angel;
     if (w.kind === 'goat') return L.goatName;
+    if (w.kind === 'dog') return L.dogName;
     if (w.kind === 'goatking') return L.gkName;
     if (w.kind === 'changer') return L.xchName;
     if (w.kind === 'clerk') return this.zone.interior?.kind === 'loan' ? L.besk : this.zone.interior?.kind === 'rebirth' ? L.pashar : this.zone.interior?.kind === 'terrace' ? L.officer : this.zone.interior?.name ?? '';
@@ -6635,6 +6709,7 @@ export class WorldScene {
     if (w.kind === 'yunae') return L.yunaeSub[1];
     if (w.cards) return L.cardSub;
     if (w.kind === 'goat') return L.goatSub;
+    if (w.kind === 'dog') return L.dogSub;
     if (w.kind === 'goatking') return L.gkSub;
     if (w.kind === 'changer') return L.xchSub;
     if (w.kind === 'clerk') return this.zone.interior?.kind === 'terrace' ? L.officerSub : this.zone.interior?.kind === 'hpalace' ? L.palaceClerkSub : L.clerkSub[(this.zone.interior?.kind ?? 'shop') as keyof typeof L.clerkSub] ?? '';
@@ -7001,6 +7076,7 @@ export class WorldScene {
     } // 31차: 헛방 — 글자 없이 (휘두름만 있고 타격음·번쩍임·움찔이 없다)
     if (to.isPlayer) this.lastHitBy = from.kind === 'remote' ? (from.rid ?? null) : null;
     // 30차 내구도: 내가 때리면 무기가, 맞으면 입은 방어구가 닳는다
+    if (from.gang === 'collector' && to.isPlayer && dmg > 0 && Math.random() < 0.55) { const want = Math.min(1500, Math.max(5, Math.round(this.hooks.cash() * (0.02 + Math.random() * 0.03)))); const got = this.hooks.cash() > 0 ? this.hooks.stolen(want) : 0; if (got > 0) { from.pick = { stolen: (from.pick?.stolen ?? 0) + got, flee: 0 }; this.float(to, `−${moneyText(got)}`, '#ff8a6a'); if (!from.bubble) this.bubble(from, (this.gangText('collector', 'Interest') as string[])[Math.floor(Math.random() * 3)]); } } // 48차: 맞을 때마다 '이자'를 떼 간다 — 쓰러뜨리면 고스란히 떨어진다
     if (to.untilHit && from.isPlayer) { to.untilHit = false; to.target = from; to.firstBy ??= from; this.bubble(to, t().torturerAngry[Math.floor(Math.random() * t().torturerAngry.length)]); } // 48차: 고문하던 괴물은 맞고서야 돌아선다
     if (from.isPlayer && to.stiffBoss && !to.firstBy) { to.firstBy = from; to.wait = 0; to.target = from; this.hooks.deed('firstStrike'); this.markCrime(); this.bubble(to, t().stiffBossFight[Math.floor(Math.random() * t().stiffBossFight.length)]); } // 47차: 사장을 먼저 치면 악행
     if (from.isPlayer && from !== to && this.gear.weapon) this.hooks.wear('weapon');
@@ -7054,6 +7130,8 @@ export class WorldScene {
     to.hurtT = 0.18;
     // 26차 회색 망령: 맞으면 가끔 가던 길을 잃는다 (누른 길이 지워진다)
     if (to.isPlayer && from.mdef?.ghost && to.path.length && Math.random() < 0.3) { to.path = []; this.kite = false; this.float(to, t().lostWay, '#c8d2ff'); }
+    if (to.kind === 'dog' && to.hp > 0 && to.hp < to.maxHp * 0.3 && !to.flee && Math.random() < 0.6) { to.flee = 8; to.target = null; to.path = []; to.act = null; to.pend = null; this.bubble(to, t().dogYelp[Math.floor(Math.random() * t().dogYelp.length)]); if (from.isPlayer) this.player.target = null; return; } // 48차: 다친 개는 깨갱 달아난다
+    if (to.kind === 'dog' && from.isPlayer) for (const x of this.packOf(to)) if (!x.target && !x.flee) { x.target = from; x.repathT = 0; } // 하나를 때리면 무리가 덤빈다
     if (to.kind === 'goat' && to.hp > 0 && to.hp < to.maxHp * 0.28 && !to.fled) {
       to.fled = true;
       if (Math.random() < 0.72) { to.flee = 9; to.target = null; to.path = []; to.act = null; to.pend = null; this.bubble(to, t().goatFlee); if (from.isPlayer) this.player.target = null; return; } // 대개는 달아난다 — 가끔은 끝까지 버티다 죽는다
@@ -7101,7 +7179,7 @@ export class WorldScene {
 
   /** 맞은 몸의 재질 → 타격음이 달라진다 */
   private bodyOf(w: Walker): sfx.Body {
-    if (w.kind === 'goat') return 'yak';
+    if (w.kind === 'goat' || w.kind === 'dog') return 'yak';
     if (w.gdef) return w.gdef.body === 'warden1' ? 'ash' : w.gdef.body === 'warden2' ? 'pret' : 'suturer';
     if (w.mdef) {
       const b = w.mdef.body;
@@ -7246,7 +7324,7 @@ export class WorldScene {
     // 22차: 적대 NPC가 떨어뜨리는 돈은 폭을 넓혀 무작위로 — 취객 1~4 · 불량배 2~6 · 강도 3~9 · 마피아 4~12
     // 26차 경제: 싸움 한 번에 드는 끼니값보다 조금 더 (취객 2~6 · 불량배 5~12 · 강도 12~28 · 마피아 25~60)
     // 42차: 현실의 돈은 일해서 번다 — 거리의 적이 떨어뜨리는 돈을 대략 절반으로
-    const amount = w.stiffBoss ? Math.round((w.owed ?? 50) * (1.5 + Math.random())) : w.kind === 'thug' ? (w.gang === 'mafia' ? rand(15, 35) : w.gang === 'robber' ? rand(7, 16) : w.gang === 'enforcer' ? rand(24, 50) : w.gang === 'boxer' ? rand(12, 25) : w.gang === 'pickpocket' ? rand(3, 8) + (w.pick?.stolen ?? 0) : w.weak === 'drunk' ? rand(1, 3) : rand(3, 7)) : w.tour ? touristCash() : passerCash();
+    const amount = w.stiffBoss ? Math.round((w.owed ?? 50) * (1.5 + Math.random())) : w.kind === 'thug' ? (w.gang === 'mafia' ? rand(15, 35) : w.gang === 'robber' ? rand(7, 16) : w.gang === 'enforcer' ? rand(24, 50) : w.gang === 'boxer' ? rand(12, 25) : w.gang === 'pickpocket' ? rand(3, 8) + (w.pick?.stolen ?? 0) : w.gang === 'collector' ? rand(18, 40) + (w.pick?.stolen ?? 0) : w.weak === 'drunk' ? rand(1, 3) : rand(3, 7)) : w.tour ? touristCash() : passerCash();
     this.dropCoin(w.x, w.y, amount, w.kind === 'passer');
   }
 
@@ -7875,9 +7953,9 @@ export class WorldScene {
       if (crit) dmg *= CRIT_MULTIPLIER;
       this.startAttack(w, tg, dmg, crit);
     } else {
-      w.atkT = w.noeulAlly ? 0.48 : w.kind === 'goat' ? 1.05 : w.gdef ? w.gdef.atk : w.mdef ? w.mdef.atk : w.kind === 'suturer' ? (w.monster ? 0.68 : 0.8) : w.weak ? 1.25 : w.weapon === 'pistol' ? 1.4 : w.gang ? 0.8 : 0.9;
+      w.atkT = w.noeulAlly ? 0.48 : w.kind === 'goat' ? 1.05 : w.kind === 'dog' ? 0.75 : w.gdef ? w.gdef.atk : w.mdef ? w.mdef.atk : w.kind === 'suturer' ? (w.monster ? 0.68 : 0.8) : w.weak ? 1.25 : w.weapon === 'pistol' ? 1.4 : w.gang ? 0.8 : 0.9;
       const f = this.zone.hell?.floor ?? 1;
-      const base = w.fb && FB[w.fb] ? rand(FB[w.fb].dmg[0], FB[w.fb].dmg[1]) * FB_HIT : w.kind === 'goat' ? rand(10, 19) : w.kind === 'angel' ? rand(30, 52) : w.gdef ? (tg.isPlayer ? Math.max(rand(w.gdef.dmg[0], w.gdef.dmg[1]) * 0.6, tg.maxHp * 0.12) : rand(w.gdef.dmg[0], w.gdef.dmg[1])) * (tg.sealT && tg.sealT > 0 ? 1.5 : 1) : w.mdef ? rand(w.mdef.dmg[0], w.mdef.dmg[1]) * (w.mdef.boss ? BOSS_HIT * (1 + 0.15 * (f - 1)) : 1 + 0.25 * (f - 1)) * (w.sealT && w.sealT > 0 ? 0.5 : 1) * (w.elite ? 1.5 : 1) * floorCurve(f).dmg : w.kind === 'suturer' ? rand(10, 18) * (w.monster ? 1.6 : 1) : w.marion ? rand(w.marion.dmg[0], w.marion.dmg[1]) : w.kind === 'fighter' ? rand(20, 34) * (1 + 0.3 * (f - 1)) : w.weak ? rand(1, 4) : w.stiffBoss ? (w.stiffBoss === 2 ? rand(26, 42) : rand(6, 12)) + (w.weapon ? 3 : 0) : w.kind === 'passer' ? (w.gunman ? rand(14, 22) : rand(3, 7) + (w.weapon ? 3 : 0)) * (1 + 0.9 * (w.ptier ?? 0)) * (w.civ ? CIV[w.civ].dmg : 1) : w.gang === 'mafia' ? rand(10, 17) + (w.weapon ? 4 : 0) : w.gang === 'robber' ? rand(6, 12) + (w.weapon ? 3 : 0) : w.gang === 'enforcer' ? rand(13, 21) + (w.weapon ? 4 : 0) : w.gang === 'boxer' ? rand(11, 19) : w.gang === 'pickpocket' ? rand(3, 6) + (w.weapon ? 3 : 0) : rand(3, 7) + (w.weapon ? 2 : 0);
+      const base = w.fb && FB[w.fb] ? rand(FB[w.fb].dmg[0], FB[w.fb].dmg[1]) * FB_HIT : w.kind === 'goat' ? rand(10, 19) : w.kind === 'dog' ? rand(4, 9) * (this.night === 1 ? 1.25 : 1) : w.kind === 'angel' ? rand(30, 52) : w.gdef ? (tg.isPlayer ? Math.max(rand(w.gdef.dmg[0], w.gdef.dmg[1]) * 0.6, tg.maxHp * 0.12) : rand(w.gdef.dmg[0], w.gdef.dmg[1])) * (tg.sealT && tg.sealT > 0 ? 1.5 : 1) : w.mdef ? rand(w.mdef.dmg[0], w.mdef.dmg[1]) * (w.mdef.boss ? BOSS_HIT * (1 + 0.15 * (f - 1)) : 1 + 0.25 * (f - 1)) * (w.sealT && w.sealT > 0 ? 0.5 : 1) * (w.elite ? 1.5 : 1) * floorCurve(f).dmg : w.kind === 'suturer' ? rand(10, 18) * (w.monster ? 1.6 : 1) : w.marion ? rand(w.marion.dmg[0], w.marion.dmg[1]) : w.kind === 'fighter' ? rand(20, 34) * (1 + 0.3 * (f - 1)) : w.weak ? rand(1, 4) : w.stiffBoss ? (w.stiffBoss === 2 ? rand(26, 42) : rand(6, 12)) + (w.weapon ? 3 : 0) : w.kind === 'passer' ? (w.gunman ? rand(14, 22) : rand(3, 7) + (w.weapon ? 3 : 0)) * (1 + 0.9 * (w.ptier ?? 0)) * (w.civ ? CIV[w.civ].dmg : 1) : w.gang === 'mafia' ? rand(10, 17) + (w.weapon ? 4 : 0) : w.gang === 'robber' ? rand(6, 12) + (w.weapon ? 3 : 0) : w.gang === 'enforcer' ? rand(13, 21) + (w.weapon ? 4 : 0) : w.gang === 'boxer' ? rand(11, 19) : w.gang === 'pickpocket' ? rand(3, 6) + (w.weapon ? 3 : 0) : w.gang === 'collector' ? rand(8, 14) + (w.weapon ? 3 : 0) : rand(3, 7) + (w.weapon ? 2 : 0);
       const dmg = Math.max(1, Math.round(base) - (tg.isPlayer ? this.gear.dr ?? 0 : 0));
       this.startAttack(w, tg, dmg);
     }
@@ -7946,11 +8024,12 @@ export class WorldScene {
     if (w.isPlayer && isDanger(w.hp, w.maxHp)) speed *= DANGER_SPEED;
     if (w.isPlayer) speed *= this.load.speed; // 47차 무게
     if (w.kind === 'thug' && w.pick && w.pick.flee > 0 && !w.target) speed = 2.0; // 35차 → 42차: 너무 빨라 잡을 수 없었다 — 나(2.3)보다 조금 느리게
-    else if (w.kind === 'thug' && w.target) speed = w.weak ? 1.05 : w.gang === 'robber' ? 1.95 : w.gang === 'mafia' ? 1.75 : w.gang === 'boxer' ? 1.9 : w.gang === 'enforcer' ? 1.7 : w.gang === 'pickpocket' ? 2.1 : 1.6;
+    else if (w.kind === 'thug' && w.target) speed = w.weak ? 1.05 : w.gang === 'robber' ? 1.95 : w.gang === 'mafia' ? 1.75 : w.gang === 'boxer' ? 1.9 : w.gang === 'enforcer' ? 1.7 : w.gang === 'pickpocket' ? 2.1 : w.gang === 'collector' ? 1.85 : 1.6;
     else if (w.kind === 'thug' && w.stalk) speed = w.weak ? 0.85 : 1.3;
     if (w.mdef && w.target) speed = w.mdef.speed * 1.35;
     if (w.gdef && w.target) speed = w.gdef.speed * 2.4;
-    if (w.kind === 'goat') speed = w.flee > 0 ? 5.2 : w.target ? 2.1 : 0.85; // 죽기 직전의 염소는 믿기지 않게 빠르다
+    if (w.kind === 'goat') speed = w.flee > 0 ? 5.2 : w.target ? 2.1 : 0.85;
+    if (w.kind === 'dog') speed = w.flee > 0 ? 3.4 : w.target ? 2.05 : 0.9; // 나(2.3)보다 조금 느리다 — 달아나면 산다 // 죽기 직전의 염소는 믿기지 않게 빠르다
     if (w.slowT && w.slowT > 0) speed *= 0.5;
     // 괴물은 휴식 공간에 들어오지 못한다
     if (w.mdef && this.inRest(tx, ty)) { w.path = []; return false; }
@@ -7977,6 +8056,7 @@ export class WorldScene {
     }
     if (this.ambushT > 0 && (this.ambushT -= dt) <= 0 && !this.zone.interior) this.spawnSuturer();
     if (this.goatT > 0 && (this.goatT -= dt) <= 0) { this.goatT = -1; if (!this.walkers.some((x) => x.kind === 'goat')) this.spawnGoat(); }
+    if (this.dogT > 0 && (this.dogT -= dt) <= 0) { this.dogT = -1; if (!this.walkers.some((x) => x.kind === 'dog' && x.down <= 0)) this.spawnDogs(); }
     if (this.realm === 'real' && !this.zone.interior && this.netRole !== 'guest' && (this.brawlT -= dt) <= 0) { this.brawlT = 70 + Math.random() * 80; this.startBrawl(); } // 42차: 거리 싸움은 드물게
     if (this.kerb) this.updateKerberos(dt);
     if (this.guide) this.updateGuide(dt);
@@ -8035,6 +8115,7 @@ export class WorldScene {
             if (w.fb) { this.removeWalker(w); continue; } // 31차: 쓰러진 필드 보스는 사라진다 (다시 나올 때는 정해진 시간 뒤)
             if (w.kind === 'suturer') { this.removeWalker(w); continue; }
             if (w.kind === 'goat') { this.removeWalker(w); this.goatT = 90 + Math.random() * 90; continue; }
+            if (w.kind === 'dog') { this.removeWalker(w); if (!this.walkers.some((x) => x.kind === 'dog' && x.down <= 0)) this.dogT = 120 + Math.random() * 120; continue; }
             if (w.reviveUp) { w.reviveUp = false; w.hp = Math.round(w.maxHp * 0.55); w.act = null; w.riseT = 0.4; w.sprite.rotation = 0; w.target = this.dead ? null : this.player; w.repathT = 0; continue; } // 실에 끌려 일어선다
             if (w.mdef) { if (w.mdef.boss || w.raider || w.invader || w.kid || !this.zone.hell) this.removeWalker(w); else this.spawnMonster(w); continue; }
             if (w.gdef) { const g = this.makeGuard(w.gdef, w.post ?? 0); this.removeWalker(w); this.walkers.push(g); continue; }
@@ -8419,6 +8500,7 @@ export class WorldScene {
     if (w.preach !== undefined) { this.thinkPreacher(w, dt); return; }
     if (w.kind === 'sleeper') return;
     if (w.kind === 'goat') { this.thinkGoat(w, moving, dt); return; }
+    if (w.kind === 'dog') { this.thinkDog(w, moving, dt); return; }
     if (w.kind === 'goatking') { this.thinkGoatKing(w, dt); return; }
     if (w.kind === 'changer') { this.thinkChanger(w, dt); return; }
     if (w.twin) { this.thinkTwin(w, moving, dt); return; } // 46차

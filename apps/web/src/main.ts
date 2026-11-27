@@ -122,9 +122,9 @@ function switchArrows(k: string) {
 // ───────────────────────── 48차 화살·탄약: 가방에 보이고 · 팔리고 · 무게가 있다 ─────────────────────────
 const isAmmo = (it: ItemDef | null | undefined) => !!it && (it.note === 'arrows' || it.note === 'ammo' || it.note === 'rifleammo');
 /** 한 묶음에 든 수 (가게에서 사는 단위) */
-const ammoBundle = (it: ItemDef) => (it.note === 'arrows' ? 20 : it.note === 'rifleammo' ? 10 : 12);
+const ammoBundle = (it: ItemDef) => it.qty ?? (it.note === 'arrows' ? 20 : it.note === 'rifleammo' ? 10 : 12);
 /** 한 발 무게: 화살 0.05 · 권총 탄 0.03 · 소총 탄 0.06 — 가볍지만 끝없이 들 수는 없다 */
-const ammoUnitW = (it: ItemDef) => (it.note === 'arrows' ? 0.05 : it.note === 'rifleammo' ? 0.06 : 0.03);
+const ammoUnitW = (it: ItemDef) => (it.note === 'arrows' ? 0.02 : it.note === 'rifleammo' ? 0.06 : 0.03); // 48차: 화살은 생계형 — 칼 한 자루가 닳는 동안의 절반쯤 쏠 만큼(약 900대 = 18) 들 수 있게. 총알은 무겁고 비싼 소비재
 /** 가진 낱개 수 (권총 탄은 현실 탄 · 지옥 유황 탄환이 한 주머니) */
 function ammoHave(it: ItemDef): number {
   if (it.note === 'arrows') return (state.arrowKey === it.key ? state.arrows ?? 0 : 0) + (state.quiver?.[it.key] ?? 0);
@@ -2638,7 +2638,7 @@ async function talkToHwang() {
     }
     if (money() < it.price) { await dlg.say(heaven ? L.ywShopNoMoney : hell ? L.hwNoMoney : L.noMoney); continue; }
     // 회복하는 물건은 몇 개 살지 고른다
-    const most = Math.min(it.cat === 'weapon' || it.cat === 'armor' ? 9 : 99, Math.floor(money() / it.price));
+    const most = Math.min((it.cat === 'weapon' || it.cat === 'armor') && !isAmmo(it) ? 9 : 99, Math.floor(money() / it.price));
     const n = needsConfirm(it) ? await askQty(it, it.price, most, 'buy') : 1; // 29차: 장비도 한 번 더 (누르자마자 돈이 사라지지 않게)
     if (n <= 0) continue;
     if (n === 1) {
@@ -3473,7 +3473,7 @@ function addToBag(it: ItemDef) {
   if (it.note === 'ammo' || it.note === 'arrows' || it.note === 'rifleammo') { delete state.unloaded; ammoGear(); } // 새로 사면 다시 끼운다
   if (it.note === 'rifleammo') { state.rifle = (state.rifle ?? 0) + 10; return; }
   if (it.note === 'ammo') { state.ammo = (state.ammo ?? 0) + 12; return; } // 22차: 지옥 유황 탄환·흑요석 화살도 같은 주머니로
-  if (it.note === 'arrows') { addArrows(it.key, 20); return; } // 24차: 마지막에 산 화살이 시위에 걸린다 (화살 종류마다 공격력이 다르다)
+  if (it.note === 'arrows') { addArrows(it.key, it.qty ?? 20); return; } // 48차: 100대 묶음 // 24차: 마지막에 산 화살이 시위에 걸린다 (화살 종류마다 공격력이 다르다)
   // 45차: 천국에서 손에 넣은 물건은 천국의 것 ('hv:키') — 현실로 가져가 쓰거나 팔 수 없다
   if (realm() === 'heaven' && !it.heaven && !it.cross && it.use !== 'diary') it = itemByKey(`hv:${it.key}`); // 관리자도 같다 (천국 돈·물건이 현실로 새던 일)
   state.bag = state.bag ?? {};
@@ -3804,7 +3804,7 @@ function gear() {
   // 24차: 활과 화살이 공격력을 반씩 나눈다 (활 < 근접 < 총)
   const arrowIt = w?.note === 'needsArrows' ? itemByKey(state.arrowKey ?? (inHell() ? 'harrows' : 'arrows')) : null;
   const arrowAtk = arrowIt ? arrowIt.atk ?? 3 : 0;
-  return { arrowFx: ranged && arrowIt ? arrowIt.arrowFx : undefined, atk: wBroken ? 0 : w?.ranged ? (ranged ? (w.atk ?? 0) + arrowAtk : 1) : w?.atk ?? 0, def, dr, ranged: ranged && !wBroken, dry: !!w?.ranged && !wBroken && !ranged, flame: w?.note === 'fuel', range: w?.range, rate: w?.rate, haste: w?.enh ? enhHaste(w.enh) : undefined, reach: !wBroken && !w?.ranged ? w?.reach : undefined, weapon: w ? w.sprite ?? w.key : null, armor };
+  return { arrowFx: ranged && arrowIt ? arrowIt.arrowFx : undefined, atk: wBroken ? 0 : w?.ranged ? (ranged ? (w.atk ?? 0) + arrowAtk : 1) : w?.atk ?? 0, def, dr, ranged: ranged && !wBroken, dry: !!w?.ranged && !wBroken && !ranged, flame: w?.note === 'fuel', range: w?.range, rate: w?.rate ?? (w?.ranged && w.note !== 'fuel' ? 1.75 : undefined), /* 48차: 활·총은 가장 느린 무기 — 양손 무기(1.6배)보다도 느리게 */ haste: w?.enh ? enhHaste(w.enh) : undefined, reach: !wBroken && !w?.ranged ? w?.reach : undefined, weapon: w ? w.sprite ?? w.key : null, armor };
 }
 /** 실시간으로 남에게 보이는 나 */
 function myInfo(): RemoteInfo {
@@ -5520,7 +5520,7 @@ function openHellStore(kind: HellVendor) {
     for (const [it, price] of stock) {
       const row = itemRow(it, priceText(price, true), async () => {
         if (h.notes < price) { toast(L.hwNoMoney); return; }
-        const n = await askQty(it, price, Math.min(it.cat === 'weapon' || it.cat === 'armor' ? 9 : 99, Math.floor(h.notes / price)), 'buy'); // 29차: 장비는 한 번 더 · 31차: 무엇이든 여러 개
+        const n = await askQty(it, price, Math.min((it.cat === 'weapon' || it.cat === 'armor') && !isAmmo(it) ? 9 : 99, Math.floor(h.notes / price)), 'buy'); // 29차: 장비는 한 번 더 · 31차: 무엇이든 여러 개
         if (n <= 0 || h.notes < price * n) return;
         h.notes -= price * n;
         ecoLog('spend', 'shop', price * n, true);
@@ -6210,7 +6210,7 @@ function openStore(kind: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept
         if ((state.wallet ?? 0) < price) { toast(L.noMoney); return; }
         // 29차: 무기·방어구 같은 물건은 몇 개 살지 한 번 더 (그 자리에서 먹는 것만 바로)
         // 31차: 우주새만이 아니라 모든 가게에서 여러 개 — 그 자리에서 먹는 것만 바로
-        const n = !it.now ? await askQty(it, price, Math.min(it.cat === 'weapon' || it.cat === 'armor' ? 9 : 99, Math.floor((state.wallet ?? 0) / price)), 'buy') : 1;
+        const n = !it.now ? await askQty(it, price, Math.min((it.cat === 'weapon' || it.cat === 'armor') && !isAmmo(it) ? 9 : 99, Math.floor((state.wallet ?? 0) / price)), 'buy') : 1;
         if (n <= 0 || (state.wallet ?? 0) < price * n) return;
         state.wallet = (state.wallet ?? 0) - price * n;
         ecoLog('spend', it.now ? 'food' : 'shop', price * n);

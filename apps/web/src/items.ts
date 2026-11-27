@@ -10,6 +10,8 @@ export interface ItemDef {
   heal?: number; // 체력 회복
   atk?: number; // 공격력
   def?: number; // 방어력
+  /** 48차: 한 묶음에 든 화살 수 (화살은 생계형 — 큰 묶음으로 싸게) */
+  qty?: number;
   note?: 'rope' | 'needsAmmo' | 'ammo' | 'needsArrows' | 'arrows' | 'fuel' | 'needsRifle' | 'rifleammo';
   /** 44차 화살 종류의 효과: pierce 꿰뚫기(층주·필드 보스·경비병에게 1.3배) · fire 불붙이기(3초 동안 타오른다) · slow 붙잡기(느려진다) · drain 거머리(준 피해의 2할을 되찾는다) */
   arrowFx?: 'pierce' | 'fire' | 'slow' | 'drain';
@@ -113,10 +115,10 @@ export const ITEMS: ItemDef[] = [
   { key: 'rifleammo', cat: 'weapon', price: 3000, note: 'rifleammo', name: { ko: '저격총탄 10발', th: 'กระสุนไรเฟิล 10 นัด', en: 'Rifle rounds ×10' } },
   // 17차 활: 소리 없이 멀리서. 활과 화살이 공격력을 반씩 (민첩이 더해진다)
   { key: 'bow', cat: 'weapon', price: 2600, atk: 3, ranged: true, note: 'needsArrows', name: { ko: '사냥 활', th: 'ธนูล่าสัตว์', en: 'Hunting bow' } },
-  { key: 'arrows', cat: 'weapon', price: 150, atk: 3, note: 'arrows', name: { ko: '화살 20대', th: 'ลูกธนู 20 ดอก', en: 'Arrows ×20' } },
+  { key: 'arrows', cat: 'weapon', price: 150, qty: 100, atk: 3, note: 'arrows', name: { ko: '화살 100대', th: 'ลูกธนู 100 ดอก', en: 'Arrows ×100' } },
   // 44차 화살 종류 (현실): 철갑 화살 · 불화살
-  { key: 'steelarrows', cat: 'weapon', price: 600, atk: 6, note: 'arrows', arrowFx: 'pierce', icon: 'arrows', tint: '#9aa4b0', name: { ko: '철갑 화살 20대', th: 'ลูกธนูหัวเหล็ก 20 ดอก', en: 'Steel arrows ×20' } },
-  { key: 'firearrows', cat: 'weapon', price: 1200, atk: 4, note: 'arrows', arrowFx: 'fire', icon: 'arrows', tint: '#ff6a1a', name: { ko: '불화살 20대', th: 'ลูกธนูไฟ 20 ดอก', en: 'Fire arrows ×20' } },
+  { key: 'steelarrows', cat: 'weapon', price: 600, qty: 100, atk: 6, note: 'arrows', arrowFx: 'pierce', icon: 'arrows', tint: '#9aa4b0', name: { ko: '철갑 화살 100대', th: 'ลูกธนูหัวเหล็ก 100 ดอก', en: 'Steel arrows ×100' } },
+  { key: 'firearrows', cat: 'weapon', price: 1200, qty: 100, atk: 4, note: 'arrows', arrowFx: 'fire', icon: 'arrows', tint: '#ff6a1a', name: { ko: '불화살 100대', th: 'ลูกธนูไฟ 100 ดอก', en: 'Fire arrows ×100' } },
   // 방어구
   { key: 'helmet', cat: 'armor', price: 690, def: 3, name: { ko: '헬멧', th: 'หมวกกันน็อก', en: 'Helmet' } },
   { key: 'shield', cat: 'armor', price: 3800, def: 4, name: { ko: '원형 방패', th: 'โล่กลม', en: 'Round shield' } }, // 20차: 왼팔에 (권총·활·양손 무기와는 못 든다)
@@ -267,12 +269,12 @@ export const ITEMS: ItemDef[] = [
   { key: 'hbonebow', cat: 'weapon', price: 2000, atk: 3, ranged: true, note: 'needsArrows', hell: true, store: 'harms', sprite: 'bow', icon: 'bow', name: { ko: '뼈활', th: 'ธนูกระดูก', en: 'Bone bow' } },
   { key: 'hlongbow', cat: 'weapon', price: 5000, atk: 4, ranged: true, note: 'needsArrows', hell: true, store: 'harms', sprite: 'bow', icon: 'bow', name: { ko: '힘줄 장궁', th: 'ธนูยาวเอ็น', en: 'Sinew longbow' } },
   { key: 'hmatchlock', cat: 'weapon', price: 28_000, atk: 9, ranged: true, note: 'needsAmmo', hell: true, store: 'harms', sprite: 'pistol', icon: 'pistol', name: { ko: '유황 화승총', th: 'ปืนคาบชุดกำมะถัน', en: 'Sulfur matchlock' } },
-  { key: 'harrows', cat: 'weapon', price: 18, atk: 3, note: 'arrows', hell: true, store: 'harms', icon: 'arrows', name: { ko: '흑요석 화살 20대', th: 'ลูกธนูหินออบซิเดียน 20 ดอก', en: 'Obsidian arrows ×20' } },
+  { key: 'harrows', cat: 'weapon', price: 45, qty: 100, atk: 3, note: 'arrows', hell: true, store: 'harms', icon: 'arrows', name: { ko: '흑요석 화살 100대', th: 'ลูกธนูหินออบซิเดียน 100 ดอก', en: 'Obsidian arrows ×100' } },
   // 44차 화살 종류 (지옥 무기상): 뼈 화살(꿰뚫기) · 유황 불화살(불) · 봉랍 화살(붙잡기) · 거머리 화살(되찾기)
-  { key: 'boneharrows', cat: 'weapon', price: 40, atk: 5, note: 'arrows', arrowFx: 'pierce', hell: true, store: 'harms', icon: 'arrows', tint: '#e8dcc0', name: { ko: '뼈 화살 20대', th: 'ลูกธนูกระดูก 20 ดอก', en: 'Bone arrows ×20' } },
-  { key: 'brimarrows', cat: 'weapon', price: 70, atk: 4, note: 'arrows', arrowFx: 'fire', hell: true, store: 'harms', icon: 'arrows', tint: '#ffb020', name: { ko: '유황 불화살 20대', th: 'ลูกธนูไฟกำมะถัน 20 ดอก', en: 'Brimstone arrows ×20' } },
-  { key: 'sealarrows', cat: 'weapon', price: 60, atk: 3, note: 'arrows', arrowFx: 'slow', hell: true, store: 'harms', icon: 'arrows', tint: '#c8281e', name: { ko: '봉랍 화살 20대', th: 'ลูกธนูตราครั่ง 20 ดอก', en: 'Waxseal arrows ×20' } },
-  { key: 'leecharrows', cat: 'weapon', price: 90, atk: 3, note: 'arrows', arrowFx: 'drain', hell: true, store: 'harms', icon: 'arrows', tint: '#6a8a3a', name: { ko: '거머리 화살 20대', th: 'ลูกธนูปลิง 20 ดอก', en: 'Leech arrows ×20' } },
+  { key: 'boneharrows', cat: 'weapon', price: 100, qty: 100, atk: 5, note: 'arrows', arrowFx: 'pierce', hell: true, store: 'harms', icon: 'arrows', tint: '#e8dcc0', name: { ko: '뼈 화살 100대', th: 'ลูกธนูกระดูก 100 ดอก', en: 'Bone arrows ×100' } },
+  { key: 'brimarrows', cat: 'weapon', price: 175, qty: 100, atk: 4, note: 'arrows', arrowFx: 'fire', hell: true, store: 'harms', icon: 'arrows', tint: '#ffb020', name: { ko: '유황 불화살 100대', th: 'ลูกธนูไฟกำมะถัน 100 ดอก', en: 'Brimstone arrows ×100' } },
+  { key: 'sealarrows', cat: 'weapon', price: 150, qty: 100, atk: 3, note: 'arrows', arrowFx: 'slow', hell: true, store: 'harms', icon: 'arrows', tint: '#c8281e', name: { ko: '봉랍 화살 100대', th: 'ลูกธนูตราครั่ง 100 ดอก', en: 'Waxseal arrows ×100' } },
+  { key: 'leecharrows', cat: 'weapon', price: 225, qty: 100, atk: 3, note: 'arrows', arrowFx: 'drain', hell: true, store: 'harms', icon: 'arrows', tint: '#6a8a3a', name: { ko: '거머리 화살 100대', th: 'ลูกธนูปลิง 100 ดอก', en: 'Leech arrows ×100' } },
   { key: 'hshot', cat: 'weapon', price: 150, note: 'ammo', hell: true, store: 'harms', icon: 'ammo', name: { ko: '유황 탄환 12발', th: 'กระสุนกำมะถัน 12 นัด', en: 'Sulfur shot ×12' } },
   { key: 'hjerky', cat: 'goods', price: 3, heal: 50, hell: true, store: 'hmeat', icon: 'chips', name: { ko: '말린 고기', th: 'เนื้อแห้ง', en: 'Dried meat' } },
   { key: 'hskewer', cat: 'goods', price: 5, heal: 100, hell: true, store: 'hmeat', icon: 'ricebox', name: { ko: '고기 꼬치', th: 'เนื้อเสียบไม้', en: 'Meat skewer' } },
@@ -399,9 +401,9 @@ export const STORES: Record<'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'd
 };
 
 const EFFECT: Record<Lang, { heal: string[]; atkN: string; defN: string; rope: string; needsAmmo: string; ammo: string; two: string; ranged: string; needsArrows: string; arrows: string; fuel: string; cross: string; steal: string; needsRifle: string; rifleammo: string }> = {
-  ko: { heal: ['조금 회복', '회복', '많이 회복', '크게 회복'], atkN: '공격력 {n}', defN: '방어력 {n}', rope: '추락을 한 번 막아 줌', needsAmmo: '탄약 필요', ammo: '권총에 넣는 탄약', two: '양손 · 느리지만 묵직하게 내려찍음', ranged: '원거리 · 민첩이 더해짐', needsArrows: '화살 필요', arrows: '활에 메기는 화살', fuel: '세 칸 앞까지 불길 · 연료는 하루 5분', cross: '현실로도 가져간다', steal: '현실·지옥에서 훔치기 +{n}%', needsRifle: '저격총탄 필요 · 8칸 밖에서 천천히', rifleammo: '저격총에 넣는 탄약' },
-  th: { heal: ['ฟื้นฟูเล็กน้อย', 'ฟื้นฟู', 'ฟื้นฟูมาก', 'ฟื้นฟูมหาศาล'], atkN: 'พลังโจมตี {n}', defN: 'พลังป้องกัน {n}', rope: 'กันตกจากที่สูงได้หนึ่งครั้ง', needsAmmo: 'ต้องใช้กระสุน', ammo: 'กระสุนสำหรับปืนพก', two: 'สองมือ · ช้าแต่ฟาดลงหนักหน่วง', ranged: 'ระยะไกล · ความว่องไวช่วยเพิ่มพลัง', needsArrows: 'ต้องใช้ลูกธนู', arrows: 'ลูกธนูสำหรับธนู', fuel: 'พ่นไฟไกลสามช่อง · เชื้อเพลิงวันละ 5 นาที', cross: 'พากลับไปโลกจริงได้', steal: 'ขโมยในโลกจริง·นรก +{n}%', needsRifle: 'ต้องใช้กระสุนไรเฟิล · ยิงช้าจากระยะ 8 ช่อง', rifleammo: 'กระสุนสำหรับปืนไรเฟิล' },
-  en: { heal: ['Heals a little', 'Heals', 'Heals a lot', 'Heals greatly'], atkN: 'Attack {n}', defN: 'Defense {n}', rope: 'Saves you from one fall', needsAmmo: 'Needs ammo', ammo: 'Rounds for the pistol', two: 'Two-handed · slow, crushing overhead blows', ranged: 'Ranged · agility adds power', needsArrows: 'Needs arrows', arrows: 'Arrows for the bow', fuel: 'Flames three tiles out · 5 minutes of fuel a day', cross: 'Comes with you to the real world', steal: 'Stealing +{n}% in reality and hell', needsRifle: 'Needs rifle rounds · slow shots from 8 tiles', rifleammo: 'Rounds for the sniper rifle' },
+  ko: { heal: ['조금 회복', '회복', '많이 회복', '크게 회복'], atkN: '공격력 {n}', defN: '방어력 {n}', rope: '추락을 한 번 막아 줌', needsAmmo: '탄약 필요', ammo: '권총에 넣는 탄약', two: '양손 · 느리지만 묵직하게 내려찍음', ranged: '원거리 · 힘 대신 민첩이 피해를 올림', needsArrows: '화살 필요', arrows: '활에 메기는 화살', fuel: '세 칸 앞까지 불길 · 연료는 하루 5분', cross: '현실로도 가져간다', steal: '현실·지옥에서 훔치기 +{n}%', needsRifle: '저격총탄 필요 · 8칸 밖에서 천천히', rifleammo: '저격총에 넣는 탄약' },
+  th: { heal: ['ฟื้นฟูเล็กน้อย', 'ฟื้นฟู', 'ฟื้นฟูมาก', 'ฟื้นฟูมหาศาล'], atkN: 'พลังโจมตี {n}', defN: 'พลังป้องกัน {n}', rope: 'กันตกจากที่สูงได้หนึ่งครั้ง', needsAmmo: 'ต้องใช้กระสุน', ammo: 'กระสุนสำหรับปืนพก', two: 'สองมือ · ช้าแต่ฟาดลงหนักหน่วง', ranged: 'ระยะไกล · ความเสียหายเพิ่มตามความว่องไว (แทนพละกำลัง)', needsArrows: 'ต้องใช้ลูกธนู', arrows: 'ลูกธนูสำหรับธนู', fuel: 'พ่นไฟไกลสามช่อง · เชื้อเพลิงวันละ 5 นาที', cross: 'พากลับไปโลกจริงได้', steal: 'ขโมยในโลกจริง·นรก +{n}%', needsRifle: 'ต้องใช้กระสุนไรเฟิล · ยิงช้าจากระยะ 8 ช่อง', rifleammo: 'กระสุนสำหรับปืนไรเฟิล' },
+  en: { heal: ['Heals a little', 'Heals', 'Heals a lot', 'Heals greatly'], atkN: 'Attack {n}', defN: 'Defense {n}', rope: 'Saves you from one fall', needsAmmo: 'Needs ammo', ammo: 'Rounds for the pistol', two: 'Two-handed · slow, crushing overhead blows', ranged: 'Ranged · damage grows with Agility instead of Strength', needsArrows: 'Needs arrows', arrows: 'Arrows for the bow', fuel: 'Flames three tiles out · 5 minutes of fuel a day', cross: 'Comes with you to the real world', steal: 'Stealing +{n}% in reality and hell', needsRifle: 'Needs rifle rounds · slow shots from 8 tiles', rifleammo: 'Rounds for the sniper rifle' },
 };
 
 export function effectText(it: ItemDef, l: Lang, skipStats = false): string {
