@@ -554,3 +554,35 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 .life-col { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .life-col button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 12px; text-align: left; }
 .life-col button small { opacity: 0.75; font-size: 12px; }
+
+/* 42차: 죽은 뒤 건너가는 장면 */
+.passage { position: fixed; inset: 0; z-index: 46; pointer-events: auto; overflow: hidden; }
+.passage .p-line { position: absolute; left: 8%; right: 8%; top: 44%; margin: 0; text-align: center; font: 600 clamp(17px, 2.6vw, 26px)/1.55 'Nanum Myeongjo', 'Noto Serif KR', 'Noto Serif Thai', Georgia, serif; letter-spacing: 0.04em; opacity: 0; transition: opacity 1.4s ease; white-space: pre-line; }
+.p-hell .p-vig { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(0,0,0,0.75) 100%); opacity: 0; transition: opacity 1.6s ease; }
+.p-hell.show .p-vig { opacity: 1; }
+.p-hell .p-line { color: #e8e4dc; text-shadow: 0 2px 10px #000, 0 0 2px #000; }
+.p-hell.text .p-line { opacity: 1; }
+.p-hell .p-black { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity 1.8s ease-in; }
+.p-hell.dark .p-black { opacity: 1; }
+.p-hell.dark .p-line { opacity: 0; transition-duration: 1.6s; }
+.p-hell.lift .p-black, .p-hell.lift .p-vig { opacity: 0; transition: opacity 2.3s ease-out; }
+.p-heaven .p-gate { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; opacity: 0; transition: opacity 0.9s ease; }
+.p-heaven.show .p-gate { opacity: 1; }
+.p-heaven .p-white { position: absolute; inset: 0; background: #fffdf6; opacity: 0; transition: opacity 0.8s ease-in; }
+.p-heaven.white .p-white { opacity: 1; }
+.p-heaven .p-line { color: #6a5428; text-shadow: 0 0 12px rgba(255,236,180,0.9); }
+.p-heaven.text .p-line { opacity: 1; }
+.p-heaven.lift .p-white, .p-heaven.lift .p-gate { opacity: 0; transition: opacity 2s ease-out; }
+.p-heaven.lift .p-line { opacity: 0; transition-duration: 1.2s; }
+.p-border { background: #000; }
+.p-border .p-snap { position: absolute; inset: 0; width: 100%; height: 100%; transform-origin: 50% 50%; }
+.p-border.off .p-snap { animation: tvOff 0.62s cubic-bezier(.6,0,.9,.4) forwards; }
+.p-border.lift { opacity: 0; transition: opacity 2.5s ease-out; }
+@keyframes tvOff {
+  0% { transform: scale(1, 1); filter: brightness(1); opacity: 1; }
+  38% { transform: scale(1, 0.008); filter: brightness(5) saturate(0); opacity: 1; }
+  66% { transform: scale(0.006, 0.008); filter: brightness(8); opacity: 1; }
+  100% { transform: scale(0.003, 0.004); filter: brightness(8); opacity: 0; }
+}
+/* 건너가는 동안은 화면의 단추·표시를 모두 감춘다 (장면만) */
+body.passing #hud, body.passing .stance, body.passing .quick-slot, body.passing .toast, body.passing .ammo { visibility: hidden !important; }

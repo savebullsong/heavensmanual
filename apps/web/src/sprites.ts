@@ -71,11 +71,16 @@ export const MASKGIRL_LOOK: Look = { sex: 'f', build: 0, skin: 0, hair: 2, hairC
  *  10대 — 질끈 묶은 말총머리, 노란 후드 집업, 청바지 (아이 몸이 아니라 키가 다 자란 열몇 살)
  *  20대 — 갈색으로 물들인 긴 머리, 검은 앞치마 같은 윗옷, 밝은 통바지, 붉은 구두 (동네 미용실 원장)
  *  30대 후반 — 단발, 팥죽색 카디건, 짙은 바지, 회색 슬리퍼 (밥상을 차려 놓고 기다리는 사람) */
+/** 42차: 유내 세 시절 전용 3D 몸 (10대 말총머리·노란 반팔 / 20대 갈색 긴 머리·검은 셔츠·허리 앞치마 / 30대 후반 단발·카디건·긴 치마) */
 export function yunaeLook(age: 0 | 1 | 2): Look {
-  if (age === 0) return { sex: 'f', build: 0, skin: 0, hair: 4, hairColor: 0, top: 0, bottom: 0, cols: { 2: '#17110e', 3: '#e2b84e', 9: '#e2b84e', 4: '#46587e', 5: '#ecebe6' } };
-  if (age === 1) return { sex: 'f', build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, cols: { 2: '#6a3a24', 3: '#24212a', 9: '#24212a', 4: '#d6c8b4', 5: '#9a2a36' } };
-  return { sex: 'f', build: 0, skin: 0, hair: 2, hairColor: 0, top: 0, bottom: 0, cols: { 2: '#241a16', 3: '#7e4e4a', 9: '#7e4e4a', 4: '#34343e', 5: '#8a8e96' } };
+  if (age === 0) return { sex: 'f', build: 0, skin: 0, hair: 4, hairColor: 0, top: 0, bottom: 0, outfit: 'yunae1', cols: { 2: '#17110e', 3: '#e2b84e', 4: '#3e4e74', 5: '#ecebe6', 10: '#f2f0ea', 12: '#c0303e' } };
+  if (age === 1) return { sex: 'f', build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'yunae2', cols: { 2: '#6a3a24', 3: '#24212a', 4: '#d6c8b4', 5: '#9a2a36', 7: '#5a4c44', 14: '#b8bcc2' } };
+  return { sex: 'f', build: 0, skin: 0, hair: 2, hairColor: 0, top: 0, bottom: 0, outfit: 'yunae3', cols: { 2: '#241a16', 3: '#7e4e4a', 4: '#30303a', 5: '#8a8e96', 9: '#e6ddd0', 14: '#c8b89a' } };
 }
+/** 42차: 지옥으로 데려가는 판초 악마 (검은 판초 · 잿빛 살 · 붉은 눈 · 성게머리) */
+export const PONCHO_DEMON: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'ponchod', cols: { 1: '#a8a49c', 2: '#141416', 3: '#1c1c20', 5: '#141414', 6: '#e02a20', 9: '#3a3434', 10: '#a8a49c', 15: '#0e0e10' } };
+/** 42차: 저승사자 (검은 도포 · 흰 동정 · 붉은 세조대 · 갓) */
+export const REAPER_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'reaper', cols: { 1: '#dcd8d0', 2: '#101012', 3: '#16161a', 4: '#16161a', 5: '#121212', 6: '#141010', 9: '#ece8e0', 10: '#dcd8d0', 12: '#7a1a1a', 15: '#0c0c0e' } };
 export const TALUS_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'talus', cols: { 1: '#d8ccb0', 3: '#5a4430', 4: '#3a2e22', 5: '#1a1410', 6: '#ffd08a', 10: '#d8ccb0', 12: '#a8281e', 13: '#2e2420', 14: '#c9a23e', 15: '#140e0c' } };
 export const HWANGHON: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'misshwang', cols: { 1: '#ead2c4', 2: '#3a0e12', 3: '#5a0e18', 4: '#2a0a10', 5: '#0c0808', 6: '#1a1210', 7: '#140a0c', 10: '#ead2c4', 12: '#b8862a', 14: '#8a6a2a', 15: '#0c0808' } }; // 39차: 미스 황과 같은 몸 · 핏빛 블라우스 · 검은 앞치마 · 바랜 금빛
 
@@ -213,6 +218,9 @@ export function layerKeys(look: Look, weapon: string | null, armorIn: string[] =
   // 39차 주요 인물 전용 몸: 미스 황(황혼 · 황색날개도) · 천사(칼은 천사 몸에 맞춰 구운 것, 다른 무기는 들지 않는다)
   if (o === 'misshwang') return { base: 'b-hw-misshwang-w', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
   if (o === 'angelk') { const mk = look.sex === 'f' ? 'af' : 'an', wp = weapon === 'sword' ? 'sword' : null; return { base: `b-${mk}-angelk-${wp ? 'm' : 'u'}`, hair: null, weapon: wp ? `w-${mk}-${wp}` : null, armor: [] as { key: string; piece: string }[], mode: (wp ? 'm' : 'u') as Mode }; }
+  // 42차: 지옥으로 데려가는 이들(판초 악마 · 저승사자) · 유내 세 시절 (서기·걷기 · 유내는 앉기도)
+  const D42: Record<string, string> = { ponchod: 'b-pd-ponchod-w', reaper: 'b-jr-reaper-w', yunae1: 'b-y1-yunae1-w', yunae2: 'b-y2-yunae2-w', yunae3: 'b-y3-yunae3-w' };
+  if (D42[o as string]) return { base: D42[o as string], hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
   if (o === 'succubus') return { base: 'b-q-succubus-w', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
   if (o === 'accubus') return { base: `b-${look.sex === 'm' ? 'i' : 'j'}-accubus-w`, hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
   if (o === 'cockatoo') return { base: 'b-b-cockatoo-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };

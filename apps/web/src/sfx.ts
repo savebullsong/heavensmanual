@@ -295,3 +295,84 @@ export function crack() {
   tone(o, t, 0.28, 'triangle', 2100, 1650, 0.1);
   noise(o, t + 0.11, 0.06, 'bandpass', 3000, 2000, 6, 0.3, 0.001);
 }
+
+// ───────────────────────── 42차: 죽은 뒤 건너가는 소리 ─────────────────────────
+/** 느리게 차오르는 음 하나 (천국의 합창·지옥의 저음에 쓴다) */
+function swell(dest: AudioNode, t: number, dur: number, type: OscillatorType, f: number, peak: number, rise: number) {
+  const o = ctx!.createOscillator();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  const g = ctx!.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + rise);
+  g.gain.setValueAtTime(peak, t + dur - Math.min(1.6, dur * 0.4));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(dest);
+  o.start(t); o.stop(t + dur + 0.05);
+}
+/** 천국: 멀리서 차오르는 합창 같은 화음 (조금씩 어긋난 음 둘씩) */
+export function heavenPad(dur = 7) {
+  if (!ready()) return;
+  const t = ctx!.currentTime, o = out({ pan: 0, vol: 0.7 }, 1);
+  for (const [f, k] of [[261.6, 0.07], [329.6, 0.06], [392, 0.055], [523.3, 0.04], [659.3, 0.025]] as const) {
+    swell(o, t, dur, 'sine', f, k, 2.2);
+    swell(o, t + 0.3, dur - 0.3, 'triangle', f * 1.004, k * 0.4, 2.6);
+  }
+  noise(o, t + 1, dur - 1, 'highpass', 5000, 7000, 0.5, 0.05, 2.5);
+}
+/** 천국의 문이 열린다: 묵직한 문 소리 위로 맑은 종 */
+export function gateOpen() {
+  if (!ready()) return;
+  const t = ctx!.currentTime, o = out({ pan: 0, vol: 0.9 }, 1);
+  noise(o, t, 1.6, 'lowpass', 300, 120, 0.8, 0.35, 0.3);
+  tone(o, t, 1.4, 'sine', 70, 55, 0.25);
+  [784, 988, 1175, 1568].forEach((f, k) => tone(o, t + 0.5 + k * 0.12, 2.2, 'sine', f, f * 1.001, 0.12));
+}
+/** 지옥: 땅 밑에서 울리는 낮은 소리 (오래) */
+export function hellDrone(dur = 8) {
+  if (!ready()) return;
+  const t = ctx!.currentTime, o = out({ pan: 0, vol: 0.9 }, 1);
+  swell(o, t, dur, 'sawtooth', 41, 0.06, 2.5);
+  swell(o, t, dur, 'sine', 55, 0.18, 2.0);
+  swell(o, t + 0.5, dur - 0.5, 'sine', 58.3, 0.08, 2.5);
+  noise(o, t, dur, 'lowpass', 180, 90, 0.7, 0.18, 2.0);
+}
+/** 무거운 발소리 한 번 (판초 악마 · 저승사자) */
+export function step(heavy = false) {
+  if (!ready()) return;
+  const t = ctx!.currentTime, o = out({ pan: (Math.random() - 0.5) * 0.6, vol: 0.6 }, 1);
+  noise(o, t, heavy ? 0.16 : 0.1, 'lowpass', heavy ? 380 : 700, 120, 0.9, heavy ? 0.5 : 0.3, 0.003);
+}
+/** 검은 문이 열리고 닫힌다 (삐걱 · 쿵) */
+export function doorCreak(close = false) {
+  if (!ready()) return;
+  const t = ctx!.currentTime, o = out({ pan: 0.2, vol: 0.8 }, 1);
+  if (!close) for (let k = 0; k < 9; k++) tone(o, t + k * 0.09, 0.12, 'sawtooth', jit(180 + k * 9), 150, 0.05);
+  noise(o, t + (close ? 0 : 0.9), 0.4, 'lowpass', 260, 80, 0.8, 0.6, 0.004);
+  tone(o, t + (close ? 0 : 0.9), 0.35, 'sine', 60, 40, 0.4);
+}
+/** 땅이 갈라지고 거대한 손이 솟는다 */
+export function groundCrack() {
+  if (!ready()) return;
+  const t = ctx!.currentTime, o = out({ pan: 0, vol: 1 }, 1);
+  for (let k = 0; k < 6; k++) noise(o, t + k * 0.07 + Math.random() * 0.03, 0.12, 'bandpass', jit(1400), 400, 2, 0.4, 0.002);
+  noise(o, t, 1.8, 'lowpass', 220, 60, 0.9, 0.8, 0.05);
+  tone(o, t, 1.6, 'sawtooth', 48, 30, 0.25);
+}
+/** 옛날 텔레비전이 꺼지는 소리: 딸깍 + 가늘게 사라지는 고음 */
+export function tvOff() {
+  if (!ready()) return;
+  const t = ctx!.currentTime, o = out({ pan: 0, vol: 0.8 }, 1);
+  noise(o, t, 0.05, 'highpass', 3000, 2000, 1, 0.5, 0.001);
+  tone(o, t, 0.9, 'sine', 15600, 9000, 0.03);
+  tone(o, t, 0.25, 'sine', 120, 50, 0.3);
+}
+/** 어둠 속 파도: 밀려왔다 쓸려 가는 물소리 몇 번 */
+export function waves(dur = 6) {
+  if (!ready()) return;
+  const t = ctx!.currentTime, o = out({ pan: 0, vol: 0.9 }, 1);
+  for (let k = 0; k * 2.6 < dur; k++) {
+    const s = t + k * 2.6 + Math.random() * 0.3;
+    noise(o, s, 2.4, 'lowpass', 600, 1800, 0.6, 0.45, 1.0);
+    noise(o, s + 1.1, 1.8, 'bandpass', 2400, 900, 0.8, 0.18, 0.5);
+  }
+}

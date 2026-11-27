@@ -145,6 +145,11 @@ for sex in 'mf':
         jobs.append({'sex': sex, 'build': b, 'sets': sets, 'only': ['swing'], 'merge': True, 'dirs': ['se', 'sw', 'ne', 'nw'], 'tag': 'swing40' + sex})
 for mk, sex in (('an', 'm'), ('af', 'f')):
     jobs.append({'sex': sex, 'build': 1, 'monster': mk, 'occluder': 'angelk', 'sets': [{'kind': 'base', 'outfit': 'angelk', 'mode': 'm'}, {'kind': 'weapon', 'weapon': 'sword'}], 'only': ['swing'], 'merge': True, 'dirs': ['se', 'sw', 'ne', 'nw'], 'stride': .85, 'tag': 'swing40' + sex})
+# ── 42차: 지옥으로 데려가는 이들 — 판초 악마 · 저승사자 (서기·걷기, 8방향) / 유내 세 시절 (서기·걷기·앉기)
+jobs.append({'sex': 'm', 'build': 1, 'monster': 'pd', 'occluder': 'ponchod', 'sets': [{'kind': 'base', 'outfit': 'ponchod', 'mode': 'w'}], 'stride': .6, 'tag': 'pass42'})
+jobs.append({'sex': 'm', 'build': 1, 'monster': 'jr', 'occluder': 'reaper', 'sets': [{'kind': 'base', 'outfit': 'reaper', 'mode': 'w'}], 'stride': .6, 'tag': 'pass42'})
+for mk, o, st in (('y1', 'yunae1', 1.0), ('y2', 'yunae2', .9), ('y3', 'yunae3', .72)):
+    jobs.append({'sex': 'f', 'build': 1, 'monster': mk, 'occluder': o, 'sets': [{'kind': 'base', 'outfit': o, 'mode': 'w', 'extra': ['sit']}], 'stride': st, 'tag': 'yunae42'})
 args = sys.argv[2:]
 # --scale2: 같은 크기의 인물을 픽셀 두 배로 (게임에서는 반으로 줄여 같은 크기, 더 섬세)
 if '--scale2' in args:

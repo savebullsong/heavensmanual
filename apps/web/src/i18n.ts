@@ -65,7 +65,7 @@ const dict = {
     bought: '{item}, 여기 있어요.', more: '더 둘러보기', enough: '그만 보기',
     toastGood: '선행 +{n}', toastEvil: '악행 +{n}', toastExp: '영혼 경험치 +{n}', rankUp: '영격 {n}',
     deathTitle: '죽었습니다', deathCar: '차에 치였습니다.', deathBeaten: '맞아 쓰러졌습니다.',
-    judgeHeaven: '선이 더 무거운 영혼입니다. 천국의 문이 열립니다.', judgeHell: '지옥 {n}층으로 떨어질 영혼입니다.', judgeGhost: '선도 악도 남기지 못한 영혼입니다.',
+    judgeHeaven: '선이 더 무거운 영혼입니다. 천국의 문이 열립니다.', judgeHell: '지옥으로 떨어질 영혼입니다.', judgeGhost: '선도 악도 남기지 못한 영혼입니다.',
     judgeClosed: '…아직 그 문은 열리지 않았습니다. 우주새에서 다시 눈을 뜹니다.', reborn: '다시 눈뜨기', karma: '이번 생: 선행 {g} · 악행 {e}',
     loading: '거리를 불러오는 중…',
   },
@@ -130,7 +130,7 @@ const dict = {
     bought: '{item} ค่ะ นี่ค่ะ', more: 'ดูต่อ', enough: 'พอแล้ว',
     toastGood: 'ความดี +{n}', toastEvil: 'ความชั่ว +{n}', toastExp: 'ค่าประสบการณ์วิญญาณ +{n}', rankUp: 'ระดับวิญญาณ {n}',
     deathTitle: 'คุณตายแล้ว', deathCar: 'ถูกรถชน', deathBeaten: 'ถูกทำร้ายจนล้มลง',
-    judgeHeaven: 'วิญญาณที่ความดีหนักกว่า ประตูสวรรค์เปิดออกแล้ว', judgeHell: 'วิญญาณที่จะตกนรกชั้น {n}', judgeGhost: 'วิญญาณที่ไม่ได้ทิ้งทั้งความดีและความชั่วไว้',
+    judgeHeaven: 'วิญญาณที่ความดีหนักกว่า ประตูสวรรค์เปิดออกแล้ว', judgeHell: 'วิญญาณที่จะตกนรก', judgeGhost: 'วิญญาณที่ไม่ได้ทิ้งทั้งความดีและความชั่วไว้',
     judgeClosed: '…ประตูนั้นยังไม่เปิด คุณจะลืมตาขึ้นที่ Cosmic Bird อีกครั้ง', reborn: 'ลืมตาอีกครั้ง', karma: 'ชาตินี้: ความดี {g} · ความชั่ว {e}',
     loading: 'กำลังโหลดถนน…',
   },
@@ -195,7 +195,7 @@ const dict = {
     bought: 'Here you are, the {item}.', more: 'Keep browsing', enough: 'That\'s all',
     toastGood: 'Good deed +{n}', toastEvil: 'Evil deed +{n}', toastExp: 'Soul exp +{n}', rankUp: 'Soul Rank {n}',
     deathTitle: 'You died', deathCar: 'Hit by a car.', deathBeaten: 'Beaten down.',
-    judgeHeaven: 'A soul weighed toward good. The gate of heaven opens.', judgeHell: 'A soul bound for floor {n} of hell.', judgeGhost: 'A soul that left neither good nor evil behind.',
+    judgeHeaven: 'A soul weighed toward good. The gate of heaven opens.', judgeHell: 'A soul bound for hell.', judgeGhost: 'A soul that left neither good nor evil behind.',
     judgeClosed: '…That gate has not opened yet. You wake again at Cosmic Bird.', reborn: 'Wake again', karma: 'This life: good {g} · evil {e}',
     loading: 'Loading the street…',
   },
@@ -458,4 +458,8 @@ export function setLang(l: Lang) {
 const merged = {} as Record<Lang, Dict>;
 export function t(): Dict {
   return (merged[current] ??= { ...dict[current], ...extra[current], ...more16[current] } as Dict);
+}
+/** 42차: 언어 하나의 글귀 전부 (관리자 '대화문 내려받기') */
+export function dictFor(l: Lang): Dict {
+  return (merged[l] ??= { ...dict[l], ...extra[l], ...more16[l] } as Dict);
 }

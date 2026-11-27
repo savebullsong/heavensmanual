@@ -8,6 +8,8 @@ import { drawCosmicBird, drawCosmicBirdHeaven } from './ujusae.ts';
 import { drawYuhwang } from './yuhwang.ts';
 import { drawLoanHouse } from './loanhouse.ts';
 import type { Building } from './zone.ts';
+import { dialogBook } from './dialogbook.ts';
+import type { Lang } from './i18n.ts';
 
 const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   'miss-hwang': { name: '미스 황', where: '현실 · 우주새 점원' },
@@ -52,7 +54,7 @@ const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   'bld-hell-4': { name: '유황새 · 지옥 4층', where: '비명의 용광로 마을 (그을음·쇳물빛 실금·쇠사슬·찌꺼기 더미) · 바닥 2×2칸' },
 };
 
-type Tab = 'portraits' | 'sprites' | 'chars';
+type Tab = 'portraits' | 'sprites' | 'chars' | 'lines';
 const isSprite = (s: PortraitSlot) => (SPRITE_SLOTS as readonly string[]).includes(s);
 
 /** 도트 칸의 지금 기본 그림 (게임이 구운 그림 그대로) */
@@ -162,18 +164,20 @@ async function loadOverrides() {
   }
 }
 
-async function showSlots(tab: Tab = location.hash === '#sprites' ? 'sprites' : location.hash === '#chars' ? 'chars' : 'portraits') {
+async function showSlots(tab: Tab = location.hash === '#sprites' ? 'sprites' : location.hash === '#chars' ? 'chars' : location.hash === '#lines' ? 'lines' : 'portraits') {
   await loadOverrides();
   root.innerHTML = '';
   const head = h('header');
   const tabs = h('nav', 'tabs');
-  for (const [k, label] of [['portraits', '인물 그림 (대화창)'], ['sprites', '도트 그림 (게임 속)'], ['chars', '관리자 캐릭터']] as [Tab, string][]) {
+  for (const [k, label] of [['portraits', '인물 그림 (대화창)'], ['sprites', '도트 그림 (게임 속)'], ['chars', '관리자 캐릭터'], ['lines', '대화문']] as [Tab, string][]) {
     const b = h('button', k === tab ? 'tab on' : 'tab', label);
     b.onclick = () => { history.replaceState(null, '', `#${k}`); showSlots(k); };
     tabs.append(b);
   }
   head.append(h('h1', '', "Heaven's Manual 관리자"), tabs,
-    h('p', 'sub', tab === 'chars'
+    h('p', 'sub', tab === 'lines'
+      ? '게임 안의 말을 인물·몹별로 모은 글 파일입니다. 내려받을 때마다 지금 판의 글을 새로 모읍니다 (인물의 말이 바뀌면 파일도 바뀝니다). 고친 파일을 보내 주시면 그대로 반영합니다.'
+      : tab === 'chars'
       ? '아이디를 넣으면 그 계정이 관리자 캐릭터가 됩니다. 게임 안 영혼 설정에서 투명해질 수 있습니다(몹이 알아보지 못하고 다른 사람에게 보이지 않음, 지도 확인용). 투명한 동안은 싸울 수 없고, 환생·죽음·돈은 다른 사람과 똑같은 절차를 따릅니다. 다음 접속(또는 새로고침)부터 적용됩니다.'
       : tab === 'portraits'
       ? '대화할 때 크게 서는 그림입니다. 세로로 긴 상반신 그림(약 2:3)이 잘 어울립니다. 저장하면 1분 안에 게임에 반영됩니다.'
@@ -183,12 +187,39 @@ async function showSlots(tab: Tab = location.hash === '#sprites' ? 'sprites' : l
   head.appendChild(out);
   root.appendChild(head);
   if (tab === 'chars') { root.appendChild(adminChars()); return; }
+  if (tab === 'lines') { root.appendChild(linesCard()); return; }
   const grid = h('div', tab === 'sprites' ? 'grid dots' : 'grid');
   for (const slot of PORTRAIT_SLOTS) {
     if (isSprite(slot) !== (tab === 'sprites')) continue;
     grid.appendChild(isSprite(slot) ? dotCard(slot) : slotCard(slot));
   }
   root.appendChild(grid);
+}
+
+/** 42차: 대화문 내려받기 (언어 하나씩 또는 셋을 나란히) */
+function linesCard() {
+  const card = h('section', 'card chars');
+  card.append(h('h2', '', '인물·몹별 대화문 내려받기'));
+  const row = h('div', 'actions');
+  const dev = (navigator.language || 'en').slice(0, 2);
+  const order: [Lang[], string][] = [[['ko'], '한국어'], [['th'], 'ภาษาไทย'], [['en'], 'English'], [['ko', 'th', 'en'], '세 언어 나란히']];
+  order.sort((a, b) => (a[0].length === 1 && a[0][0] === dev ? -1 : b[0].length === 1 && b[0][0] === dev ? 1 : 0)); // 기기 언어를 먼저
+  for (const [langs, label] of order) {
+    const b = h('button', langs.length === 1 && langs[0] === dev ? 'primary' : '', label);
+    b.onclick = () => {
+      const text = dialogBook(langs);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/plain;charset=utf-8' }));
+      a.download = `heavensmanual-lines-${langs.join('-')}-${new Date().toISOString().slice(0, 10)}.txt`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    };
+    row.append(b);
+  }
+  const pre = h('pre', 'lines-preview');
+  pre.textContent = dialogBook([order[0][0][0]]).split('\n').slice(0, 60).join('\n') + '\n…';
+  card.append(row, h('p', 'status', '미리 보기 (앞부분)'), pre);
+  return card;
 }
 
 /** 관리자 캐릭터: 아이디로 지정·해제, 지금 지정된 계정 목록 */

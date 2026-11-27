@@ -44,3 +44,6 @@ header button { grid-column: 2; grid-row: 1; }
 .card.chars input { flex: 1; min-width: 0; padding: 8px; background: #140e0a; border: 1px solid #5a4424; border-radius: 4px; color: #eadfc8; font: inherit; }
 .admin-list { margin: 0; padding-left: 18px; font-size: 14px; color: #eadfc8; line-height: 1.8; }
 .admin-list .muted { color: #9a8e7a; list-style: none; margin-left: -18px; }
+
+/* 42차 대화문 미리 보기 */
+.lines-preview { max-height: 420px; overflow: auto; background: #120e0b; color: #e8dcc4; padding: 12px; border-radius: 6px; font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
