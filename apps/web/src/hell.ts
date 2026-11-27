@@ -178,9 +178,18 @@ export const MONSTERS: Record<string, MonsterDef> = Object.fromEntries([
   M('marcion', 'marcion', '마르시온', 'มาร์ซิออน', 'Marcion', '#d8d0c8', '#141016', '#a82030', 6800, [38, 52], 0.9, 9, 1.5, 1.55, [600, 760], { boss: true, weapon: 'sealstaff', title: { ko: '천 개의 가면을 가진 자', th: 'ผู้มีหน้ากากพันหน้า', en: 'He of a Thousand Masks' }, cols: { 9: '#3a1a2a', 10: '#ece6da', 14: '#d8b048', 12: '#a82030', 15: '#08060a', 4: '#100c10', 5: '#0a080a' } }),
   // 43차 5층 필드 보스: 마네트, 실의 어미 — 도자기 가면을 쓴 거대한 목각 인형 (손끝의 검은 실로 작은 인형을 부린다)
   M('manette', 'manette', '마네트', 'มาเนตต์', 'Manette', '#a87a4a', '#5a2a4a', '#c83a3a', 9600, [34, 48], 0.8, 8, 1.2, 2.0, [950, 1200], { weapon: null, title: { ko: '실의 어미', th: 'มารดาแห่งเส้นด้าย', en: 'Mother of Threads' }, cols: { 13: '#a87a4a', 4: '#5a3a22', 10: '#f4f0ea', 12: '#c83a3a', 15: '#141014', 9: '#e8e0d0' } }),
+  // 48차 6~13층 필드 보스 (설정집) — 층이 열리면 하루 한 번. 몸은 있는 것을 빌려 색과 크기로
+  M('irene', 'maskfiend', '이렌', 'ไอเรน', 'Iren', '#d8dce8', '#8a90a8', '#c8e0ff', 11000, [36, 50], 1.0, 8, 1.0, 1.9, [1100, 1400], { weapon: 'rapier', title: { ko: '거울의 쌍생자', th: 'คู่แฝดแห่งกระจก', en: 'Mirror Twin' } }),
+  M('varg', 'gurma', '바르그', 'วาร์ก', 'Varg', '#3a4a4a', '#1e2a2a', '#7ad0d0', 12500, [38, 54], 0.8, 8, 1.2, 2.05, [1250, 1550], { weapon: null, title: { ko: '침몰한 감옥', th: 'คุกที่จมลง', en: 'Sunken Prison' } }),
+  M('ornel', 'bloat', '오르넬', 'ออร์เนล', 'Ornel', '#2a241e', '#141010', '#8a6a3a', 14000, [40, 56], 1.05, 9, 1.05, 2.0, [1400, 1700], { weapon: null, title: { ko: '검은 뿌리사슴', th: 'กวางรากดำ', en: 'Black Root Stag' } }),
+  M('temrok', 'forgeknight', '템록', 'เท็มร็อก', 'Temrok', '#8a7a5a', '#3a3028', '#f2d27a', 15500, [42, 58], 0.85, 8, 1.2, 2.1, [1550, 1900], { weapon: 'sledge', title: { ko: '열세 번째 종', th: 'ระฆังที่สิบสาม', en: 'Thirteenth Bell' } }),
+  M('molden', 'gurma', '몰덴', 'โมลเดน', 'Molden', '#6a5a2a', '#2a2410', '#e0c84a', 17000, [44, 60], 0.85, 8, 1.15, 2.1, [1700, 2100], { weapon: null, title: { ko: '금빛 부식수', th: 'ไม้ผุทองคำ', en: 'Gilded Rot' } }),
+  M('nomel', 'whisperer', '노멜', 'โนเมล', 'Nomel', '#e8e2d4', '#2a2420', '#f4f0e6', 18500, [46, 62], 0.95, 9, 1.05, 2.0, [1850, 2300], { weapon: null, title: { ko: '이름을 먹는 책', th: 'หนังสือกินชื่อ', en: 'Name-Eating Book' } }),
+  M('argon', 'forgeknight', '아르곤', 'อาร์กอน', 'Argon', '#4a4a50', '#2a1a1a', '#c8a040', 21000, [50, 66], 0.9, 8, 1.2, 2.2, [2100, 2600], { weapon: 'greatsword', title: { ko: '빈 왕좌의 전차', th: 'รถศึกบัลลังก์ว่าง', en: 'Chariot of the Empty Throne' } }),
+  M('nullmaw', 'bloat', '널', 'นัลล์', 'Null', '#0e0c12', '#06060a', '#7a4aff', 26000, [56, 74], 0.8, 10, 1.25, 2.3, [2600, 3200], { weapon: null, title: { ko: '별을 삼킨 것', th: 'ผู้กลืนดวงดาว', en: 'Starless Maw' } }),
 ].map((m) => [m.key, m]));
 /** 31차: 층마다 하루 한 번 나오는 필드 보스 */
-export const FIELD_BOSS: Record<number, string> = { 1: 'rokk', 2: 'gulon', 3: 'merk', 4: 'ferron', 5: 'manette' };
+export const FIELD_BOSS: Record<number, string> = { 1: 'rokk', 2: 'gulon', 3: 'merk', 4: 'ferron', 5: 'manette', 6: 'irene', 7: 'varg', 8: 'ornel', 9: 'temrok', 10: 'molden', 11: 'nomel', 12: 'argon', 13: 'nullmaw' }; // 48차: 6~13층은 층이 열리면
 
 // ───────────────────────── 지도 ─────────────────────────
 const TI = Object.fromEntries(TYPES.map((t, k) => [t, k])) as Record<TileType, number>;

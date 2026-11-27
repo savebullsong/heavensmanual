@@ -448,6 +448,15 @@ export const FB: Record<string, FbDef> = {
   gulon: { hp: 7000, dmg: [26, 38], size: 1.85, passive: false, patterns: ['pull', 'leap'], every: 6.5, loot: [['gulonstone', 0.45]], shards: 2, deed: 'fbossHell', col: 0xc8e05a },
   merk: { hp: 7600, dmg: [28, 40], size: 1.8, passive: false, patterns: ['coins', 'slam'], every: 6, loot: [['redseal', 0.45]], shards: 3, deed: 'fbossHell', col: 0xf2c84a },
   ferron: { hp: 8800, dmg: [32, 46], size: 2.0, passive: false, patterns: ['slam', 'pillars'], every: 6, loot: [['heartstone', 0.45]], shards: 3, deed: 'fbossHell', col: 0xff7a1a },
+  // 48차 6~13층 필드 보스 (설정집의 핵심 공격 둘 · 전리품) — 층이 열리면
+  irene: { hp: 11000, dmg: [36, 50], size: 1.9, passive: false, patterns: ['summon', 'ring'], every: 5.5, loot: [['twinshard', 0.45]], shards: 3, deed: 'fbossHell', col: 0xc8e0ff },
+  varg: { hp: 12500, dmg: [38, 54], size: 2.05, passive: false, patterns: ['pull', 'leap'], every: 5.5, loot: [['sunkgreaves', 0.25]], shards: 4, deed: 'fbossHell', col: 0x7ad0d0 },
+  ornel: { hp: 14000, dmg: [40, 56], size: 2.0, passive: false, patterns: ['charge', 'pillars'], every: 5, loot: [['blackantler', 0.45]], shards: 4, deed: 'fbossHell', col: 0x8a6a3a },
+  temrok: { hp: 15500, dmg: [42, 58], size: 2.1, passive: false, patterns: ['ring', 'slam'], every: 5, loot: [['stilledhand', 0.45]], shards: 4, deed: 'fbossHell', col: 0xf2d27a },
+  molden: { hp: 17000, dmg: [44, 60], size: 2.1, passive: false, patterns: ['rain', 'pillars'], every: 5, loot: [['rotcore', 0.45]], shards: 5, deed: 'fbossHell', col: 0xe0c84a },
+  nomel: { hp: 18500, dmg: [46, 62], size: 2.0, passive: false, patterns: ['rain', 'pull'], every: 4.8, loot: [['blankcloak', 0.2]], shards: 5, deed: 'fbossHell', col: 0xf4f0e6 },
+  argon: { hp: 21000, dmg: [50, 66], size: 2.2, passive: false, patterns: ['charge', 'summon'], every: 4.8, loot: [['crownlessshield', 0.2]], shards: 6, deed: 'fbossHell', col: 0xc8a040 },
+  nullmaw: { hp: 26000, dmg: [56, 74], size: 2.3, passive: false, patterns: ['pull', 'ring'], every: 4.5, loot: [['abysscore', 0.45]], shards: 8, deed: 'fbossHell', col: 0x7a4aff },
   manette: { hp: 9600, dmg: [34, 48], size: 2.0, passive: false, patterns: ['pull', 'slam', 'ring'], every: 5.5, loot: [['manettethread', 0.45], ['porcelainmask', 0.3]], shards: 3, deed: 'fbossHell', col: 0xf2eee6 }, // 43차 5층 실의 어미: 실로 끌어당기고 내리찍는다
 };
 

@@ -5580,6 +5580,45 @@ function openHellStore(kind: HellVendor) {
 }
 
 /** 30차 지옥 대장간: 지옥 장비를 고치고(노전), 템브라로 강화한다 */
+/** 48차 필드 보스 재료로 만드는 지옥 장비 — 재료와 대장장이 품삯(노전). 6층 아래 재료는 층이 열리면 나온다 */
+const CRAFT: { out: string; need: [string, number][]; fee: number }[] = [
+  { out: 'ashhidecoat', need: [['ashhide', 3]], fee: 1500 },
+  { out: 'gulongloves', need: [['gulonstone', 2]], fee: 1200 },
+  { out: 'sealmask', need: [['redseal', 3]], fee: 2000 },
+  { out: 'threadmail', need: [['manettethread', 3]], fee: 4000 },
+  { out: 'heartblade', need: [['heartstone', 3], ['hgreatsword', 1]], fee: 6000 },
+  { out: 'antlerbow', need: [['blackantler', 3]], fee: 9000 },
+  { out: 'rotdagger', need: [['rotcore', 2]], fee: 12_000 },
+  { out: 'abyssblade', need: [['abysscore', 3], ['heartblade', 1]], fee: 60_000 },
+];
+function craftList(list: Element, redraw: () => void) {
+  const L = t();
+  const h = hellState();
+  const have = (k: string) => sellFree(k);
+  // 한 번이라도 재료를 손에 쥔 것만 보인다 (아직 모르는 재료로 만드는 것까지 늘어놓지 않는다) — 하나도 없으면 1~5층 것만
+  const known = CRAFT.filter((r) => r.need.some(([k]) => have(k) > 0));
+  const rows = known.length ? known : CRAFT.slice(0, 5);
+  const line = document.createElement('p'); line.className = 'store-line'; line.textContent = L.craftLine; list.appendChild(line);
+  for (const r of rows) {
+    const it = itemByKey(r.out);
+    const ok = r.need.every(([k, n]) => have(k) >= n) && h.notes >= r.fee;
+    const need = r.need.map(([k, n]) => `${itemByKey(k).name[lang()]} ${Math.min(have(k), n)}/${n}`).join(' · ');
+    const row = itemRow(it, `${need} · ${priceText(r.fee, true)}`, () => {
+      if (!r.need.every(([k, n]) => have(k) >= n)) { toast(L.craftLack); return; }
+      if (h.notes < r.fee) { toast(L.hwNoMoney); return; }
+      for (const [k, n] of r.need) { state.bag![k] = (state.bag![k] ?? 0) - n; if (state.dura && state.bag![k] <= 0) delete state.dura[k]; }
+      h.notes -= r.fee;
+      ecoLog('spend', 'craft', r.fee, true);
+      addToBag(it);
+      save(state); renderHud(); renderQuick();
+      sfx.impact('blade', sfx.spot(0, 0), true);
+      toast(L.craftDone.replace('{item}', it.name[lang()]), 'good');
+      redraw();
+    }, !ok);
+    const tag = document.createElement('span'); tag.className = 'act'; tag.textContent = L.craftBtn; row.appendChild(tag); row.classList.add('has-act');
+    list.appendChild(row);
+  }
+}
 function openSmith(title?: string, hello?: string, start?: 'repair' | 'enh', enhOnly = false) {
   enhMsg = null; // 44차: 대장간을 새로 열면 지난 결과 글은 지운다
   closeMenus();
@@ -5594,15 +5633,16 @@ function openSmith(title?: string, hello?: string, start?: 'repair' | 'enh', enh
   const list = el.querySelector('.menu-list')!;
   const tabs = el.querySelector('.store-tabs')!;
   // 46차 후속: 대장장이에게 말을 걸면 언제나 수리 탭부터 (가방에서 템브라를 쓸 때만 강화부터)
-  let mode: 'repair' | 'enh' = start ?? 'repair';
-  const bFix = document.createElement('button'), bEnh = document.createElement('button');
-  bFix.textContent = L.tabRepair; bEnh.textContent = L.tabEnhance;
-  bFix.onclick = () => { mode = 'repair'; draw(); }; bEnh.onclick = () => { mode = 'enh'; draw(); };
+  let mode: 'repair' | 'enh' | 'craft' = start ?? 'repair';
+  const bFix = document.createElement('button'), bEnh = document.createElement('button'), bCraft = document.createElement('button');
+  bFix.textContent = L.tabRepair; bEnh.textContent = L.tabEnhance; bCraft.textContent = L.tabCraft;
+  bFix.onclick = () => { mode = 'repair'; draw(); }; bEnh.onclick = () => { mode = 'enh'; draw(); }; bCraft.onclick = () => { mode = 'craft'; draw(); };
   if (!enhOnly) tabs.append(bFix, bEnh); // 45차: 가방에서 템브라를 쓸 때는 강화만 (수리는 대장간에서)
+  if (!enhOnly && inHell()) tabs.append(bCraft); // 48차: 지옥 대장간은 필드 보스 재료로 장비를 만든다
   const draw = () => {
     list.innerHTML = '';
-    bFix.classList.toggle('on', mode === 'repair'); bEnh.classList.toggle('on', mode === 'enh');
-    if (mode === 'repair') repairList(list, true, draw); else enhanceList(list, draw);
+    bFix.classList.toggle('on', mode === 'repair'); bEnh.classList.toggle('on', mode === 'enh'); bCraft.classList.toggle('on', mode === 'craft');
+    if (mode === 'repair') repairList(list, true, draw); else if (mode === 'craft') craftList(list, draw); else enhanceList(list, draw);
   };
   draw();
   panelAt(el);

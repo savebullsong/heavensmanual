@@ -1158,6 +1158,11 @@ export const more16 = {
     ecoAllPlayers: "{n}명",
     ecoAllFail: "서버에서 받지 못함",
     ecoMineBelow: "아래는 이 기기의 기록",
+    tabCraft: "제작",
+    craftLine: "필드 보스에게서 얻은 재료를 가져오면 두드려 준다. 품삯은 노전으로.",
+    craftLack: "재료가 모자라다",
+    craftDone: "{item} — 불에서 막 꺼냈다",
+    craftBtn: "만들기",
     // 48차 끝
   },
   th: {
@@ -2318,6 +2323,11 @@ export const more16 = {
     ecoAllPlayers: "{n} คน",
     ecoAllFail: "ดึงจากเซิร์ฟเวอร์ไม่ได้",
     ecoMineBelow: "ด้านล่างคือบันทึกของเครื่องนี้",
+    tabCraft: "ตีของ",
+    craftLine: "เอาวัตถุดิบจากบอสสนามมา เดี๋ยวตีให้ ค่าแรงจ่ายเป็นโอบอล",
+    craftLack: "วัตถุดิบไม่พอ",
+    craftDone: "{item} — เพิ่งออกจากไฟ",
+    craftBtn: "ตี",
     // 48차 끝
   },
   en: {
@@ -3478,6 +3488,11 @@ export const more16 = {
     ecoAllPlayers: "{n} players",
     ecoAllFail: "Could not load from server",
     ecoMineBelow: "Below: this device only",
+    tabCraft: "Craft",
+    craftLine: "Bring what you took from the field bosses and I will hammer it into shape. Fee in obols.",
+    craftLack: "Not enough materials",
+    craftDone: "{item} — fresh out of the fire",
+    craftBtn: "Make",
     // 48차 끝
   },
 };

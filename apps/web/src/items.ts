@@ -22,7 +22,7 @@ export interface ItemDef {
   /** 25차: 쓴 세계(현실·지옥)에서 훔치기 확률이 오른다 (0.02 = 2%) */
   steal?: number;
   name: Record<Lang, string>;
-  store?: 'puppet' | 'antique' | 'maskgirl' | 'mart' | 'pharmacy' | 'food' | 'cafe' | 'talus' | 'hmeat' | 'tools' | 'dept' | 'hjunk' | 'drop' | 'hwater' | 'hmed' | 'harms' | 'heaven' | 'yw'; // 22차: 지옥 물장수 · 약장수 · 무기상 // drop = 어디서도 팔지 않는다 (괴물이 떨어뜨릴 뿐) // 우주새가 아니라 거리 가게(철물점·백화점) · 지옥 탈루스·고깃간·넝마장수에서 파는 것
+  store?: 'puppet' | 'antique' | 'maskgirl' | 'mart' | 'pharmacy' | 'food' | 'cafe' | 'talus' | 'hmeat' | 'tools' | 'dept' | 'hjunk' | 'drop' | 'hwater' | 'hmed' | 'harms' | 'heaven' | 'yw' | 'craft'; // 22차: 지옥 물장수 · 약장수 · 무기상 // drop = 어디서도 팔지 않는다 (괴물이 떨어뜨릴 뿐) // 우주새가 아니라 거리 가게(철물점·백화점) · 지옥 탈루스·고깃간·넝마장수에서 파는 것
   now?: boolean; // 가게에서 바로 먹는다 (가방에 넣지 않음)
   hell?: boolean; // 지옥의 우주새(황혼)에서만, 노전으로 판다
   /** 45차 천국의 물건: 천국(과 노을과의 지옥 정벌)에서만 쓴다 · 현실·지옥에서 팔리지 않는다 · 환생하면 사라진다 */
@@ -199,6 +199,25 @@ export const ITEMS: ItemDef[] = [
   { key: 'hvplate', cat: 'armor', price: 15000, def: 7, heaven: true, store: 'heaven', sprite: 'platecoat', icon: 'platecoat', tint: '#ece6d6', metal: '#e8d8a0', name: { ko: '순백 판금 겉옷', th: 'เสื้อเกราะขาวบริสุทธิ์', en: 'Pure-white platecoat' } },
   { key: 'hvhelm', cat: 'armor', price: 6000, def: 4, heaven: true, store: 'heaven', sprite: 'greathelm', icon: 'greathelm', tint: '#e8c050', metal: '#ece6d6', name: { ko: '새벽빛 투구', th: 'หมวกแสงรุ่งอรุณ', en: 'Dawnlight helm' } },
   { key: 'hvshield', cat: 'armor', price: 9000, def: 4, heaven: true, store: 'heaven', sprite: 'shield', icon: 'shield', tint: '#ece6d6', metal: '#d8b050', name: { ko: '날개 문장 방패', th: 'โล่ตราปีก', en: 'Winged shield' } },
+  // 48차 필드 보스 재료로 대장간에서 만드는 지옥 장비 (어디서도 팔지 않는다) — 1~5층 보스 재료
+  { key: 'ashhidecoat', cat: 'armor', price: 12_000, def: 9, hell: true, store: 'craft', sprite: 'jacket', icon: 'jacket', tint: '#7a746c', name: { ko: '재등 가죽 갑옷', th: 'เสื้อเกราะหนังหลังเถ้า', en: 'Ashback hide armor' } },
+  { key: 'gulongloves', cat: 'armor', price: 8000, def: 4, hell: true, store: 'craft', sprite: 'gloves', icon: 'gloves', tint: '#8aa04a', name: { ko: '위석 장갑', th: 'ถุงมือนิ่วกระเพาะ', en: 'Gastrolith gloves' } },
+  { key: 'sealmask', cat: 'armor', price: 14_000, def: 7, hell: true, store: 'craft', sprite: 'mask', icon: 'blackmask', tint: '#8a1a14', name: { ko: '봉랍 가면', th: 'หน้ากากครั่ง', en: 'Wax-seal mask' } },
+  { key: 'heartblade', cat: 'weapon', price: 60_000, atk: 14, two: true, hell: true, store: 'craft', sprite: 'greatsword', tint: '#2a1e1a', wtint: '#3a2a22#ff7a2a', name: { ko: '심장석 대검', th: 'ดาบใหญ่หินหัวใจ', en: 'Heartstone greatsword' } },
+  { key: 'threadmail', cat: 'armor', price: 40_000, def: 12, hell: true, store: 'craft', sprite: 'jacket', icon: 'jacket', tint: '#efe8dc', name: { ko: '실 엮은 갑옷', th: 'เกราะถักด้าย', en: 'Woven-thread mail' } },
+  // 48차 6~13층 필드 보스의 전리품 (층이 열리면 나온다 — 설정집)
+  { key: 'twinshard', cat: 'goods', price: 1400, hell: true, store: 'drop', name: { ko: '쌍생자의 파편', th: 'เศษของคู่แฝด', en: 'Twin shard' } },
+  { key: 'sunkgreaves', cat: 'armor', price: 70_000, def: 9, hell: true, store: 'drop', sprite: 'shinguard', icon: 'shinguard', tint: '#2e3a3a', name: { ko: '침몰의 각반', th: 'สนับแข้งจมน้ำ', en: 'Sunken greaves' } },
+  { key: 'blackantler', cat: 'goods', price: 1600, hell: true, store: 'drop', name: { ko: '검은 뿔', th: 'เขาดำ', en: 'Black antler' } },
+  { key: 'stilledhand', cat: 'goods', price: 1800, hell: true, store: 'drop', name: { ko: '정지된 초침', th: 'เข็มวินาทีที่หยุดนิ่ง', en: 'Stilled second hand' } },
+  { key: 'rotcore', cat: 'goods', price: 1900, hell: true, store: 'drop', name: { ko: '부식의 핵', th: 'แกนผุกร่อน', en: 'Rot core' } },
+  { key: 'blankcloak', cat: 'armor', price: 120_000, def: 13, hell: true, store: 'drop', sprite: 'trench', icon: 'trench', tint: '#f4f2ea', name: { ko: '백지의 망토', th: 'เสื้อคลุมกระดาษเปล่า', en: 'Blank-page cloak' } },
+  { key: 'crownlessshield', cat: 'armor', price: 150_000, def: 10, hell: true, store: 'drop', sprite: 'shield', icon: 'shield', tint: '#3a3a3e', metal: '#8a8a90', name: { ko: '무관의 방패', th: 'โล่ไร้มงกุฎ', en: 'Crownless shield' } },
+  { key: 'abysscore', cat: 'goods', price: 3000, hell: true, store: 'drop', name: { ko: '심연의 핵', th: 'แกนแห่งห้วงลึก', en: 'Abyss core' } },
+  // 48차 6~13층 재료로 만드는 것 (층이 열리면)
+  { key: 'antlerbow', cat: 'weapon', price: 90_000, atk: 7, ranged: true, note: 'needsArrows', hell: true, store: 'craft', sprite: 'bow', icon: 'bow', tint: '#1e1a18', name: { ko: '검은 뿔 활', th: 'ธนูเขาดำ', en: 'Black-antler bow' } },
+  { key: 'rotdagger', cat: 'weapon', price: 110_000, atk: 13, hell: true, store: 'craft', sprite: 'dagger', icon: 'dagger', tint: '#5a6a2a', wtint: '#6a7a3a#b8e04a', name: { ko: '부식의 단검', th: 'มีดสั้นผุกร่อน', en: 'Rot dagger' } },
+  { key: 'abyssblade', cat: 'weapon', price: 900_000, atk: 19, two: true, hell: true, store: 'craft', sprite: 'greatsword', tint: '#0e0c12', wtint: '#141018#7a4aff', name: { ko: '심연의 대검', th: 'ดาบใหญ่ห้วงลึก', en: 'Abyss greatsword' } },
   // 48차 황색날개의 가게 (천국 돈 · 천국에서만 쓰고 입는다) — 칼은 팔지 않는다. 먹을 것 · 바를 것 · 흰 옷
   { key: 'manna', cat: 'goods', price: 40, heal: 90, heaven: true, store: 'yw', icon: 'croissant', name: { ko: '만나', th: 'มานา', en: 'Manna' } },
   { key: 'milkhoney', cat: 'goods', price: 30, heal: 60, heaven: true, store: 'yw', icon: 'lassi', name: { ko: '젖과 꿀', th: 'นมกับน้ำผึ้ง', en: 'Milk and honey' } },
