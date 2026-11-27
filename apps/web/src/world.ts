@@ -370,6 +370,8 @@ export interface WorldHooks {
   maskGirl(): void;
   yunaeOut(): void; // 28차: 대문 앞의 20대 유내에게 말을 건다
   thanks(n: number): void; // 34차: 도움받은 행인의 사례 (돈)
+  /** 48차: 사례로 물건을 쥐여 주거나(item) 길을 알려 준다(tip — 그 건물 이름) */
+  passerGift(kind: 'item' | 'tip', name?: string): void;
   /** 26차: 초심자 야구 배트를 떨어뜨려도 되나 (돈·장비 없음 · 아직 받은 적 없음) */
   beginnerBat(): boolean;
   /** 지옥: 층주를 쓰러뜨렸다 */
@@ -6308,6 +6310,27 @@ export class WorldScene {
       this.makePing(k, dp);
     }
   }
+  /** 48차: 도와준 행인이 알려 주는 가게 — 은행 · 철물점 · 약국 · 백화점 · 골동품·전당포 (이 구역, 너무 가깝지도 멀지도 않은 곳) */
+  private passerTip(w: Walker): boolean {
+    const p = this.player;
+    const cands: { k: number; d: number }[] = [];
+    this.zone.buildings.forEach((b, k) => {
+      const rk = roomKindOf(b);
+      const ok = hasBank(b) || rk === 'bank' || rk === 'hardware' || rk === 'pharmacy' || rk === 'dept' || (rk === 'shop' && ['antiques', 'pawnbroker', 'second_hand'].includes(bKindOf(b)));
+      if (!ok || !canEnter(b)) return;
+      const d = Math.hypot(b.i0 + b.w / 2 - p.x, b.j0 + b.d / 2 - p.y);
+      if (d > 8 && d < 80) cands.push({ k, d });
+    });
+    if (!cands.length) return false;
+    const c = cands[Math.floor(Math.random() * cands.length)];
+    const b = this.zone.buildings[c.k];
+    const name = hasBank(b) && bankName(b, lang()) ? bankName(b, lang())! : this.nameOf(b);
+    if (!name) return false;
+    this.bubble(w, t().tipLines[Math.floor(Math.random() * t().tipLines.length)].replace('{name}', name));
+    this.setGuide(c.k);
+    this.hooks.passerGift('tip', name);
+    return true;
+  }
   setGuide(k: number) {
     const b = this.zone.buildings[k];
     if (!b) return;
@@ -6549,8 +6572,12 @@ export class WorldScene {
       w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir);
       w.owe = undefined;
       const n = Math.round(((40 + Math.random() * 260) * (w.tour ? 1.8 : 1) * (1 + 0.5 * (w.ptier ?? 0))) / 10) * 10;
-      const th = L.thanksLines; this.bubble(w, th[Math.floor(Math.random() * th.length)]);
-      this.hooks.thanks(n);
+      const th = L.thanksLines;
+      // 48차: 사례는 돈만이 아니다 — 가끔 손에 든 걸 쥐여 주거나, 쓸 만한 가게 자리를 알려 준다
+      const r = Math.random();
+      if (r < 0.2 && this.passerTip(w)) { /* 길 정보 */ }
+      else if (r < 0.5) { this.bubble(w, L.giftLines[Math.floor(Math.random() * L.giftLines.length)]); this.hooks.passerGift('item'); }
+      else { this.bubble(w, th[Math.floor(Math.random() * th.length)]); this.hooks.thanks(n); }
       w.wait = 2; w.path = [];
       return;
     }

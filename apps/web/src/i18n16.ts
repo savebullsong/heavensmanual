@@ -1147,6 +1147,11 @@ export const more16 = {
     dogGrowl: ["으르르…", "왈! 왈왈!", "컹!"],
     dogBark: ["왈왈!", "컹컹!", "으르릉!"],
     dogYelp: ["깨갱!", "끼잉…", "깽!"],
+    giftLines: ["이거라도 받아요. 고마워서.", "돈은 없고… 이거라도.", "아까는 정말 고마웠어요. 이거 드세요."],
+    tipLines: ["{name} 알아요? 거기 가 봐요. 쓸 만해요.", "고마워서 하나 알려 줄게요. {name}.", "{name}, 아는 사람만 가는 데예요."],
+    giftToast: "행인이 {item} {n}개를 쥐여 주었다",
+    tipToast: "길 정보: {name} — 위에 표시가 떴다",
+    setMovePad: "이동 패드 (휴대폰)",
     // 48차 끝
   },
   th: {
@@ -2296,6 +2301,11 @@ export const more16 = {
     dogGrowl: ["แฮ่…", "โฮ่ง! โฮ่ง ๆ!", "บ๊อก!"],
     dogBark: ["โฮ่ง ๆ!", "บ๊อก ๆ!", "แฮ่!"],
     dogYelp: ["เอ๋ง!", "หงิง…", "เอ๋ง ๆ!"],
+    giftLines: ["รับนี่ไว้เถอะ ขอบคุณนะ", "ไม่มีเงิน… เอานี่ไปละกัน", "เมื่อกี้ขอบคุณจริง ๆ เอานี่ไปกิน"],
+    tipLines: ["รู้จัก {name} ไหม ลองไปดู ใช้ได้นะ", "ขอบคุณนะ บอกอะไรให้อย่าง {name}", "{name} คนรู้เท่านั้นถึงไป"],
+    giftToast: "คนเดินถนนยัด {item} ให้ {n} ชิ้น",
+    tipToast: "ข้อมูลทาง: {name} — มีเครื่องหมายขึ้นแล้ว",
+    setMovePad: "แป้นเดิน (มือถือ)",
     // 48차 끝
   },
   en: {
@@ -3445,6 +3455,11 @@ export const more16 = {
     dogGrowl: ["Grrr…", "Woof! Woof woof!", "Bark!"],
     dogBark: ["Woof woof!", "Bark bark!", "Grrrah!"],
     dogYelp: ["Yelp!", "Whine…", "Kaing!"],
+    giftLines: ["Take this, at least. Thank you.", "No money… but here.", "Thank you for earlier. Have this."],
+    tipLines: ["Know {name}? Go there. It's useful.", "One thing, to say thanks: {name}.", "{name} — only people in the know go there."],
+    giftToast: "A passer-by pressed {n} {item} into your hand",
+    tipToast: "Directions: {name} — marked above it",
+    setMovePad: "Move pad (phone)",
     // 48차 끝
   },
 };

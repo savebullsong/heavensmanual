@@ -699,3 +699,8 @@ body:has(.bag-panel) .load-chip { display: none; }
 .doll-slot.on.w-heaven { background-image: linear-gradient(to top, #e8d08a 2px, rgba(232, 208, 138, 0.1) 2px); }
 .doll-slot.on.w-hell { background-image: linear-gradient(to top, #a8332a 2px, rgba(168, 51, 42, 0.14) 2px); }
 .doll-slot.on.w-cross { background-image: linear-gradient(to top, #a888d8 2px, rgba(168, 136, 216, 0.12) 2px); }
+/* 48차 휴대폰 이동 패드 (왼쪽 아래) */
+.move-pad { position: fixed; left: 18px; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); width: 112px; height: 112px; border-radius: 50%; z-index: 13; background: radial-gradient(circle, rgba(20, 15, 11, 0.28), rgba(20, 15, 11, 0.5)); border: 2px solid rgba(224, 180, 55, 0.45); touch-action: none; display: flex; align-items: center; justify-content: center; }
+.move-pad[hidden] { display: none; }
+.move-pad .mp-knob { width: 46px; height: 46px; border-radius: 50%; background: rgba(224, 180, 55, 0.55); border: 2px solid #f2d27a; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); pointer-events: none; transition: transform 0.08s; }
+.move-pad.on .mp-knob { transition: none; background: rgba(242, 210, 122, 0.8); }

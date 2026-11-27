@@ -201,6 +201,7 @@ const INVIS_KEY = 'heavensmanual.invisible';
 const COUNTER_KEY = 'heavensmanual.counter';
 const autoCounter = () => { try { return localStorage.getItem(COUNTER_KEY) !== '0'; } catch { return true; } };
 /** 38차 영혼 설정: 자동 회복(빠른 칸의 회복품을 체력이 몇 % 아래로 떨어지면) · 상점 알림 화살표 · PC 키 */
+const PAD_KEY = 'heavensmanual.movepad'; // 48차: 휴대폰 이동 패드 (기본 켬)
 const HEAL_KEY = 'heavensmanual.autoheal', HEALPCT_KEY = 'heavensmanual.autohealpct', PING_KEY = 'heavensmanual.shopping', KEYS_KEY = 'heavensmanual.keys';
 const lsGet = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* 그만 */ } };
@@ -956,6 +957,17 @@ const hooks: WorldHooks = {
     ecoLog('earn', 'thanks', n);
     save(state); updateHud();
     toast(t().thanksGot.replace('{n}', priceText(n)), 'good');
+  },
+  passerGift(kind, name) {
+    // 48차: 사례 — 물 · 과자 · 붕대 · 약 같은 손에 든 것, 또는 길 정보(위에 표시가 뜬다)
+    if (kind === 'tip') { toast(t().tipToast.replace('{name}', name ?? ''), 'good'); return; }
+    const pool = ['water', 'cola', 'choco', 'chips', 'bandage', 'plaster', 'painkiller', 'saline', 'ricebox', 'noodle'].map(itemByKey).filter((it) => it && worldOk(it));
+    const it = pool[Math.floor(Math.random() * pool.length)];
+    if (!it) return;
+    const n = it.price <= 20 ? 1 + Math.floor(Math.random() * 3) : 1;
+    for (let k = 0; k < n; k++) addToBag(it);
+    save(state); renderQuick();
+    toast(t().giftToast.replace('{item}', it.name[lang()]).replace('{n}', String(n)), 'good');
   },
   money(n) {
     state.wallet = (state.wallet ?? 0) + n;
@@ -5724,7 +5736,7 @@ function renderSettings() {
     </section>
     <section class="set-sec"><h4 class="h-fight"></h4><div class="set-row"><span class="lbl l-counter"></span><div class="seg s-counter"></div></div><p class="note n-counter"></p>
       <div class="set-row"><span class="lbl l-heal"></span><div class="seg s-heal"></div></div><div class="set-row"><span class="lbl l-healpct"></span><div class="seg s-healpct"></div></div><p class="note n-heal"></p></section>
-    <section class="set-sec"><h4 class="h-screen"></h4><div class="set-row"><span class="lbl l-zoom"></span><div class="seg s-zoom"></div></div><div class="set-row"><span class="lbl l-ping"></span><div class="seg s-ping"></div></div><div class="set-row"><span class="lbl l-promo"></span><div class="seg s-promo"></div></div><div class="set-row"><span class="lbl l-low"></span><div class="seg s-low"></div></div></section>
+    <section class="set-sec"><h4 class="h-screen"></h4><div class="set-row"><span class="lbl l-zoom"></span><div class="seg s-zoom"></div></div><div class="set-row"><span class="lbl l-ping"></span><div class="seg s-ping"></div></div><div class="set-row"><span class="lbl l-pad"></span><div class="seg s-pad"></div></div><div class="set-row"><span class="lbl l-promo"></span><div class="seg s-promo"></div></div><div class="set-row"><span class="lbl l-low"></span><div class="seg s-low"></div></div></section>
     ${matchMedia('(pointer: coarse)').matches ? '' : '<section class="set-sec set-keys"><h4 class="h-keys"></h4><div class="keys"></div><p class="note n-keys"></p></section>'}
     <section class="set-sec"><h4 class="h-lang"></h4><div class="seg s-lang wide"></div></section>
     <section class="set-sec set-acc"><h4 class="h-acc"></h4><div class="acc"></div></section>
@@ -5780,6 +5792,7 @@ function renderSettings() {
   // 38차: 화면 — 상점 알림 화살표 · 건물 1층으로 줄이기 (오른쪽 아래 단추에서 옮겨 왔다)
   el.querySelector('.h-screen')!.textContent = L.setScreen;
   el.querySelector('.l-ping')!.textContent = L.setShopPing;
+  el.querySelector('.l-pad')!.textContent = L.setMovePad;
   // 39차 시야: 자동(휴대폰 1.6배 · 태블릿 1.3배 · PC 1배) 또는 직접
   el.querySelector('.l-zoom')!.textContent = L.setZoom;
   const zooms = ['auto', '1', '1.2', '1.6', '1.9', '2.4'];
@@ -5792,6 +5805,7 @@ function renderSettings() {
     if (v === 'on' && !myIntro) toast(L.promoNoIntro);
     lsSet('heavensmanual.promo', v === 'on' ? '1' : '0'); applyPromo();
   });
+  seg(el.querySelector('.s-pad')!, ['on', 'off'], L.onOff, () => (lsGet(PAD_KEY) === '0' ? 'off' : 'on'), (v) => { lsSet(PAD_KEY, v === 'on' ? '1' : '0'); applyPad(); });
   seg(el.querySelector('.s-ping')!, ['on', 'off'], L.onOff, () => (lsGet(PING_KEY) === '0' ? 'off' : 'on'), (v) => { lsSet(PING_KEY, v === 'on' ? '1' : '0'); world?.setShopPing(v === 'on'); });
   seg(el.querySelector('.s-low')!, ['on', 'off'], L.onOff, () => (world?.low ? 'on' : 'off'), (v) => { if (!world) return; world.setLowBuildings(v === 'on'); street?.setLowBuildings(v === 'on'); });
   // 38차: PC 키 지정 (손가락 기기에서는 보이지 않는다)
@@ -6374,6 +6388,46 @@ function showStance(on: boolean) {
   (stanceBox.querySelector('.st-target small') as HTMLElement).textContent = t().targetLabel;
   (stanceBox.querySelector('.st-target') as HTMLElement).title = t().targetTitle;
   setStance(stance);
+}
+
+// ───────────────────────── 48차 휴대폰 이동 패드: 왼쪽 아래 동그라미를 끌면 그쪽으로 계속 걷는다 ─────────────────────────
+const movePad = document.createElement('div');
+movePad.className = 'move-pad';
+movePad.hidden = true;
+movePad.innerHTML = '<i class="mp-knob"></i>';
+document.body.appendChild(movePad);
+const padCoarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+function applyPad() {
+  const on = padCoarse && lsGet(PAD_KEY) !== '0' && scene === 'world' && !!world && !busy && !dlg.isOpen && !stanceBox.hidden && realm() !== 'ghost';
+  if (movePad.hidden === !on) return;
+  movePad.hidden = !on;
+  if (!on) { world?.setKeyDir(0, 0); padKnob(0, 0); }
+}
+function padKnob(x: number, y: number) { (movePad.firstElementChild as HTMLElement).style.transform = `translate(${x}px, ${y}px)`; }
+{
+  let pid = -1, cx = 0, cy = 0;
+  const R = 42;
+  const move = (e: PointerEvent) => {
+    let dx = e.clientX - cx, dy = e.clientY - cy;
+    const m = Math.hypot(dx, dy);
+    if (m > R) { dx = (dx / m) * R; dy = (dy / m) * R; }
+    padKnob(dx, dy);
+    if (m < R * 0.22 || busy || dlg.isOpen) { world?.setKeyDir(0, 0); return; }
+    world?.setKeyDir(dx / R, dy / R);
+  };
+  movePad.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const r = movePad.getBoundingClientRect();
+    cx = r.left + r.width / 2; cy = r.top + r.height / 2; pid = e.pointerId;
+    movePad.setPointerCapture(e.pointerId);
+    movePad.classList.add('on');
+    move(e);
+  });
+  movePad.addEventListener('pointermove', (e) => { if (e.pointerId === pid) { e.preventDefault(); move(e); } });
+  const end = (e: PointerEvent) => { if (e.pointerId !== pid) return; pid = -1; movePad.classList.remove('on'); padKnob(0, 0); world?.setKeyDir(0, 0); };
+  movePad.addEventListener('pointerup', end);
+  movePad.addEventListener('pointercancel', end);
+  setInterval(applyPad, 300);
 }
 
 // ───────────────────────── 36차 PC 키보드 이동 (W·A·S·D · 방향키) ─────────────────────────
