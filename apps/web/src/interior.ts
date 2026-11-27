@@ -5,7 +5,7 @@ import { TYPES, finalize, type Zone, type Building, type Furn, type InteriorInfo
 import { kindOf, mainPoi, hasBank, storeOf, cuisineOf } from './names.ts';
 import { faithOf } from './street.ts';
 import { TW, TH } from './gfx.ts';
-import { BESK_LOOK } from './sprites.ts';
+import { BESK_LOOK, YELLOW_WING_LOOK } from './sprites.ts';
 import { drawShore, drawShoreFurn, BULDA_LOOK } from './border.ts';
 import { menuFor, itemByKey } from './items.ts';
 import { furnishHome, furnishShowroom } from './home.ts';
@@ -43,6 +43,8 @@ export function roomKind(b: Building): string {
   if (b.cat === 'estate') return 'myhome'; // 35차 내가 산 집
   if (b.cat === 'condo' && !mainPoi(b)) return 'condo'; // 45차 아파트·콘도 한 집 (관리자만 들어가 본다)
   if (b.yunae) return 'ysalon'; // 40차 유내 미용실 (회상 속 그 미용실 그대로, 사람만 다르다)
+  if (b.cat === 'sanct') { const att = (b as { att?: string }).att; return att === 'temple' ? 'htemple' : att === 'mosque' ? 'hmosque' : 'hchurch'; } // 46차 천국 성소
+  if (b.cat === 'cottage') return 'cloudisle'; // 46차 구름 위의 오두막 (옆집 쌍둥이)
   if (b.cat === 'hbank' || b.cat === 'atone' || b.cat === 'rebirth' || b.cat === 'terrace' || b.cat === 'home' || b.cat === 'goatroom') return b.cat; // 31차 goatroom = 지옥 142층 염소대왕의 방 // 지옥 은행 · 속죄의 회당 · 지옥 로비 · 천국 환생의 테라스
   const k = kindOf(b);
   if (k === 'place_of_worship' || b.cat === 'worship') {
@@ -72,14 +74,17 @@ export function roomKind(b: Building): string {
 }
 
 /** 쉬는 곳: 종교시설·은행·병원·약국 (싸움 불가 · 빠른 회복) */
-export const REST_ROOMS = new Set(['home', 'myhome', 'temple', 'church', 'mosque', 'gurdwara', 'bank', 'clinic', 'pharmacy', 'hbank', 'atone', 'rebirth', 'terrace', 'goatroom']);
+export const REST_ROOMS = new Set(['hchurch', 'htemple', 'hmosque', 'cloudisle', 'home', 'myhome', 'temple', 'church', 'mosque', 'gurdwara', 'bank', 'clinic', 'pharmacy', 'hbank', 'atone', 'rebirth', 'terrace', 'goatroom']);
 
 const SIZE: Record<string, [number, number]> = {
+  hchurch: [19, 16], htemple: [19, 16], hmosque: [19, 16], cloudisle: [20, 15], // 46차
   temple: [13, 11], church: [13, 11], mosque: [12, 11], gurdwara: [12, 11], bank: [12, 10], clinic: [12, 10], pharmacy: [9, 8],
   mart: [11, 9], food: [12, 10], cafe: [10, 9], bar: [10, 9], salon: [9, 8], ysalon: [10, 9], massage: [10, 9], laundry: [9, 8], lobby: [11, 9], shop: [9, 8], loan: [10, 8],
   hbank: [10, 8], atone: [11, 10], myhome: [14, 11], furnshop: [12, 10], hardware: [12, 10], arcade: [13, 10], rebirth: [31, 17], terrace: [23, 16], home: [11, 9], gym: [13, 11], dojo: [13, 11], condo: [13, 10], dept: [26, 20], goatroom: [17, 17],
 };
 const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
+  hchurch: { floor: 'marble', wall: '#f6f2ea', trim: '#c9a23e' }, htemple: { floor: 'temple', wall: '#faf2e2', trim: '#c9a23e' }, hmosque: { floor: 'prayer', wall: '#f8f6f0', trim: '#2a8a80' }, // 46차 천국 성소
+  cloudisle: { floor: 'cloud', wall: '#f6f2ea', trim: '#c9a23e' }, // 46차 구름 위 오두막
   temple: { floor: 'temple', wall: '#e9dcc0', trim: '#a8322a' }, church: { floor: 'stone', wall: '#e8e2d4', trim: '#6b4a30' },
   mosque: { floor: 'prayer', wall: '#efe8d8', trim: '#2a6a5a' }, gurdwara: { floor: 'prayer', wall: '#f2ecdc', trim: '#c9822a' },
   bank: { floor: 'marble', wall: '#dfe2e4', trim: '#2a4a6a' }, clinic: { floor: 'pale', wall: '#e8eeec', trim: '#3a8a7a' },
@@ -162,6 +167,41 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
       F(mid - 2, 1, 4, 2, 24, 'altar'); clerk = { i: mid + 3, j: 2 }; counter = { i: mid + 2, j: 4 };
       F(mid - 4, 2, 1, 1, 22, 'candle'); F(mid + 2, 1, 1, 1, 22, 'candle');
       for (let jj = 4; jj < y1 - 1; jj += 2) for (const ii of [mid - 3, mid - 1]) seats.push([ii, jj]);
+      break;
+    case 'cloudisle': {
+      // 46차 구름 위의 작은 섬: 왼쪽 뒤 내 오두막 · 오른쪽 뒤 쌍둥이네 집(그네) · 빨랫줄 · 꽃밭 · 벤치. 황색날개가 데려다주고 곁에 있다
+      clerk = { i: 9, j: 7 }; counter = { i: 9, j: 8 };
+      F(2, 1, 5, 4, 74, 'hut'); F(13, 1, 4, 4, 62, 'hut2');
+      F(13, 7, 4, 1, 40, 'swing'); F(2, 8, 4, 1, 36, 'washline');
+      for (const [ii, jj, v] of [[8, 2, 0], [10, 3, 1], [1, 11, 2], [17, 10, 3], [7, 11, 1], [12, 12, 0]] as const) F(ii, jj, 1, 1, 4, 'flowerbed', v);
+      F(10, 11, 2, 1, 12, 'cbench');
+      // 둥근 섬: 네 귀퉁이를 깎는다
+      for (const [ii, jj] of [[1, 1], [W - 2, 1], [W - 3, 1], [W - 2, 2], [1, H - 2], [2, H - 2], [1, H - 3], [W - 2, H - 2], [W - 3, H - 2], [W - 2, H - 3], [W - 4, H - 2], [W - 2, H - 4]]) tiles[jj * W + ii] = TI.void;
+      break;
+    }
+    // ── 46차 천국 성소: 하루 한 번 예배. 자리(seats)는 앉는 곳 — 많은 영혼이 채운다 ──
+    case 'hchurch':
+      F(mid - 2, 1, 5, 1, 22, 'altar', 1); F(mid, 1, 1, 1, 70, 'hcross'); clerk = { i: mid + 1, j: 3 }; counter = { i: mid + 1, j: 4 };
+      for (const ii of [mid - 4, mid + 4]) F(ii, 1, 1, 1, 30, 'lampstand');
+      for (let jj = 3; jj < y1; jj += 3) { F(1, jj, 1, 1, 96, 'pillar'); F(x1, jj, 1, 1, 96, 'pillar'); }
+      for (let jj = 6; jj < y1; jj += 2) {
+        // 칸마다 한 토막씩 (앉은 사람과 의자 등받이가 칸 단위로 겹쳐 그려지게)
+        for (let ii = 2; ii < mid - 1; ii++) { F(ii, jj, 1, 1, 12, 'hpew', ii === 2 ? 1 : ii === mid - 2 ? 2 : 0); seats.push([ii, jj]); }
+        for (let ii = mid + 2; ii < x1; ii++) { F(ii, jj, 1, 1, 12, 'hpew', ii === mid + 2 ? 1 : ii === x1 - 1 ? 2 : 0); seats.push([ii, jj]); }
+      }
+      break;
+    case 'htemple':
+      F(mid - 2, 1, 5, 2, 30, 'altar'); clerk = { i: mid + 3, j: 3 }; counter = { i: mid + 3, j: 4 };
+      for (const ii of [mid - 4, mid + 4]) F(ii, 1, 1, 1, 30, 'lampstand');
+      F(mid - 3, 1, 1, 1, 22, 'candle'); F(mid + 3, 1, 1, 1, 22, 'candle');
+      for (let jj = 3; jj < y1; jj += 3) { F(1, jj, 1, 1, 96, 'pillar', 1); F(x1, jj, 1, 1, 96, 'pillar', 1); }
+      for (let jj = 6; jj < y1; jj += 2) for (let ii = 3; ii < x1 - 1; ii += 2) { if (ii === mid || ii === mid + 1) continue; F(ii, jj, 1, 1, 3, 'cushion', 1); seats.push([ii, jj]); }
+      break;
+    case 'hmosque':
+      F(mid - 1, 0, 3, 1, 80, 'mihrab'); F(mid + 3, 1, 1, 2, 30, 'minbar'); clerk = { i: mid - 3, j: 3 }; counter = { i: mid - 3, j: 4 };
+      for (const ii of [mid - 5, mid + 5]) F(ii, 1, 1, 1, 34, 'lampstand', 2);
+      for (let jj = 3; jj < y1; jj += 3) { F(1, jj, 1, 1, 96, 'pillar', 2); F(x1, jj, 1, 1, 96, 'pillar', 2); }
+      for (let jj = 6; jj < y1; jj += 2) for (let ii = 3; ii < x1 - 1; ii++) { if (ii === mid) continue; seats.push([ii, jj]); }
       break;
     case 'church':
       F(mid - 1, 1, 3, 1, 20, 'altar', 1); clerk = { i: mid + 3, j: 2 }; counter = { i: mid + 2, j: 3 };
@@ -415,7 +455,7 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
   const info: InteriorInfo = {
     // 28차: 내 집의 유내 — 거리에서 정해 둔 시절을 따른다. 20대(1)면 방은 비어 있다 (대문 앞에 나가 있거나, 그 사람 만나러 갔다)
     kind, rest: REST_ROOMS.has(kind), name, ...look, exit, clerk: kind === 'myhome' || kind === 'condo' || hAge === 3 ? undefined : clerk, counter: kind === 'myhome' || kind === 'condo' || hAge === 3 ? undefined : counter, furn, age: hAge,
-    from: { b: k, out, bd: b }, store: kind === 'bank' ? 'bank' : kind === 'furnshop' ? 'furniture' : ['mart', 'pharmacy', 'food', 'cafe'].includes(kind) ? kind : streetSeller(b), cuisine: cuisineOf(b), seats: seats.filter(([i, j]) => tiles[j * W + i] === TI.walk),
+    from: { b: k, out, bd: b }, store: kind === 'bank' ? 'bank' : kind === 'furnshop' ? 'furniture' : ['mart', 'pharmacy', 'food', 'cafe'].includes(kind) ? kind : streetSeller(b), cuisine: cuisineOf(b), seats: kind === 'hchurch' || kind === 'htemple' ? seats : seats.filter(([i, j]) => tiles[j * W + i] === TI.walk), // 46차: 성소는 의자 · 방석 위가 자리
   };
   return finalize({ id: `in-${k}`, W, H, tiles, buildings: [], props: [], lanes: [], door: exit, spawn: { i: exit.i, j: exit.j - 1 }, interior: info });
 }
@@ -456,6 +496,7 @@ const FLOORS: Record<string, [string, string]> = {
 };
 
 /** 뭉게구름 한 덩이: 아래는 옅은 보랏빛 그늘, 위는 흰 빛 (도트 느낌이 나게 좌표를 반올림) */
+const lerpN = (a: number, b: number, t: number) => a + (b - a) * t;
 function cloudPuff(g: CanvasRenderingContext2D, x: number, y: number, r: number, a = 1) {
   x = Math.round(x); y = Math.round(y); r = Math.round(r);
   g.globalAlpha = a;
@@ -466,6 +507,42 @@ function cloudPuff(g: CanvasRenderingContext2D, x: number, y: number, r: number,
 }
 
 /** 19차: 천국 '환생의 테라스' — 벽 없이 구름 위에 뜬 흰 대리석 단. 뒤로는 먼 구름 봉우리, 가장자리 아래는 구름 바다 */
+/** 46차 구름 위의 작은 섬: 먼 구름 봉우리 · 섬 밑의 뭉게구름 · 풀밭(작은 들꽃) · 출구에서 오두막까지 징검돌 */
+function drawCloudIsle(z: Zone): { canvas: HTMLCanvasElement; x: number; y: number } {
+  const info = z.interior!;
+  const W = z.W, H = z.H;
+  const M = 170;
+  const minX = (0 - H) * (TW / 2) - M, maxX = W * (TW / 2) + M;
+  const minY = -190, maxY = (W + H) * (TH / 2) + M;
+  const { c, g, P, poly } = painter(minX, minY, maxX - minX, maxY - minY);
+  const VOID = TI.void;
+  const floor = (i: number, j: number) => i >= 1 && j >= 1 && i < W - 1 && j < H - 1 && z.tiles[j * W + i] !== VOID;
+  const hsh = (a: number, b: number) => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); };
+  for (let n = 0; n < 9; n++) { const [x, y] = P(-1.5 + n * 0.2, -1 + n * 1.8, 30 + hsh(n, 1) * 60); for (let k = 0; k < 4; k++) cloudPuff(g, x + (k - 1.5) * 22 + hsh(n, k) * 10, y + k * 9, 24 + hsh(k, n) * 16, 0.7); }
+  for (let n = 0; n < 11; n++) { const [x, y] = P(-1 + n * 2, -1.5 + n * 0.2, 30 + hsh(n, 7) * 70); for (let k = 0; k < 4; k++) cloudPuff(g, x + (k - 1.5) * 22 + hsh(k, n + 3) * 10, y + k * 9, 24 + hsh(n + 2, k) * 16, 0.7); }
+  for (let j = 0; j < H; j += 1.3) { const [x, y] = P(0.8, j, -6); cloudPuff(g, x, y, 26 + hsh(j, 2) * 10); }
+  for (let i = 0; i < W; i += 1.3) { const [x, y] = P(i, 0.8, -6); cloudPuff(g, x, y, 26 + hsh(i, 5) * 10); }
+  // 풀밭: 칸마다 조금씩 다른 초록 + 밝은 얼룩 + 작은 들꽃
+  const greens = ['#cfe6b0', '#c6e0a4', '#d6ebba', '#bfdb9c'];
+  for (let j = 1; j < H - 1; j++) for (let i = 1; i < W - 1; i++) {
+    if (!floor(i, j)) continue;
+    poly([P(i - 0.01, j - 0.01, 0), P(i + 1.01, j - 0.01, 0), P(i + 1.01, j + 1.01, 0), P(i - 0.01, j + 1.01, 0)], greens[Math.floor(hsh(i, j) * 4)]);
+    if (hsh(j, i) < 0.35) { const [x, y] = P(i + hsh(i, 3), j + hsh(4, j), 0); g.fillStyle = 'rgba(255,255,255,0.35)'; g.beginPath(); g.ellipse(x, y, 10, 4, 0, 0, Math.PI * 2); g.fill(); }
+    for (let k = 0; k < 3; k++) if (hsh(i * 3 + k, j * 5) < 0.28) { const [x, y] = P(i + hsh(i + k, 9), j + hsh(k, j + 2), 0); g.fillStyle = ['#ffffff', '#f6d860', '#f4a8c0', '#a8c8f4'][Math.floor(hsh(k, i + j) * 4)]; g.fillRect(Math.round(x), Math.round(y) - 2, 2, 2); g.fillStyle = '#7aa05a'; g.fillRect(Math.round(x), Math.round(y), 1, 2); }
+  }
+  // 섬 가장자리: 풀이 구름 위로 살짝 넘친다 · 앞쪽 아래 뭉게구름
+  for (let j = 1; j < H - 1; j++) for (let i = 1; i < W - 1; i++) {
+    if (!floor(i, j)) continue;
+    if (!floor(i + 1, j)) { poly([P(i + 1, j, 0), P(i + 1, j + 1, 0), P(i + 1, j + 1, -6), P(i + 1, j, -6)], '#a8c888'); const [x, y] = P(i + 1.3, j + 0.5, -20); cloudPuff(g, x, y, 22 + hsh(i, j) * 9); }
+    if (!floor(i, j + 1)) { poly([P(i, j + 1, 0), P(i + 1, j + 1, 0), P(i + 1, j + 1, -6), P(i, j + 1, -6)], '#b8d498'); if (i !== info.exit.i) { const [x, y] = P(i + 0.5, j + 1.3, -20); cloudPuff(g, x, y, 22 + hsh(j, i) * 9); } }
+  }
+  // 징검돌: 출구에서 내 오두막 문까지
+  const ex = info.exit;
+  for (let k = 0; k <= 8; k++) { const t2 = k / 8, si = ex.i + 0.5 + (4.5 - ex.i - 0.5) * t2, sj = ex.j + 0.5 + (5.6 - ex.j - 0.5) * t2; const [x, y] = P(si, sj, 0.3); g.fillStyle = '#c8c0b0'; g.beginPath(); g.ellipse(x, y + 1, 9, 4.5, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#ece6da'; g.beginPath(); g.ellipse(x - 1, y, 8, 4, 0, 0, Math.PI * 2); g.fill(); }
+  // 출구: 구름 계단 (황색날개가 안고 내려간다)
+  for (let k = 2; k >= 0; k--) { const y0 = H - 1 + k * 0.55, z0 = -8 - k * 12; poly([P(ex.i, y0, z0), P(ex.i + 1, y0, z0), P(ex.i + 1, y0 + 0.55, z0), P(ex.i, y0 + 0.55, z0)], '#f4f1ea'); const [x, y] = P(ex.i + 1.1, y0 + 0.3, z0 - 10); cloudPuff(g, x, y, 12, 0.9); }
+  return { canvas: c, x: minX, y: minY };
+}
 function drawTerrace(z: Zone): { canvas: HTMLCanvasElement; x: number; y: number } {
   const info = z.interior!;
   const W = z.W, H = z.H;
@@ -657,6 +734,7 @@ function drawPlayground(z: Zone, night: boolean): { canvas: HTMLCanvasElement; x
 
 export function drawRoom(z: Zone, night: boolean): { canvas: HTMLCanvasElement; x: number; y: number } {
   if (z.interior!.kind === 'terrace') return drawTerrace(z);
+  if (z.interior!.kind === 'cloudisle') return drawCloudIsle(z); // 46차
   if (z.interior!.kind === 'shore') return drawShore(z); // 24차 경계의 해변
   if (z.interior!.kind === 'home' && z.interior!.age === 0) return drawPlayground(z, night); // 34차 10대 유내의 놀이터
   if (z.interior!.kind === 'voidroom') return drawVoidRoom(z); // 34차 우주 위 유리 바닥의 방
@@ -944,7 +1022,7 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
   }
   const { i, j, w, d, h } = f;
   const i1 = i + w, j1 = j + d;
-  const extra = f.kind === 'kbed' ? 34 : f.kind === 'flattv' ? 14 : f.kind === 'homesofa' ? 14 : f.kind === 'vbed' ? 24 : f.kind === 'plamp' ? 30 : f.kind === 'salonchair' && f.v === 9 ? 30 : f.kind === 'ivstand' || f.kind === 'hooddryer' ? 16 : f.kind === 'gkbrazier' ? 40 : f.kind === 'gkdesk' ? 20 : f.kind === 'xchdesk' ? 30 : f.kind === 'altar' ? 64 : f.kind === 'rgate' ? 46 : f.kind === 'cpillar' ? 30 : f.kind === 'salonchair' || f.kind === 'candle' || f.kind === 'fan' || f.kind === 'lamp' || f.kind === 'cooler' ? 18 : 14;
+  const extra = f.kind === 'hut' || f.kind === 'hut2' ? 44 : f.kind === 'hcross' ? 30 : f.kind === 'lampstand' ? 12 : f.kind === 'kbed' ? 34 : f.kind === 'flattv' ? 14 : f.kind === 'homesofa' ? 14 : f.kind === 'vbed' ? 24 : f.kind === 'plamp' ? 30 : f.kind === 'salonchair' && f.v === 9 ? 30 : f.kind === 'ivstand' || f.kind === 'hooddryer' ? 16 : f.kind === 'gkbrazier' ? 40 : f.kind === 'gkdesk' ? 20 : f.kind === 'xchdesk' ? 30 : f.kind === 'altar' ? 64 : f.kind === 'rgate' ? 46 : f.kind === 'cpillar' ? 30 : f.kind === 'salonchair' || f.kind === 'candle' || f.kind === 'fan' || f.kind === 'lamp' || f.kind === 'cooler' ? 18 : 14;
   const minX = (i - j1) * (TW / 2) - 4, maxX = (i1 - j) * (TW / 2) + 4;
   const minY = (i + j) * (TH / 2) - h - extra, maxY = (i1 + j1) * (TH / 2) + 4;
   const { c, g, P, poly } = painter(minX, minY, maxX - minX, maxY - minY);
@@ -1282,6 +1360,99 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       break;
     }
     case 'pew': B3(i, j + 0.3, i1, j1, 0, h, '#7a5232'); B3(i, j, i1, j + 0.3, 0, h + 14, '#6a4628'); break;
+    // ── 46차 구름 위의 오두막 ──
+    case 'hut': case 'hut2': {
+      // 통나무 오두막: 돌 기초 · 꿀빛 통나무 벽 · 하늘빛(쌍둥이네는 분홍) 너와 지붕 · 굴뚝 · 둥근 창의 따뜻한 불빛 · 꽃 상자 · 앞문
+      const twins = f.kind === 'hut2';
+      const x0 = i + 0.2, x2 = i1 - 0.2, y0 = j + 0.2, y2 = j1 - 0.2, wallH = h * 0.55, ym = (y0 + y2) / 2;
+      B3(x0 - 0.05, y0 - 0.05, x2 + 0.05, y2 + 0.05, 0, 5, '#b8b0a0');
+      const log = twins ? '#e8c89a' : '#d8a868';
+      for (let z = 5; z < wallH; z += 5) { box(x0, y0, x2, y2, z, Math.min(wallH, z + 5), mixHex(log, '#ffffff', 0.15), mixHex(log, '#000000', (z / 5) % 2 ? 0.06 : 0.12), mixHex(log, '#000000', (z / 5) % 2 ? 0.22 : 0.28)); }
+      // 앞문 (+j 면) · 둥근 창
+      const dx = (x0 + x2) / 2;
+      poly([P(dx - 0.35, y2 + 0.01, 5), P(dx + 0.35, y2 + 0.01, 5), P(dx + 0.35, y2 + 0.01, 30), P(dx - 0.35, y2 + 0.01, 30)], '#7a4e2e');
+      poly([P(dx - 0.29, y2 + 0.02, 7), P(dx + 0.29, y2 + 0.02, 7), P(dx + 0.29, y2 + 0.02, 28), P(dx - 0.29, y2 + 0.02, 28)], '#8e5c36');
+      { const [kx, ky] = P(dx + 0.2, y2 + 0.03, 18); g.fillStyle = '#e8c45a'; g.fillRect(Math.round(kx), Math.round(ky), 2, 2); }
+      for (const wx of [x0 + 0.6, x2 - 0.6]) { const [cx, cy] = P(wx, y2 + 0.01, wallH * 0.62); g.fillStyle = '#7a4e2e'; g.beginPath(); g.ellipse(cx, cy, 8, 8, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#ffe9a8'; g.beginPath(); g.ellipse(cx, cy, 6, 6, 0, 0, Math.PI * 2); g.fill(); g.strokeStyle = '#7a4e2e'; g.lineWidth = 1; g.beginPath(); g.moveTo(cx - 6, cy); g.lineTo(cx + 6, cy); g.moveTo(cx, cy - 6); g.lineTo(cx, cy + 6); g.stroke();
+        poly([P(wx - 0.35, y2 + 0.05, wallH * 0.62 - 11), P(wx + 0.35, y2 + 0.05, wallH * 0.62 - 11), P(wx + 0.35, y2 + 0.05, wallH * 0.62 - 15), P(wx - 0.35, y2 + 0.05, wallH * 0.62 - 15)], '#8a5a32');
+        for (let k = 0; k < 4; k++) { const [fx, fy] = P(wx - 0.28 + k * 0.18, y2 + 0.06, wallH * 0.62 - 13); g.fillStyle = ['#f4a8c0', '#ffffff', '#f6d860', '#a8c8f4'][k]; g.beginPath(); g.arc(fx, fy - 3, 2.4, 0, Math.PI * 2); g.fill(); } }
+      { const [cx, cy] = P(x2 + 0.01, ym, wallH * 0.6); g.fillStyle = '#7a4e2e'; g.beginPath(); g.ellipse(cx, cy, 6, 7, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#ffe2a0'; g.beginPath(); g.ellipse(cx, cy, 4.5, 5.5, 0, 0, Math.PI * 2); g.fill(); }
+      // 지붕: 앞뒤로 기운 박공 (처마가 튀어나온다) · 너와 줄무늬
+      const roofC = twins ? '#e89aa8' : '#7aa8d8', RZ = h;
+      const eave = 0.35;
+      const front = [P(x0 - eave, y2 + eave, wallH - 2), P(x2 + eave, y2 + eave, wallH - 2), P(x2 + eave, ym, RZ), P(x0 - eave, ym, RZ)] as Pt[];
+      poly(front, roofC);
+      for (let k = 1; k < 6; k++) { const t2 = k / 6; const a2 = P(x0 - eave, lerpN(y2 + eave, ym, t2), lerpN(wallH - 2, RZ, t2)), b2 = P(x2 + eave, lerpN(y2 + eave, ym, t2), lerpN(wallH - 2, RZ, t2)); g.strokeStyle = mixHex(roofC, '#000000', 0.18); g.lineWidth = 1; g.beginPath(); g.moveTo(a2[0], a2[1]); g.lineTo(b2[0], b2[1]); g.stroke(); }
+      poly([P(x2, y0, wallH), P(x2, y2, wallH), P(x2, ym, RZ - 4)], mixHex(log, '#000000', 0.12));
+      poly([P(x2 + eave, y2 + eave, wallH - 2), P(x2 + eave, ym, RZ), P(x2 + eave, y0 - eave, wallH - 2), P(x2 + eave + 0.02, y0 - eave, wallH - 5), P(x2 + eave + 0.02, ym, RZ - 3), P(x2 + eave + 0.02, y2 + eave, wallH - 5)], mixHex(roofC, '#000000', 0.3));
+      { const a2 = P(x0 - eave, ym, RZ), b2 = P(x2 + eave, ym, RZ); g.strokeStyle = mixHex(roofC, '#ffffff', 0.4); g.lineWidth = 2; g.beginPath(); g.moveTo(a2[0], a2[1]); g.lineTo(b2[0], b2[1]); g.stroke(); }
+      // 굴뚝과 옅은 연기
+      { const cx0 = x0 + 0.5, cy0 = ym - 0.3; B3(cx0, cy0, cx0 + 0.5, cy0 + 0.5, RZ - 14, RZ + 14, '#b8a898'); const [sx, sy] = P(cx0 + 0.25, cy0 + 0.25, RZ + 16); for (let k = 0; k < 4; k++) { g.fillStyle = `rgba(255,255,255,${0.5 - k * 0.1})`; g.beginPath(); g.arc(sx + k * 4, sy - k * 9, 4 + k * 2, 0, Math.PI * 2); g.fill(); } }
+      if (twins) { // 쌍둥이네 문 앞: 공 · 나무 칼 두 자루
+        const [bx, by] = P(x2 - 0.3, y2 + 0.6, 0); g.fillStyle = '#e85a5a'; g.beginPath(); g.arc(bx, by - 3, 3.5, 0, Math.PI * 2); g.fill(); g.fillStyle = '#ffffff'; g.fillRect(Math.round(bx) - 3, Math.round(by) - 4, 6, 1);
+        const [sx, sy] = P(x0 + 0.4, y2 + 0.5, 0); g.strokeStyle = '#b8864a'; g.lineWidth = 2; g.beginPath(); g.moveTo(sx - 6, sy); g.lineTo(sx + 6, sy - 4); g.moveTo(sx - 4, sy + 3); g.lineTo(sx + 8, sy); g.stroke();
+      }
+      break;
+    }
+    case 'washline': { // 빨랫줄: 기둥 둘 · 흰 이불 · 셔츠 · 작은 옷 둘 (쌍둥이 것이 섞여 있다)
+      const ln = (a: Pt, b2: Pt, wd: number, col: string) => { g.strokeStyle = col; g.lineWidth = wd; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b2[0], b2[1]); g.stroke(); };
+      ln(P(i + 0.2, j + 0.5, 0), P(i + 0.2, j + 0.5, h), 2.5, '#9a7a52'); ln(P(i1 - 0.2, j + 0.5, 0), P(i1 - 0.2, j + 0.5, h), 2.5, '#9a7a52');
+      ln(P(i + 0.2, j + 0.5, h - 2), P(i1 - 0.2, j + 0.5, h - 4), 1, '#e8e2d6');
+      const cloths: [number, number, string][] = [[0.5, 1.2, '#ffffff'], [1.85, 0.6, '#a8c8f4'], [2.6, 0.38, '#f4a8c0'], [3.1, 0.38, '#f6d860']];
+      for (const [u, wd, col] of cloths) { const za = h - 3, zb = h - 3 - (wd > 1 ? 18 : 11); poly([P(i + 0.2 + u, j + 0.5, za), P(i + 0.2 + u + wd, j + 0.5, za - 0.5), P(i + 0.2 + u + wd, j + 0.5, zb), P(i + 0.2 + u, j + 0.5, zb + 1)], col); poly([P(i + 0.2 + u, j + 0.5, zb + 1), P(i + 0.2 + u + wd, j + 0.5, zb), P(i + 0.2 + u + wd, j + 0.5, zb - 1.5), P(i + 0.2 + u, j + 0.5, zb - 0.5)], mixHex(col, '#000000', 0.15)); }
+      break;
+    }
+    case 'flowerbed': { // 작은 꽃밭 (돌 테두리 · 색은 v마다)
+      const cols = [['#f4a8c0', '#ffffff'], ['#f6d860', '#f2a040'], ['#a8c8f4', '#ffffff'], ['#e86a6a', '#f6d860']][(f.v ?? 0) % 4];
+      const [cx, cy] = P(i + 0.5, j + 0.5, 0);
+      g.fillStyle = '#b8ae9c'; g.beginPath(); g.ellipse(cx, cy, 20, 10, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#6a8a4a'; g.beginPath(); g.ellipse(cx, cy - 1, 17, 8, 0, 0, Math.PI * 2); g.fill();
+      for (let k = 0; k < 11; k++) { const a = k * 2.4, r = (k % 4) * 3.4 + 2; const fx = cx + Math.cos(a) * r * 1.6, fy = cy - 2 + Math.sin(a) * r * 0.7; g.fillStyle = '#4a7a3a'; g.fillRect(Math.round(fx), Math.round(fy) - 1, 1, 4); g.fillStyle = cols[k % 2]; g.beginPath(); g.arc(fx, fy - 2, 2.2, 0, Math.PI * 2); g.fill(); }
+      break;
+    }
+    // ── 46차 천국 성소의 가구 ──
+    case 'hpew': // 등받이가 뒤(+j)에 있는 흰 나무 의자 (앞의 제단을 보고 앉는다) · 금 테
+      B3(i, j + 0.05, i1, j1 - 0.3, 0, h, '#e8dcc4'); B3(i, j1 - 0.3, i1, j1, 0, h + 16, '#d8c8a8');
+      poly([P(i, j1, h + 14), P(i1, j1, h + 14), P(i1, j1, h + 16), P(i, j1, h + 16)], '#d9b44a');
+      if (f.v === 1) B3(i, j + 0.05, i + 0.12, j1, 0, h + 10, '#cdb88e'); // 줄 끝의 팔걸이
+      if (f.v === 2) B3(i1 - 0.12, j + 0.05, i1, j1, 0, h + 10, '#cdb88e');
+      break;
+    case 'hcross': { // 제단 뒤 큰 금 십자가와 둘레의 빛
+      const [cx, cy] = P(i + 0.5, j + 0.2, 0);
+      const gl = g.createRadialGradient(cx, cy - h * 0.6, 2, cx, cy - h * 0.6, 40); gl.addColorStop(0, 'rgba(255,240,180,0.9)'); gl.addColorStop(1, 'rgba(255,240,180,0)');
+      g.fillStyle = gl; g.beginPath(); g.arc(cx, cy - h * 0.6, 40, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#c9a23e'; g.fillRect(Math.round(cx) - 3, Math.round(cy - h), 6, h - 22); g.fillRect(Math.round(cx) - 16, Math.round(cy - h * 0.72), 32, 6);
+      g.fillStyle = '#f6dc8a'; g.fillRect(Math.round(cx) - 2, Math.round(cy - h), 2, h - 22); g.fillRect(Math.round(cx) - 16, Math.round(cy - h * 0.72), 32, 2);
+      break;
+    }
+    case 'pillar': { // 흰 대리석 기둥 (금 기둥머리) · v1 붉은 기둥(불당) · v2 청록 띠(모스크)
+      const col = f.v === 1 ? '#b8322a' : '#f6f2ea';
+      B3(i + 0.15, j + 0.15, i1 - 0.15, j1 - 0.15, 0, 8, '#e8e0d0');
+      B3(i + 0.25, j + 0.25, i1 - 0.25, j1 - 0.25, 8, h - 10, col);
+      B3(i + 0.15, j + 0.15, i1 - 0.15, j1 - 0.15, h - 10, h, '#e0b84e');
+      if (f.v === 2) B3(i + 0.24, j + 0.24, i1 - 0.24, j1 - 0.24, h * 0.45, h * 0.45 + 6, '#2a8a80');
+      break;
+    }
+    case 'cushion': { // 둥근 방석 (주황 · 금 테)
+      const [cx, cy] = P(i + 0.5, j + 0.5, 0);
+      g.fillStyle = '#a8621a'; g.beginPath(); g.ellipse(cx, cy, 16, 8, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#e8963a'; g.beginPath(); g.ellipse(cx, cy - 2, 15, 7, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = '#f2d27a'; g.lineWidth = 1; g.beginPath(); g.ellipse(cx, cy - 2, 11, 5, 0, 0, Math.PI * 2); g.stroke();
+      break;
+    }
+    case 'mihrab': { // 앞벽의 미흐랍: 금 테 두른 뾰족 아치 벽감 · 안은 청록 타일 · 위로 빛
+      const yy = j1 - 0.05, xa = i + 0.3, xb = i1 - 0.3, cxm = (xa + xb) / 2;
+      const arch = (inset: number, col: string, top: number) => { const pts: Pt[] = [P(xa + inset, yy, 0), P(xb - inset, yy, 0), P(xb - inset, yy, top * 0.6)]; for (let k = 1; k < 10; k++) { const a = Math.PI * k / 10; pts.push(P(cxm + Math.cos(a) * ((xb - xa) / 2 - inset), yy, top * 0.6 + Math.sin(a) * top * 0.4 * Math.pow(Math.sin(a), 0.4))); } pts.push(P(xa + inset, yy, top * 0.6)); poly(pts, col); };
+      arch(0, '#e0b84e', h); arch(0.18, '#f6f2ea', h - 8); arch(0.32, '#2a8a80', h - 18); arch(0.5, '#1e6a62', h - 30);
+      const [lx, ly] = P(cxm, yy, h * 0.5); g.fillStyle = 'rgba(255,240,190,0.5)'; g.beginPath(); g.arc(lx, ly, 6, 0, Math.PI * 2); g.fill();
+      break;
+    }
+    case 'lampstand': { // 금 촛대: 가는 기둥 · 세 갈래 · 불꽃
+      const [cx, cy] = P(i + 0.5, j + 0.5, 0);
+      g.fillStyle = '#b8862f'; g.fillRect(Math.round(cx) - 4, Math.round(cy) - 3, 8, 3); g.fillStyle = '#e0b84e'; g.fillRect(Math.round(cx) - 1, Math.round(cy - h), 2, h);
+      g.strokeStyle = '#e0b84e'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(cx - 8, cy - h + 4); g.quadraticCurveTo(cx, cy - h + 14, cx + 8, cy - h + 4); g.stroke();
+      for (const dx of [-8, 0, 8]) { const fy = cy - h + (dx ? 2 : -2); const gl = g.createRadialGradient(cx + dx, fy, 0.5, cx + dx, fy, 7); gl.addColorStop(0, 'rgba(255,230,150,0.9)'); gl.addColorStop(1, 'rgba(255,200,100,0)'); g.fillStyle = gl; g.beginPath(); g.arc(cx + dx, fy, 7, 0, Math.PI * 2); g.fill(); g.fillStyle = '#fff2b0'; g.fillRect(Math.round(cx + dx) - 1, Math.round(fy) - 3, 2, 3); }
+      break;
+    }
     case 'gkdesk': {
       // 31차 판관석: 검은 옻칠 · 금빛 테두리 · 앞에 늘어진 붉은 휘장(금빛 숫양 문장) · 위에 펼친 장부 · 붓 · 붉은 인장
       B3(i, j, i1, j1, 0, h - 4, '#1e1414');
@@ -1821,6 +1992,8 @@ export function grandpaLook(hell: boolean): Look {
 export const YSALON_LOOK: Look = { sex: 'f', build: 1, skin: 0, hair: 2, hairColor: 0, top: 0, bottom: 0, outfit: 'apron', cols: { 2: '#3a2620', 3: '#24212a', 9: '#24212a', 4: '#3a3638', 5: '#1e1a1a', 7: '#2e2a30' } };
 export function clerkLook(kind: string, seed: number): Look {
   if (kind === 'terrace') return LUEN_LOOK;
+  if (kind === 'cloudisle') return YELLOW_WING_LOOK;
+  if (kind === 'hchurch' || kind === 'htemple' || kind === 'hmosque') return { sex: kind === 'htemple' ? 'm' : seed % 2 ? 'f' : 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'angelk', cols: { 2: kind === 'hmosque' ? '#f2e6c8' : '#e8c870', 3: '#fbf8f0', 4: '#efe8d8', 5: '#b89a6a', 14: '#e0b450', 12: kind === 'htemple' ? '#f2a040' : '#7ad8ff' } } as Look; // 46차: 예배를 이끄는 천사 // 46차 구름 위 오두막: 데려다준 황색날개가 곁에
   if (kind === 'shore') return BULDA_LOOK;
   if (kind === 'loan') return BESK_LOOK;
   if (kind === 'rebirth') return PASHAR_LOOK;

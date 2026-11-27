@@ -19,7 +19,7 @@ function styleOf(it: ItemDef): Style {
   if (it.heaven) return { blade: '#f2ead6', fit: '#e6be52', grip: '#efe8d8', wrap: '#c9a23e', gem: '#6fb4ff', glow: 'rgba(255,240,190,0.55)' };
   if (it.hell) {
     const bone = BONE_KEYS.test(it.key);
-    return { hell: true, blade: bone ? '#d8ccb0' : '#8e868a', fit: bone ? '#8a7a62' : '#4e4446', grip: '#2a1c1a', wrap: '#5a1a14', edge: bone ? undefined : '#ff6a2a', gem: it.price >= 300 ? '#ff3a1a' : undefined, glow: it.price >= 400 ? 'rgba(255,80,30,0.35)' : undefined };
+    return { hell: true, blade: bone ? '#d8ccb0' : '#8e868a', fit: bone ? '#8a7a62' : '#4e4446', grip: '#2a1c1a', wrap: '#5a1a14', edge: bone ? undefined : '#ff6a2a', gem: it.price >= 3_000 ? '#ff3a1a' : undefined, glow: it.price >= 20_000 ? 'rgba(255,80,30,0.35)' : undefined };
   }
   const p = it.price;
   if (p >= 1_000_000) return { blade: it.key === 'meteorblade' ? '#7a8494' : '#e4ebf2', fit: '#ecc04a', grip: '#4a1018', wrap: '#e0b437', gem: it.key === 'meteorblade' ? '#8a5aff' : '#e0283a', glow: 'rgba(255,220,140,0.45)' };

@@ -264,56 +264,65 @@ def obolo(self, g):
 
 # ─────────────────────────── 천국의 신앙 감시자 노을 ───────────────────────────
 def noeul(self, g):
-    """유내와 똑같이 생긴 천사: 짙은 밤색 머리를 뒤로 높이 틀어 올리고 옆머리 두 가닥, 무릎까지 오는 흰 튜닉(노을빛 밑단),
-    은빛 가슴받이와 어깨 갑, 허리의 붉은 띠, 정강이 보호대. 오른손에 늘 긴 장검(칼끝을 아래로). 날개는 게임이 붙인다.
-    구역: 튜닉 3 · 속옷 4 · 신 5 · 은 14 · 노을빛 12 · 칼날 10 · 손잡이 13 · 머리 2"""
+    """46차 사용자 컨셉 그림: 허리 아래까지 흘러내린 웨이브 진 검은 머리와 일자 앞머리, 창백한 피부,
+    어깨를 드러낸 흰 민소매 드레스(바닥까지 끌리는 주름) 위로 왼팔에 걸친 비치는 흰 숄, 장식 없는 맨팔.
+    오른손에 은빛 장검(가시처럼 갈라진 은 날밑 · 흰 칼날). 흰 날개는 게임이 붙인다.
+    구역: 드레스 3 · 치마 4 · 신 5 · 은 14 · 숄 12 · 칼날 10 · 손잡이 13 · 머리 2"""
     s, V = self.s, self.V
-    tunic = rmat('top', .75, .2); under = rmat('bottom', .75, .2); silver = rmat('metal', .25, .7, .9); dusk = rmat('crest', .45, .4)
-    blade = rmat('bandage', .2, .8, .9); grip = rmat('wood', .5, .3); hm = rmat('hair', .45, .5)
+    dress = rmat('top', .7, .18); skirt = rmat('bottom', .7, .18); silver = rmat('metal', .2, .8, .95); shawl = rmat('crest', .8, .1)
+    blade = rmat('bandage', .15, .85, .95); grip = rmat('wood', .45, .35); hm = rmat('hair', .5, .45)
     sw = _spine_w(s)
-    self.legs(g, under, rmat('shoe', .5, .3), foot=.86, boot=True)
-    self.torso(g, tunic, tunic, hem=0, extra=lambda rings: [(c, u, v, rs * 1.03 + .006, rf * 1.05 + .008) for c, u, v, rs, rf in rings])
+    self.legs(g, rmat('skin', .55, .35), rmat('shoe', .5, .3), foot=.8)
+    self.torso(g, dress, dress, hem=0, extra=lambda rings: [(c, u, v, rs * 1.02 + .004, rf * 1.04 + .006) for c, u, v, rs, rf in rings])
     self.head(g)
-    self.arms(g, tunic, 1.9, wide=1.0); self.hands(g)
-    table = [(1.0, .17, .13), (.84, .2, .15), (.66, .218, .162), (.52, .226, .168)]
-    _skirt(self, g, table, tunic, trim=dusk, trim_z=.56)
-    P = Part(g + '.armor')
-    bw = self.bw
-    loft(P, [(V(0, -.008, 1.1), Vector((0, -1, 0)), Vector((1, 0, 0)), .14 * s * bw + .014, .1 * s + .016),
-             (V(0, -.012, 1.24), Vector((0, -1, 0)), Vector((1, 0, 0)), .16 * s * bw + .016, .125 * s + .018),
-             (V(0, -.01, 1.38), Vector((0, -1, 0)), Vector((1, 0, 0)), .15 * s * bw + .014, .1 * s + .014)], silver, None, segs=18, caps=(False, False))
+    self.arms(g, None); self.hands(g)   # 민소매: 맨팔
+    table = [(1.02, .14, .11), (.86, .19, .15), (.62, .235, .185), (.38, .27, .205), (.14, .3, .225), (.04, .31, .235)]
+    _skirt(self, g, table, skirt)
+    P = Part(g + '.folds')
+    # 깊게 파인 브이넥 깃 · 가슴에서 허리로 흐르는 주름 · 치마의 세로 주름
     for sx in (1, -1):
-        sh = self.bones['upper_arm.' + ('L' if sx > 0 else 'R')][0]
-        blob(P, sh + Vector((sx * .015, 0, .02)), (.072 * s, .066 * s, .042 * s), silver, None, segs=10, rings=6, cut=lambda co: co.z < sh.z - .005)
-    self.torso_band(P, 1.02, dusk, grow=1.05, h=.04, add=.014)
-    limb(P, V(.1, -.12, 1.0), V(.13, -.15, .7), [(0, .03 * s, .006 * s), (1, .026 * s, .005 * s)], dusk, None, segs=4)
-    ob = finish(P); bind(ob, self.arm, sw, subsurf=0); self.add(g, ob)
-    for k in 'LR':   # 정강이 보호대
-        a, b = self.bones[f'shin.{k}'][0], self.bones[f'shin.{k}'][1]
-        P = Part(f'{g}.greave.{k}')
-        limb(P, a + (b - a) * .15, a + (b - a) * .7, [(0, .064 * s, .066 * s), (1, .058 * s, .06 * s)], silver, None, segs=10)
-        ob = finish(P); bind(ob, self.arm, rigid(f'shin.{k}'), subsurf=0); self.add(g, ob)
-    # 오른손의 긴 장검 (칼끝이 아래로 — 손목을 따라 움직인다)
+        limb(P, V(sx * .1, -.04, 1.46), V(sx * .012, -.14, 1.22), [(0, .022 * s, .007 * s), (1, .014 * s, .005 * s)], dress, None, segs=5)
+    for k in range(7):
+        a = math.radians(-70 + k * 23)
+        x0, y0 = math.sin(a) * .2, -math.cos(a) * .16
+        limb(P, V(x0 * .8, y0 * .8 + .01, .9), V(x0 * 1.45, y0 * 1.42 + .01, .1), [(0, .012 * s, .008 * s), (1, .02 * s, .01 * s)], skirt, None, segs=4)
+    ob = finish(P); bind(ob, self.arm, gown_w(self)); self.add(g, ob)
+    # 왼팔에 걸쳐 흘러내린 비치는 숄 (어깨 뒤에서 팔꿈치를 감고 무릎께까지)
+    sh, el = self.bones['upper_arm.L'][0], self.bones['upper_arm.L'][1]
+    wr = self.bones['forearm.L'][1]
+    P = Part(g + '.shawl')
+    limb(P, sh + Vector((.01, .04, .02)), el + Vector((.03, .0, -.01)), [(0, .05 * s, .03 * s), (1, .07 * s, .04 * s)], shawl, None, segs=8)
+    limb(P, el + Vector((.03, .0, -.01)), wr + Vector((.05, -.02, -.06)), [(0, .07 * s, .04 * s), (1, .09 * s, .035 * s)], shawl, None, segs=8)
+    limb(P, wr + Vector((.05, -.02, -.06)), wr + Vector((.08, .0, -.45 * s)), [(0, .09 * s, .035 * s), (.6, .1 * s, .03 * s), (1, .07 * s, .02 * s)], shawl, None, segs=8)
+    ob = finish(P); bind(ob, self.arm, lambda co: {'upper_arm.L': .5, 'forearm.L': .5}); self.add(g, ob)
+    # 오른손의 은빛 장검 (칼끝이 아래로): 흰 칼날 · 가시처럼 휘어 갈라진 은 날밑 · 흰 손잡이 · 은 칼끝 장식 머리
     def sword(P, c, d):
         n = d.normalized()
-        tip = c + n * .95 * s
-        limb(P, c - n * .14 * s, c + n * .02 * s, [(0, .016 * s, .016 * s), (1, .016 * s, .016 * s)], grip, None, segs=6)
-        blob(P, c - n * .15 * s, (.022 * s, .022 * s, .022 * s), silver, None, segs=6, rings=4)
+        tip = c + n * 1.0 * s
         side = n.cross(Vector((1, 0, 0)))
         side = side.normalized() if side.length > .1 else Vector((0, 1, 0))
-        limb(P, c + n * .03 * s - side * .07 * s, c + n * .03 * s + side * .07 * s, [(0, .012 * s, .012 * s), (1, .012 * s, .012 * s)], silver, None, segs=5)
-        limb(P, c + n * .05 * s, tip, [(0, .02 * s, .006 * s), (.85, .017 * s, .005 * s), (1, .002 * s, .002 * s)], blade, None, segs=5)
+        limb(P, c - n * .16 * s, c + n * .02 * s, [(0, .015 * s, .015 * s), (1, .015 * s, .015 * s)], grip, None, segs=6)
+        blob(P, c - n * .18 * s, (.02 * s, .02 * s, .03 * s), silver, None, segs=6, rings=4)
+        limb(P, c - n * .19 * s, c - n * .25 * s, [(0, .012 * s, .012 * s), (1, .002 * s, .002 * s)], silver, None, segs=5)   # 머리 끝 뾰족 장식
+        for sd in (1, -1):   # 날밑: 옆으로 뻗다 칼끝 쪽으로 휘는 가시
+            a0 = c + n * .035 * s
+            a1 = a0 + side * sd * .075 * s
+            a2 = a1 + n * .035 * s + side * sd * .02 * s
+            limb(P, a0, a1, [(0, .011 * s, .011 * s), (1, .008 * s, .008 * s)], silver, None, segs=5)
+            limb(P, a1, a2, [(0, .008 * s, .008 * s), (1, .002 * s, .002 * s)], silver, None, segs=4)
+            limb(P, a0 + side * sd * .03 * s, a0 + side * sd * .04 * s - n * .03 * s, [(0, .006 * s, .006 * s), (1, .002 * s, .002 * s)], silver, None, segs=4)
+        limb(P, c + n * .05 * s, tip, [(0, .022 * s, .006 * s), (.88, .019 * s, .005 * s), (1, .002 * s, .002 * s)], blade, None, segs=5)
     _hold(self, g, 'R', 'sword', sword)
-    # 머리: 뒤로 높이 틀어 올린 밤색 머리 + 옆으로 흘러내린 두 가닥 (유내 20대와 같은 얼굴)
-    R = (.101 * s, .114 * s, .128 * s)
-    P = Part(g + '.hair')
-    blob(P, V(0, .008, 1.632), (R[0] * 1.04, R[1] * 1.03, R[2] * 1.01), hm, None, segs=16, rings=12,
-         cut=lambda co: (co.y < -.03 * s and co.z < 1.672 * s) or co.z < 1.54 * s or (co.z < 1.6 * s and co.y < .02 * s))
-    _bangs(self, P, hm, side=-.02, depth=.8)
-    blob(P, V(0, .11, 1.69), (.055 * s, .045 * s, .05 * s), hm, None, segs=10, rings=7)
+    # 머리: 허리 아래까지 흘러내린 검은 머리 · 눈썹을 덮는 일자 앞머리 · 어깨와 등의 굵은 웨이브
+    _long_hair(self, g, hm, .86, front=True, width=1.16)
+    hc0, hs = _head_tools(self)
+    P = Part(g + '.waves')
+    _bangs(self, P, hm, side=0, depth=1.05)
     for sx in (1, -1):
-        limb(P, V(sx * .088, -.04, 1.62), V(sx * .1, -.06, 1.45), [(0, .016 * s, .012 * s), (1, .006 * s, .005 * s)], hm, None, segs=5)
-    ob = finish(P); self.scale_head(ob); bind(ob, self.arm, lambda co: {'head': 1.0}); self.add(g, ob)
+        for k, (x, y, z) in enumerate(((.108, .0, 1.52), (.13, .03, 1.38), (.13, .06, 1.22), (.11, .09, 1.06), (.09, .11, .94))):
+            c = hs(V(sx * x, y, z)) if z > 1.45 else V(sx * x, y, z)
+            blob(P, c, (.036 * s, .034 * s, .05 * s), hm, None, segs=8, rings=6)
+    ob = finish(P); bind(ob, self.arm, lambda co: {'head': smooth(co.z, 1.4 * s, 1.5 * s), 'spine': 1 - smooth(co.z, 1.4 * s, 1.5 * s)}); self.add(g, ob)
 
 
 # ─────────────────────────── 5층 인형술사 마리 ───────────────────────────

@@ -18,7 +18,7 @@ import { load, save, type Slot, type Stash } from './state.ts';
 import { hellZone, OPEN_FLOORS, floorDef, MONSTERS, GUARDS, TOLL, ATONE_GOAL, GURMA_FULL, setRaidForce, FLOORS, FIELD_BOSS } from './hell.ts';
 import type { HellVendor } from './zone.ts';
 import { interiorZone, roomKind as roomKindOf, canEnter, voidZone, drawFurn, setAdminVisit } from './interior.ts';
-import { heavenZone, HEAVEN_ID, heavenPriceMul } from './heavenworld.ts';
+import { heavenZone, HEAVEN_ID, heavenPriceMul, heavenMeta } from './heavenworld.ts';
 import { designateHomes, HOME_PRICE, FURN, furnByKey, type FurnDef } from './home.ts';
 import { borderZone } from './border.ts';
 import { TWO, DOT3, setDot3 } from './sprites.ts';
@@ -497,7 +497,7 @@ async function boot() {
   setInterval(updateHud, 1000);
   setInterval(() => { snapPos(); state.played = (state.played ?? 0) + 4; state.seen = Date.now(); if (scene === 'world' && !document.hidden) ecoDay().t += 4; save(state); }, 4000);
   addEventListener('pagehide', () => { snapPos(); save(state); });
-  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior(), store: (k: 'tools' | 'antique', n: string) => openStore(k, n), terrace: () => enterTerrace(), officer: () => talkToOfficer(), pasharTalk: () => talkToPashar(), cage: () => openCage(), parrot: () => talkToParrot(), hstore: (k: HellVendor) => openHellStore(k), smith: () => openSmith(), soul: () => renderSoul(), give: (k: string) => { addToBag(itemByKey(k)); save(state); }, regear: () => world?.setGear(gear()), eco: () => openEcoStats(), perf: (v: boolean) => setPerf(v), xchTalk: () => talkToChanger(), shopIn: () => enterShop(true), ferum: () => talkToFerum(), parrotFeed: (n: number) => { state.parrotFed = n; save(state); }, wearW: (n: number) => { for (let i = 0; i < n; i++) wear('weapon'); }, setDura: (k: string, n: number) => { (state.dura ??= {})[k] = n; save(state); }, duraMax: (k: string) => duraMax(itemByKey(k)), ysalon: () => talkToSalon(), besk: () => talkToBesk(), grandpa: (h: boolean) => talkToGrandpa(h), mari: () => talkToMari(), marion: (k: string) => useMarionette(k), bare: () => bareTrial(), lifePick: () => chooseLife('system2', lifeLine({ soul: { rank: 5, exp: 0 }, realm: 'hell', hell: { floor: 3 } as typeof state.hell }), lifeLine(state)) }; // 개발용 확인 창구
+  if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior(), store: (k: 'tools' | 'antique', n: string) => openStore(k, n), terrace: () => enterTerrace(), officer: () => talkToOfficer(), pasharTalk: () => talkToPashar(), cage: () => openCage(), parrot: () => talkToParrot(), hstore: (k: HellVendor) => openHellStore(k), smith: () => openSmith(), soul: () => renderSoul(), give: (k: string) => { addToBag(itemByKey(k)); save(state); }, regear: () => world?.setGear(gear()), eco: () => openEcoStats(), perf: (v: boolean) => setPerf(v), xchTalk: () => talkToChanger(), shopIn: () => enterShop(true), ferum: () => talkToFerum(), parrotFeed: (n: number) => { state.parrotFed = n; save(state); }, wearW: (n: number) => { for (let i = 0; i < n; i++) wear('weapon'); }, setDura: (k: string, n: number) => { (state.dura ??= {})[k] = n; save(state); }, duraMax: (k: string) => duraMax(itemByKey(k)), ysalon: () => talkToSalon(), besk: () => talkToBesk(), grandpa: (h: boolean) => talkToGrandpa(h), mari: () => talkToMari(), marion: (k: string) => useMarionette(k), bare: () => bareTrial(), svc: (k?: Sanct) => { svcForce = true; if (k) void svcGo(k); }, svcEnd: () => { if (svc) svc.end = Date.now(); }, home: () => flyHome(), ywTalk: () => talkToYellowWing(), lifePick: () => chooseLife('system2', lifeLine({ soul: { rank: 5, exp: 0 }, realm: 'hell', hell: { floor: 3 } as typeof state.hell }), lifeLine(state)) }; // 개발용 확인 창구
   if (perfOn()) setPerf(true); // 34차: 관리자가 켜 둔 성능 표시
 }
 
@@ -995,6 +995,8 @@ const hooks: WorldHooks = {
     save(state);
     toast(t().ywLostToast);
   },
+  hutDoor(which) { void hutDoor(which); },
+  twinsTalk() { void twinsTalk(); },
   heavenAct(what) {
     heavenAct(what);
   },
@@ -1452,6 +1454,8 @@ function openRoom(z: Zone, chaser: { monster: boolean; hp: number } | null, work
 /** 방의 나가는 매트: 거리의 그 건물 앞으로 (쫓던 대식자는 따라 나온다) */
 function leaveInterior(force = false) {
   if (!world?.zone.interior || !street) return;
+  if (!force && world.zone.interior.kind === 'cloudisle') { void flyBack(); return; } // 46차: 구름 위 섬은 황색날개가 안고 내려간다
+  if (!force && svc) { toast(t().svcStay); return; } // 46차 예배 중
   // 31차: 염소대왕의 방은 나가는 매트로 그냥 나가지 않는다 — 상담 전이면 염소대왕이 부르고, 끝났으면 아래로 떨어진다
   if (!force && world.zone.interior.kind === 'goatroom') { if (gkPending) world.gkBlock(); else leaveGoatRoom(); return; } // 42차: 이야기 전에는 못 나간다
   // 37차: 회상의 문을 나서면 거리가 아니라 지금의 집 — 정신이 들면 빈방이다
@@ -3215,7 +3219,8 @@ const noShieldWith = (k?: string) => { const it = k ? itemByKey(k) : null; retur
  */
 function duraMax(it: ItemDef) {
   const b = it.cat === 'armor' ? 220 : it.two || TWO.has(it.sprite ?? it.key) ? 260 : it.ranged ? 240 : 220;
-  const tier = it.hell ? (it.price >= 900 ? 2 : it.price >= 300 ? 1.5 : 1) : it.price >= 1_000_000 ? 2 : it.price >= 100_000 ? 1.5 : 1;
+  const tier = it.hell ? (it.price >= 20_000 ? 2 : it.price >= 3_000 ? 1.5 : 1) : // 46차: 지옥 값이 열 배 넘게 올라 기준도 함께
+    it.price >= 1_000_000 ? 2 : it.price >= 100_000 ? 1.5 : 1;
   return Math.round(b * tier);
 }
 function duraOf(k: string) { const it = itemByKey(k); return it ? Math.min(duraMax(it), state.dura?.[k] ?? duraMax(it)) : 0; }
@@ -4234,6 +4239,7 @@ function pickN<T>(a: readonly T[], n: number): T[] {
 const HEAVEN_GIFTS = ['water', 'cola', 'choco', 'chips', 'bandage'];
 async function talkToYellowWing() {
   const L = t();
+  let jealous = false;
   busy = true;
   dlg.open({ name: L.yellowWing, portrait: 'yellow-wing' });
   if (!state.heaven?.met) {
@@ -4244,11 +4250,43 @@ async function talkToYellowWing() {
   } else await dlg.say(pick(L.ywLines));
   for (;;) {
     const M = L.ywMenu;
-    const opts: [string, string][] = [['rebirth', M.rebirth], ['luen', M.luen], ['rules', M.rules], ['gift', M.gift]];
-    opts.push(state.heaven?.ywLost ? ['follow', M.follow] : ['alone', M.alone]);
+    const M2 = L.ywMenu2;
+    const isle = world?.zone.interior?.kind === 'cloudisle';
+    const opts: [string, string][] = isle ? [['back', M2.back], ['praise', M2.praise], ['present', M2.present], ['angels', M2.angels]] : [['home', M2.home], ['praise', M2.praise], ['present', M2.present], ['rebirth', M.rebirth], ['luen', M.luen], ['rules', M.rules], ['angels', M2.angels], ['gift', M.gift]];
+    if (!isle) opts.push(state.heaven?.ywLost ? ['follow', M.follow] : ['alone', M.alone]);
     opts.push(['bye', M.bye]);
     const c = opts[await dlg.choose(opts.map((o) => o[1]))]?.[0] ?? 'bye';
     if (c === 'bye') break;
+    // 46차: 칭찬 · 선물 (그러면 어디선가 노을이 칼을 뽑는다) · 천사의 품계 · 구름 위의 집
+    if (c === 'praise') {
+      const k = await dlg.choose([...L.ywPraise, L.ywNo]);
+      if (k >= 0 && k < L.ywPraise.length) { await dlg.say(L.ywPraiseReply[k]); state.heaven = { ...state.heaven, praise: (state.heaven?.praise ?? 0) + 1 }; save(state); jealous = true; }
+      continue;
+    }
+    if (c === 'present') {
+      const own = Object.keys(state.bag ?? {}).filter((k) => (state.bag![k] ?? 0) > 0 && !Object.values(state.equip ?? {}).includes(k)).map(itemByKey).filter((it) => it && it.price > 0).slice(0, 6);
+      if (!own.length) { await dlg.say(L.ywGiveNone); continue; }
+      await dlg.say(L.ywGiveAsk);
+      const k = await dlg.choose([...own.map((it) => it.name[lang()]), L.ywNo]);
+      if (k >= 0 && k < own.length) {
+        const it = own[k];
+        state.bag![it.key] = Math.max(0, (state.bag![it.key] ?? 1) - 1);
+        state.heaven = { ...state.heaven, gifts: (state.heaven?.gifts ?? 0) + 1 };
+        save(state); renderQuick();
+        await dlg.say(L.ywGiveReply.replace('{item}', it.name[lang()]));
+        jealous = true;
+      }
+      continue;
+    }
+    if (c === 'angels') { for (const line of L.ywAngels) await dlg.say(line); continue; }
+    if (c === 'home') {
+      for (const line of state.heaven?.homeSeen ? [L.ywHomeGo] : L.ywHomeFirst) await dlg.say(line);
+      dlg.close(); busy = false;
+      if (jealous) world?.noeulProwl(40);
+      void flyHome();
+      return;
+    }
+    if (c === 'back') { await dlg.say(L.ywBackGo); dlg.close(); busy = false; void flyBack(); return; }
     if (c === 'rebirth') {
       await dlg.say(pick(L.ywRebirthPuzzled));
       for (const line of pickN(L.ywRebirthPleas, 3)) await dlg.say(line);
@@ -4286,6 +4324,7 @@ async function talkToYellowWing() {
   dlg.close();
   busy = false;
   renderHud();
+  if (jealous) world?.noeulProwl(40); // 46차: 황색날개에게 다정했다 — 노을이 칼을 뽑고 어슬렁거린다
 }
 /** 21차: 천국의 음식 — 가게 앞 천사와 따라다니는 요리사가 권한다. 공짜, 맛있다, 아무 효과도 없다 */
 async function heavenFood(from: string) {
@@ -4319,14 +4358,18 @@ async function talkToNoeul() {
     await dlg.say(pick(L.noeulSuspect));
     if (Math.random() < 0.3) await dlg.say(pick(L.noeulSuspect2));
   }
-  if (Math.random() < 0.34 || !state.heaven?.rites) {
+  // 46차: 예배 시간이면 명령, 아니면 오늘 예배 시간을 일러 둔다
+  if (svcInWindow() && !svcDoneToday()) {
     await dlg.say(pick(L.noeulOrder));
     const c = await dlg.choose([L.ceremonyJoin, L.noeulRefuse]);
     if (c !== 0) { await dlg.say(pick(L.noeulNoted)); dropped() || endTalk(); return; }
     dlg.close();
-    await runCeremony();
+    const kind = await svcPick(L.noeulName, 'noeul');
+    busy = false;
+    await svcGo(kind);
     return;
   }
+  if (!svcDoneToday() && (Math.random() < 0.34 || !state.heaven?.rites)) await dlg.say(L.noeulTellTime.replace('{t}', svcTime()));
   // 45차: 지옥 정벌 — 노을에게 묻는다. 천국의 무기고도 노을이 지킨다
   for (;;) {
     if (dropped()) return;
@@ -4469,27 +4512,195 @@ async function talkToPreacher() {
 }
 /** 종교행사 한 번 (행사 장면 → 끝 인사 → 처음이면 황색날개의 한마디) */
 async function runCeremony() {
+  // 46차: 예배는 하루 한 번 정해진 때에, 성소 안에서. 그때가 아니면 시간만 알려 준다
   const L = t();
+  if (svcInWindow() && !svcDoneToday()) { busy = true; const kind = await svcPick(L.preachAngel, undefined); busy = false; await svcGo(kind); return; }
   busy = true;
-  const fx = worldFade('heaven', false);
-  await fx.covered;
-  dlg.open({ name: L.ceremonyTitle });
-  for (const line of L.ceremonyLines) await dlg.say(line);
-  dlg.close();
-  fx.done();
   dlg.open({ name: L.preachAngel });
-  await dlg.say(L.ceremonyDone);
+  await dlg.say((svcDoneToday() ? L.svcDone : L.svcNext).replace('{t}', svcTime()));
   dlg.close();
-  const first = !state.heaven?.adapted;
-  state.heaven = { ...state.heaven, adapted: true, rites: (state.heaven?.rites ?? 0) + 1 };
-  save(state);
-  if (first) {
-    dlg.open({ name: L.yellowWing, portrait: 'yellow-wing' });
-    await dlg.say(L.ywAdapted);
-    dlg.close();
-  }
   busy = false;
 }
+
+// ───────────────────────── 46차: 천국의 예배 (하루 한 번 · 예고 종 두 번 · 칼을 뽑은 노을이 데리러 온다 · 5분 앉아 있기) ─────────────────────────
+const SVC_HOUR = 20, SVC_LEN_MS = 5 * 60_000;
+type Sanct = 'church' | 'temple' | 'mosque';
+const svcClock = () => (state.region === 'seoul' ? seoulClock() : bangkokClock());
+const svcDayKey = () => new Date(Date.now() + (state.region === 'seoul' ? 9 : 7) * 3600e3).toISOString().slice(0, 10);
+const svcTime = () => `${String(SVC_HOUR).padStart(2, '0')}:00`;
+let svc: { kind: Sanct; end: number; chip: HTMLElement; next: number; mur: number; k: number } | null = null;
+let svcBell = '';
+let svcForce = false; // 개발용: 지금이 예배 시간인 것으로
+let svcGoing = false; // 데려가는 중 (겹쳐 부르지 않게)
+function svcInWindow() { if (svcForce) return true; const { h, m } = svcClock(); const mm = h * 60 + m; return mm >= SVC_HOUR * 60 && mm < SVC_HOUR * 60 + 5; }
+function svcDoneToday() { return state.heaven?.svcDay === svcDayKey(); }
+function svcTick() {
+  if (svc) { svcRun(); return; }
+  if (realm() !== 'heaven' || !world || scene !== 'world' || state.crusade || !state.heaven?.met || svcDoneToday()) return;
+  const { h, m } = svcClock(), mm = h * 60 + m, st = SVC_HOUR * 60, day = svcDayKey();
+  if (!svcForce && mm >= st - 10 && mm < st - 1 && svcBell !== day + '1') { svcBell = day + '1'; chime(); toast(t().svcSoon10.replace('{t}', svcTime())); }
+  else if (!svcForce && mm === st - 1 && svcBell !== day + '2') { svcBell = day + '2'; chime(); toast(t().svcSoon1); }
+  else if (svcInWindow() && !busy && !dlg.isOpen && !world.seated && !svcGoing) void svcEscort();
+}
+window.setInterval(svcTick, 1000);
+const SANCT_ROOMS = ['hchurch', 'htemple', 'hmosque'];
+async function svcEscort() {
+  if (!world || svcGoing) return;
+  svcGoing = true;
+  try { await svcEscort0(); } finally { svcGoing = false; }
+}
+async function svcEscort0() {
+  if (!world) return;
+  const L = t();
+  const inRoom = world.zone.interior?.kind;
+  if (inRoom && SANCT_ROOMS.includes(inRoom)) { svcBegin(inRoom === 'htemple' ? 'temple' : inRoom === 'hmosque' ? 'mosque' : 'church'); return; } // 이미 성소 안이면 그 자리에서
+  busy = true;
+  if (inRoom) { busy = false; leaveInterior(true); busy = true; await sleepMs(500); }
+  if (!world || world.zone.interior) { busy = false; return; }
+  world.noeulEscort(true);
+  await sleepMs(900);
+  dlg.open({ name: L.noeulName, portrait: 'noeul' });
+  for (const line of L.svcNoeulCome) await dlg.say(line);
+  dlg.close();
+  dlg.open({ name: L.yellowWing, portrait: 'yellow-wing' });
+  await dlg.say(L.svcYwCome);
+  dlg.close();
+  const kind = await svcPick(L.noeulName, 'noeul');
+  busy = false;
+  await svcGo(kind);
+}
+async function svcPick(name: string, portrait: 'noeul' | undefined): Promise<Sanct> {
+  const L = t();
+  dlg.open(portrait ? { name, portrait } : { name });
+  await dlg.say(L.svcChoose);
+  const kinds: Sanct[] = ['church', 'temple', 'mosque'];
+  const c = await dlg.choose(kinds.map((k) => L.svcPlace[k]));
+  dlg.close();
+  return kinds[c] ?? 'church';
+}
+async function svcGo(kind: Sanct) {
+  if (!world) return;
+  const was = svcGoing; svcGoing = true;
+  const fx = worldFade('heaven', false);
+  await fx.covered;
+  world?.noeulEscort(false);
+  svcEnterAndSit(kind);
+  fx.done();
+  svcGoing = was;
+}
+function svcEnterAndSit(kind: Sanct) {
+  const w0 = world, meta = heavenMeta();
+  if (!w0 || !meta || w0.zone.interior) return;
+  const k = meta.sancts[kind], b = w0.zone.buildings[k];
+  if (!b) return;
+  const out = { i: Math.floor(b.i0 + b.w / 2), j: b.j0 + b.d };
+  const z = interiorZone(b, k, out, buildingName(b, lang()));
+  const mid = z.W / 2;
+  const seats = z.interior!.seats.slice().sort((a, c) => (a[1] + Math.abs(a[0] + 0.5 - mid) * 0.6) - (c[1] + Math.abs(c[0] + 0.5 - mid) * 0.6));
+  const seat = seats[Math.min(seats.length - 1, 2 + Math.floor(Math.random() * 5))] ?? seats[0];
+  WorldScene.svcNext = { on: true, seat: seat ?? null };
+  openRoom(z, null, false, true);
+  svcBegin(kind, seat);
+}
+function svcBegin(kind: Sanct, seat?: [number, number]) {
+  const w = world;
+  if (!w || svc) return;
+  if (!seat) { const ss = w.serviceSeats(); seat = ss[Math.min(ss.length - 1, 3)]; }
+  if (!seat) return;
+  w.seatPlayer({ i: seat[0], j: seat[1], pose: kind === 'church' ? 'sit' : 'lotus', dir: 'ne' });
+  const chip = document.createElement('div');
+  chip.className = 'train-chip svc-chip';
+  document.body.appendChild(chip);
+  svc = { kind, end: Date.now() + SVC_LEN_MS, chip, next: Date.now() + 3500, mur: Date.now() + 8000, k: 0 };
+  toast(t().svcBegin);
+  svcRun();
+}
+function svcRun() {
+  const s = svc;
+  if (!s) return;
+  const L = t();
+  const left = s.end - Date.now();
+  if (!world || !world.zone.interior || !SANCT_ROOMS.includes(world.zone.interior.kind) || left <= 0) { svcFinish(left <= 0); return; }
+  const mm = Math.floor(left / 60000), ss = Math.floor((left % 60000) / 1000);
+  s.chip.textContent = L.svcChip.replace('{t}', `${mm}:${String(ss).padStart(2, '0')}`);
+  if (Date.now() >= s.next) { const ls = L.svcLines[s.kind]; world.officiantSay(ls[s.k++ % ls.length]); s.next = Date.now() + 14000 + Math.random() * 6000; }
+  if (Date.now() >= s.mur) { world.congregationSay(pick(L.svcMurmur)); s.mur = Date.now() + 6000 + Math.random() * 7000; }
+}
+function svcFinish(done: boolean) {
+  const s = svc;
+  if (!s) return;
+  svc = null;
+  svcForce = false;
+  s.chip.remove();
+  const L = t();
+  world?.seatPlayer(null);
+  world?.setService(false);
+  if (!done) return;
+  world?.officiantSay(L.svcBless[s.kind]);
+  state.heaven = { ...state.heaven, svcDay: svcDayKey(), adapted: true, rites: (state.heaven?.rites ?? 0) + 1 };
+  recordDeed('pray');
+  save(state);
+  toast(L.svcEnd, 'good');
+  void (async () => { await sleepMs(1800); if (busy || dlg.isOpen) return; busy = true; dlg.open({ name: L.yellowWing, portrait: 'yellow-wing' }); await dlg.say(L.svcEndYw); dlg.close(); busy = false; })();
+}
+
+// ───────────────────────── 46차: 구름 위의 오두막 (황색날개가 안고 날아간다) · 옆집 쌍둥이 ─────────────────────────
+async function flyHome() {
+  if (!world || realm() !== 'heaven') return;
+  const L = t();
+  const fx = worldFade('heaven', true);
+  await fx.covered;
+  if (world.zone.interior) leaveInterior(true);
+  if (!world || world.zone.interior) { fx.done(); return; }
+  const p = world.playerTile();
+  const b = { i0: p.i, j0: p.j, w: 1, d: 1, h: 0, cat: 'cottage', att: 'isle', color: '#ffffff' } as unknown as Building;
+  openRoom(interiorZone(b, -6, { i: p.i, j: p.j }, L.cottageName), null, false, true);
+  if (!state.heaven?.homeSeen) { state.heaven = { ...state.heaven, homeSeen: true }; save(state); }
+  toast(L.cottageArrive);
+  fx.done();
+}
+async function flyBack() {
+  if (!world?.zone.interior || world.zone.interior.kind !== 'cloudisle') return;
+  const fx = worldFade('heaven', true);
+  await fx.covered;
+  leaveInterior(true);
+  fx.done();
+}
+/** 내 오두막 문 앞: 들어가 잠깐 눕는다 (체력이 찬다) · 쌍둥이네 문 앞: 잠겨 있다 */
+async function hutDoor(which: 'mine' | 'twins') {
+  if (busy || dlg.isOpen) return;
+  const L = t();
+  busy = true;
+  dlg.open({ name: which === 'mine' ? L.hutMine : L.hutTwins, monologue: which === 'mine' });
+  if (which === 'twins') { await dlg.say(L.hutTwinsLocked); dlg.close(); busy = false; return; }
+  const c = await dlg.choose([L.hutRestBtn, L.ywNo]);
+  if (c === 0 && !dlg.cancelled) {
+    dlg.close();
+    const fx = worldFade('heaven', false);
+    await fx.covered;
+    dlg.open({ name: '', monologue: true });
+    for (const line of L.hutRest) await dlg.say(line);
+    dlg.close();
+    world?.heal(maxHp()); state.hp = maxHp(); save(state); renderHud();
+    fx.done();
+    toast(L.hutRested, 'good');
+  } else dlg.close();
+  busy = false;
+}
+/** 쌍둥이와 이야기 — 둘이 번갈아 떠든다. 가끔은 장난 */
+async function twinsTalk() {
+  if (busy || dlg.isOpen) return;
+  const L = t();
+  const sib = bodyLook().sex === 'f' ? '누나' : '형아';
+  busy = true;
+  dlg.open({ name: `${L.twinBoy} · ${L.twinGirl}` });
+  const conv = pick(L.twinTalk);
+  for (const line of conv) await dlg.say(line.replaceAll('{sib}', sib));
+  if (Math.random() < 0.25) { await dlg.say(pick(L.twinPrank)); await dlg.say(L.twinReturn); }
+  dlg.close();
+  busy = false;
+}
+
 /** 21차: 도시 끝의 택시 천사 — 아주 큰 날개로 다른 도시까지 태워 준다 (지금은 수쿰빗 안에서만. 서울·파타야는 아직 하늘길이 없다) */
 async function talkToTaxi() {
   const L = t();

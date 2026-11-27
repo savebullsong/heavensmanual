@@ -175,6 +175,9 @@ for sex in 'mf':
     jobs.append({'sex': sex, 'build': 1, 'sets': [{'kind': 'armor', 'piece': pc, 'mode': m, 'extra': ['stab'] if m == 'm' else []} for pc in ('greathelm', 'hornhelm', 'skullhelm', 'maskhelm') for m in MODES], 'tag': 'helm44' + sex})
 # 45차: 노을이 지옥 정벌에서 함께 싸운다 — 몸에 붙은 장검으로 휘두르기 · 찌르기 (무기 자세 m)
 jobs.append({'sex': 'f', 'build': 1, 'monster': 'no', 'occluder': 'noeul', 'sets': [{'kind': 'base', 'outfit': 'noeul', 'mode': 'm'}], 'stride': .95, 'crisp': True, 'tag': 'noeul45'})
+# 46차 노을 컨셉 그림(검은 웨이브 긴 머리 · 흰 민소매 드레스 · 숄 · 은빛 장검)으로 다시: 서 있는 몸(고유 동작) + 칼 든 몸
+jobs.append({'sex': 'f', 'build': 1, 'monster': 'no', 'occluder': 'noeul', 'gest': 'blade', 'sets': [{'kind': 'base', 'outfit': 'noeul', 'mode': 'w', 'extra': ['gest']}], 'stride': .95, 'crisp': True, 'tag': 'noeul46'})
+jobs.append({'sex': 'f', 'build': 1, 'monster': 'no', 'occluder': 'noeul', 'sets': [{'kind': 'base', 'outfit': 'noeul', 'mode': 'm'}], 'stride': .95, 'crisp': True, 'tag': 'noeul46'})
 # 45차: 총 넷의 방향 — 쏘는 자세에서 총구가 하늘을 향하던 것 (권총 · 저격총 · 화염방사기 · 탈루스 산탄총)
 for sex in 'mf':
     jobs.append({'sex': sex, 'build': 1, 'sets': [{'kind': 'weapon', 'weapon': w} for w in ('pistol', 'rifle', 'flamer')], 'tag': 'gun45'})

@@ -3,6 +3,23 @@
 import { TYPES, finalize, type Zone, type Building, type HellBuildKind, type Prop, type TileType , type HellVendor} from './zone.ts';
 import type { Lang } from './i18n.ts';
 
+/**
+ * 46차 기준점 — 층마다 괴물이 얼마나 센가 (6층부터 새 층을 만들 때 이 곡선 위에 얹는다)
+ * · 1~5층: 지금 그대로. 쇳물 판금 갑주(3만 2천 닢)를 입으면 1 대 1이 수월하다
+ * · 6~9층: 명중이 빠르게 올라 '강화한 사람'만 수월하다 (방어구 +n마다 방어 +n → 회피 등급 +n/2)
+ * · 10층부터: 누구에게나 어렵다 — 빗나가도 스치는 피해(graze)가 남아 회피만으로는 버틸 수 없다
+ * 값의 기준: 기본 장비 수십~백 닢 · 약간 중급 천 닢대 · 중급 몇 천 · 고급 몇 만 · 6층부터 한 층씩 조금 강한 장비는 몇 십만
+ */
+export function floorCurve(f: number) {
+  const d = Math.max(0, f - 5);
+  return {
+    hit: 3 + f + Math.round(d * 2.6), // 괴물의 명중 보너스(d20에 더함): 5층 8 · 6층 12 · 8층 19 · 10층 26 · 13층 37
+    bossHit: 9 + Math.round(d * 2.6),
+    graze: Math.min(0.5, d * 0.07), // 빗나가도 남는 피해 몫: 6층 7% · 10층 35% · 13층 50%
+    hp: 1 + d * 0.22, // 같은 몸이라도 깊을수록 단단하게 (이미 있는 층마다 +25% 위에 더)
+    dmg: 1 + d * 0.16,
+  };
+}
 export const OPEN_FLOORS = 5; // 지금 열린 층 (43차: 5층 가면의 도시까지 · 6~13층은 하나씩 업데이트)
 
 export type Theme = 'ash' | 'swamp' | 'market' | 'forge' | 'mask'; // 24차: 4층 용광로 · 43차: 5층 가면의 도시

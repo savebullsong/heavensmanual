@@ -39,7 +39,7 @@ export function heavenPriceMul(name: string): number {
   return [1, 2, 3, 5, 10, 50, 200][h % 7];
 }
 
-export interface HeavenMeta { palace: number; base: { i: number; j: number }; pools: [number, number, number, number][]; cages: { i0: number; j0: number; i1: number; j1: number; kind: 'demon' | 'beast' | 'sinner' }[] }
+export interface HeavenMeta { sancts: Record<'church' | 'temple' | 'mosque', number>; palace: number; base: { i: number; j: number }; pools: [number, number, number, number][]; cages: { i0: number; j0: number; i1: number; j1: number; kind: 'demon' | 'beast' | 'sinner' }[] }
 let meta: HeavenMeta | null = null;
 export const heavenMeta = () => meta;
 
@@ -97,6 +97,15 @@ export function heavenZone(): Zone {
   // 휴양지 호텔 (큰길 북쪽)
   buildings.push({ i0: 134, j0: 50, w: 12, d: 6, h: 260, cat: 'hotel', sign: 'left', color: '#fbf6ea', pois: [P('hotel', '그랜드 헤븐 호텔', 'แกรนด์เฮเว่นโฮเต็ล', 'Grand Heaven Hotel')] });
   buildings.push({ i0: 150, j0: 50, w: 8, d: 6, h: 120, cat: 'shop', sign: 'left', color: '#eef6f4', pois: [P('bar', '풀사이드 바', 'พูลไซด์บาร์', 'Poolside Bar')] });
+  // 46차 성소의 언덕 (남서쪽): 구름 대성당 · 연화 불당 · 새벽빛 모스크 — 하루 한 번 예배(안으로 들어가 앉는다)
+  rect(26, 88, 92, 90, 'walk'); rect(41, 77, 41, 87, 'park'); rect(54, 77, 55, 87, 'lot');
+  const sancts = {} as Record<'church' | 'temple' | 'mosque', number>;
+  sancts.church = buildings.length;
+  buildings.push({ i0: 29, j0: 77, w: 11, d: 10, h: 150, cat: 'sanct', att: 'church', sign: 'left', color: '#ffffff', pois: [P('place_of_worship', '구름 대성당', 'มหาวิหารเมฆ', 'Cloud Cathedral', 'church')] });
+  sancts.temple = buildings.length;
+  buildings.push({ i0: 42, j0: 77, w: 11, d: 10, h: 120, cat: 'sanct', att: 'temple', sign: 'left', color: '#ffffff', pois: [P('place_of_worship', '연화 불당', 'วิหารดอกบัว', 'Lotus Hall', 'temple')] });
+  sancts.mosque = buildings.length;
+  buildings.push({ i0: 61, j0: 77, w: 11, d: 10, h: 130, cat: 'sanct', att: 'mosque', sign: 'left', color: '#ffffff', pois: [P('place_of_worship', '새벽빛 모스크', 'มัสยิดรุ่งอรุณ', 'Mosque of Dawn', 'mosque')] });
   // 소품
   const props: Prop[] = [];
   const prop = (i: number, j: number, kind: string, o = 0) => { if (tiles[j * W + i] !== TI.water && tiles[j * W + i] !== TI.void) props.push({ i, j, kind: kind as Prop['kind'], o }); };
@@ -127,7 +136,10 @@ export function heavenZone(): Zone {
   // 우주선 기지: 발사대 (계단 대신)
   const base = { i: 194, j: 58 };
   const door = { i: 17, j: 55 };
-  meta = { palace, base, pools, cages };
+  // 성소 앞길의 나무 · 분수
+  for (let i = 30; i <= 90; i += 5) { if (i >= 55 && i <= 60) continue; prop(i, 92, 'tree'); }
+  prop(57, 84, 'fountain');
+  meta = { sancts, palace, base, pools, cages };
   return finalize({ id: HEAVEN_ID, W, H, tiles, buildings, props, lanes: [], door, spawn: door, heavenGen: true } as unknown as Omit<Zone, 'blocked'>);
 }
 
@@ -243,7 +255,7 @@ export function drawHeavenGround(z: Zone, i0: number, j0: number, chunk: number)
 }
 
 // ───────────────────────── 건물 ─────────────────────────
-function frame(b: Building, top: number) {
+export function frame(b: Building, top: number) {
   const i1 = b.i0 + b.w, j1 = b.j0 + b.d;
   const minX = (b.i0 - j1) * (TW / 2) - 8, maxX = (i1 - b.j0) * (TW / 2) + 8;
   const minY = (b.i0 + b.j0) * (TH / 2) - top - 8, maxY = (i1 + j1) * (TH / 2) + 6;

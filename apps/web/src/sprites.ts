@@ -76,7 +76,7 @@ export const KALDREK_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairCo
 /** 43차: 환전상 오볼로 (붉은 살 · 검은 로브 금 테두리 · 외알 안경 · 접힌 박쥐 날개 · 가는 꼬리) */
 export const OBOLO_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'obolo', cols: { 1: '#b8382a', 3: '#1e1416', 4: '#1a1012', 5: '#140a08', 7: '#5a3a1e', 9: '#5a1a1a', 13: '#2a1a14', 14: '#e0b437' } };
 /** 43차: 천국의 신앙 감시자 노을 — 유내와 똑같은 얼굴 · 흰 튜닉 · 은 갑 · 노을빛 띠 · 긴 장검 */
-export const NOEUL_LOOK: Look = { sex: 'f', build: 1, skin: 0, hair: 2, hairColor: 0, top: 0, bottom: 0, outfit: 'noeul', cols: { 2: '#24180f', 3: '#f4f0ea', 4: '#e8e2d8', 5: '#8a8a92', 10: '#e8eef2', 12: '#e0703a', 13: '#5a3a22', 14: '#c8ccd4' } };
+export const NOEUL_LOOK: Look = { sex: 'f', build: 1, skin: 0, hair: 2, hairColor: 0, top: 0, bottom: 0, outfit: 'noeul', cols: { 1: '#f2e2da', 2: '#141216', 3: '#f6f4f0', 4: '#eeece8', 5: '#d8d2c8', 10: '#f2f4f8', 12: '#e2e4ea', 13: '#dcdce2', 14: '#c8ccd6' } }; // 46차 사용자 컨셉 그림: 검은 웨이브 긴 머리 · 창백한 피부 · 흰 민소매 드레스와 숄 · 은빛 장검
 /** 43차: 5층 인형술사 마리 (검은 드레스 · 손가락의 흰 실 · 실에 매달린 작은 인형) */
 export const MARI_LOOK: Look = { sex: 'f', build: 1, skin: 0, hair: 2, hairColor: 0, top: 0, bottom: 0, outfit: 'mari', cols: { 1: '#e6dcd2', 2: '#3a3634', 3: '#141214', 4: '#141214', 5: '#0e0c0c', 9: '#d8d2c8', 10: '#ece8e0', 12: '#8a1a24', 13: '#a87a4a' } };
 /** 28차 유내: 내 집의 동양인 여성. 올 때마다 10대 · 20대 · 30대 후반 중 한 시절로 나온다
