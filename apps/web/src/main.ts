@@ -540,7 +540,8 @@ async function boot() {
   else { enterShop(false); if (firstTime) setTimeout(() => { if (scene === 'shop' && !busy && !dlg.isOpen) void talkToHwang(); }, 1200); } // 48차: 처음 온 사람도 말이 걸린 채로
   setInterval(updateHud, 1000);
   setInterval(() => { snapPos(); state.played = (state.played ?? 0) + 4; state.seen = Date.now(); if (scene === 'world' && !document.hidden) ecoDay().t += 4; save(state); }, 4000);
-  addEventListener('pagehide', () => { snapPos(); save(state); });
+  addEventListener('pagehide', () => { world?.payWorkSoFar(); snapPos(); save(state); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { world?.payWorkSoFar(); save(state); if (net.account()) void net.pushSave(state); } }); // 48차: 일하다 앱을 나가도 번 돈은 지갑에
   if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __hm: unknown }).__hm = { shop: () => shop, world: () => world, state, hell: enterHell, deed: recordDeed, interior: enterInterior, raid: setRaidForce, pashar: () => talkToPashar(), bulda: () => talkToBulda(), border: (w: 'zero' | 'stillborn') => enterBorder(w), hellDeath: () => showHellDeath(), gearBag: () => { bagTab = 'gear'; renderBag(); }, mask: () => talkToMaskGirl(), gear: () => gear(), rooms: () => (world?.zone.buildings ?? []).map((b, k) => [k, roomKindOf(b), canEnter(b)]), leave: () => leaveInterior(), store: (k: 'tools' | 'antique', n: string) => openStore(k, n), terrace: () => enterTerrace(), officer: () => talkToOfficer(), pasharTalk: () => talkToPashar(), cage: () => openCage(), parrot: () => talkToParrot(), hstore: (k: HellVendor) => openHellStore(k), smith: () => openSmith(), soul: () => renderSoul(), give: (k: string) => { addToBag(itemByKey(k)); save(state); }, regear: () => world?.setGear(gear()), eco: () => openEcoStats(), perf: (v: boolean) => setPerf(v), xchTalk: () => talkToChanger(), shopIn: () => enterShop(true), ferum: () => talkToFerum(), parrotFeed: (n: number) => { state.parrotFed = n; save(state); }, wearW: (n: number) => { for (let i = 0; i < n; i++) wear('weapon'); }, setDura: (k: string, n: number) => { (state.dura ??= {})[k] = n; save(state); }, duraMax: (k: string) => duraMax(itemByKey(k)), ysalon: () => talkToSalon(), besk: () => talkToBesk(), grandpa: (h: boolean) => talkToGrandpa(h), mari: () => talkToMari(), marion: (k: string) => useMarionette(k), bare: () => bareTrial(), svc: (k?: Sanct) => { svcForce = true; if (k) void svcGo(k); }, svcEnd: () => { if (svc) svc.end = Date.now(); }, home: () => flyHome(), ywTalk: () => talkToYellowWing(), prof: (p: Parameters<typeof profileCard>[0]) => profileCard(p), lifePick: () => chooseLife('system2', lifeLine({ soul: { rank: 5, exp: 0 }, realm: 'hell', hell: { floor: 3 } as typeof state.hell }), lifeLine(state)) }; // 개발용 확인 창구
   if (perfOn()) setPerf(true); // 34차: 관리자가 켜 둔 성능 표시
 }
@@ -2761,6 +2762,11 @@ function ecoDay() {
   }
   return state.eco[key];
 }
+// 48차: 2분마다 오늘(과 날이 바뀌었으면 어제) 치를 서버에 올린다 — 관리자 통계는 모든 유저의 합
+const ecoPushed: Record<string, string> = {};
+setInterval(() => {
+  for (const k of Object.keys(state.eco ?? {}).sort().slice(-2)) { const sig = JSON.stringify(state.eco![k]); if (ecoPushed[k] === sig) continue; ecoPushed[k] = sig; void net.pushEco(k, state.eco![k]); }
+}, 120_000);
 function ecoLog(dir: 'earn' | 'spend', cat: string, n: number, hell = false) {
   if (!(n > 0)) return;
   const d = ecoDay();
@@ -2788,6 +2794,31 @@ function openEcoStats() {
   const hold = document.createElement('p'); hold.className = 'eco-hold';
   hold.textContent = L.ecoHold.replace('{w}', priceText(Math.floor(state.wallet ?? 0))).replace('{b}', priceText(Math.floor(state.bank ?? 0))).replace('{n}', fmt(h?.notes ?? 0)).replace('{hb}', fmt(h?.bank ?? 0));
   list.appendChild(hold);
+  // 48차: 서버에 모인 모든 유저의 합 (오늘 · 7일) — 아래 표는 이 기기 것
+  if (net.account()?.admin) {
+    const box = document.createElement('div'); box.className = 'eco-box eco-all';
+    const head = document.createElement('b'); head.textContent = L.ecoAllLoading; box.appendChild(head);
+    list.appendChild(box);
+    void Promise.all([net.ecoSum(1), net.ecoSum(7)]).then(([d1, d7]) => {
+      box.innerHTML = '';
+      for (const [title, d] of [[L.ecoAllToday, d1], [L.ecoAllWeek, d7]] as const) {
+        const hh = document.createElement('b'); box.appendChild(hh);
+        if (!d) { hh.textContent = `${title} · ${L.ecoAllFail}`; continue; }
+        const tot = (o: Record<string, number>) => Object.values(o).reduce((a, b) => a + b, 0);
+        const hrs = d.t / 3600;
+        hh.textContent = `${title} · ${L.ecoAllPlayers.replace('{n}', String(d.players))} · ${L.ecoPlay.replace('{h}', hrs.toFixed(1))}`;
+        const table = document.createElement('table'); table.className = 'eco-table';
+        const row = (a: string, b: string, c: string, cls = '') => { const tr = document.createElement('tr'); if (cls) tr.className = cls; for (const x of [a, b, c]) { const td = document.createElement('td'); td.textContent = x; tr.appendChild(td); } table.appendChild(tr); };
+        row('', L.ecoReal, L.ecoObol, 'eco-th');
+        row(L.ecoIn, fmt(tot(d.e)), fmt(tot(d.he)));
+        row(L.ecoOut, fmt(tot(d.s)), fmt(tot(d.hs)));
+        for (const k of [...new Set([...Object.keys(d.e), ...Object.keys(d.he)])].sort((a, b) => (d.e[b] ?? 0) - (d.e[a] ?? 0)).slice(0, 6)) row('  ' + cat(k), d.e[k] ? fmt(d.e[k]) : '·', d.he[k] ? fmt(d.he[k]) : '·');
+        if (hrs > 0.05) row(L.ecoPerHour, fmt(tot(d.e) / hrs), fmt(tot(d.he) / hrs), 'eco-net');
+        box.appendChild(table);
+      }
+      const mine = document.createElement('p'); mine.className = 'eco-hold'; mine.textContent = L.ecoMineBelow; box.appendChild(mine);
+    });
+  }
   const today = last(1), week = last(7);
   const secs = (ds: { t: number }[]) => ds.reduce((a, d) => a + (d.t ?? 0), 0);
   for (const [title, ds] of (days.length > 1 ? [[L.ecoToday, today], [L.ecoWeek, week]] : [[L.ecoToday, today]]) as [string, typeof today][]) { // 하루치뿐이면 같은 표를 두 번 보이지 않는다

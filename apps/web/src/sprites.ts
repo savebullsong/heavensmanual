@@ -94,6 +94,23 @@ export function yunaeLook(age: 0 | 1 | 2): Look {
 export const PONCHO_DEMON: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'ponchod', cols: { 1: '#a8a49c', 2: '#141416', 3: '#1c1c20', 5: '#141414', 6: '#e02a20', 9: '#3a3434', 10: '#a8a49c', 15: '#0e0e10' } };
 /** 42차: 저승사자 (검은 도포 · 흰 동정 · 붉은 세조대 · 갓) */
 export const REAPER_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'reaper', cols: { 1: '#dcd8d0', 2: '#101012', 3: '#16161a', 4: '#16161a', 5: '#121212', 6: '#141010', 9: '#ece8e0', 10: '#dcd8d0', 12: '#7a1a1a', 15: '#0c0c0e' } };
+/** 48차: 지옥 장사꾼 차림 (world 와 관리자 그림 칸이 함께 쓴다) — 고깃간(앞치마·식칼) · 넝마(우비) · 물장수(푸른 두건) · 약장수(바랜 흰 겉옷) · 장사꾼(기운 옷) · 무기상(가죽·활) · 호텔 지배인(붉은 조끼) · 대장장이(그을린 가죽) */
+export type DotVendor = 'butcher' | 'junk' | 'water' | 'medic' | 'trader' | 'arms' | 'hotel' | 'smith';
+export const DOT_VENDORS: DotVendor[] = ['butcher', 'junk', 'water', 'medic', 'trader', 'arms', 'hotel', 'smith'];
+export function hellVendorLook(kind: DotVendor, sk = '#a8785a', sex: 'm' | 'f' = 'm'): Look {
+  const L: Record<DotVendor, Look> = {
+    butcher: { sex, build: 2, skin: 0, hair: 5, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: sk, 10: sk, 2: '#1a1410', 3: '#8a7a6a', 4: '#3a2a22', 9: '#8a7a6a', 5: '#2a1a10' } },
+    junk: { sex, build: 0, skin: 0, hair: 1, hairColor: 0, top: 0, bottom: 0, outfit: 'raincoat', cols: { 1: sk, 10: sk, 8: '#3a3430', 3: '#2a2420', 4: '#2a2420', 5: '#1a1410' } },
+    water: { sex, build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'raincoat', cols: { 1: sk, 10: sk, 8: '#2e4458', 3: '#22303a', 4: '#1e2228', 5: '#141618' } },
+    medic: { sex, build: 1, skin: 0, hair: 4, hairColor: 0, top: 0, bottom: 0, outfit: 'raincoat', cols: { 1: sk, 10: sk, 8: '#b8b098', 3: '#8a846e', 4: '#3a362e', 5: '#1a1814' } },
+    trader: { sex, build: 2, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: sk, 10: sk, 2: '#2a1a10', 3: '#7a5a3a', 4: '#4a5a3a', 9: '#8a3a2a', 5: '#2a1a10' } },
+    arms: { sex, build: 2, skin: 0, hair: 5, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: sk, 10: sk, 2: '#1a1410', 3: '#4a3424', 4: '#2a2018', 9: '#4a3424', 5: '#120c08' } },
+    hotel: { sex, build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: sk, 10: sk, 2: '#0e0a08', 3: '#5a1a14', 4: '#1a1414', 9: '#e8e0d0', 5: '#0e0a08' } },
+    smith: { sex: 'm', build: 2, skin: 0, hair: 5, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: sk, 10: sk, 2: '#0e0a08', 3: '#2a1e16', 4: '#1e1612', 9: '#5a3a24', 5: '#0e0a08' } },
+  };
+  return L[kind];
+}
+export const VENDOR_WEAPON: Partial<Record<DotVendor, string>> = { butcher: 'knife', arms: 'bow', smith: 'hammer' };
 export const TALUS_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'talus', cols: { 1: '#d8ccb0', 3: '#5a4430', 4: '#3a2e22', 5: '#1a1410', 6: '#ffd08a', 10: '#d8ccb0', 12: '#a8281e', 13: '#2e2420', 14: '#c9a23e', 15: '#140e0c' } };
 export const HWANGHON: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'misshwang', cols: { 1: '#ead2c4', 2: '#3a0e12', 3: '#5a0e18', 4: '#2a0a10', 5: '#0c0808', 6: '#1a1210', 7: '#140a0c', 10: '#ead2c4', 12: '#b8862a', 14: '#8a6a2a', 15: '#0c0808' } }; // 39차: 미스 황과 같은 몸 · 핏빛 블라우스 · 검은 앞치마 · 바랜 금빛
 

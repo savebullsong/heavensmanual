@@ -32,6 +32,17 @@ export function myId() {
   return account()?.username ?? guestId();
 }
 
+/** 48차 경제 통계: 하루치(들어온 돈 · 나간 돈 · 논 시간)를 서버에 올린다 (기기 또는 계정마다 하루 한 줄) */
+export async function pushEco(day: string, data: unknown) {
+  try { await sb.rpc('hm_eco_push', { p_who: myId(), p_day: day, p_data: data }); } catch { /* 무시 */ }
+}
+/** 48차: 모든 사람의 합 (관리자만) — 최근 n일 */
+export async function ecoSum(days: number): Promise<{ e: Record<string, number>; s: Record<string, number>; he: Record<string, number>; hs: Record<string, number>; t: number; players: number } | null> {
+  const a = account();
+  if (!a) return null;
+  try { const { data, error } = await sb.rpc('hm_eco_sum', { p_token: a.token, p_days: days }); return error ? null : data; } catch { return null; }
+}
+
 type Err = 'bad_id' | 'bad_pw' | 'taken' | 'bad' | 'wait' | 'net' | 'session';
 async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T | { error: Err }> {
   try {

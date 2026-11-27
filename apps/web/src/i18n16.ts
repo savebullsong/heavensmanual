@@ -1152,6 +1152,12 @@ export const more16 = {
     giftToast: "행인이 {item} {n}개를 쥐여 주었다",
     tipToast: "길 정보: {name} — 위에 표시가 떴다",
     setMovePad: "이동 패드 (휴대폰)",
+    ecoAllLoading: "모든 유저 합계를 불러오는 중…",
+    ecoAllToday: "모든 유저 · 오늘",
+    ecoAllWeek: "모든 유저 · 최근 7일",
+    ecoAllPlayers: "{n}명",
+    ecoAllFail: "서버에서 받지 못함",
+    ecoMineBelow: "아래는 이 기기의 기록",
     // 48차 끝
   },
   th: {
@@ -2306,6 +2312,12 @@ export const more16 = {
     giftToast: "คนเดินถนนยัด {item} ให้ {n} ชิ้น",
     tipToast: "ข้อมูลทาง: {name} — มีเครื่องหมายขึ้นแล้ว",
     setMovePad: "แป้นเดิน (มือถือ)",
+    ecoAllLoading: "กำลังโหลดยอดรวมผู้เล่นทั้งหมด…",
+    ecoAllToday: "ผู้เล่นทั้งหมด · วันนี้",
+    ecoAllWeek: "ผู้เล่นทั้งหมด · 7 วันล่าสุด",
+    ecoAllPlayers: "{n} คน",
+    ecoAllFail: "ดึงจากเซิร์ฟเวอร์ไม่ได้",
+    ecoMineBelow: "ด้านล่างคือบันทึกของเครื่องนี้",
     // 48차 끝
   },
   en: {
@@ -3460,6 +3472,12 @@ export const more16 = {
     giftToast: "A passer-by pressed {n} {item} into your hand",
     tipToast: "Directions: {name} — marked above it",
     setMovePad: "Move pad (phone)",
+    ecoAllLoading: "Loading totals for all players…",
+    ecoAllToday: "All players · today",
+    ecoAllWeek: "All players · last 7 days",
+    ecoAllPlayers: "{n} players",
+    ecoAllFail: "Could not load from server",
+    ecoMineBelow: "Below: this device only",
     // 48차 끝
   },
 };

@@ -17,6 +17,7 @@ import { smithyChimney, puppetEyes } from './hellbuild.ts';
 import { Application, BlurFilter, ColorMatrixFilter, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture, TilingSprite } from 'pixi.js';
 import { type Look } from './character.ts';
 import { beastHand } from './passgfx.ts';
+import { DOT_VENDORS, hellVendorLook, type DotVendor } from './sprites.ts';
 import { MISS_HWANG, TALUS_LOOK, MASKGIRL_LOOK, YELLOW_WING_LOOK, KALDREK_LOOK, OBOLO_LOOK, NOEUL_LOOK, MARI_LOOK, yunaeLook, PONCHO_DEMON, REAPER_LOOK, charSet, frameOf, artDensity, mirrorFrameOf, applyFrame, dirFromTile, turnedDir, DIRS, auraFor, makeAuraSprite, ANIM_FPS, IMPACT, TWO, type CharSet, type Dir, type Anim, type Frame, BODY_K } from './sprites.ts';
 import { type Zone, type Building, type Lane, type Prop, type HellVendor, type Furn, findPath, walkable, randomWalkTileNear, tileAt, groundAt, TYPES } from './zone.ts';
 import { iso, TW, TH, drawBuilding, drawGroundChunk, buildingHeight } from './gfx.ts';
@@ -82,7 +83,7 @@ function goatKingSet(): Promise<CharSet | null> {
     const im = new Image(); im.crossOrigin = 'anonymous';
     im.onload = () => {
       const tx = Texture.from(im); tx.source.scaleMode = 'nearest';
-      const f: Frame = { tex: tx, ax: 0.5, ay: 1, w: im.width, h: im.height, k: 0.5 };
+      const f: Frame = { tex: tx, ax: 0.5, ay: 1, w: im.width, h: im.height, k: Math.abs(im.width - 660) <= 3 ? 1 / 3 : 0.5 }; // 48차: 3배 그림(660×939)이면 3분의 1로
       const frames = new Map<string, Frame>();
       for (const d of ['se', 'sw', 'ne', 'nw', 's', 'e', 'n', 'w'] as Dir[]) frames.set(`idle-${d}-0`, f);
       res({ mode: 'u', attack: null, frames, counts: { idle: 1 }, eight: true, masks: new Map() });
@@ -3779,6 +3780,15 @@ export class WorldScene {
   get isWorkingInside() {
     return !!this.workIn;
   }
+  /** 48차: 휴대폰에서 일하다 앱을 나가면 쌓인 시급이 사라졌다 — 화면이 가려질 때 지금까지 번 돈을 먼저 쥐여 준다 (일은 이어진다) */
+  payWorkSoFar() {
+    for (const w of [this.workIn, this.working] as ({ name: string; earned: number } | null)[]) {
+      if (!w || w.earned < 0.01) continue;
+      const n = w.earned;
+      w.earned = 0;
+      this.hooks.wage(n, w.name, false);
+    }
+  }
   stopWorkInside(stiffed = false) {
     if (!this.workIn) return;
     const w = this.workIn;
@@ -4145,21 +4155,12 @@ export class WorldScene {
       const sk = SKINS[R(SKINS.length)];
       const sex = (p: number): 'm' | 'f' => (Math.random() < p ? 'm' : 'f');
       // 22차: 장사꾼마다 차림이 다르다 — 고깃간(앞치마·식칼) · 물장수(푸른 두건) · 넝마(우비) · 약장수(바랜 흰 겉옷) · 장사꾼(덕지덕지 기운 옷) · 무기상(가죽·활) · 호텔 지배인(붉은 조끼) · 서큐버스(층마다 다른 모습)
-      const looks: Record<HellVendor, Look> = {
-        butcher: { sex: sex(0.6), build: 2, skin: 0, hair: 5, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: sk, 10: sk, 2: '#1a1410', 3: '#8a7a6a', 4: '#3a2a22', 9: '#8a7a6a', 5: '#2a1a10' } },
-        junk: { sex: sex(0.5), build: 0, skin: 0, hair: 1, hairColor: 0, top: 0, bottom: 0, outfit: 'raincoat', cols: { 1: sk, 10: sk, 8: '#3a3430', 3: '#2a2420', 4: '#2a2420', 5: '#1a1410' } },
-        water: { sex: sex(0.5), build: 0, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'raincoat', cols: { 1: sk, 10: sk, 8: '#2e4458', 3: '#22303a', 4: '#1e2228', 5: '#141618' } },
-        medic: { sex: sex(0.5), build: 1, skin: 0, hair: 4, hairColor: 0, top: 0, bottom: 0, outfit: 'raincoat', cols: { 1: sk, 10: sk, 8: '#b8b098', 3: '#8a846e', 4: '#3a362e', 5: '#1a1814' } },
-        trader: { sex: sex(0.7), build: 2, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: sk, 10: sk, 2: '#2a1a10', 3: '#7a5a3a', 4: '#4a5a3a', 9: '#8a3a2a', 5: '#2a1a10' } },
-        arms: { sex: sex(0.6), build: 2, skin: 0, hair: 5, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: sk, 10: sk, 2: '#1a1410', 3: '#4a3424', 4: '#2a2018', 9: '#4a3424', 5: '#120c08' } },
-        hotel: { sex: sex(0.6), build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: sk, 10: sk, 2: '#0e0a08', 3: '#5a1a14', 4: '#1a1414', 9: '#e8e0d0', 5: '#0e0a08' } },
-        succubus: SUCCUBUS_LOOK[h.floor] ?? SUCCUBUS_LOOK[1],
-        smith: { sex: 'm', build: 2, skin: 0, hair: 5, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 1: sk, 10: sk, 2: '#0e0a08', 3: '#2a1e16', 4: '#1e1612', 9: '#5a3a24', 5: '#0e0a08' } }, // 30차: 그을린 가죽 앞치마의 대장장이
-        puppeteer: MARI_LOOK, // 43차 5층 인형술사 마리 (전용 3D 몸 — 서 있으면 가끔 실을 당긴다)
-      };
+      const dv = (DOT_VENDORS as string[]).includes(v.kind) ? (v.kind as DotVendor) : null;
+      const look: Look = dv ? hellVendorLook(dv, sk, v.kind === 'smith' ? 'm' : sex(v.kind === 'trader' ? 0.7 : v.kind === 'butcher' || v.kind === 'arms' || v.kind === 'hotel' ? 0.6 : 0.5)) : v.kind === 'succubus' ? SUCCUBUS_LOOK[h.floor] ?? SUCCUBUS_LOOK[1] : MARI_LOOK; // 48차: 차림은 sprites.ts (관리자 그림 칸과 함께)
       const weapon = v.kind === 'butcher' ? 'knife' : v.kind === 'arms' ? 'bow' : v.kind === 'smith' ? 'hammer' : null;
       const ferum = v.kind === 'smith' && h.floor === 4;
-      const w = this.makeWalker(ferum ? KALDREK_LOOK : looks[v.kind], v.i, v.j, 'vendor', ferum ? null : weapon);
+      const w = this.makeWalker(ferum ? KALDREK_LOOK : look, v.i, v.j, 'vendor', ferum ? null : weapon);
+      if (dv && !ferum) this.dotArt(w, `sprite-vendor-${dv}` as PortraitSlot); // 48차: 관리자가 올린 장사꾼 도트 (서 있을 때)
       w.vend = v.kind; w.dir = 'sw'; w.wait = 1e9; w.speed = 0; w.maxHp = w.hp = 400;
       if (ferum) {
         // 34차 칼드렉 → 43차: 팔 넷 · 뿔 · 망치와 집게를 모두 몸에 함께 구운 전용 3D 몸 (서 있으면 가끔 망치질)
@@ -8210,7 +8211,7 @@ export class WorldScene {
       if (w.pack?.vend) {
         // 31차: 장사꾼 차림 — 왼쪽 아래(sw)·오른쪽 아래(se)만 본다 (그림은 sw 기준, se는 좌우 뒤집기)
         if (w.dir !== 'sw' && w.dir !== 'se') w.dir = this.player.x - w.x - (this.player.y - w.y) >= 0 ? 'se' : 'sw';
-        const flip = w.dir === 'se', on = w.down <= 0 && w.sprite.visible;
+        const flip = w.dir === 'se', on = w.down <= 0 && w.sprite.visible && !(w.art && w.sprite.texture === w.art); // 48차: 관리자 도트엔 차림이 그려져 있다
         for (const [sp, layer, dz] of [[w.pack.under, 'under', -0.003], [w.pack.over, 'over', 0.003]] as const) {
           const tx = vendorGear(w.pack.vend, layer);
           sp.visible = on && !!tx;
