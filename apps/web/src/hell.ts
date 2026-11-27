@@ -116,7 +116,7 @@ export const GUARDS: Record<string, GuardDef> = {
  *  1층 잿빛 망자(곡괭이) · 불씨 망자(머리가 타오르는 숯 몸, 낙인 쇠) · 걷는 해골 · 문지기 야크 / 층주 아쉬갈(숯 바위 거인, 성문 빗장)
  *  2층 프렛(국자) · 늪 망자(불어 터진 시체, 쇠갈고리 장대) · 탐식귀(두꺼비 거구, 몽둥이) / 층주 구르마(산 같은 배, 맨손)
  *  3층 흥정꾼(웃는 가면 상인, 고기 칼) · 빚쟁이 해골(멍에·족쇄, 빚 갈고리) · 살점 거간꾼(뚱뚱한 금붙이 상인, 고기 칼) / 층주 세라네 */
-export type MonsterBody = 'ash' | 'pret' | 'yak' | 'bones' | 'serane' | 'ashgal' | 'gurma' | 'cinder' | 'bloat' | 'glutton' | 'hawker' | 'debtor' | 'broker' | 'forgeknight' | 'maskfiend' | 'whisperer' | 'puppet' | 'marcion' | 'manette'; // 43차: 5층 가면의 도시
+export type MonsterBody = 'ash' | 'pret' | 'yak' | 'bones' | 'serane' | 'ashgal' | 'gurma' | 'cinder' | 'bloat' | 'glutton' | 'hawker' | 'debtor' | 'broker' | 'forgeknight' | 'maskfiend' | 'whisperer' | 'puppet' | 'marcion' | 'manette' | 'rokkb' | 'gulonb' | 'merkb' | 'ferronb'; // 48차: 필드 보스 전용 몸 · 43차: 5층 가면의 도시
 export interface MonsterDef {
   key: string; body: MonsterBody; name: Record<Lang, string>;
   skin: string; cloth: string; glow: string; // 살·옷·빛나는 곳 색
@@ -166,10 +166,10 @@ export const MONSTERS: Record<string, MonsterDef> = Object.fromEntries([
   M('barkan', 'forgeknight', '바르칸', 'บาร์คาน', 'Barkan', '#2a2422', '#5a0e10', '#ff4a1a', 5400, [34, 48], 0.9, 8, 1.05, 1.6, [520, 640], { boss: true, weapon: 'chainmace', title: { ko: '용광로의 장군', th: 'แม่ทัพแห่งเตาหลอม', en: 'General of the Furnace' }, cols: { 13: '#7a1014', 14: '#5a5250', 15: '#0a0606' } }),
   M('serane', 'serane', '세라네', 'เซราเน', 'Serane', '#5e1a20', '#360a0e', '#e0281e', 4200, [30, 42], 0.8, 6, 1.0, 1.85, [380, 460], { boss: true, weapon: null, title: { ko: '붉은 시장의 주인', th: 'เจ้าตลาดแดง', en: 'Master of the Red Market' } }),
   // 31차 필드 보스 (사용자 설정집 「지옥 13층 · 필드보스 설정집」): 층주와 다른 희귀 개체 — 하루 한 번, 날마다 다른 자리에. 몸은 있는 것을 빌려 색과 크기로 (전용 모습은 나중에)
-  M('rokk', 'bloat', '로크', 'ร็อก', 'Rokk', '#6e6862', '#3a3430', '#ff8a3a', 6400, [24, 36], 0.95, 8, 1.2, 1.95, [700, 900], { weapon: 'boathook', title: { ko: '재등짐승', th: 'สัตว์หลังเถ้า', en: 'Ashback' }, cols: { 4: '#2a2622', 10: '#5a5450', 14: '#8a8278' } }),
-  M('gulon', 'gurma', '굴론', 'กูลอน', 'Gulon', '#4e5a3a', '#2e3420', '#d8f04a', 7000, [26, 38], 0.9, 8, 1.15, 1.85, [760, 960], { weapon: null, title: { ko: '빈배의 포식자', th: 'ผู้กลืนกินท้องกลวง', en: 'Hollow Maw' } }),
-  M('merk', 'broker', '메르크', 'เมิร์ก', 'Merk', '#6a5a3a', '#2a2018', '#f2c84a', 7600, [28, 40], 0.95, 8, 1.1, 1.8, [820, 1020], { weapon: 'cleaver', title: { ko: '계약포식자', th: 'ผู้กลืนสัญญา', en: 'Contract Eater' }, cols: { 14: '#c9a23e', 13: '#8a1a14' } }),
-  M('ferron', 'forgeknight', '페론', 'เฟอร์รอน', 'Ferron', '#3a3430', '#4a2a1a', '#ff7a1a', 8800, [32, 46], 0.85, 8, 1.15, 2.0, [900, 1150], { weapon: 'greatsword', title: { ko: '용광로의 심장', th: 'หัวใจเตาหลอม', en: 'Furnace Heart' }, cols: { 12: '#ffb04a', 6: '#ff6a1a' } }),
+  M('rokk', 'rokkb', '로크', 'ร็อก', 'Rokk', '#6e6862', '#3a3430', '#ff8a3a', 6400, [24, 36], 0.95, 8, 1.2, 1.5, [700, 900], { weapon: null, title: { ko: '재등짐승', th: 'สัตว์หลังเถ้า', en: 'Ashback' }, cols: { 2: '#4a4440', 13: '#5a5450', 14: '#7a5a3a', 15: '#1a1614' } }), // 48차: 전용 몸 (굽은 등의 돌덩이 · 엄니)
+  M('gulon', 'gulonb', '굴론', 'กูลอน', 'Gulon', '#4e5a3a', '#7a8452', '#d8f04a', 7000, [26, 38], 0.9, 8, 1.15, 1.85, [760, 960], { weapon: null, title: { ko: '빈배의 포식자', th: 'ผู้กลืนกินท้องกลวง', en: 'Hollow Maw' }, cols: { 11: '#e8e0c0', 13: '#3a3020' } }), // 48차: 전용 몸 (빈 항아리 두꺼비)
+  M('merk', 'merkb', '메르크', 'เมิร์ก', 'Merk', '#2a2018', '#2a2018', '#b02018', 7600, [28, 40], 0.95, 8, 1.1, 1.65, [820, 1020], { weapon: null, title: { ko: '계약포식자', th: 'ผู้กลืนสัญญา', en: 'Contract Eater' }, cols: { 14: '#4a4440', 13: '#c9a23e', 10: '#e8dcc0' } }), // 48차: 전용 몸 (걸어다니는 금고)
+  M('ferron', 'ferronb', '페론', 'เฟอร์รอน', 'Ferron', '#3a3430', '#4a2a1a', '#ff7a1a', 8800, [32, 46], 0.85, 8, 1.15, 1.55, [900, 1150], { weapon: null, title: { ko: '용광로의 심장', th: 'หัวใจเตาหลอม', en: 'Furnace Heart' }, cols: { 15: '#2a2420', 14: '#4a4038', 13: '#8a7a6a' } }), // 48차: 전용 몸 (굴뚝 달린 용광로)
   // 43차 5층 가면의 도시: 가면귀(웃는 얼굴로 다가와 찌른다) · 속삭임꾼(소문을 퍼뜨려 둘레의 괴물을 부른다) · 인형병사(쓰러져도 실에 끌려 한 번 다시 선다) · 가면 쓴 해골(우리 것)
   M('maskfiend', 'maskfiend', '가면귀', 'ผีหน้ากาก', 'Mask fiend', '#efe8dc', '#8a8680', '#d84a5a', 1250, [26, 38], 1.15, 7, 0.95, 1, [24, 40], { weapon: 'rapier', feign: true, cols: { 10: '#f2eee6', 15: '#0e0c0c', 12: '#d84a5a', 9: '#141214', 14: '#b8a070', 4: '#1a1818' } }),
   M('whisperer', 'whisperer', '속삭임꾼', 'นักกระซิบ', 'Whisperer', '#8a9078', '#3a4430', '#c8a040', 900, [18, 28], 1.3, 9, 0.85, 1, [18, 32], { weapon: null, rumor: true, cols: { 9: '#2a3020', 15: '#1a0a0a', 10: '#e8e0c8', 12: '#c8a040', 4: '#1e221a' } }),

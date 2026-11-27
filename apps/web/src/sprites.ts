@@ -70,6 +70,8 @@ export const BESK_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor
 /** 43차: 마스크 팔이 소녀 전용 3D 몸 — 헝클어진 갈색 단발 · 등과 어깨를 덮은 해진 숄 · 검붉은 원피스 · 왼팔의 검은 마스크 바구니 · 등의 화염방사기 */
 export const MASKGIRL_LOOK: Look = { sex: 'f', build: 0, skin: 0, hair: 2, hairColor: 0, top: 0, bottom: 0, outfit: 'maskgirl', cols: { 2: '#4a2e1c', 3: '#7a6a56', 4: '#5e2a2e', 5: '#2a1e18', 13: '#8a6a3a', 15: '#1a1616', 14: '#6a6e72', 12: '#d8a02a' } };
 /** 43차: 황색날개 전용 몸 (웨이브 금발 · 흰 드레이프 드레스 · 금 밑단 · 이마의 가는 금관) — 노란 날개는 게임이 붙인다 */
+/** 48차 층을 거니는 염소대왕: 검붉은 관복 · 금테 감긴 뿔 · 붉은 눈 · 흰 수염 · 구슬 */
+export const GOAT_KING_WALK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'goatkingw', cols: { 1: '#d8ccb4', 2: '#f2ede2', 3: '#6a1418', 4: '#3a0c0e', 5: '#2a1a12', 9: '#2a0a0c', 10: '#c8a060', 12: '#ff2a1a', 13: '#8a7458', 14: '#d8b040', 15: '#140c0a' } };
 export const YELLOW_WING_LOOK: Look = { sex: 'f', build: 1, skin: 0, hair: 3, hairColor: 0, top: 0, bottom: 0, outfit: 'yellowwing', cols: { 2: '#e8c870', 3: '#f8f4ea', 4: '#f6f1e6', 5: '#d8c49a', 12: '#f2c42a', 14: '#e0b844' } };
 /** 43차: 4층 대장장이 칼드렉 (팔 넷 · 그을린 거구 · 가죽 앞치마 · 망치와 집게) */
 export const KALDREK_LOOK: Look = { sex: 'm', build: 1, skin: 0, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'kaldrek', cols: { 1: '#2a2624', 2: '#141010', 4: '#2a2220', 7: '#4a3424', 12: '#ff7a2a', 13: '#3a2a22', 14: '#6a6460' } };
@@ -118,7 +120,7 @@ export const MELEE = ['pipe', 'hammer', 'knife', 'shovel', 'bat', 'hatchet', 'da
 /** 양손 무기 (16차): 두 손으로 크게 들어 내려찍는다 (heavy 동작) — 느리지만 묵직하다 */
 export const TWO = new Set(['sledge', 'fireaxe', 'greatsword', 'maul', 'boltcutter', 'spear']);
 /** 16차 괴물 몸: 차림 → [굽기 키, 자세] (무기를 들면 m) */
-const MON16: Record<string, [string, string, Mode]> = { ashgal: ['h', 'ashgal', 'm'], gurma: ['u', 'gurma', 'u'], cinder: ['n', 'cinder', 'm'], bloat: ['l', 'bloat', 'm'], glutton: ['e', 'glutton', 'm'], hawker: ['v', 'hawker', 'm'], debtor: ['d', 'debtor', 'm'], broker: ['k', 'besk', 'm'], forgeknight: ['z', 'forgeknight', 'm'], maskfiend: ['gm', 'maskfiend', 'm'], whisperer: ['ws', 'whisperer', 'u'], puppet: ['ip', 'puppet', 'm'], marcion: ['mc', 'marcion', 'm'], manette: ['mn', 'manette', 'u'] }; // 24차: 4층 층주 바르칸 · 25차 철갑마
+const MON16: Record<string, [string, string, Mode]> = { ashgal: ['h', 'ashgal', 'm'], gurma: ['u', 'gurma', 'u'], cinder: ['n', 'cinder', 'm'], bloat: ['l', 'bloat', 'm'], glutton: ['e', 'glutton', 'm'], hawker: ['v', 'hawker', 'm'], debtor: ['d', 'debtor', 'm'], broker: ['k', 'besk', 'm'], forgeknight: ['z', 'forgeknight', 'm'], maskfiend: ['gm', 'maskfiend', 'm'], whisperer: ['ws', 'whisperer', 'u'], puppet: ['ip', 'puppet', 'm'], marcion: ['mc', 'marcion', 'm'], manette: ['mn', 'manette', 'u'], rokkb: ['rk', 'rokkb', 'u'], gulonb: ['gn', 'gulonb', 'u'], merkb: ['mq', 'merkb', 'u'], ferronb: ['fr', 'ferronb', 'u'] }; // 24차: 4층 층주 바르칸 · 25차 철갑마
 /** 방어구 겉모습: 그리는 순서와 색 (구역 3 = 본색, 구역 5 = 신발) */
 const ARMOR_ORDER = ['workpants', 'shinguard', 'boots', 'jacket', 'vest', 'trench', 'firesuit', 'combatcoat', 'hauberk', 'platecoat', 'gloves', 'shield']; // 40차: 긴 겉옷은 바지·신 위에, 장갑 아래에
 const ARMOR_COLOR: Record<string, string> = { greathelm: '#c83a1e', hornhelm: '#d8ccb0', skullhelm: '#d8ccb0', maskhelm: '#f2eee6', cap: '#2a3a5a', visor: '#f2f0ea', ngob: '#c8a868', mask: '#262322', helmet: '#b0302a', jacket: '#4a5236', vest: '#3a3f46', gloves: '#d8cfb4', workpants: '#4a4536', shinguard: '#2b2f36', boots: '#3a2a1a', shield: '#7a4a2a', trench: '#8a6a44', firesuit: '#b8954a', combatcoat: '#4e5638', hauberk: '#5a1a16', platecoat: '#3a2a5a' };
@@ -260,7 +262,7 @@ function layerKeys0(look: Look, weapon: string | null, armorIn: string[] = []): 
   if (o === 'angelk') { const mk = look.sex === 'f' ? 'af' : 'an', wp = weapon === 'sword' ? 'sword' : null; return { base: `b-${mk}-angelk-${wp ? 'm' : 'u'}`, hair: null, weapon: wp ? `w-${mk}-${wp}` : null, armor: [] as { key: string; piece: string }[], mode: (wp ? 'm' : 'u') as Mode }; }
   // 42차: 지옥으로 데려가는 이들(판초 악마 · 저승사자) · 유내 세 시절 (서기·걷기 · 유내는 앉기도)
   const D42: Record<string, string> = { ponchod: 'b-pd-ponchod-w', reaper: 'b-jr-reaper-w', yunae1: 'b-y1-yunae1-w', yunae2: 'b-y2-yunae2-w', yunae3: 'b-y3-yunae3-w', pashar: 'b-ps-pashar-w', luen: 'b-lu-luen-w', grandpa: 'b-gp-grandpa-w', bulda: 'b-bd-bulda-w',
-    yellowwing: 'b-yw-yellowwing-w', maskgirl: 'b-mg-maskgirl-w', kaldrek: 'b-kd-kaldrek-w', obolo: 'b-ob-obolo-w', noeul: 'b-no-noeul-w', mari: 'b-mr-mari-w' }; // 43차
+    yellowwing: 'b-yw-yellowwing-w', maskgirl: 'b-mg-maskgirl-w', kaldrek: 'b-kd-kaldrek-w', obolo: 'b-ob-obolo-w', noeul: 'b-no-noeul-w', mari: 'b-mr-mari-w', goatkingw: 'b-gw-goatkingw-w' }; // 43차 · 48차 걷는 염소대왕
   if (o === 'noeul' && weapon) return { base: 'b-no-noeul-m', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'm' as Mode }; // 45차: 지옥 정벌에서 함께 싸우는 노을 (장검은 몸에 붙어 있다)
   if (D42[o as string]) return { base: D42[o as string], hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
   if (o === 'succubus') return { base: 'b-q-succubus-w', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };

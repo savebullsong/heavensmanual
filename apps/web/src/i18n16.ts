@@ -1163,6 +1163,12 @@ export const more16 = {
     craftLack: "재료가 모자라다",
     craftDone: "{item} — 불에서 막 꺼냈다",
     craftBtn: "만들기",
+    gkWalkArrive: "염소대왕이 이 층을 거닐고 있다",
+    gkWalkLeave: "염소대왕이 뿔을 한 번 쓸어 넘기고 재 속으로 걸어 들어갔다",
+    gkWalkLook: "관복 자락이 재를 쓸고 지나간다. 142층의 옥좌는 비어 있다.",
+    gkWalkSub: "층을 거니는 중",
+    gkWalkIdle: ["이 층은 아직 덜 탔군.", "길을 묻지 마라. 나도 걷는 중이다.", "(관복 자락에 붙은 재를 턴다.)", "옥좌는 오래 앉아 있으면 허리가 굳는다.", "영혼이 가벼워 보이는구나. 좋은 징조는 아니다.", "(구슬 줄이 한 번 흔들린다.)", "여기 불은 142층보다 따뜻하군."],
+    gkWalkHi: [["(염소대왕이 걸음을 멈춘다.)", "여기서 보는구나. 옥좌 밖에서는 처음인가."], ["(붉은 눈이 천천히 내려온다.)", "물을 게 있으면 걸으면서 물어라. 오래 서 있진 않는다."], ["(관복 자락을 한 번 털고 돌아선다.)", "142층은 멀다. 그래서 가끔 내려온다. 묻고 싶은 게 있느냐."]],
     // 48차 끝
   },
   th: {
@@ -2328,6 +2334,12 @@ export const more16 = {
     craftLack: "วัตถุดิบไม่พอ",
     craftDone: "{item} — เพิ่งออกจากไฟ",
     craftBtn: "ตี",
+    gkWalkArrive: "ราชาแพะกำลังเดินเล่นอยู่บนชั้นนี้",
+    gkWalkLeave: "ราชาแพะลูบเขาทีหนึ่ง แล้วเดินหายเข้าไปในขี้เถ้า",
+    gkWalkLook: "ชายเสื้อครุยกวาดขี้เถ้าไปตามทาง บัลลังก์ชั้น 142 ว่างอยู่",
+    gkWalkSub: "กำลังเดินตรวจชั้น",
+    gkWalkIdle: ["ชั้นนี้ยังไหม้ไม่หมด", "อย่าถามทาง ข้าเองก็กำลังเดินอยู่", "(ปัดขี้เถ้าที่ติดชายเสื้อครุย)", "นั่งบัลลังก์นาน ๆ หลังมันแข็ง", "วิญญาณเจ้าดูเบาไป ไม่ใช่ลางดีนัก", "(สายลูกปัดแกว่งไปทีหนึ่ง)", "ไฟที่นี่อุ่นกว่าชั้น 142"],
+    gkWalkHi: [["(ราชาแพะหยุดเดิน)", "เจอกันที่นี่เองรึ นอกบัลลังก์คงเป็นครั้งแรก"], ["(ดวงตาแดงค่อย ๆ มองลงมา)", "มีอะไรจะถามก็ถามระหว่างเดิน ข้าไม่ยืนนาน"], ["(ปัดชายเสื้อครุยทีหนึ่งแล้วหันมา)", "ชั้น 142 อยู่ไกล ข้าเลยลงมาบ้าง มีอะไรจะถามไหม"]],
     // 48차 끝
   },
   en: {
@@ -3493,6 +3505,12 @@ export const more16 = {
     craftLack: "Not enough materials",
     craftDone: "{item} — fresh out of the fire",
     craftBtn: "Make",
+    gkWalkArrive: "The Goat King is walking this floor",
+    gkWalkLeave: "The Goat King smoothed back a horn and walked off into the ash",
+    gkWalkLook: "His robe hem sweeps the ash behind him. The throne on floor 142 stands empty.",
+    gkWalkSub: "Walking the floor",
+    gkWalkIdle: ["This floor hasn't finished burning.", "Don't ask me the way. I'm walking too.", "(He brushes ash from his robe.)", "Sit on a throne too long and your back sets like stone.", "Your soul looks light. That's rarely a good sign.", "(The bead strings sway once.)", "The fire here is warmer than on 142."],
+    gkWalkHi: [["(The Goat King stops walking.)", "So we meet here. First time off the throne, is it."], ["(The red eyes come down slowly.)", "If you have questions, ask while I walk. I don't stand long."], ["(He shakes out his robe and turns.)", "Floor 142 is far. So now and then I come down. Something to ask?"]],
     // 48차 끝
   },
 };

@@ -950,6 +950,7 @@ const hooks: WorldHooks = {
     toast(state.unloaded && wi?.note !== 'fuel' ? L.unloadedToast : wi?.note === 'needsArrows' ? L.noArrows : wi?.note === 'needsRifle' ? L.noRifleAmmo : wi?.note === 'fuel' ? L.fuelOut : L.noAmmo);
   },
   goatKing: () => (gkPending ? talkToGoatKing(gkPending.reason, gkPending.want) : talkToGoatKing('visit')),
+  goatKingWalk: () => void talkToGoatKing('walk'),
   changer: () => void talkToChanger(),
   notice(text) { toast(text, 'evil'); },
   thanks(n) {
@@ -3088,13 +3089,14 @@ async function parrotVision(kind: 'shore' | 'void') {
  */
 type GkWhy = 'death' | 'chose' | 'returned';
 let gkPending: { reason: GkWhy; want: number } | null = null;
-async function talkToGoatKing(reason: GkWhy | 'visit', want = 0) {
+async function talkToGoatKing(reason: GkWhy | 'visit' | 'walk', want = 0) {
   if (busy || dlg.isOpen) return;
   const L = t();
   busy = true;
   dlg.open({ name: L.gkName, portrait: 'goat-king' });
   const first = !(state.gk ?? 0);
   if (reason === 'visit') for (const l of L.gkWander) await dlg.say(l);
+  else if (reason === 'walk') { const hi = L.gkWalkHi[Math.floor(Math.random() * L.gkWalkHi.length)]; for (const l of hi) await dlg.say(l); } // 48차: 층을 거니는 염소대왕
   else {
     gkPending = null;
     await dlg.say(L.gkArrive);
@@ -3123,10 +3125,10 @@ async function talkToGoatKing(reason: GkWhy | 'visit', want = 0) {
     for (const l of L.gkA[c]) await dlg.say(l);
   }
   for (const l of L.gkBye) await dlg.say(l);
-  if (reason !== 'visit') await dlg.say(L.gkChanger);
+  if (reason !== 'visit' && reason !== 'walk') await dlg.say(L.gkChanger);
   endTalk();
   // 33차: 상담이 끝나도 바로 떨어지지 않는다 — 환전상에게 들렀다가 문(나가는 매트)으로 나서면 묵을 층의 휴식 마을로
-  if (reason !== 'visit') { state.gkWait = { reason, want, done: true }; save(state); }
+  if (reason !== 'visit' && reason !== 'walk') { state.gkWait = { reason, want, done: true }; save(state); }
 }
 /** 142층 염소대왕의 방을 연다 (이 층 휴식 마을 위에 겹쳐 연다 — 나가면 그 휴식 마을). why가 있으면 잠시 뒤 염소대왕이 먼저 말을 건다 */
 function openGoatRoom(g: { reason: GkWhy; want: number; done?: boolean } | null, quiet = false) {

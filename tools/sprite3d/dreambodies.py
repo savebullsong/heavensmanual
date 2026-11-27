@@ -849,3 +849,5 @@ from bodies43 import NEW43  # noqa: E402
 NEW.update(NEW43)
 from bodies44 import NEW44   # 44차: 4층 쇠모루지기 · 5층 가면파수꾼
 NEW.update(NEW44)
+from bodies48 import NEW48   # 48차: 필드 보스 넷 · 걷는 염소대왕
+NEW.update(NEW48)

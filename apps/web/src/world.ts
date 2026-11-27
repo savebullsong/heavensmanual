@@ -17,7 +17,7 @@ import { smithyChimney, puppetEyes } from './hellbuild.ts';
 import { Application, BlurFilter, ColorMatrixFilter, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture, TilingSprite } from 'pixi.js';
 import { type Look } from './character.ts';
 import { beastHand } from './passgfx.ts';
-import { DOT_VENDORS, hellVendorLook, type DotVendor } from './sprites.ts';
+import { DOT_VENDORS, hellVendorLook, GOAT_KING_WALK, type DotVendor } from './sprites.ts';
 import { MISS_HWANG, TALUS_LOOK, MASKGIRL_LOOK, YELLOW_WING_LOOK, KALDREK_LOOK, OBOLO_LOOK, NOEUL_LOOK, MARI_LOOK, yunaeLook, PONCHO_DEMON, REAPER_LOOK, charSet, frameOf, artDensity, mirrorFrameOf, applyFrame, dirFromTile, turnedDir, DIRS, auraFor, makeAuraSprite, ANIM_FPS, IMPACT, TWO, type CharSet, type Dir, type Anim, type Frame, BODY_K } from './sprites.ts';
 import { type Zone, type Building, type Lane, type Prop, type HellVendor, type Furn, findPath, walkable, randomWalkTileNear, tileAt, groundAt, TYPES } from './zone.ts';
 import { iso, TW, TH, drawBuilding, drawGroundChunk, buildingHeight } from './gfx.ts';
@@ -135,7 +135,7 @@ function tex(c: HTMLCanvasElement): Texture {
   return tx;
 }
 
-export type NpcKind = 'passer' | 'thug' | 'suturer' | 'monster' | 'pashar' | 'clerk' | 'angel' | 'yellowwing' | 'officer' | 'guard' | 'talus' | 'soul' | 'vendor' | 'fighter' | 'elder' | 'sleeper' | 'goat' | 'maskgirl' | 'yunae' | 'goatking' | 'changer' | 'noeul' | 'mari' | 'marionette' | 'caged' | 'dog';
+export type NpcKind = 'passer' | 'thug' | 'suturer' | 'monster' | 'pashar' | 'clerk' | 'angel' | 'yellowwing' | 'officer' | 'guard' | 'talus' | 'soul' | 'vendor' | 'fighter' | 'elder' | 'sleeper' | 'goat' | 'maskgirl' | 'yunae' | 'goatking' | 'changer' | 'noeul' | 'mari' | 'marionette' | 'caged' | 'dog' | 'gkwalk';
 export type Realm = 'real' | 'ghost' | 'hell' | 'heaven' | 'border'; // 24차: border = 경계의 해변 (귀신 대신)
 export type Stance = 'talk' | 'hostile' | 'all';
 /** name = 아이디(프로필·신고에 쓰는 열쇠), nick = 게임 속 이름(보이는 이름) */
@@ -196,6 +196,8 @@ interface Walker {
   untilHit?: boolean;
   /** 48차 들개 무리 번호 */
   dogPack?: number;
+  /** 48차 걷는 염소대왕: 떠나기까지 남은 초 */
+  leaveT?: number;
   mdef?: MonsterDef; // 지옥 괴물
   gdef?: GuardDef; // 휴식 마을 경비병
   post?: number; // 경비병 번호 (순찰로)
@@ -339,6 +341,8 @@ export interface WorldHooks {
   fbossDown(key: string, mine: boolean): void;
   /** 31차 염소대왕: 말을 걸면 상담 (떨어진 자들의 상담자 — 싸우지 않는다) */
   goatKing(): void;
+  /** 48차: 층을 거니는 염소대왕과 이야기 */
+  goatKingWalk(): void;
   /** 33차: 염소대왕의 방 환전상 오볼로 */
   changer(): void;
   /** 31차: 쏘는 무기에 쏠 것이 없을 때 알림 (화살·탄약·연료·빼 둠) */
@@ -444,10 +448,10 @@ const BOSS_SK: Record<string, FbDef> = {
 export const FB: Record<string, FbDef> = {
   mafiaboss: { hp: 2600, dmg: [20, 32], size: 1.3, passive: true, patterns: ['coins', 'charge'], every: 7, cash: [600, 1400], loot: [['pistol', 0.3], ['rifleammo', 0.4], ['diary', 0.5]], deed: 'fbossDown', col: 0xffd24a },
   bkkeater: { hp: 7200, dmg: [34, 52], size: 1.75, passive: true, patterns: ['pull', 'ring', 'charge'], every: 6, cash: [2000, 4000], loot: [['katana', 0.25], ['shinsakuto', 0.08], ['firstaid', 0.8]], deed: 'fbossFinal', col: 0xc83a2a },
-  rokk: { hp: 6400, dmg: [24, 36], size: 1.95, passive: false, patterns: ['charge', 'ring'], every: 6.5, loot: [['ashhide', 0.45]], shards: 2, deed: 'fbossHell', col: 0xb8b0a4 },
+  rokk: { hp: 6400, dmg: [24, 36], size: 1.5, passive: false, patterns: ['charge', 'ring'], every: 6.5, loot: [['ashhide', 0.45]], shards: 2, deed: 'fbossHell', col: 0xb8b0a4 },
   gulon: { hp: 7000, dmg: [26, 38], size: 1.85, passive: false, patterns: ['pull', 'leap'], every: 6.5, loot: [['gulonstone', 0.45]], shards: 2, deed: 'fbossHell', col: 0xc8e05a },
-  merk: { hp: 7600, dmg: [28, 40], size: 1.8, passive: false, patterns: ['coins', 'slam'], every: 6, loot: [['redseal', 0.45]], shards: 3, deed: 'fbossHell', col: 0xf2c84a },
-  ferron: { hp: 8800, dmg: [32, 46], size: 2.0, passive: false, patterns: ['slam', 'pillars'], every: 6, loot: [['heartstone', 0.45]], shards: 3, deed: 'fbossHell', col: 0xff7a1a },
+  merk: { hp: 7600, dmg: [28, 40], size: 1.65, passive: false, patterns: ['coins', 'slam'], every: 6, loot: [['redseal', 0.45]], shards: 3, deed: 'fbossHell', col: 0xf2c84a },
+  ferron: { hp: 8800, dmg: [32, 46], size: 1.55, passive: false, patterns: ['slam', 'pillars'], every: 6, loot: [['heartstone', 0.45]], shards: 3, deed: 'fbossHell', col: 0xff7a1a },
   // 48차 6~13층 필드 보스 (설정집의 핵심 공격 둘 · 전리품) — 층이 열리면
   irene: { hp: 11000, dmg: [36, 50], size: 1.9, passive: false, patterns: ['summon', 'ring'], every: 5.5, loot: [['twinshard', 0.45]], shards: 3, deed: 'fbossHell', col: 0xc8e0ff },
   varg: { hp: 12500, dmg: [38, 54], size: 2.05, passive: false, patterns: ['pull', 'leap'], every: 5.5, loot: [['sunkgreaves', 0.25]], shards: 4, deed: 'fbossHell', col: 0x7ad0d0 },
@@ -2488,6 +2492,7 @@ export class WorldScene {
    * 하나가 나를 보거나 맞으면 무리 전체가 덤빈다. 다치면 깨갱 달아나고, 둘 이하로 줄면 남은 것도 달아난다. 나보다 조금 느려 도망칠 수는 있다
    */
   private dogT = -1;
+  private gkVisitT = -1; // 48차: 염소대왕이 거닐러 오기까지
   private packN = 0;
   private spawnDogs() {
     const p0 = this.player;
@@ -2851,6 +2856,41 @@ export class WorldScene {
         const col = n === 2 ? 0xffc04a : n % 2 ? 0xff5a2a : 0xd8301e;
         g.moveTo(f.x + dx - 3, f.y).quadraticCurveTo(f.x + dx - 2 + Math.sin(t0 * 7 + n) * 2, f.y - hh * 0.6, f.x + dx + Math.sin(t0 * 5 + n) * 2.5, f.y - hh).quadraticCurveTo(f.x + dx + 2, f.y - hh * 0.5, f.x + dx + 3, f.y).fill({ color: col, alpha: 0.55 });
       }
+    }
+  }
+  /** 48차 층을 거니는 염소대왕: 휴식 마을을 천천히 돌다 몇 분 뒤 재 속으로 사라진다. 싸우지 않고, 말을 걸면 묻고 답하기 */
+  private spawnGkWalk() {
+    const h = this.zone.hell;
+    if (!h || this.zone.interior || this.dead || this.walkers.some((x) => x.kind === 'goatking' || x.kind === 'gkwalk')) return;
+    const vs = h.villages ?? [h.rest];
+    const v = vs[Math.floor(Math.random() * vs.length)];
+    const to = randomWalkTileNear(this.zone, Math.floor(v.i), Math.floor(v.j), Math.max(2, Math.floor(v.r) - 1));
+    if (!to) return;
+    const w = this.makeWalker(GOAT_KING_WALK, to[0], to[1], 'gkwalk');
+    w.maxHp = w.hp = 99999;
+    w.speed = 0.85; w.size = 1.3; w.wait = 3;
+    w.home = [Math.floor(v.i), Math.floor(v.j)];
+    w.leaveT = 240 + Math.random() * 120;
+    this.walkers.push(w);
+    for (let k = 0; k < 16; k++) { const a = Math.random() * Math.PI * 2, v = 20 + Math.random() * 40; const [sx, sy] = iso(w.x, w.y); this.sparks.push({ x: sx, y: sy - 30, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.4, t: 0.5 + Math.random() * 0.3, col: 0xd8b040 }); }
+    this.hooks.notice(t().gkWalkArrive);
+  }
+  private thinkGkWalk(w: Walker, moving: boolean, dt: number) {
+    const p = this.player, d = Math.hypot(p.x - w.x, p.y - w.y);
+    if ((w.leaveT = (w.leaveT ?? 0) - dt) <= 0 && d > 3) {
+      { const [sx, sy] = iso(w.x, w.y); for (let k = 0; k < 16; k++) { const a = Math.random() * Math.PI * 2, v = 20 + Math.random() * 40; this.sparks.push({ x: sx, y: sy - 30, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.4, t: 0.5 + Math.random() * 0.3, col: 0xd8b040 }); } }
+      if (d < 12) this.hooks.notice(t().gkWalkLeave);
+      this.removeWalker(w);
+      this.gkVisitT = 900 + Math.random() * 900; // 한참 뒤 또
+      return;
+    }
+    if (d < 6 && !w.bubble && Math.random() < dt * 0.05) { const c = t().gkWalkIdle; this.bubble(w, c[Math.floor(Math.random() * c.length)]); }
+    if (d < 2.2 && !moving) { w.dir = dirFromTile(p.x - w.x, p.y - w.y, w.dir); return; }
+    w.wait -= dt;
+    if (!moving && w.wait <= 0) {
+      const to = randomWalkTileNear(this.zone, w.home[0], w.home[1], 7);
+      if (to) w.path = findPath(this.zone, Math.floor(w.x), Math.floor(w.y), to[0], to[1]) ?? [];
+      w.wait = 4 + Math.random() * 6;
     }
   }
   private placeGoatKing(i: number, j: number) {
@@ -4100,6 +4140,7 @@ export class WorldScene {
     for (let k = 0; k < n; k++) this.spawnMonster();
     if (!this.bossDown) this.spawnBoss();
     if (FIELD_BOSS[h.floor]) this.spawnFieldBosses(); // 31차: 하루 한 번 나오는 필드 보스
+    if (Math.random() < (h.floor <= 2 ? 0.4 : 0.3)) this.gkVisitT = 30 + Math.random() * 210; // 48차: 염소대왕이 가끔 이 층을 거닌다 (1~4분 뒤)
     // (환생관 파샤르는 1층 불탄 도시 골목 끝 '지옥 로비' 안 상담 책상으로 옮겼다)
     this.featureG.zIndex = 0;
     this.objects.addChild(this.featureG);
@@ -6560,6 +6601,7 @@ export class WorldScene {
     if (w.kind === 'dog') { this.hooks.say(L.dogName, pd.kind === 'look' ? L.dogLook : L.dogGrowl[0]); return; }
     if (w.kind === 'goatking') { w.path = []; w.dir = this.player.x - w.x - (this.player.y - w.y) >= 0 ? 'e' : 'w'; if (pd.kind === 'look') this.hooks.say(L.gkName, L.gkLook); else this.hooks.goatKing(); return; }
     if (w.kind === 'changer') { w.path = []; if (pd.kind === 'look') this.hooks.say(L.xchName, L.xchSub); else this.hooks.changer(); return; }
+    if (w.kind === 'gkwalk') { w.path = []; w.wait = 12; w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); if (pd.kind === 'look') this.hooks.say(L.gkName, L.gkWalkLook); else this.hooks.goatKingWalk(); return; } // 48차: 층을 거니는 염소대왕
     if (w.dumpAngel) { const ls = pd.kind === 'look' ? [L.dumpLook] : L.dumpLines; this.hooks.say(this.npcName(w), ls[Math.floor(Math.random() * ls.length)]); return; } // 47차 쓰레기장 천사
     if (w.kind === 'angel' || w.kind === 'officer' || w.kind === 'yellowwing' || w.kind === 'noeul') {
       if (pd.kind === 'look') { this.hooks.say(this.npcName(w), this.npcSub(w)); return; }
@@ -6699,7 +6741,7 @@ export class WorldScene {
     if (w.cards) return L.angel;
     if (w.kind === 'goat') return L.goatName;
     if (w.kind === 'dog') return L.dogName;
-    if (w.kind === 'goatking') return L.gkName;
+    if (w.kind === 'goatking' || w.kind === 'gkwalk') return L.gkName;
     if (w.kind === 'changer') return L.xchName;
     if (w.kind === 'clerk') return this.zone.interior?.kind === 'loan' ? L.besk : this.zone.interior?.kind === 'rebirth' ? L.pashar : this.zone.interior?.kind === 'terrace' ? L.officer : this.zone.interior?.name ?? '';
     if (w.mdef) return w.elite ? L.eliteName.replace('{n}', w.mdef.name[lang()]) : w.mdef.name[lang()];
@@ -6748,6 +6790,7 @@ export class WorldScene {
     if (w.kind === 'goat') return L.goatSub;
     if (w.kind === 'dog') return L.dogSub;
     if (w.kind === 'goatking') return L.gkSub;
+    if (w.kind === 'gkwalk') return L.gkWalkSub;
     if (w.kind === 'changer') return L.xchSub;
     if (w.kind === 'clerk') return this.zone.interior?.kind === 'terrace' ? L.officerSub : this.zone.interior?.kind === 'hpalace' ? L.palaceClerkSub : L.clerkSub[(this.zone.interior?.kind ?? 'shop') as keyof typeof L.clerkSub] ?? '';
     if (w.mdef) return w.mdef.title ? `${L.hellBoss.replace('{n}', String(this.zone.hell?.floor ?? 1))} · ${w.mdef.title[lang()]}` : w.mdef.boss ? L.hellBoss.replace('{n}', String(this.zone.hell?.floor ?? 1)) : L.hellMonster;
@@ -6912,7 +6955,7 @@ export class WorldScene {
     if (w.kind === 'remote' && (this.safeAt(w.x, w.y) || this.safeAt(this.player.x, this.player.y))) { this.hooks.say('', t().pvpSafe); return; }
     if (w.kind === 'talus') { w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); this.bubble(w, t().talusNoFight); return; } // 총구 앞에서는 손을 들 수 없다
     if (w.kind === 'changer') { const n = t().xchIdle; this.bubble(w, n[Math.floor(Math.random() * n.length)]); return; } // 33차: 환전상은 싸우지 않는다
-    if (w.kind === 'goatking') { w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); const n = t().gkNoFight; this.bubble(w, n[Math.floor(Math.random() * n.length)]); return; } // 31차: 염소대왕은 싸우지 않는다 (뿔은 그냥 달려 있다)
+    if (w.kind === 'goatking' || w.kind === 'gkwalk') { w.path = []; w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); const n = t().gkNoFight; this.bubble(w, n[Math.floor(Math.random() * n.length)]); return; } // 31차: 염소대왕은 싸우지 않는다 (뿔은 그냥 달려 있다)
     if (w.kind === 'maskgirl') { w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); this.bubble(w, t().maskNoFight); return; } // 25차: 중립 — 맞지도 때리지도 않는다
     if (w.kind === 'yunae') { w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); const n = t().yunaeNoFight; this.bubble(w, n[Math.floor(Math.random() * n.length)]); return; } // 28차: 유내에게는 손을 들 수 없다
     if (w.down > 0) return;
@@ -7086,7 +7129,7 @@ export class WorldScene {
     return rollToHit(bonus, armorClass(this.gear.def, this.stats.agi)).hit;
   }
   private hit(from: Walker, to: Walker, dmg: number, crit = false, kind?: sfx.HitKind) {
-    if (to.kind === 'maskgirl' || to.kind === 'yunae' || to.kind === 'goatking' || to.kind === 'changer') return;
+    if (to.kind === 'maskgirl' || to.kind === 'yunae' || to.kind === 'goatking' || to.kind === 'gkwalk' || to.kind === 'changer') return;
     if (to.fb && !from.isPlayer && from.kind !== 'remote' && from.kind !== 'fighter' && from.kind !== 'marionette') return; // 31차: 필드 보스는 영혼(과 부른 켈베로스)에게만 맞는다 — 경비병·탈루스가 몰래 잡던 것 // 25차: 소녀는 맞지 않는다 · 28차: 유내도
     if (to.down > 0 || this.dead) return;
     // 44차 층계 대기소 · 광산 작업장: 영혼끼리는 싸울 수 없다 (치는 쪽이든 맞는 쪽이든 그 안에 있으면)
@@ -8093,6 +8136,7 @@ export class WorldScene {
     }
     if (this.ambushT > 0 && (this.ambushT -= dt) <= 0 && !this.zone.interior) this.spawnSuturer();
     if (this.goatT > 0 && (this.goatT -= dt) <= 0) { this.goatT = -1; if (!this.walkers.some((x) => x.kind === 'goat')) this.spawnGoat(); }
+    if (this.gkVisitT > 0 && (this.gkVisitT -= dt) <= 0) { this.gkVisitT = -1; this.spawnGkWalk(); } // 48차: 염소대왕이 가끔 층을 거닌다
     if (this.dogT > 0 && (this.dogT -= dt) <= 0) { this.dogT = -1; if (!this.walkers.some((x) => x.kind === 'dog' && x.down <= 0)) this.spawnDogs(); }
     if (this.realm === 'real' && !this.zone.interior && this.netRole !== 'guest' && (this.brawlT -= dt) <= 0) { this.brawlT = 70 + Math.random() * 80; this.startBrawl(); } // 42차: 거리 싸움은 드물게
     if (this.kerb) this.updateKerberos(dt);
@@ -8539,6 +8583,7 @@ export class WorldScene {
     if (w.kind === 'goat') { this.thinkGoat(w, moving, dt); return; }
     if (w.kind === 'dog') { this.thinkDog(w, moving, dt); return; }
     if (w.kind === 'goatking') { this.thinkGoatKing(w, dt); return; }
+    if (w.kind === 'gkwalk') { this.thinkGkWalk(w, moving, dt); return; }
     if (w.kind === 'changer') { this.thinkChanger(w, dt); return; }
     if (w.twin) { this.thinkTwin(w, moving, dt); return; } // 46차
     if (w.kind === 'noeul') { this.thinkNoeul(w, moving, dt); return; }
