@@ -144,6 +144,48 @@ export function sendHit(to: string, dmg: number, crit: boolean, kind: string) {
 export function sendDown(by: string, cash: number, wasCriminal: boolean) {
   channel?.send({ type: 'broadcast', event: 'down', payload: { id: myId(), by, cash, crim: wasCriminal } });
 }
+// ───────────────────────── 41차: 같은 구역의 몹은 한 사람(방장)이 계산해 나눈다 ─────────────────────────
+// 방장 = 이 구역에 가장 먼저 들어온 사람 (같은 때면 아이디 순). 방장 기기가 몹·행인을 움직이고 0.2초마다 모두에게 나눠 준다.
+// 손님은 그 몹을 비춰 그리고, 때리면 '때렸다'만 방장에게 알린다. 나중에 전용 서버(C안)가 방장 자리를 대신한다.
+export interface MobHooks {
+  /** 방장이 정해졌다 · 바뀌었다 (peers = 나 말고 같은 구역 사람 수) */
+  role(host: boolean, hostId: string, peers: number): void;
+  /** 방장 → 모두: 몹 위치·동작 */
+  snap(host: string, l: unknown[]): void;
+  /** 방장 → 모두: 몹 생김새 (새로 나왔거나 바뀐 것) */
+  desc(host: string, l: unknown[]): void;
+  /** 손님 → 방장: 모르는 몹의 생김새를 달라 */
+  req(from: string, ids: number[]): void;
+  /** 손님 → 방장: 이 몹을 때렸다 */
+  hit(from: string, id: number, dmg: number, crit: boolean, kind: string): void;
+  /** 방장 → 손님: 몹이 나를 쳤다 */
+  strike(id: number, dmg: number, crit: boolean, kind: string): void;
+  /** 방장 → 모두: 몹이 쓰러졌다 (by = 쓰러뜨린 사람) */
+  kill(id: number, by: string): void;
+}
+let mob: MobHooks | null = null;
+let joinedAt = 0;
+const peerSince = new Map<string, number>();
+let curHost = '';
+let roleKey = '';
+function computeHost() {
+  const id = myId();
+  let best = id, bs = joinedAt;
+  for (const [pid, s] of peerSince) if (s < bs || (s === bs && pid < best)) { best = pid; bs = s; }
+  curHost = best;
+  const k = `${best}|${peerSince.size}`;
+  if (k !== roleKey) { roleKey = k; mob?.role(best === id, best, peerSince.size); }
+}
+export function hostId() { return curHost; }
+export function isHost() { return !!curHost && curHost === myId(); }
+function bsend(event: string, payload: unknown) { channel?.send({ type: 'broadcast', event, payload }); }
+export function sendMobSnap(l: unknown[]) { bsend('ms', { h: myId(), l }); }
+export function sendMobDesc(l: unknown[]) { bsend('md', { h: myId(), l }); }
+export function sendMobReq(ids: number[]) { bsend('mq', { from: myId(), to: curHost, ids: ids.slice(0, 80) }); }
+export function sendMobHit(id: number, dmg: number, crit: boolean, kind: string) { bsend('mh', { from: myId(), to: curHost, id, dmg, crit, kind }); }
+export function sendMobStrike(to: string, id: number, dmg: number, crit: boolean, kind: string) { bsend('mx', { h: myId(), to, id, dmg, crit, kind }); }
+export function sendMobKill(id: number, by: string) { bsend('mk', { h: myId(), id, by }); }
+
 /** 시험용 (?loopnet): 같은 브라우저의 탭끼리 BroadcastChannel로 서로 보이고 싸운다 (서버 없이 PvP 확인) */
 function loopChannel(name: string, key: string) {
   const bc = new BroadcastChannel(`hm-${name}`);
@@ -169,9 +211,11 @@ function loopChannel(name: string, key: string) {
   return ch;
 }
 
-export function joinZone(zoneId: string, me: () => { info: RemoteInfo; pos: NetPos } | null, onPeer: (id: string, info: RemoteInfo | null, pos: NetPos | null) => void, onLeave: (id: string) => void, hooks?: PvpHooks) {
+export function joinZone(zoneId: string, me: () => { info: RemoteInfo; pos: NetPos } | null, onPeer: (id: string, info: RemoteInfo | null, pos: NetPos | null) => void, onLeave: (id: string) => void, hooks?: PvpHooks, mobHooks?: MobHooks) {
   pvp = hooks ?? null;
   leaveZone();
+  mob = mobHooks ?? null;
+  joinedAt = Date.now();
   const id = myId();
   const ch = (LOOP ? loopChannel(`zone:${zoneId}`, id) : sb.channel(`zone:${zoneId}`, { config: { presence: { key: id }, broadcast: { self: false } } })) as ReturnType<typeof sb.channel>;
   channel = ch;
@@ -179,12 +223,16 @@ export function joinZone(zoneId: string, me: () => { info: RemoteInfo; pos: NetP
     const st = ch.presenceState() as Record<string, { info: RemoteInfo; pos: NetPos }[]>;
     for (const [pid, metas] of Object.entries(st)) {
       if (pid === id || !metas.length) continue;
-      const m = metas[metas.length - 1];
+      const m = metas[metas.length - 1] as { info: RemoteInfo; pos: NetPos; since?: number };
       onPeer(pid, m.info, m.pos);
+      // 41차: 방장 고르기 — 들어온 때를 함께 싣는다 (옛 판의 사람은 방장이 되지 않는다)
+      peerSince.set(pid, typeof m.since === 'number' ? m.since : Number.MAX_SAFE_INTEGER);
     }
+    for (const pid of [...peerSince.keys()]) if (!st[pid]?.length) peerSince.delete(pid);
+    computeHost();
   };
   ch.on('presence', { event: 'sync' }, fromPresence);
-  ch.on('presence', { event: 'leave' }, ({ key }) => { if (key !== id) onLeave(key); });
+  ch.on('presence', { event: 'leave' }, ({ key }) => { if (key !== id) { onLeave(key); peerSince.delete(key); computeHost(); } });
   ch.on('broadcast', { event: 'p' }, ({ payload }) => { if (payload?.id && payload.id !== id) onPeer(payload.id, null, payload.pos); });
   ch.on('broadcast', { event: 'hit' }, ({ payload }) => {
     if (!payload || payload.to !== id || typeof payload.dmg !== 'number') return;
@@ -194,16 +242,25 @@ export function joinZone(zoneId: string, me: () => { info: RemoteInfo; pos: NetP
     if (!payload?.id || payload.id === id) return;
     pvp?.down(String(payload.id), String(payload.by), Math.max(0, Math.min(100000, Number(payload.cash) || 0)), !!payload.crim);
   });
+  // 41차: 몹 나누기 (방장 ↔ 손님)
+  const num = (v: unknown, lo: number, hi: number) => Math.max(lo, Math.min(hi, Number(v) || 0));
+  ch.on('broadcast', { event: 'ms' }, ({ payload }) => { if (payload?.h && payload.h === curHost && !isHost() && Array.isArray(payload.l)) mob?.snap(payload.h, payload.l); });
+  ch.on('broadcast', { event: 'md' }, ({ payload }) => { if (payload?.h && payload.h === curHost && !isHost() && Array.isArray(payload.l)) mob?.desc(payload.h, payload.l); });
+  ch.on('broadcast', { event: 'mq' }, ({ payload }) => { if (payload?.to === id && isHost() && Array.isArray(payload.ids)) mob?.req(String(payload.from), payload.ids.map(Number).filter(Number.isFinite)); });
+  ch.on('broadcast', { event: 'mh' }, ({ payload }) => { if (payload?.to === id && isHost() && payload.from) mob?.hit(String(payload.from), num(payload.id, 0, 1e9), num(payload.dmg, 0, 400), !!payload.crit, String(payload.kind ?? 'fist')); });
+  ch.on('broadcast', { event: 'mx' }, ({ payload }) => { if (payload?.to === id && payload.h === curHost) mob?.strike(num(payload.id, 0, 1e9), num(payload.dmg, 0, 400), !!payload.crit, String(payload.kind ?? 'fist')); });
+  ch.on('broadcast', { event: 'mk' }, ({ payload }) => { if (payload?.h && payload.h === curHost) mob?.kill(num(payload.id, 0, 1e9), String(payload.by ?? '')); });
   let lastPos = '';
   lastTrack = 0;
   ch.subscribe((status) => {
     if (status !== 'SUBSCRIBED') return;
+    computeHost(); // 혼자면 내가 방장
     const tick = () => {
       const m = me();
       if (!m) return;
       const s = JSON.stringify(m.pos);
       const now = Date.now();
-      if (now - lastTrack > 6000) { lastTrack = now; ch.track(m); }
+      if (now - lastTrack > 6000) { lastTrack = now; ch.track({ ...m, since: joinedAt }); }
       if (s !== lastPos) { lastPos = s; ch.send({ type: 'broadcast', event: 'p', payload: { id, pos: m.pos } }); }
     };
     tick();
@@ -211,6 +268,7 @@ export function joinZone(zoneId: string, me: () => { info: RemoteInfo; pos: NetP
   });
 }
 export function leaveZone() {
+  peerSince.clear(); curHost = ''; roleKey = '';
   if (timer) clearInterval(timer);
   timer = 0;
   if (channel) { if (LOOP) (channel as unknown as { close(): void }).close(); else sb.removeChannel(channel); }

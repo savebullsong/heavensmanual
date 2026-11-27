@@ -791,7 +791,17 @@ function joinNet(w: WorldScene) {
   net.joinZone(w.realm === 'heaven' ? `${w.zone.id}~heaven` : w.zone.id, () => (scene === 'world' && world ? { info: myInfo(), pos: world.netPos() } : null), (id, info, pos) => w.upsertRemote(id, info, pos), (id) => w.removeRemote(id), {
     hit: (from, dmg, crit, kind) => w.pvpHit(from, dmg, crit, kind),
     down: (victim, by, cash, crim) => w.pvpDown(victim, by, cash, crim),
+  }, {
+    // 41차: 같은 구역에서 먼저 온 사람(방장)의 몹을 모두가 함께 본다
+    role: (h, id, n) => w.setNet(h, id, n),
+    snap: (h, l) => w.mobSnap(h, l),
+    desc: (h, l) => w.mobDesc(h, l),
+    req: (_f, ids) => w.mobReq(ids),
+    hit: (f, id, d, c, k) => w.mobHitIn(f, id, d, c, k),
+    strike: (id, d, c, k) => w.mobStrikeIn(id, d, c, k),
+    kill: (id, by) => w.mobKillIn(id, by),
   });
+  w.mobOut = { snap: net.sendMobSnap, desc: net.sendMobDesc, req: net.sendMobReq, hit: net.sendMobHit, strike: net.sendMobStrike, kill: net.sendMobKill };
 }
 
 function leaveShop() {

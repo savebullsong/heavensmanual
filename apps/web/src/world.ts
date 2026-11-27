@@ -13,7 +13,7 @@ import { hellDecor } from './hellprops.ts';
 import { smithyChimney } from './hellbuild.ts';
 import { Application, ColorMatrixFilter, Container, Graphics, Matrix, Rectangle, Sprite, Text, Texture, TilingSprite } from 'pixi.js';
 import { type Look } from './character.ts';
-import { MISS_HWANG, TALUS_LOOK, MASKGIRL_LOOK, yunaeLook, charSet, frameOf, artDensity, mirrorFrameOf, applyFrame, dirFromTile, turnedDir, auraFor, makeAuraSprite, ANIM_FPS, IMPACT, TWO, type CharSet, type Dir, type Anim, type Frame, BODY_K } from './sprites.ts';
+import { MISS_HWANG, TALUS_LOOK, MASKGIRL_LOOK, yunaeLook, charSet, frameOf, artDensity, mirrorFrameOf, applyFrame, dirFromTile, turnedDir, DIRS, auraFor, makeAuraSprite, ANIM_FPS, IMPACT, TWO, type CharSet, type Dir, type Anim, type Frame, BODY_K } from './sprites.ts';
 import { type Zone, type Building, type Lane, type Prop, type HellVendor, type Furn, findPath, walkable, randomWalkTileNear, tileAt, groundAt } from './zone.ts';
 import { iso, TW, TH, drawBuilding, drawGroundChunk, buildingHeight } from './gfx.ts';
 import { beyondOf } from './beyond.ts';
@@ -238,6 +238,10 @@ interface Walker {
   beg?: boolean; // 2층 층주 구르마: 먹을 것을 든 영혼에게는 싸우지 않고 조른다
   asleep?: boolean; // 배불러 잠든 구르마
   lingerT?: number; // 싸우다 나간 사람의 몸이 남아 있는 시간
+  /** 41차 몹 나누기: 방장이 붙인 번호 · 손님 기기에서는 방장 몹을 비추는 거울 */
+  nid?: number;
+  mirror?: { tx: number; ty: number; d: Dir; seen: number; an: number; mv: boolean };
+  netActRef?: unknown; netActN?: number;
   barT: number;
   repathT: number;
   home: [number, number];
@@ -254,6 +258,16 @@ interface Coin { x: number; y: number; amount: number; sprite: Graphics; fromVic
 interface BView { parts: Sprite[]; base: Texture; x: number; y: number; w: number; h: number; top: number; lx: number; ly: number; alpha?: Uint8Array; cv?: HTMLCanvasElement; b: Building; ghost?: { parts: Sprite[]; base: Texture; a: number; used: number } }
 interface Floater { obj: Container; t: number; vy: number }
 type LabelRef = { kind: 'shop' } | { kind: 'b'; k: number } | { kind: 'w'; w: Walker } | null;
+
+/** 41차: 몹 나누기 — 보내는 길 (main.ts 가 net 함수를 넣는다) */
+export interface MobOut {
+  snap(l: unknown[]): void;
+  desc(l: unknown[]): void;
+  req(ids: number[]): void;
+  hit(id: number, dmg: number, crit: boolean, kind: string): void;
+  strike(to: string, id: number, dmg: number, crit: boolean, kind: string): void;
+  kill(id: number, by: string): void;
+}
 
 /** main.ts 가 받는 일들 */
 export interface WorldHooks {
@@ -2393,10 +2407,12 @@ export class WorldScene {
     const def = FB[w.fb!];
     const key = w.fb!;
     w.down = 3;
-    if (def.cash) this.dropCoin(w.x, w.y, rand(def.cash[0], def.cash[1]), false);
+    // 41차: 손님이 쓰러뜨린 필드 보스의 돈·물건은 손님 기기에 떨어진다 (방장 바닥에는 없다)
+    const remote = by.kind === 'remote' && this.netRole === 'host';
+    if (def.cash && !remote) this.dropCoin(w.x, w.y, rand(def.cash[0], def.cash[1]), false);
     let n = 0;
-    for (const [k, ch] of def.loot) if (Math.random() < ch) this.dropLoot(w.x + (n++ % 3) * 0.5 - 0.5, w.y + 0.4, k, 900);
-    for (let s2 = 0; s2 < (def.shards ?? 0); s2++) this.dropLoot(w.x - 0.6 + s2 * 0.5, w.y - 0.3, 'tshard', 900);
+    if (!remote) for (const [k, ch] of def.loot) if (Math.random() < ch) this.dropLoot(w.x + (n++ % 3) * 0.5 - 0.5, w.y + 0.4, k, 900);
+    if (!remote) for (let s2 = 0; s2 < (def.shards ?? 0); s2++) this.dropLoot(w.x - 0.6 + s2 * 0.5, w.y - 0.3, 'tshard', 900);
     const mine = by.isPlayer || (w.pdmg ?? 0) > 0;
     if (mine) this.hooks.deed(def.deed);
     this.float(w, t().fbDown, '#ffd45a');
@@ -2759,14 +2775,14 @@ export class WorldScene {
   }
   /** 플레이어 근처 보도(불량배는 골목)에 사람을 세운다. 이미 있던 사람이면 자리만 옮긴다 */
   private spawnNpc(kind: NpcKind, existing?: Walker, weakIn?: Walker['weak'], gangIn?: Walker['gang']) {
-    const p = this.player;
+    const p = this.netRole === 'host' && (kind === 'passer' || kind === 'thug') ? this.leastBody() : this.player;
     let weak = existing?.weak ?? weakIn;
     let gang = existing?.gang ?? gangIn;
     const prefer: Parameters<typeof randomWalkTileNear>[4] = kind === 'thug' ? ['soi', 'walk'] : ['walk', 'cross', 'park'];
     let spot: [number, number] | null = null;
     for (let n = 0; n < 6 && !spot; n++) {
       const s = randomWalkTileNear(this.zone, Math.floor(p.x), Math.floor(p.y), 24, prefer);
-      if (s && Math.hypot(s[0] - p.x, s[1] - p.y) > 9) spot = s;
+      if (s && this.bodies().every((b) => Math.hypot(s[0] - b.x, s[1] - b.y) > 9)) spot = s;
     }
     if (!spot) return;
     if (kind === 'thug' && this.realm === 'real' && weak !== 'shade') ({ weak, gang } = this.rollThug(spot));
@@ -3411,7 +3427,7 @@ export class WorldScene {
     if (!w.target && Math.random() < dt * 5) {
       let best: Walker | null = null, bd = 15;
       for (const m of this.walkers) {
-        if (!m.mdef || m.fb || m.down > 0 || !this.nearRest(m.x, m.y, 6)) continue; // 31차: 필드 보스는 경비병이 건드리지 않는다 (영혼들이 잡는 것)
+        if (!m.mdef || m.fb || m.mirror || m.down > 0 || !this.nearRest(m.x, m.y, 6)) continue; // 31차: 필드 보스는 경비병이 건드리지 않는다 (영혼들이 잡는 것)
         const d = Math.hypot(m.x - w.x, m.y - w.y);
         if (d < bd) { bd = d; best = m; }
       }
@@ -3612,7 +3628,7 @@ export class WorldScene {
   /** 층마다 일반 괴물 3종 중 하나를 내 둘레(휴식 공간 밖)에 세운다 */
   private spawnMonster(existing?: Walker) {
     const h = this.zone.hell!;
-    const p = this.player;
+    const p = this.netRole === 'host' ? this.leastBody() : this.player;
     const def = floorDef(h.floor);
     const field = h.spawns.filter(([i, j]) => !this.nearRest(i + 0.5, j + 0.5, 8)); // 경비병 둘레 밖 들판
     const near = field.filter(([i, j]) => { const d = Math.hypot(i - p.x, j - p.y); return d > 10 && d < 30; });
@@ -3823,6 +3839,241 @@ export class WorldScene {
     };
   }
   /** 실시간: 다른 사람 나타남·움직임 */
+  // ───────────────────────── 41차: 몹 나누기 (구역 방장) ─────────────────────────
+  // 방장 기기가 이 구역의 행인·적·괴물·필드 보스를 움직이고 0.2초마다 나눠 준다. 손님은 그것을 비춰(거울) 그리고,
+  // 때리면 방장에게 알린다. 쓰러뜨린 사람의 기기에 돈·물건·행위가 남는다. (나중에 전용 서버가 방장 자리를 맡는다)
+  netRole: 'solo' | 'host' | 'guest' = 'solo';
+  mobOut: MobOut | null = null;
+  private netHost = '';
+  private nidSeq = 0;
+  private sentSig = new Map<number, string>();
+  private mirrors = new Map<number, Walker>();
+  private snapT = 0;
+  private topT = 3;
+  private reqT = 0;
+  private askIds = new Set<number>();
+  /** 나누는 것: 행인 · 거리의 적 · 지옥 괴물(층주 포함) · 필드 보스. 장사꾼·경비병·천사·따라오는 이·쫓아오는 대식자는 각자 */
+  private isShared(w: Walker): boolean {
+    if (w.isPlayer || w.kind === 'remote' || w.mirror) return false;
+    if (w.fb) return true;
+    if (w.kind === 'monster') return !!w.mdef && !w.invader;
+    if (w.kind === 'passer') return !w.tail && !w.vend && !w.still;
+    return w.kind === 'thug';
+  }
+  /** 몹이 볼 수 있는 사람들: 나 + (방장이면) 같은 구역 손님들 */
+  private bodies(): Walker[] {
+    const out: Walker[] = [];
+    if (!this.dead) out.push(this.player);
+    if (this.netRole === 'host') for (const w of this.walkers) if (w.kind === 'remote' && !w.lingerT && w.down <= 0 && !w.rinfo?.hidden) out.push(w);
+    if (!out.length) out.push(this.player);
+    return out;
+  }
+  private nearestBody(w: Walker): Walker {
+    let best = this.player, bd = Infinity;
+    for (const b of this.bodies()) { const d = Math.hypot(b.x - w.x, b.y - w.y); if (d < bd) { bd = d; best = b; } }
+    return best;
+  }
+  /** 새 몹이 날 자리: 둘레에 몹이 가장 적은 사람 곁 */
+  private leastBody(): Walker {
+    const bs = this.bodies();
+    if (bs.length === 1) return bs[0];
+    let best = bs[0], bn = Infinity;
+    for (const b of bs) {
+      let n = 0;
+      for (const w of this.walkers) if (this.isShared(w) && Math.hypot(w.x - b.x, w.y - b.y) < 24) n++;
+      if (n < bn) { bn = n; best = b; }
+    }
+    return best;
+  }
+  /** 방장이 정해졌다 (main.ts → net.ts 에서) */
+  setNet(host: boolean, hostId: string, peers: number) {
+    const role: 'solo' | 'host' | 'guest' = peers === 0 ? 'solo' : host ? 'host' : 'guest';
+    this.netHost = hostId;
+    const prev = this.netRole;
+    if (role === prev) return;
+    this.netRole = role;
+    this.sentSig.clear();
+    if (role === 'guest') {
+      // 손님이 되었다: 내 기기가 만든 몹은 걷어 내고 방장의 것을 비춘다
+      for (const w of this.walkers.slice()) if (this.isShared(w)) { if (this.player.target === w) this.player.target = null; this.removeWalker(w); }
+      this.mirrors.clear();
+    } else if (prev === 'guest') {
+      // 방장이 되었다 (먼저 온 사람이 떠났다): 비추던 것을 걷고 내 기기가 새로 채운다
+      for (const w of this.mirrors.values()) { if (this.player.target === w) this.player.target = null; this.removeWalker(w); }
+      this.mirrors.clear();
+      this.populateShared();
+    }
+  }
+  private populateShared() {
+    if (this.zone.interior || this.realm === 'ghost' || this.realm === 'border') return;
+    if (this.zone.hell) {
+      for (let k = 0; k < this.sharedBase().monster; k++) this.spawnMonster();
+      if (!this.bossDown && !this.walkers.some((w) => w.mdef?.boss)) this.spawnBoss();
+      if (FIELD_BOSS[this.zone.hell.floor]) this.spawnFieldBosses();
+      return;
+    }
+    const b = this.sharedBase();
+    for (let n = 0; n < b.passer; n++) this.spawnNpc('passer');
+    for (let n = 0; n < b.thug; n++) this.spawnNpc('thug');
+    if (this.realm === 'real' && this.zone.city !== 'seoul') this.spawnFieldBosses();
+  }
+  private sharedBase(): { passer: number; thug: number; monster: number } {
+    if (this.zone.hell) return { passer: 0, thug: 0, monster: this.zone.hell.floor === 1 ? 22 : 12 };
+    if (this.realm === 'heaven') return { passer: PED_COUNT, thug: 0, monster: 0 };
+    return { passer: PED_COUNT + (this.realm === 'real' ? 6 : 0), thug: this.realm === 'real' ? THUG_COUNT + DRUNK_COUNT + ROBBER_COUNT + MAFIA_COUNT : THUG_COUNT, monster: 0 };
+  }
+  /** 손님이 있으면 몹을 더 (손님 한 명에 8할씩, 셋까지) · 손님이 떠나면 아무도 없는 곳의 몹부터 줄인다 */
+  private topUp() {
+    if (this.zone.interior || this.realm === 'ghost' || this.realm === 'border') return;
+    const bs = this.bodies();
+    const mult = 1 + 0.8 * Math.min(3, Math.max(0, bs.length - 1));
+    const base = this.sharedBase();
+    const cat = (w: Walker) => (w.fb ? '' : w.kind === 'monster' ? (w.mdef && !w.mdef.boss && !w.raider && !w.kid ? 'monster' : '') : w.kind);
+    for (const k of ['passer', 'thug', 'monster'] as const) {
+      if (!base[k]) continue;
+      const list = this.walkers.filter((w) => this.isShared(w) && cat(w) === k);
+      const want = Math.round(base[k] * mult);
+      if (list.length < want) { for (let n = 0; n < Math.min(2, want - list.length); n++) { if (k === 'monster') this.spawnMonster(); else this.spawnNpc(k); } }
+      else if (list.length > want + 2) {
+        let cut = Math.min(2, list.length - want);
+        for (const w of list) {
+          if (cut <= 0) break;
+          if (w.down > 0 || w.target) continue;
+          if (bs.every((b) => Math.hypot(b.x - w.x, b.y - w.y) > 30)) { this.removeWalker(w); cut--; }
+        }
+      }
+    }
+  }
+  private sigOf(w: Walker) {
+    return JSON.stringify([w.kind, w.look, w.weapon, w.armor, w.size ?? 1, w.maxHp, w.mdef?.key ?? '', w.fb ?? '', w.gang ?? '', w.weak ?? '', w.tour ?? '', w.monster ? 1 : 0]);
+  }
+  private descOf(w: Walker) {
+    return { i: w.nid, k: w.kind, l: w.look, w: w.weapon, ar: w.armor, s: w.size ?? 1, hp: w.maxHp, m: w.mdef?.key, fb: w.fb, g: w.gang, wk: w.weak, t: w.tour, mo: w.monster ? 1 : 0, x: Math.round(w.x * 100), y: Math.round(w.y * 100), sp: w.speed };
+  }
+  /** 방장: 0.2초마다 손님 둘레 40칸 안의 몹을 나눠 준다 (새로 나왔거나 생김새가 바뀐 것은 생김새도) */
+  private hostTick(dt: number) {
+    if ((this.topT -= dt) <= 0) { this.topT = 3; this.topUp(); }
+    if ((this.snapT -= dt) > 0) return;
+    this.snapT = 0.2;
+    const guests = this.walkers.filter((w) => w.kind === 'remote' && !w.lingerT);
+    if (!guests.length || !this.mobOut) return;
+    const rows: unknown[] = [], descs: unknown[] = [];
+    for (const w of this.walkers) {
+      if (!this.isShared(w) || w.sprite.destroyed) continue;
+      if (!guests.some((b) => Math.hypot(b.x - w.x, b.y - w.y) < 40)) continue;
+      w.nid ??= ++this.nidSeq;
+      const sig = this.sigOf(w);
+      if (this.sentSig.get(w.nid) !== sig) { this.sentSig.set(w.nid, sig); descs.push(this.descOf(w)); }
+      if (w.act !== w.netActRef) { w.netActRef = w.act; if (w.act && w.act.anim !== 'fall') w.netActN = ((w.netActN ?? 0) + 1) % 1000; }
+      const row: unknown[] = [w.nid, Math.round(w.x * 100), Math.round(w.y * 100), Math.max(0, DIRS.indexOf(w.dir)), Math.round((100 * Math.max(0, w.hp)) / (w.maxHp || 1)), w.down > 0 ? 1 : 0, w.netActN ?? 0];
+      if (w.act && w.act.anim !== 'fall') row.push(w.act.anim);
+      rows.push(row);
+    }
+    if (descs.length) this.mobOut.desc(descs);
+    this.mobOut.snap(rows);
+  }
+  /** 방장: 손님이 모르는 몹의 생김새를 달라고 했다 */
+  mobReq(ids: number[]) {
+    if (this.netRole !== 'host') return;
+    const out: unknown[] = [];
+    for (const id of ids) { const w = this.walkers.find((x) => x.nid === id && this.isShared(x)); if (w) out.push(this.descOf(w)); }
+    if (out.length) this.mobOut?.desc(out);
+  }
+  /** 손님: 오래(2.5초) 소식이 없는 거울은 걷는다 · 모르는 번호는 모아서 묻는다 */
+  private guestTick() {
+    for (const [id, w] of this.mirrors) if (this.time - w.mirror!.seen > 2.5) { if (this.player.target === w) this.player.target = null; this.removeWalker(w); this.mirrors.delete(id); }
+    if (this.askIds.size && this.time > this.reqT) { this.reqT = this.time + 1.2; this.mobOut?.req([...this.askIds]); this.askIds.clear(); }
+  }
+  mobSnap(host: string, l: unknown[]) {
+    if (this.netRole !== 'guest' || host !== this.netHost) return;
+    for (const raw of l) {
+      if (!Array.isArray(raw)) continue;
+      const [id, x, y, di, hp, dn, an, a] = raw as [number, number, number, number, number, number, number, string | undefined];
+      const w = this.mirrors.get(id);
+      if (!w) { this.askIds.add(id); continue; }
+      const m = w.mirror!;
+      m.tx = x / 100; m.ty = y / 100; m.d = DIRS[di] ?? w.dir; m.seen = this.time;
+      const ratio = Math.max(0, Math.min(1, hp / 100));
+      if (ratio < w.hp / (w.maxHp || 1) - 0.005) w.barT = 5;
+      w.hp = ratio * w.maxHp;
+      if (dn && w.down <= 0) { w.down = 999; w.act = { anim: 'fall', t: 0 }; w.path = []; if (this.player.target === w) this.player.target = null; }
+      else if (!dn && w.down > 0) { w.down = 0; w.act = null; }
+      if (an !== m.an) { const first = m.an < 0; m.an = an; if (!first && a && !dn && w.cs?.counts[a as Anim]) w.act = { anim: a as Anim, t: 0 }; }
+    }
+  }
+  mobDesc(host: string, l: unknown[]) {
+    if (this.netRole !== 'guest' || host !== this.netHost) return;
+    for (const raw of l) {
+      const d = raw as { i: number; k: string; l: Look; w: string | null; ar: string[]; s: number; hp: number; m?: string; fb?: string; g?: Walker['gang']; wk?: Walker['weak']; t?: Walker['tour']; mo?: number; x: number; y: number; sp?: number };
+      if (!d || typeof d.i !== 'number' || !d.l || typeof d.x !== 'number') continue;
+      const x = d.x / 100, y = d.y / 100;
+      const old = this.mirrors.get(d.i);
+      if (old) {
+        old.mirror!.tx = x; old.mirror!.ty = y;
+        if (JSON.stringify([old.look, old.weapon, old.armor]) !== JSON.stringify([d.l, d.w ?? null, d.ar ?? []])) this.dress(old, d.l, d.w ?? null, d.ar ?? []);
+        old.gang = d.g; old.weak = d.wk; old.tour = d.t; old.fb = d.fb; old.size = d.s; old.maxHp = d.hp; old.monster = !!d.mo;
+        old.mdef = d.m ? MONSTERS[d.m] : undefined;
+        continue;
+      }
+      const md = d.m ? MONSTERS[d.m] : undefined;
+      const kind = (['passer', 'thug', 'monster'].includes(d.k) ? d.k : 'passer') as NpcKind;
+      const w = md ? this.makeMonster(md, Math.floor(x), Math.floor(y)) : this.makeWalker(d.l, Math.floor(x), Math.floor(y), kind, d.w ?? null, d.ar ?? []);
+      if (md && JSON.stringify(d.l) !== JSON.stringify(w.look)) this.dress(w, d.l, d.w ?? null, d.ar ?? []);
+      w.kind = kind; w.x = x; w.y = y;
+      w.gang = d.g; w.weak = d.wk; w.tour = d.t; w.fb = d.fb; w.size = d.s; w.maxHp = w.hp = d.hp; w.monster = !!d.mo;
+      if (d.sp) w.speed = d.sp;
+      w.nid = d.i;
+      w.mirror = { tx: x, ty: y, d: w.dir, seen: this.time, an: -1, mv: false };
+      this.walkers.push(w);
+      this.mirrors.set(d.i, w);
+    }
+  }
+  /** 거울: 방장이 보낸 자리로 미끄러지듯 (0.2초 사이를 메운다). 많이 벌어지면 곧장 옮긴다 */
+  private moveMirror(w: Walker, dt: number) {
+    const m = w.mirror!;
+    const dx = m.tx - w.x, dy = m.ty - w.y, d = Math.hypot(dx, dy);
+    if (d > 6) { w.x = m.tx; w.y = m.ty; m.mv = false; return; }
+    m.mv = d > 0.05 && w.down <= 0;
+    if (d > 0.002) { const step = Math.min(d, Math.max(w.speed || 2, d / 0.2) * dt); w.x += (dx / d) * step; w.y += (dy / d) * step; }
+    w.dir = m.mv && (!w.act || w.act.anim === 'hit') ? dirFromTile(dx, dy, w.dir) : m.d;
+  }
+  /** 방장: 손님이 내 몹을 때렸다 → 그 손님의 몸이 때린 것으로 계산한다 (몹은 그 손님에게 맞선다) */
+  mobHitIn(from: string, id: number, dmg: number, crit: boolean, kind: string) {
+    if (this.netRole !== 'host') return;
+    const mob = this.walkers.find((w) => w.nid === id && this.isShared(w));
+    const r = this.walkers.find((w) => w.rid === from && w.kind === 'remote');
+    if (!mob || !r || mob.down > 0) return;
+    this.hit(r, mob, dmg, crit, (['fist', 'blunt', 'blade', 'gun'].includes(kind) ? kind : 'fist') as sfx.HitKind);
+  }
+  /** 손님: 방장의 몹이 나를 쳤다 (회피·방어구는 내 기기가 계산한다) */
+  mobStrikeIn(id: number, dmg: number, crit: boolean, kind: string) {
+    if (this.netRole !== 'guest') return;
+    const p = this.player;
+    if (this.dead || this.safeAt(p.x, p.y)) return;
+    const k = (['fist', 'blunt', 'blade', 'gun'].includes(kind) ? kind : 'fist') as sfx.HitKind;
+    dmg = Math.max(1, Math.round(dmg) - (this.gear.dr ?? 0));
+    const m = this.mirrors.get(id);
+    if (m && m.down <= 0) { this.hit(m, p, dmg, crit, k); return; }
+    if (!this.rollHits(4)) return;
+    p.hp -= dmg; p.hurtT = 0.18; this.combatT = 0;
+    this.hooks.hp(Math.max(0, p.hp), p.maxHp);
+    if (p.hp <= 0) this.die('beaten');
+  }
+  /** 손님: 방장의 몹이 쓰러졌다 — 내가 쓰러뜨렸으면 돈·물건·행위가 내 기기에 남는다 */
+  mobKillIn(id: number, by: string) {
+    if (this.netRole !== 'guest') return;
+    const w = this.mirrors.get(id);
+    if (!w) return;
+    if (this.player.target === w) this.player.target = null;
+    if (by === this.myNetId) { w.down = 0; w.hp = 0; this.knockDown(w, this.player); return; }
+    if (w.down > 0) return;
+    w.down = 999; w.hp = 0; w.act = { anim: 'fall', t: 0 };
+    sfx.thud(this.spotOf(w));
+    // 층주는 누가 잡든 그 층에 있던 모두에게 '정리됨'
+    if (w.mdef?.boss && this.zone.hell && !this.bossDown) { this.bossDown = true; this.drawFeatures(); this.hooks.bossDown(this.zone.hell.floor); }
+    if (w.fb) this.float(w, t().fbDown, '#ffd45a');
+  }
+
   upsertRemote(id: string, info: RemoteInfo | null, pos: NetPos | null) {
     if (info?.hidden) { this.removeRemote(id); return; } // 투명한 관리자는 그리지 않는다
     let r = this.walkers.find((w) => w.rid === id);
@@ -5096,8 +5347,20 @@ export class WorldScene {
     if (from.isPlayer && this.zone.hell && (to.gdef || (to.kind === 'remote' && this.nearRest(to.x, to.y, 6)))) this.guardAlarm(to.gdef ? to : null);
     if (kind) sfx.impact(kind, this.spotOf(to), crit, this.bodyOf(to), (to.voice ??= 0.85 + Math.random() * 0.3), to.size ?? (to.gang === 'mafia' ? 1.1 : 1));
     this.impactFx(from, to, crit, kind);
+    // 41차: 방장 몹의 거울 — 체력은 방장 기기가 계산한다. 나는 '때렸다'만 알린다 (먼저 때린 행인이면 악행은 내 몫)
+    if (to.mirror) {
+      if (from.isPlayer || from.kind === 'fighter') {
+        if (!to.firstBy && from.isPlayer && to.kind === 'passer') { to.firstBy = from; this.hooks.deed('firstStrike'); this.markCrime(); }
+        to.hurtT = 0.18; to.barT = 5;
+        if (!to.act) to.act = { anim: 'hit', t: 0 };
+        if (from.isPlayer) this.combatT = 0;
+        if (to.nid) this.mobOut?.hit(to.nid, dmg, crit, kind ?? 'fist');
+      }
+      return;
+    }
     // 다른 사람(실시간): 체력은 그 사람 기기가 계산한다. 몸만 남은 사람은 여기서 계산
     if (to.kind === 'remote' && to.rid && !to.lingerT) {
+      if (!from.isPlayer && this.netRole === 'host' && this.isShared(from)) { from.nid ??= ++this.nidSeq; this.mobOut?.strike(to.rid, from.nid, dmg, crit, kind ?? 'fist'); to.barT = 5; return; }
       if (from.isPlayer) {
         if (!to.rpos?.c && !this.recentAttacker(to.rid) && !this.struckFirst.has(to.rid)) {
           this.struckFirst.add(to.rid);
@@ -5231,6 +5494,8 @@ export class WorldScene {
     w.flee = 0;
     w.pend = null;
     w.act = { anim: 'fall', t: 0 };
+    const remoteKill = by.kind === 'remote' && this.netRole === 'host';
+    if (remoteKill && by.rid) { w.nid ??= ++this.nidSeq; this.mobOut?.kill(w.nid, by.rid); }
     if (w.fb) this.fieldBossDown(w, by);
     if (w.kind === 'thug' && w.helped && !this.dead && this.realm === 'real') {
       w.helped = false;
@@ -5280,6 +5545,7 @@ export class WorldScene {
       }
       if (w.mdef.boss) { this.bossDown = true; this.drawFeatures(); this.hooks.bossDown(f); }
       // 드물게 노전 말고 물건도 떨어진다 (층주는 둘)
+      if (remoteKill) return; // 41차: 손님이 잡은 괴물의 노전·물건은 손님 기기에 떨어진다
       if (share > 0 || by.isPlayer) for (let n = w.mdef.boss ? 2 : Math.random() < 0.05 ? 1 : 0; n > 0; n--) this.dropLoot(w.x + (n - 1) * 0.6, w.y + 0.3, rollLoot(f));
       // 30차 템브라 파편: 지옥 어디서나 아주 드물게 (보통 2.5% · 층주 40%)
       if ((share > 0 || by.isPlayer) && Math.random() < (w.mdef.boss ? 0.4 : 0.025)) this.dropLoot(w.x - 0.4, w.y + 0.5, 'tshard', 300);
@@ -5288,6 +5554,7 @@ export class WorldScene {
       return;
     }
     if (w.weak === 'shade') { w.down = 2.5; return; } // 그림자는 흩어질 뿐 남기는 게 없다
+    if (remoteKill) return; // 41차: 손님이 쓰러뜨린 사람의 돈은 손님 기기에 떨어진다
     // 22차: 적대 NPC가 떨어뜨리는 돈은 폭을 넓혀 무작위로 — 취객 1~4 · 불량배 2~6 · 강도 3~9 · 마피아 4~12
     // 26차 경제: 싸움 한 번에 드는 끼니값보다 조금 더 (취객 2~6 · 불량배 5~12 · 강도 12~28 · 마피아 25~60)
     const amount = w.kind === 'thug' ? (w.gang === 'mafia' ? rand(25, 60) : w.gang === 'robber' ? rand(12, 28) : w.gang === 'enforcer' ? rand(40, 90) : w.gang === 'boxer' ? rand(20, 45) : w.gang === 'pickpocket' ? rand(6, 16) + (w.pick?.stolen ?? 0) : w.weak === 'drunk' ? rand(2, 6) : rand(5, 12)) : w.tour ? touristCash() : passerCash();
@@ -5966,10 +6233,12 @@ export class WorldScene {
     }
     if (this.ambushT > 0 && (this.ambushT -= dt) <= 0 && !this.zone.interior) this.spawnSuturer();
     if (this.goatT > 0 && (this.goatT -= dt) <= 0) { this.goatT = -1; if (!this.walkers.some((x) => x.kind === 'goat')) this.spawnGoat(); }
-    if (this.realm === 'real' && !this.zone.interior && (this.brawlT -= dt) <= 0) { this.brawlT = 30 + Math.random() * 40; this.startBrawl(); }
+    if (this.realm === 'real' && !this.zone.interior && this.netRole !== 'guest' && (this.brawlT -= dt) <= 0) { this.brawlT = 30 + Math.random() * 40; this.startBrawl(); }
     if (this.kerb) this.updateKerberos(dt);
     if (this.guide) this.updateGuide(dt);
-    if (this.fbWarns.length || this.walkers.some((w) => w.fb)) this.updateFieldBosses(dt);
+    if (this.netRole !== 'guest' && (this.fbWarns.length || this.walkers.some((w) => w.fb))) this.updateFieldBosses(dt);
+    if (this.netRole === 'host') this.hostTick(dt);
+    else if (this.netRole === 'guest') this.guestTick();
     this.updateLandmarks(dt);
     if (this.hazeOn && this.terraceSky) { this.terraceSky.width = this.app.screen.width; this.terraceSky.height = this.app.screen.height; }
     if (this.stairWant && this.heavenStair) {
@@ -6012,7 +6281,8 @@ export class WorldScene {
         this.moveRemote(w, dt);
         continue;
       }
-      if (w.down > 0) {
+      if (w.mirror) this.moveMirror(w, dt);
+      else if (w.down > 0) {
         if (!w.isPlayer) {
           w.down -= dt;
           if (w.down <= 0) {
@@ -6029,8 +6299,8 @@ export class WorldScene {
         }
       } else if (!(w.isPlayer && this.dead)) this.fight(w, dt);
       if (w.sprite.destroyed) continue;
-      const moving = w.down <= 0 && !(w.isPlayer && this.dead) && this.stepWalker(w, dt);
-      if (!w.isPlayer && w.down <= 0) this.think(w, moving, dt, nf);
+      const moving = w.mirror ? w.mirror.mv : w.down <= 0 && !(w.isPlayer && this.dead) && this.stepWalker(w, dt);
+      if (!w.isPlayer && w.down <= 0 && !w.mirror) this.think(w, moving, dt, nf);
       if (w.sprite.destroyed) continue;
       w.anim = moving ? w.anim + dt * (w.flee > 0 ? 1.9 : w.speed) * 8.5 : 0;
       this.pose(w, moving, dt);
@@ -6295,7 +6565,7 @@ export class WorldScene {
     this.refreshNight(nf);
     this.streamT -= dt;
     if (this.streamT <= 0 || this.streamMore) { this.streamT = 0.12; this.stream(false); } // 22차: 남은 일이 있으면 다음 프레임에 조금 더
-    this.updateRaid(dt);
+    if (this.netRole !== 'guest') this.updateRaid(dt);
     this.updateGoatFx(dt); // 33차
     this.updateChimney(dt); // 34차
     this.updateBeyondLife(dt);
@@ -6316,7 +6586,7 @@ export class WorldScene {
 
   /** 행인·불량배의 평소 행동 */
   private think(w: Walker, moving: boolean, dt: number, nf: number) {
-    const p = this.player;
+    const p = this.netRole === 'host' && this.isShared(w) ? this.nearestBody(w) : this.player; // 41차: 방장 기기는 손님들도 '사람'으로 본다
     if (w.fb && this.thinkFieldBoss(w, moving, dt)) return;
     if (w.kind === 'guard') { this.thinkGuard(w, moving, dt); return; }
     if (w.kind === 'talus') { this.thinkTalus(w, dt); return; }
