@@ -479,7 +479,12 @@ function wallBlock(theme: Theme, v: number, o: number, r: (k: number) => number)
   const seams = bog ? 0 : ash ? 1 : 2;
   for (let q = 0; q < seams; q++) if (r(40 + q) < (ash ? 0.55 : 0.85)) {
     let x = cx + (r(44 + q) - 0.5) * Rx * 0.9;
-    for (let z = H * (0.55 + r(46 + q) * 0.35); z > 4; z -= 2) { x += (r(Math.floor(z * 3 + q * 7)) - 0.5) * 2.6; const k = Math.sqrt(Math.max(0, 1 - (z / H) ** 2)) * Rx; const dx = Math.max(-k * 0.9, Math.min(k * 0.9, x - cx)); const yy = cy - z + Math.sqrt(Math.max(0, 1 - (dx / Math.max(1, k)) ** 2)) * k * 0.5; p.R(cx + dx - 1, yy - 1, 3, 2, z % 6 < 2 ? '#ff8a2a' : '#c2401a'); }
+    // 45차 후속: 점선처럼 끊겨 비처럼 보이던 것 — 이어진 금 한 줄(검붉은 테 + 가운데 주황), 가끔 곁가지
+    const pts: [number, number][] = [];
+    for (let z = H * (0.55 + r(46 + q) * 0.35); z > 4; z -= 5) { x += (r(Math.floor(z * 3 + q * 7)) - 0.5) * 7; const k = Math.sqrt(Math.max(0, 1 - (z / H) ** 2)) * Rx; const dx = Math.max(-k * 0.9, Math.min(k * 0.9, x - cx)); pts.push([cx + dx, cy - z + Math.sqrt(Math.max(0, 1 - (dx / Math.max(1, k)) ** 2)) * k * 0.5]); }
+    for (let k = 1; k < pts.length; k++) p.L(pts[k - 1][0], pts[k - 1][1], pts[k][0], pts[k][1], 3, '#8a2a12');
+    for (let k = 1; k < pts.length; k++) p.L(pts[k - 1][0], pts[k - 1][1], pts[k][0], pts[k][1], 1, k % 3 ? '#ff8a2a' : '#ffb04a');
+    if (pts.length > 4 && r(60 + q) < 0.6) { const [bx, by] = pts[Math.floor(pts.length / 2)], sx = r(62 + q) < 0.5 ? -1 : 1; p.L(bx, by, bx + sx * 9, by + 6, 2, '#8a2a12'); p.L(bx, by, bx + sx * 9, by + 6, 1, '#e8601a'); }
   }
   if (ash && r(70) < 0.3) { // 꼭대기의 현무암 기둥
     const x = cx + (r(71) - 0.5) * 30, y = cy - H + 6; const hh = 26 + r(73) * 36, ww = 11 + r(74) * 7;

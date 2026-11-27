@@ -5554,6 +5554,8 @@ stanceBox.hidden = true;
 (stanceBox.querySelector('.st-hand') as HTMLButtonElement).onclick = () => setStance('talk');
 // 건물 낮추기 (1층만 보이게) — 도심에서 길이 가려 움직이기 힘들 때
 (stanceBox.querySelector('.st-pick') as HTMLButtonElement).onclick = () => pickAct();
+// 45차 후속: 누른 단추에 초점이 남으면 키보드를 쓸 때 네모 테가 생기고, 스페이스·엔터가 그 단추를 다시 누른다 → 누르고 나면 초점을 놓는다
+document.addEventListener('click', (e) => { const b = (e.target as HTMLElement | null)?.closest?.('.stance button, #hud button') as HTMLElement | null; if (b) b.blur(); });
 /** 38차 줍기: 가까운 돈·물건만 (멀면 그쪽으로 걸어가 줍는다) */
 function pickAct() {
   if (!world || scene !== 'world' || busy || dlg.isOpen) return;

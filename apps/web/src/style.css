@@ -636,3 +636,6 @@ body.passing #hud, body.passing .stance, body.passing .quick-slot, body.passing 
 /* 45차: 대상 바꾸기 단추 — 칼 태세에서만 */
 .stance[data-mode="talk"] .st-target { display: none; }
 .stance .st-target { border-color: rgba(255, 110, 90, 0.55); }
+/* 45차 후속: 단추를 누른 뒤 키보드(Tab · W·A·S·D)를 쓰면 브라우저가 단추 둘레에 네모 테(포커스 표시)를 그리던 것 */
+.stance button, #hud button { -webkit-tap-highlight-color: transparent; }
+.stance button:focus, .stance button:focus-visible, #hud button:focus, #hud button:focus-visible { outline: none; }
