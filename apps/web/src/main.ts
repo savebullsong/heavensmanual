@@ -5618,8 +5618,7 @@ function craftList(list: Element, redraw: () => void) {
   for (const r of rows) {
     const it = itemByKey(r.out);
     const ok = r.need.every(([k, n]) => have(k) >= n) && h.notes >= r.fee;
-    const need = r.need.map(([k, n]) => `${itemByKey(k).name[lang()]} ${Math.min(have(k), n)}/${n}`).join(' · ');
-    const row = itemRow(it, `${need} · ${priceText(r.fee, true)}`, () => {
+    const row = itemRow(it, priceText(r.fee, true), () => {
       if (!r.need.every(([k, n]) => have(k) >= n)) { toast(L.craftLack); return; }
       if (h.notes < r.fee) { toast(L.hwNoMoney); return; }
       for (const [k, n] of r.need) { state.bag![k] = (state.bag![k] ?? 0) - n; if (state.dura && state.bag![k] <= 0) delete state.dura[k]; }
@@ -5632,6 +5631,10 @@ function craftList(list: Element, redraw: () => void) {
       redraw();
     }, !ok);
     const tag = document.createElement('span'); tag.className = 'act'; tag.textContent = L.craftBtn; row.appendChild(tag); row.classList.add('has-act');
+    // 48차: 재료는 오른쪽 값 자리가 아니라 이름 아래 한 줄로 (길면 이름 칸이 한 글자 너비로 눌리던 것) — 모자란 재료는 붉게
+    const nd = document.createElement('span'); nd.className = 'need';
+    for (const [k, n] of r.need) { const c = document.createElement('b'); c.className = have(k) >= n ? 'ok' : 'lack'; c.textContent = `${itemByKey(k).name[lang()]} ${Math.min(have(k), n)}/${n}`; nd.appendChild(c); }
+    row.appendChild(nd);
     list.appendChild(row);
   }
 }
