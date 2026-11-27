@@ -80,9 +80,9 @@ export function furnishShowroom(W: number, H: number, put: (i: number, j: number
 
 // ───────────────────────── 거리에 집과 가구점을 정한다 ─────────────────────────
 type Nm = { n: string; nko: string; nth: string; nen: string };
-const NAMES: Record<EstateCity, { home: Nm; furn: Nm; tools: Nm }> = {
-  bkk: { home: { n: 'The Asok Residence', nko: '더 아속 레지던스', nth: 'ดิ อโศก เรสซิเดนซ์', nen: 'The Asok Residence' }, furn: { n: 'Baan Living', nko: '반 리빙 가구', nth: 'บ้านลิฟวิ่ง', nen: 'Baan Living Furniture' }, tools: { n: 'Sin Thai Hardware', nko: '신타이 철물점', nth: 'สินไทย ฮาร์ดแวร์', nen: 'Sin Thai Hardware' } },
-  seoul: { home: { n: 'Yeoksam Central Heights', nko: '역삼 센트럴 하이츠', nth: 'ยอกซัม เซ็นทรัล ไฮทส์', nen: 'Yeoksam Central Heights' }, furn: { n: 'Nonhyeon Living', nko: '논현 리빙 가구', nth: 'นนฮยอน ลิฟวิ่ง', nen: 'Nonhyeon Living Furniture' }, tools: { n: 'Yeoksam Hardware', nko: '역삼 철물점', nth: 'ร้านฮาร์ดแวร์ยอกซัม', nen: 'Yeoksam Hardware' } },
+const NAMES: Record<EstateCity, { home: Nm; furn: Nm; tools: Nm; dojo: Nm }> = {
+  bkk: { home: { n: 'The Asok Residence', nko: '더 아속 레지던스', nth: 'ดิ อโศก เรสซิเดนซ์', nen: 'The Asok Residence' }, furn: { n: 'Baan Living', nko: '반 리빙 가구', nth: 'บ้านลิฟวิ่ง', nen: 'Baan Living Furniture' }, tools: { n: 'Sin Thai Hardware', nko: '신타이 철물점', nth: 'สินไทย ฮาร์ดแวร์', nen: 'Sin Thai Hardware' } , dojo: { n: 'Sit Asok Muay Thai', nko: '싯아속 무에타이 체육관', nth: 'ค่ายมวยศิษย์อโศก', nen: 'Sit Asok Muay Thai' } },
+  seoul: { home: { n: 'Yeoksam Central Heights', nko: '역삼 센트럴 하이츠', nth: 'ยอกซัม เซ็นทรัล ไฮทส์', nen: 'Yeoksam Central Heights' }, furn: { n: 'Nonhyeon Living', nko: '논현 리빙 가구', nth: 'นนฮยอน ลิฟวิ่ง', nen: 'Nonhyeon Living Furniture' }, tools: { n: 'Yeoksam Hardware', nko: '역삼 철물점', nth: 'ร้านฮาร์ดแวร์ยอกซัม', nen: 'Yeoksam Hardware' } , dojo: { n: 'Yeoksam Taekwondo', nko: '역삼 태권도장', nth: 'โรงฝึกเทควันโดยอกซัม', nen: 'Yeoksam Taekwondo' } },
 };
 /** 건물 앞(간판 면)에 걸어 설 수 있는 칸이 있으면 그 면 */
 function openFace(z: Zone, b: Building): 'left' | 'right' | null {
@@ -126,6 +126,13 @@ export function designateHomes(z: Zone) {
     tools.b.cat = 'shop';
     tools.b.sign = tools.face!;
     tools.b.pois = [{ t: 'hardware', ...NAMES[city].tools }];
+  }
+  // 45차: 우주새에서 멀지 않은 곳에 도장 하나 (방콕 무에타이 체육관 · 서울 태권도장) — 헬스장처럼 운동해 영혼을 아주 조금 단련한다
+  const dojo = free.filter((x) => x !== home && x !== shop && x !== tools && x.b.w * x.b.d >= 12 && x.b.w * x.b.d <= 120 && x.dist >= 7 && x.dist <= 45).sort((a, b) => Math.abs(a.dist - 20) - Math.abs(b.dist - 20) || a.k - b.k)[0];
+  if (dojo) {
+    dojo.b.cat = 'shop';
+    dojo.b.sign = dojo.face!;
+    dojo.b.pois = [{ t: 'dojo', ...NAMES[city].dojo }];
   }
   // 40차: 서울 집 가까운 골목의 낮은 벽돌집 하나가 '유내 미용실' — 간판은 그대로인데, 지금은 유내를 모르는 사람이 가위를 든다
   if (city === 'seoul') {

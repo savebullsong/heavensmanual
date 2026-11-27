@@ -628,3 +628,11 @@ body.passing #hud, body.passing .stance, body.passing .quick-slot, body.passing 
 .quiver-row small { width: 100%; opacity: .75; }
 .quiver-row button { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .18); background: rgba(255, 255, 255, .06); color: inherit; font-size: 12px; }
 .quiver-row .icon { width: 20px; height: 20px; image-rendering: pixelated; }
+/* 45차: 헬스장 · 도장 운동 중 */
+.train-chip { position: fixed; left: 50%; bottom: calc(88px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 10px; padding: 7px 8px 7px 14px; border-radius: 999px; background: rgba(20, 18, 16, 0.86); border: 1px solid rgba(242, 210, 122, 0.45); color: #f2e6c8; font-size: 13px; font-weight: 600; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
+.train-chip button { border: 0; border-radius: 999px; padding: 5px 12px; background: #3a342c; color: #f2e6c8; font-weight: 700; cursor: pointer; }
+/* 45차: 죽음으로 악업이 씻겨 위층에서 깨어날 때 */
+.death.washed .death-box { box-shadow: 0 0 48px rgba(255, 236, 190, 0.35); border-color: rgba(255, 236, 190, 0.5); }
+/* 45차: 대상 바꾸기 단추 — 칼 태세에서만 */
+.stance[data-mode="talk"] .st-target { display: none; }
+.stance .st-target { border-color: rgba(255, 110, 90, 0.55); }

@@ -19,9 +19,13 @@ export interface ItemDef {
   /** 25차: 쓴 세계(현실·지옥)에서 훔치기 확률이 오른다 (0.02 = 2%) */
   steal?: number;
   name: Record<Lang, string>;
-  store?: 'puppet' | 'antique' | 'maskgirl' | 'mart' | 'pharmacy' | 'food' | 'cafe' | 'talus' | 'hmeat' | 'tools' | 'dept' | 'hjunk' | 'drop' | 'hwater' | 'hmed' | 'harms'; // 22차: 지옥 물장수 · 약장수 · 무기상 // drop = 어디서도 팔지 않는다 (괴물이 떨어뜨릴 뿐) // 우주새가 아니라 거리 가게(철물점·백화점) · 지옥 탈루스·고깃간·넝마장수에서 파는 것
+  store?: 'puppet' | 'antique' | 'maskgirl' | 'mart' | 'pharmacy' | 'food' | 'cafe' | 'talus' | 'hmeat' | 'tools' | 'dept' | 'hjunk' | 'drop' | 'hwater' | 'hmed' | 'harms' | 'heaven'; // 22차: 지옥 물장수 · 약장수 · 무기상 // drop = 어디서도 팔지 않는다 (괴물이 떨어뜨릴 뿐) // 우주새가 아니라 거리 가게(철물점·백화점) · 지옥 탈루스·고깃간·넝마장수에서 파는 것
   now?: boolean; // 가게에서 바로 먹는다 (가방에 넣지 않음)
   hell?: boolean; // 지옥의 우주새(황혼)에서만, 노전으로 판다
+  /** 45차 천국의 물건: 천국(과 노을과의 지옥 정벌)에서만 쓴다 · 현실·지옥에서 팔리지 않는다 · 환생하면 사라진다 */
+  heaven?: boolean;
+  /** 45차: 무기의 쇠 빛 ('#쇠빛' 또는 '#쇠빛#나무빛') — 천국 무기는 흰 금빛 */
+  wtint?: string;
   sprite?: string; // 몸에 그릴 때 쓰는 그림 (지옥 무기·방어구는 현실 그림을 빌려 쓴다)
   icon?: string; // 아이콘 그림 (없으면 key)
   two?: boolean; // 양손 무기: 두 손으로 내려찍는다 (느리지만 묵직하다)
@@ -184,6 +188,14 @@ export const ITEMS: ItemDef[] = [
   { key: 'boghornhelm', cat: 'armor', price: 150, def: 5, hell: true, sale: [2], sprite: 'hornhelm', icon: 'hornhelm', tint: '#a8b890', metal: '#5e6c4c', name: { ko: '늪뼈 뿔투구', th: 'หมวกเขากระดูกบึง', en: 'Bog-bone horned helm' } },
   { key: 'waxknighthelm', cat: 'armor', price: 260, def: 6, hell: true, sale: [3], sprite: 'greathelm', icon: 'greathelm', tint: '#8a1a1a', metal: '#34302e', name: { ko: '봉랍 기사 투구', th: 'หมวกอัศวินตราครั่ง', en: 'Waxseal knight helm' } },
   { key: 'maskhelm', cat: 'armor', price: 760, def: 8, hell: true, floor: 5, sale: [5], sprite: 'maskhelm', icon: 'maskhelm', tint: '#f2eee6', name: { ko: '도자기 얼굴 투구', th: 'หมวกหน้ากระเบื้อง', en: 'Porcelain-face helm' } },
+  // 45차 천국의 장비: 노을의 무기고 (천국 돈) — 천국과 노을과의 지옥 정벌에서만 든다. 흰 금빛 쇠
+  { key: 'hvdagger', cat: 'weapon', price: 2000, atk: 7, heaven: true, store: 'heaven', sprite: 'dagger', icon: 'dagger', tint: '#f0e2b0', wtint: '#f4ecd2#d8b050', name: { ko: '순례자의 단검', th: 'มีดสั้นผู้แสวงบุญ', en: "Pilgrim's dagger" } },
+  { key: 'hvsword', cat: 'weapon', price: 8000, atk: 10, heaven: true, store: 'heaven', sprite: 'sword', icon: 'sword', tint: '#f0e2b0', wtint: '#f4ecd2#d8b050', name: { ko: '새벽빛 장검', th: 'ดาบแสงรุ่งอรุณ', en: 'Dawnlight sword' } },
+  { key: 'hvspear', cat: 'weapon', price: 12000, atk: 11, reach: 2.1, heaven: true, store: 'heaven', sprite: 'spear', icon: 'spear', tint: '#f0e2b0', wtint: '#f4ecd2#d8b050', name: { ko: '파수천사의 창', th: 'หอกทูตผู้เฝ้ายาม', en: "Sentinel's spear" } },
+  { key: 'hvgreat', cat: 'weapon', price: 20000, atk: 14, two: true, heaven: true, store: 'heaven', sprite: 'greatsword', icon: 'greatsword', tint: '#f0e2b0', wtint: '#f4ecd2#d8b050', name: { ko: '심판의 대검', th: 'ดาบใหญ่แห่งการพิพากษา', en: 'Greatsword of judgment' } },
+  { key: 'hvplate', cat: 'armor', price: 15000, def: 7, heaven: true, store: 'heaven', sprite: 'platecoat', icon: 'platecoat', tint: '#ece6d6', metal: '#e8d8a0', name: { ko: '순백 판금 겉옷', th: 'เสื้อเกราะขาวบริสุทธิ์', en: 'Pure-white platecoat' } },
+  { key: 'hvhelm', cat: 'armor', price: 6000, def: 4, heaven: true, store: 'heaven', sprite: 'greathelm', icon: 'greathelm', tint: '#e8c050', metal: '#ece6d6', name: { ko: '새벽빛 투구', th: 'หมวกแสงรุ่งอรุณ', en: 'Dawnlight helm' } },
+  { key: 'hvshield', cat: 'armor', price: 4000, def: 4, heaven: true, store: 'heaven', sprite: 'shield', icon: 'shield', tint: '#ece6d6', metal: '#d8b050', name: { ko: '날개 문장 방패', th: 'โล่ตราปีก', en: 'Winged shield' } },
   { key: 'bareface', cat: 'weapon', price: 680, atk: 11, hell: true, floor: 5, sale: [5], sprite: 'rapier', icon: 'rapier', name: { ko: '맨얼굴', th: 'ใบหน้าเปลือย', en: 'Bare Face' } },
   { key: 'manettethread', cat: 'goods', price: 1100, hell: true, store: 'drop', name: { ko: '마네트의 실', th: 'ด้ายของมาเนตต์', en: "Manette's thread" } },
   // 43차 5층 인형술사 마리의 마리오네트: 줄을 당기면 곁에서 3분 동안 함께 싸운다 (한 번에 하나 · 지옥에서만)
@@ -434,6 +446,8 @@ export function priceText(n: number, hell = false): string {
 /** 30차: 물건 찾기 — 강화한 장비('hsword+4')는 바탕 물건에서 이름·공격력·방어력만 바꿔 만든다 */
 const derived = new Map<string, ItemDef>();
 const WRECK_NAME: Record<Lang, string> = { ko: '박살난 {item}', th: '{item} (แตกหัก)', en: 'Shattered {item}' };
+/** 45차: 천국에서 산 물건('hv:키') — 생김새·힘은 그대로, 천국의 것이 된다 */
+const HV_NAME: Record<Lang, string> = { ko: '천국의 {item}', th: '{item} จากสวรรค์', en: 'Heavenly {item}' };
 export function itemByKey(k: string): ItemDef {
   const hit = ITEMS.find((x) => x.key === k);
   if (hit) return hit;
@@ -445,6 +459,16 @@ export function itemByKey(k: string): ItemDef {
     if (!b) return undefined as unknown as ItemDef;
     const nm = (l: Lang) => WRECK_NAME[l].replace('{item}', b.name[l]);
     const d: ItemDef = { key: k, cat: 'goods', price: Math.max(1, Math.round(b.price * 0.15)), hell: b.hell, store: b.store === 'talus' ? 'talus' : undefined, icon: b.icon ?? b.sprite ?? b.base ?? b.key, wreck: true, name: { ko: nm('ko'), th: nm('th'), en: nm('en') } };
+    derived.set(k, d);
+    return d;
+  }
+  if (k.startsWith('hv:')) {
+    const got = derived.get(k);
+    if (got) return got;
+    const b = itemByKey(k.slice(3));
+    if (!b) return undefined as unknown as ItemDef;
+    const nm = (l: Lang) => HV_NAME[l].replace('{item}', b.name[l]);
+    const d: ItemDef = { ...b, key: k, heaven: true, hell: false, store: undefined, icon: b.icon ?? b.sprite ?? b.key, sprite: b.sprite ?? b.key, name: { ko: nm('ko'), th: nm('th'), en: nm('en') } };
     derived.set(k, d);
     return d;
   }
@@ -462,6 +486,12 @@ export function itemByKey(k: string): ItemDef {
 }
 export function iconFor(it: ItemDef): HTMLCanvasElement {
   const c = itemIcon(it.icon ?? it.sprite ?? it.key, it.tint);
+  if (it.heaven) { // 45차 천국의 물건: 위쪽에 작은 빛 고리와 반짝임 (현실·지옥 물건과 한눈에 갈리게)
+    const g0 = c.getContext('2d')!;
+    g0.strokeStyle = '#f2d66a'; g0.lineWidth = 1.2;
+    g0.beginPath(); g0.ellipse(25, 5, 5, 2, 0, 0, Math.PI * 2); g0.stroke();
+    g0.fillStyle = '#fff6d0'; g0.fillRect(4, 3, 1, 3); g0.fillRect(3, 4, 3, 1);
+  }
   if (it.wreck) {
     // 35차 박살난 무기: 빛이 빠지고, 가운데가 깨져 갈라진 금 · 떨어져 나간 조각
     const g0 = c.getContext('2d')!;

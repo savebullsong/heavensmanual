@@ -17,7 +17,7 @@ import { t, lang, setLang, LANGS, type Lang } from './i18n.ts';
 import { load, save, type Slot, type Stash } from './state.ts';
 import { hellZone, OPEN_FLOORS, floorDef, MONSTERS, GUARDS, TOLL, ATONE_GOAL, GURMA_FULL, setRaidForce, FLOORS, FIELD_BOSS } from './hell.ts';
 import type { HellVendor } from './zone.ts';
-import { interiorZone, roomKind as roomKindOf, canEnter, voidZone, drawFurn } from './interior.ts';
+import { interiorZone, roomKind as roomKindOf, canEnter, voidZone, drawFurn, setAdminVisit } from './interior.ts';
 import { heavenZone, HEAVEN_ID, heavenPriceMul } from './heavenworld.ts';
 import { designateHomes, HOME_PRICE, FURN, furnByKey, type FurnDef } from './home.ts';
 import { borderZone } from './border.ts';
@@ -65,14 +65,28 @@ save(state);
 const stats = () => (state.soul!.stats ??= newStats());
 const maxHp = () => maxHpFor(stats().vit);
 
+/** 45차: 세계를 건널 때 지갑을 바꿔 낀다 — 천국 돈은 천국에만, 현실 돈은 현실에만 (관리자 시찰로 오가도 섞이지 않게) */
+type RealmName = 'real' | 'ghost' | 'hell' | 'heaven' | 'border';
+function setRealm(to: RealmName) {
+  const from = (state.realm ?? 'real') as RealmName;
+  if (from === to) return;
+  const w = (state.wallets ??= {});
+  if (from === 'real' || from === 'heaven') w[from] = state.wallet ?? 0;
+  if (to === 'real' || to === 'heaven') { state.wallet = w[to] ?? 0; delete w[to]; }
+  state.realm = to;
+}
 /** 새 생: 처음 모습을 뽑고, 이번 생의 것(돈·가방·업)은 비운다. 영혼(영격)은 남는다 */
 function newLife(kind?: Arrival) {
   const k = kind ?? rollArrival();
   state.arrival = { kind: k, look: arrivalLook(k) };
   delete state.look;
   state.wallet = 0;
+  delete state.wallets; // 45차: 지난 생의 지갑(천국 돈 포함)은 남지 않는다
   // 26차: 세계를 건너도 몸에 남는 물건(검은 마스크)은 새 생에도 그대로
   const cross = (k: string) => !!itemByKey(k)?.cross;
+  // 45차: 천국의 물건은 어디에도 맡겨지지 않고 사라진다 (환생하면 다 사라진다)
+  for (const k of Object.keys(state.bag ?? {})) if (itemByKey(k)?.heaven) delete state.bag![k];
+  for (const [slot, k] of Object.entries(state.equip ?? {})) if (k && itemByKey(k)?.heaven) delete state.equip![slot as Slot];
   const keepBag: Record<string, number> = {}, keepEq: Partial<Record<Slot, string>> = {};
   for (const [k, n] of Object.entries(state.bag ?? {})) if (n > 0 && cross(k)) keepBag[k] = n;
   for (const [slot, k] of Object.entries(state.equip ?? {})) if (k && cross(k)) keepEq[slot as Slot] = k;
@@ -226,9 +240,17 @@ function seal(w: 'real' | 'hell') {
 /** 38차: 현실 물건은 지옥에서, 지옥 물건은 현실·천국에서 쓰지 못한다 (세계를 건너는 검은 마스크 · 일기장 · 관리자는 예외) */
 function worldOk(it: ItemDef | null | undefined): boolean {
   if (!it) return false;
-  if (it.cross || it.use === 'diary' || net.account()?.admin) return true;
+  if (it.cross || it.use === 'diary') return true;
+  // 45차: 천국의 물건은 천국에서만 — 노을과의 지옥 정벌 때는 천국의 무기·방어구만 든다 (회복품은 못 쓴다). 관리자도 예외 없음
+  if (it.heaven) return realm() === 'heaven' || (crusading() && (it.cat === 'weapon' || it.cat === 'armor'));
+  if (net.account()?.admin) return true;
+  if (realm() === 'heaven' || crusading()) return false;
   return inHell() ? !!it.hell : !it.hell;
 }
+/** 45차: 물건이 속한 세계 */
+function worldOf(it: ItemDef): 'heaven' | 'hell' | 'real' { return it.heaven ? 'heaven' : it.hell ? 'hell' : 'real'; }
+/** 45차: 노을과 지옥 정벌 중인가 */
+function crusading() { return !!state.crusade && inHell(); }
 function vaultOf(w: 'real' | 'hell'): Stash | null {
   const v = state.vault?.[w];
   return v && (Object.values(v.bag).some((n) => n > 0) || v.ammo > 0) ? v : null;
@@ -259,7 +281,11 @@ const PARROT_KIND_MS = 30 * 60e3;
 const parrotKind = () => Date.now() - (state.parrotAt ?? 0) < PARROT_KIND_MS;
 const stashRate = (it: ItemDef) => { const r = stashRate0(it); return parrotKind() && r >= 0.04 - 1e-9 ? r - 0.02 : r; };
 const stashFee = (it: ItemDef) => it.price * stashRate(it);
-const stashTotal = (sel: { it: ItemDef; n: number }[], hell: boolean) => Math.max(1, Math.round(sel.reduce((a, x) => a + stashFee(x.it) * x.n, 0)));
+/** 45차: 쓰러져 떨군 채 아무도 줍지 않아 우리로 온 물건은 원가의 절반을 내야 되찾는다 (잃은 것부터 먼저 꺼낸다) */
+const LOST_RATE = 0.5;
+const lostN = (v: Stash | null | undefined, k: string) => v?.lost?.[k] ?? 0;
+const takeFee = (it: ItemDef, n: number, lost: number) => { const a = Math.min(n, lost); return a * it.price * LOST_RATE + (n - a) * stashFee(it); };
+const stashTotal = (sel: { it: ItemDef; n: number; lost?: number }[], hell: boolean) => Math.max(1, Math.round(sel.reduce((a, x) => a + takeFee(x.it, x.n, x.lost ?? 0), 0)));
 /** 가게 안 우리 그림에 맡긴 물건 몇 개를 보인다 */
 function refreshCage() {
   const v = state.vault?.[cageW()];
@@ -354,9 +380,10 @@ function openCage() {
     for (const k of [...picked.keys()]) if (!rows.some((r) => r.key === k)) picked.delete(k);
     if (here && rows.length) { const p = document.createElement('p'); p.className = 'cage-note'; p.textContent = L.cagePickHint + (parrotKind() ? ` · ${L.cageKind}` : ''); list.appendChild(p); }
     for (const r of rows) {
-      const fee = stashFee(r.it);
+      const lost = lostN(v, r.key);
+      const fee = lost > 0 ? r.it.price * LOST_RATE : stashFee(r.it); // 45차: 잃었던 물건은 개당 원가의 절반
       const k0 = picked.get(r.key);
-      const row = itemRow(r.it, here ? (k0 ? `${L.cagePicked.replace('{n}', String(k0))} · ${priceText(Math.round(fee * k0), hell)}` : `×${r.n} · ${L.cageFeeEach.replace('{p}', priceText(Math.max(1, Math.round(fee)), hell))}`) : `×${r.n}`, async () => {
+      const row = itemRow(r.it, here ? (k0 ? `${L.cagePicked.replace('{n}', String(k0))} · ${priceText(Math.round(takeFee(r.it, k0, lost)), hell)}` : `×${r.n} · ${(lost > 0 ? L.cageLostEach : L.cageFeeEach).replace('{p}', priceText(Math.max(1, Math.round(fee)), hell))}`) : `×${r.n}`, async () => {
         if (!here) return;
         if (picked.has(r.key)) { picked.delete(r.key); draw(); return; }
         const n = r.n > 1 ? await askQty(r.it, Math.max(1, Math.round(fee)), r.n, 'take') : 1;
@@ -377,7 +404,7 @@ function openCage() {
     const go = document.createElement('button');
     go.className = 'primary';
     const sel = rows.filter((r) => picked.has(r.key)).map((r) => ({ r, n: picked.get(r.key)! }));
-    const total = stashTotal(sel.map((x) => ({ it: x.r.it, n: x.n })), tw === 'hell');
+    const total = stashTotal(sel.map((x) => ({ it: x.r.it, n: x.n, lost: lostN(v, x.r.key) })), tw === 'hell');
     go.textContent = L.cageTakeSel.replace('{k}', String(sel.length)).replace('{p}', priceText(total, hell));
     go.disabled = !sel.length;
     go.onclick = async () => {
@@ -416,6 +443,7 @@ async function parrotFee(sel: { r: { key: string; it: ItemDef; n: number; ammo?:
         if (r.ammo) { const k = Math.min(v.ammo, n * 12); state.ammo = (state.ammo ?? 0) + k; v.ammo -= k; ammoGear(); }
         else {
           v.bag[r.key] = Math.max(0, (v.bag[r.key] ?? 0) - n);
+          if (v.lost?.[r.key]) { v.lost[r.key] = Math.max(0, v.lost[r.key] - n); if (!v.lost[r.key]) delete v.lost[r.key]; }
           if (r.key === 'arrows20') { state.arrows = (state.arrows ?? 0) + n * 20; ammoGear(); }
           else if (r.key === 'rifleammo') { state.rifle = (state.rifle ?? 0) + n * 10; ammoGear(); }
           else { state.bag ??= {}; state.bag[r.key] = (state.bag[r.key] ?? 0) + n; }
@@ -552,6 +580,7 @@ function enterShop(fromStreet: boolean) {
 }
 
 async function enterWorld(at: 'door' | [number, number] = 'door', zoneId?: string) {
+  setAdminVisit(!!net.account()?.admin); // 45차: 관리자는 아파트·콘도에도 들어가 본다
   restInShop();
   dropInterior();
   // 어느 구역: 우주새 문 = 아속. 자리로 들어가면 주어진 구역 → 지금 서 있던 현실 구역 → 아속 (모르는 구역(옛 저장)이면 우주새 문 앞)
@@ -671,7 +700,7 @@ function worldFade(kind: 'hell' | 'heaven', long: boolean) {
 
 /** 42차: 죽은 뒤 건너가는 장면이 화면을 덮고 있으면, 다음 세계로 들어가는 쪽이 그것을 걷는다 */
 let passing: Passage | null = null;
-async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | 'shop' | 'resume' | 'teleport', goat?: { reason: GkWhy; want: number } | null) {
+async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | 'shop' | 'resume' | 'teleport' | 'wash' | 'crusade', goat?: { reason: GkWhy; want: number } | null) {
   hellAreaLabel = null; // 44차: 새 층에선 구역 이름을 다시
   const pass = passing;
   passing = null;
@@ -681,7 +710,7 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
   workLine = ''; // 하던 일은 이 세계에 두고 간다 ('일하는 중'이 따라오지 않게)
   const f = Math.max(1, Math.min(OPEN_FLOORS, floor));
   const h = hellState();
-  state.realm = 'hell';
+  setRealm('hell');
   h.floor = f;
   h.deepest = Math.max(h.deepest ?? 0, f, ...h.cleared); // 25차: 가 본 층은 다시 계단으로 내려갈 수 있다
   save(state);
@@ -714,6 +743,9 @@ async function enterHell(floor: number, how: 'fall' | 'drop' | 'up' | 'down' | '
   w.setStance(stance);
   w.setAutoCounter(autoCounter());
   w.setInvisible(invisible()); // 관리자 투명은 층을 옮겨도 그대로
+  // 45차 지옥 정벌: 노을이 곁에 서고, 쉬어도 체력이 차지 않는다
+  w.setNoRegen(!!state.crusade);
+  if (state.crusade) { const g = gear(); const st = stats(); const base = 4 + 10 * 3 + st.str; w.summonNoeul(maxHp(), [base, base + 4 + Math.round(g.atk * 0.5)]); }
   if (zh.exit === 'ford' && (h.fed ?? 0) >= GURMA_FULL && !h.cleared.includes(f)) w.gurmaSleep(); // 배불러 잠든 구르마
   w.start();
   if (pendingEater) { pendingEater = false; setTimeout(() => world?.sendEater(), 1500); } // 황혼의 가게에서 훔치다 걸렸다
@@ -744,7 +776,7 @@ function adminTeleport(to: number | 'back' | 'heaven' | 'bkk' | 'seoul' | 'goat'
     if (realm() === 'heaven' && state.heaven?.admin) delete state.heaven;
     if (realm() === 'border') delete state.border;
     if (trip === 'hell') { enterHell(hellState().floor, 'teleport'); return; }
-    state.realm = trip;
+    setRealm(trip);
     save(state);
     if (world) { world.destroy(); world = null; net.leaveZone(); }
     enterWorld('door');
@@ -755,7 +787,7 @@ function adminTeleport(to: number | 'back' | 'heaven' | 'bkk' | 'seoul' | 'goat'
   if (to === 'bkk' || to === 'seoul') {
     // 25차: 관리자 도시 이동 — 그 도시의 우주새 문 앞 (현실로)
     state.region = to;
-    if (realm() !== 'real') { state.realm = 'real'; delete state.adminTrip; }
+    if (realm() !== 'real') { setRealm('real'); delete state.adminTrip; }
     save(state);
     if (world) { world.destroy(); world = null; net.leaveZone(); }
     enterWorld('door');
@@ -771,7 +803,7 @@ function adminTeleport(to: number | 'back' | 'heaven' | 'bkk' | 'seoul' | 'goat'
   // 33차: 서울 달동네 골목 끝 내 집 (현실로 · 바로 집 안)
   if (to === 'home') {
     state.region = 'seoul';
-    if (realm() !== 'real') { state.realm = 'real'; delete state.adminTrip; }
+    if (realm() !== 'real') { setRealm('real'); delete state.adminTrip; }
     save(state);
     if (world) { world.destroy(); world = null; net.leaveZone(); }
     void loadZone('seoul-gangnam').then(async (z) => {
@@ -795,7 +827,7 @@ function adminTeleport(to: number | 'back' | 'heaven' | 'bkk' | 'seoul' | 'goat'
     const open = () => { if (!world || world.zone.interior || realm() !== 'heaven') return; const st = world.heavenStair ?? world.zone.door; /* 계단이 없는 구역이면 우주새 문 앞에서 바로 */ const b: Building = { i0: st.i, j0: st.j, w: 1, d: 1, h: 0, cat: 'terrace', color: '#ffffff' }; openRoom(interiorZone(b, -4, { i: st.i, j: st.j + 1 }, t().terraceName), null, false); };
     if (realm() === 'heaven' && world) { open(); return; }
     state.heaven ??= { admin: true };
-    state.realm = 'heaven';
+    setRealm('heaven');
     save(state);
     if (world) { world.destroy(); world = null; net.leaveZone(); }
     const fx = worldFade('heaven', true);
@@ -812,7 +844,7 @@ function adminTeleport(to: number | 'back' | 'heaven' | 'bkk' | 'seoul' | 'goat'
   if (to === 'heaven') {
     if (realm() === 'heaven') return;
     state.heaven ??= { admin: true };
-    state.realm = 'heaven';
+    setRealm('heaven');
     save(state);
     if (world) { world.destroy(); world = null; net.leaveZone(); }
     const fx = worldFade('heaven', true);
@@ -898,6 +930,7 @@ const hooks: WorldHooks = {
     toast(L.wagePaid.replace('{n}', amt), 'good');
   },
   deed(key, opt) {
+    if (key === 'hellMonster' && state.crusade) state.crusade.kills++; // 45차: 정벌 중 쓰러뜨린 수
     recordDeed(key, opt);
   },
   hp(hp, max) {
@@ -1082,6 +1115,16 @@ const hooks: WorldHooks = {
     hellState().notes += n;
     ecoLog('earn', 'drop', n, true);
     updateHud();
+  },
+  crusadeTalk() { void crusadeTalk(); },
+  lostItem(key) { // 45차: 쓰러져 떨군 물건을 아무도 줍지 않으면 제 세계의 보관 우리로 — 되찾을 땐 원가의 절반
+    const it = itemByKey(key);
+    if (!it || it.heaven) return;
+    const w: 'real' | 'hell' = it.hell ? 'hell' : 'real';
+    const v = ((state.vault ??= {})[w] ??= { bag: {}, ammo: 0 });
+    v.bag[key] = (v.bag[key] ?? 0) + 1;
+    (v.lost ??= {})[key] = (v.lost[key] ?? 0) + 1;
+    save(state);
   },
   loot(key, n = 1) {
     const it = itemByKey(key);
@@ -1471,6 +1514,65 @@ function healFull() {
   updateHpBar(state.hp, maxHp());
 }
 
+// ───────────────────────── 45차: 헬스장 · 도장 운동 ─────────────────────────
+const TRAIN_FEE = 200, TRAIN_MIN = 60, TRAIN_CAP = 180; // 한 번 ฿200 · 한 시간 · 하루 세 시간 (1분 = 영혼 경험치 1)
+let training: { kind: 'gym' | 'dojo'; left: number; sec: number; swing: number; gained: number; chip: HTMLElement; id: number } | null = null;
+/** 영혼 경험치를 조금 더한다 (영격이 오르면 알린다) */
+function gainSoulExp(n: number) {
+  const soul = state.soul ?? { rank: 1, exp: 0 };
+  const up = addSoulExp(soul.rank, soul.exp, n);
+  state.soul = { ...soul, rank: up.rank, exp: up.exp };
+  if (up.rank > soul.rank) rankUpShow(up.rank);
+}
+function startTraining(kind: 'gym' | 'dojo') {
+  const L = t();
+  const dd = daily();
+  if ((dd.train ?? 0) >= TRAIN_CAP) { toast(L.trainCapped); return; }
+  if (!pay(TRAIN_FEE)) return;
+  stopTraining(true);
+  const chip = document.createElement('div');
+  chip.className = 'train-chip';
+  chip.innerHTML = '<span></span><button></button>';
+  (chip.querySelector('button') as HTMLButtonElement).textContent = L.trainStop;
+  (chip.querySelector('button') as HTMLButtonElement).onclick = () => stopTraining();
+  document.body.appendChild(chip);
+  training = { kind, left: TRAIN_MIN, sec: 0, swing: 0, gained: 0, chip, id: window.setInterval(trainTick, 250) };
+  trainChip();
+  save(state);
+}
+function trainChip() {
+  if (!training) return;
+  const L = t();
+  training.chip.querySelector('span')!.textContent = (training.kind === 'gym' ? L.trainOnGym : L.trainOnDojo).replace('{m}', String(TRAIN_MIN - training.left)).replace('{e}', String(training.gained));
+}
+function trainTick() {
+  const tr = training;
+  if (!tr) return;
+  const k = world?.zone.interior?.kind;
+  if (!world || scene !== 'world' || (k !== 'gym' && k !== 'dojo') || world.playerMoving()) { stopTraining(); return; }
+  if (busy || dlg.isOpen) return;
+  tr.swing += 0.25;
+  if (tr.swing >= 1.3) { tr.swing = 0; world.trainSwing(); }
+  tr.sec += 0.25;
+  if (tr.sec < 60) return;
+  tr.sec = 0;
+  tr.left--;
+  const dd = daily();
+  dd.train = (dd.train ?? 0) + 1;
+  tr.gained++;
+  gainSoulExp(1);
+  save(state); renderHud(); trainChip();
+  if (tr.left <= 0 || dd.train >= TRAIN_CAP) stopTraining();
+}
+function stopTraining(quiet = false) {
+  const tr = training;
+  if (!tr) return;
+  training = null;
+  clearInterval(tr.id);
+  tr.chip.remove();
+  if (!quiet) toast(t().trainDone.replace('{e}', String(tr.gained)), tr.gained ? 'good' : '');
+}
+
 /** 방의 직원: 업종마다 할 수 있는 것 */
 function clerkTalk() {
   const info = world?.zone.interior;
@@ -1525,6 +1627,10 @@ function clerkTalk() {
       dd.donate++;
       recordDeed('donate100');
     } });
+  } else if (info.kind === 'gym' || info.kind === 'dojo') {
+    // 45차: 헬스장 · 도장 — 한 번 값을 내면 한 시간 운동. 1분마다 영혼 경험치 1 (하루 세 시간까지 · 아주 조금씩)
+    const dd = daily();
+    opts.push({ label: (info.kind === 'gym' ? L.trainGym : L.trainDojo).replace('{p}', moneyText(TRAIN_FEE)).replace('{n}', String(Math.max(0, TRAIN_CAP - (dd.train ?? 0)))), act: () => startTraining(info.kind as 'gym' | 'dojo') });
   } else if (info.kind === 'massage') {
     // 21차: 마사지 — 체력을 가득 채우고 넘치게 (최대 체력의 40%만큼 더, 맞으면 먼저 깎이고 10분에 걸쳐 빠진다)
     opts.push({ label: L.massageBtn, act: () => { if (pay(250)) { healFull(); world?.addOverHp(Math.round(maxHp() * 0.4)); toast(L.massaged, 'good'); } } });
@@ -1628,6 +1734,7 @@ function hellAct(kind: 'up' | 'down' | 'pashar' | 'talus') {
   const h = hellState();
   if (kind === 'talus') { talkToTalus(); return; }
   if (kind === 'pashar') return; // 파샤르는 지옥 로비 안 상담 책상에 있다
+  if (state.crusade && (kind === 'up' || kind === 'down')) { toast(L.crusadeStayFloor); return; } // 45차: 정벌은 고른 층에서만
   if (kind === 'up') { passUp(); return; }
   if (h.floor + 1 > OPEN_FLOORS) { toast(L.hellDeeper); return; }
   // 25차: 계단은 가 본 층까지만. 더 깊은 곳은 악업을 쌓고 쓰러져야 떨어진다
@@ -1652,6 +1759,17 @@ async function passUp() {
   };
   // 43차 5층 상승 시련: 가면을 벗고, 자기가 어떤 사람인지 사실대로 말해야 위로 간다 (한 번 통과하면 그 영혼은 다시 묻지 않는다)
   if (f === 5 && !h.bared && !(await bareTrial())) return;
+  // 45차: 1층 — 환생의 길은 층주를 쓰러뜨린 자에게만 열린다 (통행세도 속죄 헌금도 받지 않는다)
+  if (f === 1 && !h.cleared.includes(1)) {
+    busy = true;
+    const gd = def.guard ? GUARDS[def.guard] : null;
+    dlg.open({ name: gd ? gd.name[lang()] : L.ferryGuard });
+    const bn = MONSTERS[def.boss].name[lang()];
+    await dlg.say(L.lobbyNeedBoss.replace('{boss}', lang() === 'ko' ? bn + iGa(bn) : bn));
+    dlg.close();
+    busy = false;
+    return;
+  }
   if (h.cleared.includes(f) || (h.paid ?? []).includes(f) || (exit === 'ford' && (h.fed ?? 0) >= GURMA_FULL)) {
     if (exit === 'ferry' && h.cleared.includes(f)) toast(L.ferryFree);
     go();
@@ -1965,8 +2083,9 @@ function rebirthFrom(from: 'hell' | 'ghost' | 'heaven' | 'border', carryBaht = 0
     seal('hell');
     const h = hellState();
     h.cleared = []; h.paid = []; h.fed = 0;
+    delete h.deaths; delete h.washed; delete h.washFrom; // 45차
   } else seal('real'); // 26차: 천국·경계에서 들고 있던 것(관리자 시찰로 가져간 현실 물건 등)도 현실 우주새에 봉인 — 사라지지 않게
-  state.realm = 'real';
+  setRealm('real');
   delete state.pos;
   // 26차: 상담에서 미리 정한 다음 생 (모습·도시·선업으로 산 물건)
   const nl = state.nextLife;
@@ -2000,7 +2119,7 @@ async function enterBorder(why: 'zero' | 'stillborn' | 'resume', quiet = false) 
   dropInterior();
   if (street) { street.destroy(); street = null; }
   net.leaveZone();
-  state.realm = 'border';
+  setRealm('border');
   if (why !== 'resume' || !state.border) state.border = { since: Date.now(), met: state.border?.met };
   state.hp = maxHp();
   delete state.pos;
@@ -2517,7 +2636,8 @@ function sellFree(k: string) {
 function sellable(hell: boolean) {
   const bag = state.bag ?? {};
   const worn = new Set(Object.values(state.equip ?? {}));
-  return Object.keys(bag).filter((k) => bag[k] > 0).map(itemByKey).filter((it) => it && it.price > 0 && (hell ? !!it.hell || it.store === 'talus' : !it.hell && it.store !== 'talus') && !(worn.has(it.key) && bag[it.key] <= 1));
+  const here = hell ? 'hell' : realm() === 'heaven' ? 'heaven' : 'real'; // 45차: 천국의 물건은 현실·지옥에서 팔리지 않는다
+  return Object.keys(bag).filter((k) => bag[k] > 0).map(itemByKey).filter((it) => it && it.price > 0 && (hell ? (!!it.hell && !it.heaven) || it.store === 'talus' : worldOf(it) === here && it.store !== 'talus') && !(worn.has(it.key) && bag[it.key] <= 1));
 }
 
 /** 상품 창: 고른 물건(사기·팔기)을 돌려준다. '나가기'나 창 밖 빈 곳을 누르면 null */
@@ -2776,6 +2896,7 @@ function fallToGoat(reason: 'chose' | 'returned') {
   const d = state.deeds ?? { good: 0, evil: 0 };
   const j = judge(d);
   const want = Math.max(HELL_START, j.world === 'hell' ? j.floor : HELL_START);
+  { const h0 = hellState(); delete h0.deaths; delete h0.washed; delete h0.washFrom; } // 45차: 새 지옥길은 씻김을 처음부터
   seal('real');
   state.wallet = 0;
   state.played = Math.max(state.played ?? 0, RETURN_PLAYED);
@@ -3074,6 +3195,8 @@ function addToBag(it: ItemDef) {
   if (it.note === 'rifleammo') { state.rifle = (state.rifle ?? 0) + 10; return; }
   if (it.note === 'ammo') { state.ammo = (state.ammo ?? 0) + 12; return; } // 22차: 지옥 유황 탄환·흑요석 화살도 같은 주머니로
   if (it.note === 'arrows') { addArrows(it.key, 20); return; } // 24차: 마지막에 산 화살이 시위에 걸린다 (화살 종류마다 공격력이 다르다)
+  // 45차: 천국에서 손에 넣은 물건은 천국의 것 ('hv:키') — 현실로 가져가 쓰거나 팔 수 없다
+  if (realm() === 'heaven' && !it.heaven && !it.cross && it.use !== 'diary') it = itemByKey(`hv:${it.key}`); // 관리자도 같다 (천국 돈·물건이 현실로 새던 일)
   state.bag = state.bag ?? {};
   state.bag[it.key] = (state.bag[it.key] ?? 0) + 1;
 }
@@ -3360,6 +3483,7 @@ function gear() {
   const dr = Object.entries(eq).reduce((s, [, k]) => (!k ? s : s + (itemByKey(k)?.dr ?? 0)), 0);
   // 40차: 천 색이 있는 겉옷은 '그림#색'으로 (같은 그림을 물건마다 다른 색으로 입힌다)
   const armor = Object.entries(eq).filter(([slot, k]) => slot !== 'weapon' && k && itemByKey(k)).map(([, k]) => { const it = itemByKey(k as string), sp = it.sprite ?? (k as string); return it.tint ? `${sp}${it.tint}${it.metal ?? ''}` : sp; });
+  if (w?.wtint && !wBroken) armor.push(`wtint${w.wtint}`); // 45차: 무기의 쇠 빛 (천국 무기는 흰 금빛) — 방어구 목록에 실어 남의 기기에도 같은 빛으로
   // 24차: 활과 화살이 공격력을 반씩 나눈다 (활 < 근접 < 총)
   const arrowIt = w?.note === 'needsArrows' ? itemByKey(state.arrowKey ?? (inHell() ? 'harrows' : 'arrows')) : null;
   const arrowAtk = arrowIt ? arrowIt.atk ?? 3 : 0;
@@ -3394,6 +3518,7 @@ function useItem(k: string): boolean | 'wait' {
   const bag = state.bag ?? {};
   const it = itemByKey(k);
   if (!it?.heal || !(bag[k] > 0)) return false;
+  if (crusading()) { toast(t().crusadeNoHeal); return false; } // 45차: 정벌 중엔 지옥·천국 회복품 모두 못 쓴다
   if (!worldOk(it)) { toast(t().otherWorldItem); return false; }
   if (itemCooling()) return 'wait';
   useReadyAt = performance.now() + USE_CD_MS;
@@ -3517,13 +3642,15 @@ function renderBag() {
     const slot = slotOf(k);
     const on = bagTab !== 'gear' && !!slot && state.equip?.[slot] === k; // 장비 탭의 목록은 끼지 않은 여분뿐
     const quick = state.quick === k;
-    const label = it.use === 'marionette' ? L.pullString : it.use ? L.readBook : it.heal ? (it.key === 'bandage' || it.key === 'hbandage' ? L.use : L.eat) : slot ? (on ? L.unequip : L.equip) : '';
+    const tem = k === 'tembra' || k === 'tshard'; // 45차: 템브라 · 파편은 가방에서 바로 '쓰기' (강화 창이 열린다)
+    const label = tem ? L.use : it.use === 'marionette' ? L.pullString : it.use ? L.readBook : it.heal ? (it.key === 'bandage' || it.key === 'hbandage' ? L.use : L.eat) : slot ? (on ? L.unequip : L.equip) : '';
     const foreign = !worldOk(it);
     const row = itemRow(it, `${foreign ? L.otherWorldTag + ' · ' : ''}${slot ? L.slotNames[slot] + ' · ' : it.wreck ? L.wreckTag + ' · ' : ''}×${bag[k] - (bagTab === 'gear' ? worn(k) : 0)}${on ? ' · ' + L.equipped : ''}`, () => {
       if (bagDrop) { bagDrop = null; renderBag(); return; }
       if (it.use === 'diary') { el.remove(); void readDiary(k); return; }
       if (it.use === 'marionette') { useMarionette(k); redraw(); return; } // 43차
       if (!on && !worldOk(it)) { toast(L.otherWorldItem); return; } // 38차
+      if (tem) { el.remove(); openSmith(L.tembraUseTitle, L.tembraUseLine, 'enh', true); return; } // 45차: 산 템브라를 쓸 곳을 못 찾던 것
       if (it.heal) { if (useItem(k) === 'wait') { toast(L.useWait); return; } }
       else if (slot) {
         state.equip = state.equip ?? {};
@@ -3879,6 +4006,7 @@ function toast(text: string, kind: '' | 'good' | 'evil' = '') {
 
 // ───────────────────────── 죽음과 심판 ─────────────────────────
 function showDeath(cause: 'car' | 'beaten' | 'hell') {
+  if (state.crusade && inHell()) { void crusadeFall(); return; } // 45차: 정벌 중엔 한 번 쓰러지면 끝 — 노을과 천국으로
   if (cause === 'hell' || inHell()) { showHellDeath(); return; }
   const L = t();
   closeMenus();
@@ -3939,7 +4067,7 @@ function showDeath(cause: 'car' | 'beaten' | 'hell') {
     btn.onclick = () => {
       el.remove();
       state.heaven = { met: state.heaven?.met };
-      state.realm = 'heaven';
+      setRealm('heaven');
       state.hp = maxHp();
       save(state);
       const w = world;
@@ -4197,8 +4325,135 @@ async function talkToNoeul() {
     await runCeremony();
     return;
   }
+  // 45차: 지옥 정벌 — 노을에게 묻는다. 천국의 무기고도 노을이 지킨다
+  for (;;) {
+    if (dropped()) return;
+    const c = await dlg.choose([L.crusadeAskBtn, L.noeulArmoryBtn, L.noeulBye]);
+    if (c === 1) { dlg.close(); busy = false; openHeavenArmory(); return; }
+    if (c !== 0) break;
+    await dlg.say(L.crusadeOffer);
+    const c2 = await dlg.choose([L.crusadeJoin, L.crusadeRulesBtn, L.crusadeLater]);
+    if (c2 === 1) { for (const line of L.crusadeRules) await dlg.say(line); continue; }
+    if (c2 !== 0) { await dlg.say(pick(L.crusadeLaterLine)); continue; }
+    const floors = Array.from({ length: OPEN_FLOORS }, (_, k) => k + 1);
+    const c3 = await dlg.choose([...floors.map((f) => L.crusadeFloor.replace('{n}', String(f)).replace('{name}', floorDef(f).name[lang()])), L.crusadeLater]);
+    if (c3 < 0 || c3 >= floors.length) continue;
+    if (!state.equip?.weapon || !itemByKey(state.equip.weapon)?.heaven) await dlg.say(L.crusadeNoWeapon); // 천국 무기 없이 가면 맨주먹
+    await dlg.say(L.crusadeGo.replace('{n}', String(floors[c3])));
+    dlg.close();
+    busy = false;
+    void startCrusade(floors[c3]);
+    return;
+  }
   dropped() || endTalk();
 }
+
+// ───────────────────────── 45차: 노을과 지옥 정벌 ─────────────────────────
+/** 천국의 무기고 (노을): 천국 돈으로 천국의 무기·방어구 — 천국과 지옥 정벌에서만 든다 */
+function openHeavenArmory() {
+  closeMenus();
+  document.querySelector('.store-panel')?.remove();
+  const L = t();
+  const el = document.createElement('div');
+  el.className = 'store-panel shop-menu';
+  el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close">✕</button></div><p class="store-line"></p><div class="menu-list"></div>`;
+  el.querySelector('.menu-head b')!.textContent = L.noeulArmory;
+  el.querySelector('.store-line')!.textContent = L.noeulArmoryLine;
+  (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
+  const list = el.querySelector('.menu-list')!;
+  const draw = () => {
+    list.innerHTML = '';
+    for (const it of ITEMS.filter((x) => x.store === 'heaven')) {
+      const row = itemRow(it, priceText(it.price, false), async () => {
+        if ((state.wallet ?? 0) < it.price) { toast(L.noMoney); return; }
+        const n = await askQty(it, it.price, Math.min(9, Math.floor((state.wallet ?? 0) / it.price)), 'buy');
+        if (n <= 0 || (state.wallet ?? 0) < it.price * n) return;
+        state.wallet = (state.wallet ?? 0) - it.price * n;
+        ecoLog('spend', 'shop', it.price * n);
+        for (let k = 0; k < n; k++) addToBag(it);
+        save(state); renderHud(); renderQuick();
+        toast(L.bought.replace('{item}', it.name[lang()]).replace('{n}', String(n)), 'good');
+        draw();
+      }, (state.wallet ?? 0) < it.price);
+      list.appendChild(row);
+    }
+  };
+  draw();
+  panelAt(el);
+}
+/** 정벌을 떠난다: 천국을 잠시 비우고 고른 층으로 (지옥 노전 · 진행은 따로 두었다가 돌아오면 되돌린다) */
+async function startCrusade(floor: number) {
+  const h = hellState();
+  state.crusade = { floor, at: Date.now(), got: {}, kills: 0, snap: JSON.parse(JSON.stringify(h)), exp0: (state.soul?.exp ?? 0), rank0: state.soul?.rank ?? 1 };
+  h.notes = 0;
+  state.hp = maxHp();
+  save(state);
+  const fx = worldFade('heaven', false);
+  await fx.covered;
+  await enterHell(floor, 'crusade');
+  fx.done();
+}
+/** 정벌 중 쓰러졌다: 노을이 안고 천국으로 날아오른다 */
+async function crusadeFall() {
+  const L = t();
+  closeMenus();
+  document.querySelector('.bag-panel')?.remove();
+  toast(L.crusadeFallToast, 'evil');
+  await sleepMs(1400);
+  await endCrusade('fall');
+}
+/** 정벌 중 노을에게 말을 걸면: 돌아가자 / 계속 */
+async function crusadeTalk() {
+  if (busy || dlg.isOpen || !state.crusade) return;
+  const L = t();
+  busy = true;
+  dlg.open({ name: L.noeulName, portrait: 'noeul', exit: true });
+  await dlg.say(pick(L.crusadeMid));
+  const c = await dlg.choose([L.crusadeReturn, L.crusadeStay]);
+  if (c === 0 && !dlg.cancelled) { await dlg.say(L.crusadeReturnLine); dlg.close(); busy = false; void endCrusade('recall'); return; }
+  dropped() || endTalk();
+}
+/** 정벌을 마친다: 얻은 지옥 물건은 유황새 우리로 · 번 노전은 지옥 은행으로 · 지옥 진행은 떠나기 전 그대로 */
+async function endCrusade(why: 'recall' | 'fall') {
+  const cr = state.crusade;
+  if (!cr) return;
+  const L = t();
+  const h = hellState();
+  const earned = Math.floor(h.notes);
+  const sent: string[] = [];
+  const v = ((state.vault ??= {}).hell ??= { bag: {}, ammo: 0 });
+  for (const [k, n] of Object.entries(state.bag ?? {})) {
+    const it = itemByKey(k);
+    if (!it || n <= 0 || !it.hell) continue;
+    v.bag[k] = (v.bag[k] ?? 0) + n;
+    delete state.bag![k];
+    sent.push(`${it.name[lang()]} ×${n}`);
+  }
+  for (const [slot, k] of Object.entries(state.equip ?? {})) if (k && itemByKey(k)?.hell) delete state.equip![slot as Slot];
+  const snap = cr.snap as typeof h;
+  state.hell = { ...snap, bank: (snap.bank ?? 0) + earned };
+  const exp = (state.soul?.rank ?? 1) === cr.rank0 ? Math.max(0, (state.soul?.exp ?? 0) - cr.exp0) : -1;
+  delete state.crusade;
+  state.hp = maxHp();
+  save(state);
+  const fx = worldFade('heaven', why === 'fall');
+  await fx.covered;
+  if (world) { world.destroy(); world = null; net.leaveZone(); }
+  setRealm('heaven');
+  save(state);
+  await enterWorld('door');
+  fx.done();
+  dlg.open({ name: L.noeulName, portrait: 'noeul', exit: true });
+  busy = true;
+  await dlg.say(why === 'fall' ? L.crusadeFellLine : L.crusadeBackLine);
+  const parts = [L.crusadeSumKills.replace('{n}', String(cr.kills))];
+  if (exp >= 0) parts.push(L.crusadeSumExp.replace('{n}', String(exp)));
+  if (earned > 0) parts.push(L.crusadeSumNotes.replace('{n}', earned.toLocaleString('en-US')));
+  parts.push(sent.length ? L.crusadeSumItems.replace('{list}', sent.join(', ')) : L.crusadeSumNoItems);
+  await dlg.say(parts.join(' '));
+  dropped() || endTalk();
+}
+
 /** 21차: 종교시설 앞 천사 — 행사는 필수. 한 번 다녀오면 천국에 익숙해진 것으로 치고, 안내천사는 제자리로 돌아간다 */
 async function talkToPreacher() {
   const L = t();
@@ -4292,8 +4547,12 @@ function heavenFaint() {
 let pullWarned = 0;
 function sinkTo() {
   const j = judge(state.deeds ?? { good: 0, evil: 0 });
-  return j.world === 'hell' ? Math.min(OPEN_FLOORS, j.floor) : 0;
+  // 45차: 죽음으로 씻겨 올라온 층보다 깊이 가라앉지 않는다 (씻긴 뒤에 새로 지은 악업이 더 깊으면 그만큼)
+  const w = hellState().washed;
+  return j.world === 'hell' ? Math.min(OPEN_FLOORS, w && j.floor <= (hellState().washFrom ?? 99) ? Math.min(j.floor, w) : j.floor) : 0;
 }
+/** 45차: 한 층에서 이만큼 쓰러지면 악업이 씻겨 위층에서 깨어난다 (13층 → 1층까지 층마다 10번) */
+const DEATHS_TO_RISE = 10;
 function showHellDeath() {
   const L = t();
   closeMenus();
@@ -4301,6 +4560,18 @@ function showHellDeath() {
   const h = hellState();
   const sink = sinkTo();
   const deeper = sink > h.floor ? sink : 0;
+  // 45차: 지옥에서 여러 번 쓰러지면 악업이 씻긴다 — 한 층에서 열 번이면 위층에서 깨어난다 (1층은 씻기지 않는다: 환생하려면 층주를 쓰러뜨려야 한다)
+  let rise = 0, deathsHere = 0;
+  if (!deeper && h.floor > 1) {
+    h.deaths ??= {};
+    deathsHere = h.deaths[h.floor] = (h.deaths[h.floor] ?? 0) + 1;
+    if (deathsHere >= DEATHS_TO_RISE) {
+      rise = h.floor - 1;
+      h.deaths[h.floor] = 0;
+      h.washFrom = Math.max(h.washFrom ?? 0, judge(state.deeds ?? { good: 0, evil: 0 }).world === 'hell' ? (judge(state.deeds ?? { good: 0, evil: 0 }) as { floor: number }).floor : 0);
+      h.washed = Math.min(h.washed ?? 99, rise);
+    }
+  }
   const dropped = Math.floor(h.notes);
   h.notes -= dropped;
   ecoLog('spend', 'death', dropped, true);
@@ -4313,30 +4584,30 @@ function showHellDeath() {
     else if (bagGear.length) lost = bagGear[Math.floor(Math.random() * bagGear.length)];
     if (lost) { state.bag![lost] = Math.max(0, (state.bag![lost] ?? 1) - 1); world?.setGear(gear()); net.nudge(); }
   }
+  // 45차: 지옥에서 쓰러져도 몸과 가방의 물건은 그대로 — 떨군 것만 바닥에 남고, 아무도 줍지 않으면 유황새 우리로 (되찾을 땐 원가의 절반)
   if (world && !world.zone.interior) world.dropOnDeath(dropped, lost);
-  // 38차: 떨구지 않은 물건은 모두 유황새 보관 우리로 (꺼낼 때 수수료) — 현실 물건이 섞여 있으면 그것은 우주새 우리로
-  const sealedH = seal('hell');
-  if (sealedH) { world?.setGear(gear()); net.nudge(); renderQuick(); }
+  else if (lost) hooks.lostItem(lost);
   state.hp = maxHp();
   save(state);
   const el = document.createElement('div');
   el.className = 'death hell';
   el.innerHTML = `<div class="death-box"><h1></h1><p class="cause"></p><p class="money"></p><button class="primary"></button></div>`;
   el.querySelector('h1')!.textContent = L.hellPlace.replace('{n}', String(h.floor)).replace('{name}', floorDef(h.floor).name[lang()]);
-  el.querySelector('.cause')!.textContent = deeper ? L.hellSink.replace('{n}', String(deeper)) : L.hellDeath;
+  el.querySelector('.cause')!.textContent = deeper ? L.hellSink.replace('{n}', String(deeper)) : rise ? L.hellWashed.replace('{n}', String(rise)) : h.floor === 1 ? `${L.hellDeath} ${L.hellNoWash1}` : `${L.hellDeath} ${L.hellWashCount.replace('{k}', String(deathsHere)).replaceAll('{m}', String(DEATHS_TO_RISE))}`;
+  if (rise) el.classList.add('washed');
   el.querySelector('.money')!.textContent = [
-    dropped > 0 ? L.hellDeathDrop.replace('{n}', dropped.toLocaleString('en-US')) : '',
-    lost ? L.hellDeathItem.replace('{item}', itemByKey(lost).name[lang()]) : '',
-    sealedH ? L.hellDeathVault : '',
+    dropped > 0 ? (deeper || rise ? L.hellDeathDropLeft.replace('{f}', String(h.floor)) : L.hellDeathDrop).replace('{n}', dropped.toLocaleString('en-US')) : '', // 45차: 층을 떠나면 '10분 안에 주울 수 있다'는 맞지 않는다
+    lost ? L.hellDeathItem2.replace('{item}', itemByKey(lost).name[lang()]) : '',
     (h.bank ?? 0) > 0 ? L.hellDeathBank.replace('{n}', Math.floor(h.bank ?? 0).toLocaleString('en-US')) : '',
   ].filter(Boolean).join(' ');
   const btn = el.querySelector('button')!;
-  btn.textContent = deeper ? L.hellSinkBtn.replace('{n}', String(deeper)) : L.hellRise;
+  btn.textContent = deeper ? L.hellSinkBtn.replace('{n}', String(deeper)) : rise ? L.hellWashBtn.replace('{n}', String(rise)) : L.hellRise;
   btn.onclick = () => {
     el.remove();
     if (!world) return;
     world.revive(bodyLook());
     if (deeper) { pullWarned = 0; enterHell(deeper, 'drop'); return; }
+    if (rise) { sfx.chime(); enterHell(rise, 'wash'); return; }
     // 44차: 쓰러진 자리에서 가장 가까운 마을에서 일어난다 (깊은 층엔 마을이 둘)
     const v = world.nearestVillage();
     world.placeNear(v.i, v.j, maxHp());
@@ -4435,6 +4706,10 @@ function openAtone() {
     (el.querySelector('.xpbar > i') as HTMLElement).style.width = `${Math.min(100, (a / goal) * 100)}%`;
     const q = el.querySelector('.bank-quick')!, act = el.querySelector('.bank-act')!;
     q.innerHTML = ''; act.innerHTML = '';
+    if (a >= goal && f === 1 && !h.cleared.includes(1)) { // 45차: 1층은 헌금이 차도 층주를 쓰러뜨려야 환생의 길이 열린다
+      const p = document.createElement('p'); p.className = 'cage-note'; p.textContent = L.atoneNeedBoss; act.appendChild(p);
+      return;
+    }
     if (a >= goal) {
       const b = document.createElement('button');
       b.className = 'primary';
@@ -4525,7 +4800,7 @@ function openHellStore(kind: HellVendor) {
 }
 
 /** 30차 지옥 대장간: 지옥 장비를 고치고(노전), 템브라로 강화한다 */
-function openSmith(title?: string, hello?: string) {
+function openSmith(title?: string, hello?: string, start?: 'repair' | 'enh', enhOnly = false) {
   enhMsg = null; // 44차: 대장간을 새로 열면 지난 결과 글은 지운다
   closeMenus();
   document.querySelector('.store-panel')?.remove();
@@ -4538,11 +4813,12 @@ function openSmith(title?: string, hello?: string) {
   (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
   const list = el.querySelector('.menu-list')!;
   const tabs = el.querySelector('.store-tabs')!;
-  let mode: 'repair' | 'enh' = 'repair';
+  // 45차: 템브라나 파편을 들고 오면 강화 탭부터 (수리 탭이 먼저 열려 템브라를 어디에 쓰는지 몰랐다)
+  let mode: 'repair' | 'enh' = start ?? ((state.bag?.tembra ?? 0) > 0 || (state.bag?.tshard ?? 0) > 0 ? 'enh' : 'repair');
   const bFix = document.createElement('button'), bEnh = document.createElement('button');
   bFix.textContent = L.tabRepair; bEnh.textContent = L.tabEnhance;
   bFix.onclick = () => { mode = 'repair'; draw(); }; bEnh.onclick = () => { mode = 'enh'; draw(); };
-  tabs.append(bFix, bEnh);
+  if (!enhOnly) tabs.append(bFix, bEnh); // 45차: 가방에서 템브라를 쓸 때는 강화만 (수리는 대장간에서)
   const draw = () => {
     list.innerHTML = '';
     bFix.classList.toggle('on', mode === 'repair'); bEnh.classList.toggle('on', mode === 'enh');
@@ -4591,6 +4867,7 @@ async function talkToFerum() {
 /** 22차 지옥호텔: 바깥 공터의 매트리스 한 장 — 층×10 노전에 한숨 자면 체력이 다 찬다 */
 async function talkToHotel() {
   const L = t();
+  if (crusading()) { toast(L.crusadeNoHeal); return; } // 45차
   const h = hellState();
   const price = 10 * h.floor;
   busy = true;
@@ -4957,7 +5234,7 @@ function hellAreaText(key: string, floor: number): { name: string; sub: string }
   if (kind === 's') return v === 'mine' ? { name: L.mineYard, sub: L.mineYardSub } : { name: L.stairRoom.replace('{f}', String(floor)), sub: v === 'stairUp' ? L.stairRoomUp : L.stairRoomDown };
   const r = Number(v);
   if (r === 1) return { name: L.deepField, sub: L.deepFieldSub };
-  if (r === 2) return { name: L.lairField.replace('{boss}', MONSTERS[floorDef(floor).boss].name[lang()]), sub: L.lairFieldSub };
+  if (r === 2) return { name: L.lairField.replace('{boss}', MONSTERS[floorDef(floor).boss].name[lang()]), sub: floor === 1 ? L.lairFieldSub1 : L.lairFieldSub }; // 45차: 1층은 환생 전 마지막 관문
   if (r === 3) return { name: L.mineField, sub: L.mineFieldSub };
   return null;
 }
@@ -5265,6 +5542,13 @@ stanceBox.className = 'stance';
 const PICK_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 2.5v9m-3.5-3.5L12 11.5 15.5 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 12.5h16l-1.6 8H5.6z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="12" cy="16.3" r="1.6" fill="currentColor"/></svg>';
 const LENS_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M14.5 14.5 20 20" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>';
 stanceBox.innerHTML = `<button class="st-pick" aria-label="pick up">${PICK_SVG}<small></small></button><button class="st-hand" aria-label="interact">${LENS_SVG}<small></small></button><button class="st-sword" aria-label="attack stance"><span class="sw">⚔</span><small></small></button>`;
+// 45차: 대상 바꾸기 — 칼 태세에서만 보인다. 누를 때마다 내 둘레의 적을 가까운 순으로 돌아가며 노린다 (PC는 Tab)
+const TARGET_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+{ const b = document.createElement('button'); b.className = 'st-target'; b.setAttribute('aria-label', 'next target'); b.innerHTML = `${TARGET_SVG}<small></small>`; stanceBox.insertBefore(b, stanceBox.querySelector('.st-sword')); b.onclick = () => targetAct(); }
+function targetAct() {
+  if (!world || scene !== 'world' || busy || dlg.isOpen) return;
+  if (!world.cycleTarget()) toast(t().targetNone);
+}
 document.body.appendChild(stanceBox);
 stanceBox.hidden = true;
 (stanceBox.querySelector('.st-hand') as HTMLButtonElement).onclick = () => setStance('talk');
@@ -5314,6 +5598,8 @@ function showStance(on: boolean) {
   (stanceBox.querySelector('.st-pick') as HTMLElement).title = t().pickLabel;
   (stanceBox.querySelector('.st-pick small') as HTMLElement).textContent = t().pickLabel;
   (stanceBox.querySelector('.st-hand small') as HTMLElement).textContent = t().stance.talk;
+  (stanceBox.querySelector('.st-target small') as HTMLElement).textContent = t().targetLabel;
+  (stanceBox.querySelector('.st-target') as HTMLElement).title = t().targetTitle;
   setStance(stance);
 }
 
@@ -5341,6 +5627,7 @@ function showStance(on: boolean) {
   window.addEventListener('keydown', (e) => {
     if (keyCapture) { e.preventDefault(); e.stopPropagation(); keyCapture(e.code); return; }
     if (typing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.code === 'Tab' && scene === 'world' && world && !stanceBox.hidden) { e.preventDefault(); if (stance === 'talk') setStance('hostile'); targetAct(); return; } // 45차: Tab = 대상 바꾸기
     const km = keyMap();
     const act = KEY_ACTS.find((a) => km[a] === e.code);
     if (!act) return;

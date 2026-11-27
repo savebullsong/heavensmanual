@@ -1400,6 +1400,7 @@ class Doll:
         grip = (wr + hd) / 2 + Vector((0, -.008, 0))
         d = Vector((0, -.55, -.83)).normalized()        # 손에서 앞-아래로 뻗는 방향
         side = Vector((1, 0, 0)); up = d.cross(side).normalized()
+        G = lambda x, y, z: Vector((x, -z, y))   # 45차 총: 예전 (옆, 뒤, 위) 좌표 → 쏘는 자세의 손 축 (위 = 손 앞쪽 -Y, 뒤 = 손 위쪽 +Z)
         wood, metal, dark = rmat('wood', .45, .4), rmat('metal', .3, .6, .9), rmat('dark', .7, .2)
         P = Part(g)
         if name == 'bat':
@@ -1522,21 +1523,21 @@ class Doll:
             for k in range(len(pts) - 1):
                 limb(P, pts[k], pts[k + 1], [(0, .012 - k * .001, .012 - k * .001), (1, .011 - k * .001, .011 - k * .001)], metal, None, segs=6)
         elif name == 'flamer':   # 25차 화염방사기: 손잡이 아래 연료통, 앞으로 긴 분사관, 끝이 벌어진 노즐
-            fwd = Vector((0, -1, 0))
+            fwd = G(0, -1, 0)   # 45차: 쏘는 자세에서 손의 아래쪽(-Z)이 앞 — 예전엔 총구가 하늘을 향했다
             tank = rmat('raincoat', .55, .3, tag='wpn')
-            limb(P, grip + Vector((0, .01, .04)), grip + Vector((0, -.01, -.06)), [(0, .016, .024), (1, .016, .024)], dark, None, segs=6)   # 손잡이
-            limb(P, grip + Vector((0, .1, .07)), grip + Vector((0, .1, .07)) + fwd * .5, [(0, .017, .017), (1, .015, .015)], metal, None, segs=6)   # 분사관
-            limb(P, grip + Vector((0, -.4, .07)), grip + Vector((0, -.47, .07)), [(0, .02, .02), (1, .03, .03)], dark, None, segs=8)   # 노즐
-            limb(P, grip + Vector((0, .08, -.03)), grip + Vector((0, -.16, -.03)), [(0, .042, .042), (.1, .05, .05), (.9, .05, .05), (1, .042, .042)], tank, None, segs=10)   # 연료통
-            limb(P, grip + Vector((0, -.18, .07)), grip + Vector((0, -.26, -.01)), [(0, .014, .018), (1, .014, .018)], dark, None, segs=6)   # 앞 손잡이
-            blob(P, grip + Vector((0, -.445, .1)), (.012, .012, .012), rmat('crest', .25, .85), None, segs=6, rings=4)   # 불씨
+            limb(P, grip + G(0, .01, .04), grip + G(0, -.01, -.06), [(0, .016, .024), (1, .016, .024)], dark, None, segs=6)   # 손잡이
+            limb(P, grip + G(0, .1, .07), grip + G(0, .1, .07) + fwd * .5, [(0, .017, .017), (1, .015, .015)], metal, None, segs=6)   # 분사관
+            limb(P, grip + G(0, -.4, .07), grip + G(0, -.47, .07), [(0, .02, .02), (1, .03, .03)], dark, None, segs=8)   # 노즐
+            limb(P, grip + G(0, .08, -.03), grip + G(0, -.16, -.03), [(0, .042, .042), (.1, .05, .05), (.9, .05, .05), (1, .042, .042)], tank, None, segs=10)   # 연료통
+            limb(P, grip + G(0, -.18, .07), grip + G(0, -.26, -.01), [(0, .014, .018), (1, .014, .018)], dark, None, segs=6)   # 앞 손잡이
+            blob(P, grip + G(0, -.445, .1), (.012, .012, .012), rmat('crest', .25, .85), None, segs=6, rings=4)   # 불씨
         elif name == 'shotgun':   # 탈루스: 개머리판 달린 쌍대 산탄총
-            fwd = Vector((0, -1, 0))
-            limb(P, grip + Vector((0, .025, .035)), grip + Vector((0, .21, -.05)), [(0, .02, .03), (1, .03, .048)], wood, None, segs=6)   # 개머리판
-            limb(P, grip + Vector((0, .02, .05)), grip + Vector((0, -.1, .06)), [(0, .024, .03), (1, .024, .03)], metal, None, segs=6)   # 기관부
+            fwd = G(0, -1, 0)   # 45차: 쏘는 자세에서 손의 아래쪽(-Z)이 앞 — 예전엔 총구가 하늘을 향했다
+            limb(P, grip + G(0, .025, .035), grip + G(0, .21, -.05), [(0, .02, .03), (1, .03, .048)], wood, None, segs=6)   # 개머리판
+            limb(P, grip + G(0, .02, .05), grip + G(0, -.1, .06), [(0, .024, .03), (1, .024, .03)], metal, None, segs=6)   # 기관부
             for sx in (-.012, .012):
                 limb(P, grip + Vector((sx, -.1, .07)), grip + Vector((sx, -.1, .07)) + fwd * .44, [(0, .011, .011), (1, .011, .011)], dark, None, segs=6)
-            limb(P, grip + Vector((0, -.13, .05)), grip + Vector((0, -.29, .055)), [(0, .016, .022), (1, .016, .022)], wood, None, segs=6)   # 앞 손잡이
+            limb(P, grip + G(0, -.13, .05), grip + G(0, -.29, .055), [(0, .016, .022), (1, .016, .022)], wood, None, segs=6)   # 앞 손잡이
         elif name == 'bow':   # 17차 활: 위아래로 휜 나무 활대, 팽팽한 시위, 메긴 화살 (쏘는 자세에서 세로로 선다)
             # 쏘는 자세에서 손의 아래쪽(-Z)이 앞을, 앞쪽(-Y)이 위를 향한다 → 활대는 Y 축, 화살은 -Z 축
             fwd = Vector((0, 0, -1)); zz = Vector((0, -1, 0))
@@ -1555,9 +1556,9 @@ class Doll:
             for sg in (1, -1):
                 limb(P, nock - fwd * .0 + zz * sg * .004, nock + fwd * .08 + zz * sg * .03, [(0, .004, .004), (1, .002, .002)], rmat('crest', .7, .1), None, segs=3)   # 깃
         elif name == 'pistol':
-            fwd = Vector((0, -1, 0))
-            limb(P, grip + Vector((0, .01, .04)), grip + Vector((0, -.01, -.06)), [(0, .016, .026), (1, .016, .026)], dark, None, segs=6)
-            limb(P, grip + Vector((0, .03, .07)), grip + Vector((0, .03, .07)) + fwd * .19, [(0, .015, .022), (1, .015, .022)], dark, None, segs=6)
+            fwd = G(0, -1, 0)   # 45차: 쏘는 자세에서 손의 아래쪽(-Z)이 앞 — 예전엔 총구가 하늘을 향했다
+            limb(P, grip + G(0, .01, .04), grip + G(0, -.01, -.06), [(0, .016, .026), (1, .016, .026)], dark, None, segs=6)
+            limb(P, grip + G(0, .03, .07), grip + G(0, .03, .07) + fwd * .19, [(0, .015, .022), (1, .015, .022)], dark, None, segs=6)
         # ── 16차: 양손 무기 (현실 오함마·소방 도끼 · 지옥 대검·철퇴) — 손잡이가 손 뒤로도 길게 뻗어 왼손이 함께 쥔다 ──
         elif name == 'sledge':   # 오함마: 긴 나무 자루 + 네모난 쇠머리
             limb(P, grip - d * .32, grip + d * .8, [(0, .02, .02), (1, .018, .018)], wood, None, segs=8)
@@ -1667,12 +1668,12 @@ class Doll:
                 limb(P, grip + d * .62 + side * sg * .012, grip + d * .76, [(0, .02, .012), (1, .006, .004)], metal, None, segs=5)
             blob(P, grip + d * .62, (.03, .03, .03), dark, None, segs=8, rings=5)
         elif name == 'rifle':   # 26차 저격총: 긴 총열, 나무 개머리판, 위에 망원 조준경
-            fwd = Vector((0, -1, 0))
-            limb(P, grip + Vector((0, .025, .035)), grip + Vector((0, .27, -.06)), [(0, .02, .03), (1, .032, .05)], wood, None, segs=6)   # 개머리판
-            limb(P, grip + Vector((0, .02, .05)), grip + Vector((0, -.16, .06)), [(0, .024, .028), (1, .024, .028)], dark, None, segs=6)   # 기관부
-            limb(P, grip + Vector((0, -.16, .065)), grip + Vector((0, -.16, .065)) + fwd * .5, [(0, .011, .011), (1, .009, .009)], dark, None, segs=6)   # 총열
-            limb(P, grip + Vector((0, -.02, .11)), grip + Vector((0, -.2, .11)), [(0, .02, .02), (.15, .016, .016), (.85, .016, .016), (1, .022, .022)], dark, None, segs=8)   # 조준경
-            limb(P, grip + Vector((0, -.1, .06)), grip + Vector((0, -.12, -.01)), [(0, .01, .016), (1, .01, .016)], dark, None, segs=5)   # 탄창
+            fwd = G(0, -1, 0)   # 45차: 쏘는 자세에서 손의 아래쪽(-Z)이 앞 — 예전엔 총구가 하늘을 향했다
+            limb(P, grip + G(0, .025, .035), grip + G(0, .27, -.06), [(0, .02, .03), (1, .032, .05)], wood, None, segs=6)   # 개머리판
+            limb(P, grip + G(0, .02, .05), grip + G(0, -.16, .06), [(0, .024, .028), (1, .024, .028)], dark, None, segs=6)   # 기관부
+            limb(P, grip + G(0, -.16, .065), grip + G(0, -.16, .065) + fwd * .5, [(0, .011, .011), (1, .009, .009)], dark, None, segs=6)   # 총열
+            limb(P, grip + G(0, -.02, .11), grip + G(0, -.2, .11), [(0, .02, .02), (.15, .016, .016), (.85, .016, .016), (1, .022, .022)], dark, None, segs=8)   # 조준경
+            limb(P, grip + G(0, -.1, .06), grip + G(0, -.12, -.01), [(0, .01, .016), (1, .01, .016)], dark, None, segs=5)   # 탄창
         # ── 35차: 멀리서부터 때리는 근접 무기 ──
         elif name == 'whip':   # 가죽 채찍: 짧은 손잡이, 앞으로 뻗었다 아래로 늘어지며 가늘어지는 끈
             leather = rmat('wood', .82, .05)

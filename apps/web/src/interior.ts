@@ -14,13 +14,17 @@ export { BESK_LOOK };
 const TI = Object.fromEntries(TYPES.map((t, k) => [t, k])) as Record<(typeof TYPES)[number], number>;
 
 /** 들어갈 수 있는 건물: 가게·시설이 있고 문(간판 면)이 있는 곳 */
+/** 45차: 관리자는 아파트·콘도 안에도 들어가 본다 (main이 관리자 로그인 때 켠다) */
+let adminVisit = false;
+export function setAdminVisit(v: boolean) { adminVisit = v; }
 export function canEnter(b: Building) {
   const p = mainPoi(b);
+  if (b.cat === 'condo' && adminVisit) return true;
   if (b.cat === 'home' || b.cat === 'estate') return true; // 24차 내 집 · 35차 사는 집
   if (!p || b.cat === 'ujusae') return false;
   // 간판이 없어도 들어갈 수 있는 곳: 종교시설·병원·은행
   // 32차: 물건을 파는 곳·은행은 반드시 안으로 들어가서 산다 (문 앞에서 사던 버그)
-  return !!b.sign || ['place_of_worship', 'hospital', 'clinic', 'bank'].includes(p.t) || !!storeOf(b) || hasBank(b);
+  return !!b.sign || ['place_of_worship', 'hospital', 'clinic', 'bank', 'fitness_centre', 'fitness_center', 'sports_centre', 'gym', 'dojo', 'martial_arts'].includes(p.t) || !!storeOf(b) || hasBank(b); // 45차: 헬스장 · 도장은 간판이 없어도 들어간다
 }
 
 /** 17차: 우주새와 다른 무기를 파는 거리 상인 — 철물점·수리점(공구) · 백화점·쇼핑몰(주방칼·운동용품) */
@@ -37,6 +41,7 @@ function streetSeller(b: Building): 'tools' | 'dept' | 'antique' | undefined {
 export function roomKind(b: Building): string {
   if (b.cat === 'loan') return 'loan'; // 지옥 3층 베스크 대부소
   if (b.cat === 'estate') return 'myhome'; // 35차 내가 산 집
+  if (b.cat === 'condo' && !mainPoi(b)) return 'condo'; // 45차 아파트·콘도 한 집 (관리자만 들어가 본다)
   if (b.yunae) return 'ysalon'; // 40차 유내 미용실 (회상 속 그 미용실 그대로, 사람만 다르다)
   if (b.cat === 'hbank' || b.cat === 'atone' || b.cat === 'rebirth' || b.cat === 'terrace' || b.cat === 'home' || b.cat === 'goatroom') return b.cat; // 31차 goatroom = 지옥 142층 염소대왕의 방 // 지옥 은행 · 속죄의 회당 · 지옥 로비 · 천국 환생의 테라스
   const k = kindOf(b);
@@ -46,7 +51,8 @@ export function roomKind(b: Building): string {
   }
   if (k === 'bank' || k === 'bureau_de_change') return 'bank';
   if (['clinic', 'hospital', 'dentist', 'veterinary'].includes(k) || b.cat === 'clinic') return 'clinic';
-  if (['fitness_centre', 'fitness_center', 'sports_centre', 'gym', 'dojo'].includes(k)) return 'gym'; // 19차 헬스장
+  if (['dojo', 'martial_arts'].includes(k)) return 'dojo'; // 45차 도장 (방콕 무에타이 체육관 · 서울 태권도장)
+  if (['fitness_centre', 'fitness_center', 'sports_centre', 'gym'].includes(k)) return 'gym'; // 19차 헬스장
   if (['department_store', 'mall'].includes(k)) return 'dept'; // 22차 백화점·쇼핑몰: 넓은 매장
   // 대표 가게(첫 POI)의 업종이 먼저 (한 건물에 식당·미용실이 같이 있으면 대표 가게의 방)
   if (['convenience', 'supermarket', 'kiosk', 'variety_store'].includes(k)) return 'mart';
@@ -71,7 +77,7 @@ export const REST_ROOMS = new Set(['home', 'myhome', 'temple', 'church', 'mosque
 const SIZE: Record<string, [number, number]> = {
   temple: [13, 11], church: [13, 11], mosque: [12, 11], gurdwara: [12, 11], bank: [12, 10], clinic: [12, 10], pharmacy: [9, 8],
   mart: [11, 9], food: [12, 10], cafe: [10, 9], bar: [10, 9], salon: [9, 8], ysalon: [10, 9], massage: [10, 9], laundry: [9, 8], lobby: [11, 9], shop: [9, 8], loan: [10, 8],
-  hbank: [10, 8], atone: [11, 10], myhome: [14, 11], furnshop: [12, 10], hardware: [12, 10], arcade: [13, 10], rebirth: [31, 17], terrace: [23, 16], home: [11, 9], gym: [13, 11], dept: [26, 20], goatroom: [17, 17],
+  hbank: [10, 8], atone: [11, 10], myhome: [14, 11], furnshop: [12, 10], hardware: [12, 10], arcade: [13, 10], rebirth: [31, 17], terrace: [23, 16], home: [11, 9], gym: [13, 11], dojo: [13, 11], condo: [13, 10], dept: [26, 20], goatroom: [17, 17],
 };
 const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   temple: { floor: 'temple', wall: '#e9dcc0', trim: '#a8322a' }, church: { floor: 'stone', wall: '#e8e2d4', trim: '#6b4a30' },
@@ -87,6 +93,8 @@ const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   rebirth: { floor: 'marble', wall: '#dfe3e6', trim: '#56687a' },
   terrace: { floor: 'cloud', wall: '#f6f2ea', trim: '#c9a23e' },
   home: { floor: 'jangpan', wall: '#e6dcc6', trim: '#7a5a3e' },
+  condo: { floor: 'wood', wall: '#eae6de', trim: '#5a6a7a' }, // 45차 아파트·콘도
+  dojo: { floor: 'rubber', wall: '#e8e0d0', trim: '#b8302a' }, // 45차 도장
   myhome: { floor: 'wood', wall: '#ece4d6', trim: '#7a6450' }, // 35차 방콕 콘도 (서울 아파트는 아래에서 대리석)
   furnshop: { floor: 'wood', wall: '#e6ddd0', trim: '#5a4636' },
   hardware: { floor: 'grey', wall: '#dcd6c8', trim: '#d8641e' }, // 38차 철물점: 시멘트 바닥 · 주황 띠
@@ -245,6 +253,22 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
       break;
     }
     case 'myhome': furnishHome(owned ?? [], W, H, F); break; // 35차: 산 가구가 저절로 놓인다 (직원 없음)
+    case 'dojo': {
+      // 45차 도장: 바닥 매트 넷 · 샌드백 줄 · 거울 · 앞쪽 관장 자리 (무에타이는 샌드백, 태권도는 매트 위 발차기)
+      F(W - 5, y1 - 2, 3, 1, 22, 'counter', 6); clerk = { i: W - 4, j: y1 - 3 }; counter = { i: W - 4, j: y1 - 1 };
+      for (let n = 0; n < 4; n++) F(1 + n * 2, 1, 1, 1, 64, 'punchbag', n);
+      F(2, 4, 5, 5, 1, 'rug', 5); // 넓은 수련 매트 한 장
+      F(x1, 1, 1, 1, 30, 'rope'); F(x1, 3, 1, 1, 20, 'towels'); F(9, 1, 2, 1, 24, 'dumbbells');
+      seats.push([3, 5], [6, 5], [3, 8]);
+      break;
+    }
+    case 'condo':
+      // 45차 아파트·콘도 한 집: 부엌 · 큰 침대 · 소파와 TV · 식탁 · 옷장 · 화분 (사람은 없다)
+      F(1, 1, 3, 1, 24, 'kitchen', 1); F(5, 1, 2, 3, 16, 'kbed', 1); F(8, 1, 2, 1, 50, 'shelf', 4); F(x1, 1, 1, 2, 58, 'wardrobe');
+      F(1, 5, 1, 3, 24, 'flattv', 1); F(4, 5, 1, 3, 14, 'homesofa'); F(3, 6, 1, 1, 12, 'ctable'); F(2, 5, 3, 3, 1, 'rug', 2);
+      F(7, 6, 2, 1, 16, 'table', 4); F(7, 7, 1, 1, 12, 'chair'); F(8, 7, 1, 1, 12, 'chair', 1);
+      F(x1, y1, 1, 1, 12, 'plant'); F(1, y1, 1, 1, 48, 'lamp');
+      break;
     case 'arcade':
       // 35차 오락실: 뒤 벽을 따라 게임기 줄 · 왼쪽 벽 인형 뽑기 둘 · 가운데 에어하키 · 앞쪽 리듬 발판 · 동전 바꾸는 계산대
       for (let n = 0; n < 6; n++) F(1 + n, 1, 1, 1, 44, 'arcadecab', n);
@@ -390,7 +414,7 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
   const look = kind === 'myhome' && b.estate === 'seoul' ? { floor: 'marble', wall: '#f2eee6', trim: '#9a8a6a' } : hAge === 0 ? { floor: 'sand', wall: '#b8b0a4', trim: '#6a6a66' } : hAge === 1 || kind === 'ysalon' ? { floor: 'checker', wall: '#f2e6e0', trim: '#b85a74' } : hAge === 2 ? { floor: 'pale', wall: '#e6ecea', trim: '#3a8a7a' } : LOOKS[kind];
   const info: InteriorInfo = {
     // 28차: 내 집의 유내 — 거리에서 정해 둔 시절을 따른다. 20대(1)면 방은 비어 있다 (대문 앞에 나가 있거나, 그 사람 만나러 갔다)
-    kind, rest: REST_ROOMS.has(kind), name, ...look, exit, clerk: kind === 'myhome' || hAge === 3 ? undefined : clerk, counter: kind === 'myhome' || hAge === 3 ? undefined : counter, furn, age: hAge,
+    kind, rest: REST_ROOMS.has(kind), name, ...look, exit, clerk: kind === 'myhome' || kind === 'condo' || hAge === 3 ? undefined : clerk, counter: kind === 'myhome' || kind === 'condo' || hAge === 3 ? undefined : counter, furn, age: hAge,
     from: { b: k, out, bd: b }, store: kind === 'bank' ? 'bank' : kind === 'furnshop' ? 'furniture' : ['mart', 'pharmacy', 'food', 'cafe'].includes(kind) ? kind : streetSeller(b), cuisine: cuisineOf(b), seats: seats.filter(([i, j]) => tiles[j * W + i] === TI.walk),
   };
   return finalize({ id: `in-${k}`, W, H, tiles, buildings: [], props: [], lanes: [], door: exit, spawn: { i: exit.i, j: exit.j - 1 }, interior: info });

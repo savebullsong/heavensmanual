@@ -10,6 +10,10 @@ export interface Save {
   lang?: Lang;
   // 이번 생 (죽으면 사라진다)
   wallet?: number;
+  /** 45차: 지금 세계가 아닌 쪽의 지갑 (현실 · 천국) */
+  wallets?: { real?: number; heaven?: number };
+  /** 45차: 노을과 지옥 정벌 중 (천국에서 떠나 고른 층에서 싸운다 · 한 번 쓰러지면 끝) */
+  crusade?: { floor: number; at: number; got: Record<string, number>; kills: number; /** 떠나기 전 지옥 진행 (돌아오면 되돌린다) */ snap: unknown; exp0: number; rank0: number };
   /** 은행 통장: 죽어도 남는다 (영혼이 아니라 계정·기기에 붙음) */
   bank?: number;
   bag?: Record<string, number>;
@@ -88,6 +92,10 @@ export interface Save {
     mariMet?: boolean;
     /** 43차: 5층 상승 시련(맨얼굴)을 통과했다 */
     bared?: boolean;
+    /** 45차: 층마다 쓰러진 횟수 (열 번이면 악업이 씻겨 위층에서 깨어난다) */
+    deaths?: Record<number, number>;
+    /** 45차: 죽음으로 씻겨 올라온 가장 얕은 층 · 그때의 업이 가리키던 층 (이보다 깊은 악업을 새로 지으면 다시 가라앉는다) */
+    washed?: number; washFrom?: number;
   };
   /** 26차: 환생 상담에서 미리 정한 다음 생 — 처음 모습의 운, 고른 몸, 도시, 선업으로 산 물건 */
   nextLife?: { kind: import('./character.ts').Arrival; look: import('./character.ts').Look; region: string; bag: Record<string, number>; /** 37차 선업의 값 (바트 셈) */ cash?: number };
@@ -128,9 +136,9 @@ export interface Save {
   seen?: number;
   played?: number;
   /** 하루에 한도가 있는 선행 (기도 3 · 읽기 1 · 기부 20) */
-  daily?: { d: string; pray: number; read: number; donate: number };
+  daily?: { d: string; pray: number; read: number; donate: number; /** 45차: 오늘 운동한 분 (헬스장 · 도장) */ train?: number };
 }
-export interface Stash { bag: Record<string, number>; ammo: number }
+export interface Stash { bag: Record<string, number>; ammo: number; /** 45차: 쓰러져 떨군 채 우리로 온 것 (되찾을 때 원가의 절반) */ lost?: Record<string, number> }
 export type Slot = 'weapon' | 'offhand' | 'head' | 'body' | 'hands' | 'legs' | 'shins' | 'feet';
 // v2: 작은 캐릭터와 '처음 모습' 시나리오로 바뀌어 예전 저장은 새로 시작한다
 const KEY = 'heavensmanual.save.v2';

@@ -127,7 +127,8 @@ export const MONSTERS: Record<string, MonsterDef> = Object.fromEntries([
   M('bonewalker', 'bones', '걷는 해골', 'โครงกระดูกเดินได้', 'Walking bones', '#d8cfb8', '#3a3026', '#ff6a2a', 230, [9, 15], 1.2, 7, 0.9, 1, [4, 9], { weapon: 'femur' }),
   M('gateyak', 'yak', '뼈지기', 'ผู้เฝ้ากระดูก', 'Bone warden', '#6a6e76', '#3a2a22', '#e0b437', 520, [14, 22], 0.9, 5, 1.15, 1.12, [10, 18], { weapon: 'club', cols: { 13: '#e0d6bc', 14: '#c8bea4' } }),
   // 아쉬갈: 숯이 된 바위 거인. 갈라진 틈으로 용암이 흐르고 숫양 뿔이 말렸다. 불탄 성문의 쇠 빗장을 휘두른다
-  M('ashgal', 'ashgal', '아쉬갈', 'อัชกัล', 'Ashgal', '#4a4440', '#2a2220', '#ff6a1a', 2400, [22, 32], 1.0, 9, 1.15, 1.45, [120, 160], { boss: true, weapon: 'gatebar', title: { ko: '재의 문지기', th: 'ผู้เฝ้าประตูเถ้า', en: 'Gatekeeper of Ash' }, cols: { 13: '#3a2a1e', 14: '#5a5652', 15: '#120c0a' } }),
+  M('ashgal', 'ashgal', '아쉬갈', 'อัชกัล', 'Ashgal', '#4a4440', '#2a2220', '#ff6a1a', 8000, [24, 34], 1.0, 9, 1.1, 1.75, [400, 600], { // 45차: 환생 전 마지막 관문 — 체력 2400 → 8000 · 더 크게 · 기술 여덟(world BOSS_SK)
+    boss: true, weapon: 'gatebar', title: { ko: '재의 문지기', th: 'ผู้เฝ้าประตูเถ้า', en: 'Gatekeeper of Ash' }, cols: { 13: '#3a2a1e', 14: '#5a5652', 15: '#120c0a' } }),
   // 2층 굶주림의 늪 (26차 설정집): 늪충 — 진흙 속에서 튀어나온다 · 탐식귀 — 주변을 삼킨다 · 진흙거인 — 거대한 몸으로 길을 막는다
   M('mudworm', 'serane', '늪충', 'หนอนบึง', 'Mud worm', '#4a5a32', '#2a3018', '#c8e05a', 300, [10, 17], 1.05, 6, 0.95, 0.72, [5, 11], { weapon: null }),
   M('glutton', 'glutton', '탐식귀', 'ผีตะกละ', 'Glutton', '#5f7a4a', '#c9b27a', '#e0b437', 640, [16, 25], 0.85, 5, 1.15, 1.1, [12, 22], { weapon: 'club', cols: { 4: '#3a2a1a' } }),
@@ -720,8 +721,19 @@ export function hellZone(floor: number): Zone {
   }
   // 경계 장식 (17차): 해안 절벽과 산등성이에 바위 기둥 — 1층 현무암(틈에 용암) · 2층 안개 낀 바위산 · 3층 무너진 담
   const isBlk = (i: number, j: number) => at(i, j) === TI.block && !buildings.some((b) => i >= b.i0 && i < b.i0 + b.w && j >= b.j0 && j < b.j0 + b.d);
-  for (const idx of cliff) { const i = idx % W, j = Math.floor(idx / W); if (isBlk(i, j) && (i + j) % 2 === 0) props.push({ i, j, kind: 'crag' }); }
-  for (const idx of ridge) { const i = idx % W, j = Math.floor(idx / W); if (isBlk(i, j) && ((i + j) % 2 === 0 || hash2(i, j) < 0.25)) props.push({ i, j, kind: hash2(j, i) < 0.8 ? 'crag' : 'rock' }); }
+  // 45차: 산등성이 · 구역 벽은 칸마다 이어지는 입체 블록으로 (1층 화산재 언덕 · 2층 이끼 낀 진흙 둔덕 · 3층 성벽 · 4층 쇳돌 절벽 · 5층 흰 회벽). 3층부터는 해안 절벽도 같은 벽
+  const wallSet = new Set<number>();
+  for (const idx of ridge) { const i = idx % W, j = Math.floor(idx / W); if (isBlk(i, j)) wallSet.add(idx); }
+  if (T !== 'ash') for (const idx of cliff) { const i = idx % W, j = Math.floor(idx / W); if (isBlk(i, j)) wallSet.add(idx); }
+  else for (const idx of cliff) { const i = idx % W, j = Math.floor(idx / W); if (isBlk(i, j) && (i + j) % 2 === 0) props.push({ i, j, kind: 'crag' }); }
+  const isW = (i: number, j: number) => wallSet.has(j * W + i);
+  for (const idx of wallSet) {
+    const i = idx % W, j = Math.floor(idx / W);
+    const m = (isW(i, j - 1) ? 1 : 0) | (isW(i + 1, j) ? 2 : 0) | (isW(i, j + 1) ? 4 : 0) | (isW(i - 1, j) ? 8 : 0);
+    const deg = (m & 1 ? 1 : 0) + (m & 2 ? 1 : 0) + (m & 4 ? 1 : 0) + (m & 8 ? 1 : 0);
+    const hc = T === 'market' ? ((deg <= 1 || hash2(i * 5, j * 3) < 0.05) ? 3 : 0) : Math.max(0, Math.min(3, Math.floor(vnoise(i * 0.14, j * 0.14, floor * 7) * 4.4 - (4 - deg) * 0.35)));
+    props.push({ i, j, kind: 'wall', o: (T === 'market' ? m : 0) + 16 * (T === 'mask' ? 0 : hc) }); // 둔덕 · 회벽은 이웃 모양을 안 쓴다 (그림 수를 줄인다)
+  }
   if (T === 'swamp') for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
     if (!isBlk(i, j) || cliff.has(j * W + i) || ridge.has(j * W + i)) continue;
     const shore = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b2]) => at(i + a, j + b2) === TI.water);

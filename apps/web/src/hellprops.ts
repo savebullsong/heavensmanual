@@ -174,6 +174,8 @@ export function hellDecor(kind: string, theme: Theme, v: number, o = 0): HPic {
     if (theme === 'market') p.R(cx - 6, cb + 4, 2, 14, '#7a0a0a');
     p.finish();
     out = { canvas: p.c, ax: 18.5 / 96, ay: 110 / 112 };
+  } else if (kind === 'wall') {
+    out = wallBlock(theme, v, o, r); // 45차
   } else if (kind === 'crag') {
     out = crag(theme, v, o, r);
   } else if (kind === 'dicetable') {
@@ -386,6 +388,117 @@ export function hellDecor(kind: string, theme: Theme, v: number, o = 0): HPic {
 }
 
 /** 경계 (지나갈 수 없는 곳) */
+/**
+ * 45차 지옥의 벽: 칸마다 빈틈없이 이어지는 입체 블록 (예전엔 칸 하나 걸러 같은 방향 벽돌 판을 세워 듬성듬성했다).
+ * o = 이웃 벽(북 1 · 동 2 · 남 4 · 서 8) + 16 × 높이 단계(0~3). 층마다 다르게:
+ *  1층 화산재 언덕(둥근 잿더미 · 용암 금 · 현무암 머리) · 3층 붉은 벽돌 성벽(총안 · 망루 · 해골 창) · 4층 쇠똥 절벽(검은 쇳돌 · 벌건 틈 · 녹 흐름) · 5층 흰 회벽(갓돌 · 걸린 가면 · 먹물 자국)
+ */
+function wallBlock(theme: Theme, v: number, o: number, r: (k: number) => number): HPic {
+  const mask = o & 15, hc = (o >> 4) & 3;
+  const nN = !!(mask & 1), nE = !!(mask & 2), nS = !!(mask & 4), nW = !!(mask & 8);
+  const tower = theme === 'market' && hc === 3;
+  const H = theme === 'ash' ? [56, 80, 104, 128][hc] : theme === 'swamp' ? [48, 70, 92, 114][hc] : theme === 'forge' ? [70, 96, 122, 148][hc] : theme === 'mask' ? 104 : tower ? 150 : 100;
+  const W1 = theme === 'ash' || theme === 'forge' || theme === 'swamp' ? 92 : 68, H1 = Math.round((H + 140) / 2); // 둔덕은 칸보다 넓다
+  const p = pen(W1, H1);
+  const cx = W1, cy = H1 * 2 - 44;
+  const P = (u: number, w: number, z: number): [number, number] => [cx + (u - w) * 64, cy - 32 + (u + w) * 32 - z];
+  const face = (a: [number, number], b: [number, number], z0: number, z1: number, col: string) => p.poly([[a[0], a[1] - z0], [b[0], b[1] - z0], [b[0], b[1] - z1], [a[0], a[1] - z1]], col);
+  const L0 = P(0, 1, 0), B0 = P(1, 1, 0), R0 = P(1, 0, 0), T0 = P(0, 0, 0);
+  // 바닥 그림자
+  p.E(cx, cy + 6, 70, 22, 'rgba(10,6,5,0.55)');
+  const strip = (a: [number, number], b: [number, number], z: number, col: string, w = 1) => p.L(a[0], a[1] - z, b[0], b[1] - z, w, col);
+  if (theme === 'mask') {
+    // 흰 회벽: 아래 검은 돌 띠 · 분칠한 듯 흰 벽 · 위로 튀어나온 갓돌. 앞면엔 가끔 웃는 가면이 걸리고 먹물이 흘러내린다
+    face(L0, B0, 0, H, '#d6d0c6'); face(B0, R0, 0, H, '#aca69c');
+    face(L0, B0, 0, 14, '#2a2628'); face(B0, R0, 0, 14, '#1c1a1c');
+    for (let z = 22; z < H - 10; z += 18) { strip(L0, B0, z, '#c8c2b8'); strip(B0, R0, z, '#9c968c'); }
+    // 갓돌 (밖으로 조금 나온다)
+    const k = 0.06;
+    p.poly([[P(-k, -k, H)[0], P(-k, -k, H)[1]], [P(1 + k, -k, H)[0], P(1 + k, -k, H)[1]], [P(1 + k, 1 + k, H)[0], P(1 + k, 1 + k, H)[1]], [P(-k, 1 + k, H)[0], P(-k, 1 + k, H)[1]]], '#ece8e0');
+    face(P(-k, 1 + k, 0), P(1 + k, 1 + k, 0), H - 8, H, '#bcb6ac'); face(P(1 + k, 1 + k, 0), P(1 + k, -k, 0), H - 8, H, '#8e887e');
+    if (!nS && r(3) < 0.45) { // 앞 왼쪽 면에 걸린 가면
+      const [mx, my] = P(0.5, 1, 0); const yy = my - H * 0.56;
+      p.L(mx, yy - 22, mx, yy - 10, 1, '#3a3236');
+      p.E(mx, yy, 11, 14, '#f4f0e8'); p.E(mx - 2, yy - 2, 9, 11, '#fffcf6');
+      p.R(mx - 6, yy - 4, 4, 2, '#2a2228'); p.R(mx + 3, yy - 4, 4, 2, '#2a2228');
+      for (let q = -5; q <= 5; q++) p.R(mx + q, yy + 5 + Math.round((q * q) / 9), 1, 1, '#b8283a');
+      if (r(4) < 0.5) p.R(mx - 4, yy - 2, 1, 6, '#6a1a2a'); // 핏물 눈물
+    }
+    for (let q = 0; q < 2; q++) if (r(10 + q) < 0.4) { const t = 0.15 + r(12 + q) * 0.7; const [x, y] = [L0[0] + (B0[0] - L0[0]) * t, L0[1] + (B0[1] - L0[1]) * t]; p.R(x, y - H + 6, 2, 16 + r(14 + q) * 40, '#2a2430'); }
+    p.finish([20, 16, 18], 0);
+    return { canvas: p.c, ax: 0.5, ay: cy / (H1 * 2) };
+  }
+  if (theme === 'market') {
+    // 붉은 벽돌 성벽: 칸마다 이어지는 벽 · 위는 순라길, 바깥쪽(이웃이 없는 쪽) 가장자리에만 총안 · 높은 칸은 망루
+    const face2 = (a: [number, number], b: [number, number], col: string, dark: string) => {
+      face(a, b, 0, H, col);
+      for (let z = 10; z < H; z += 10) strip(a, b, z, dark);
+      const n = 6;
+      for (let row = 0; row < H / 10; row++) for (let q = 0; q < n; q++) { const t = (q + (row % 2) * 0.5) / n; if (t > 1) continue; const x = a[0] + (b[0] - a[0]) * t, y = a[1] + (b[1] - a[1]) * t - row * 10; p.R(x, y - 10, 1, 10, dark); }
+    };
+    face2(L0, B0, '#6a3028', '#3a1612'); face2(B0, R0, '#48201c', '#24100c');
+    p.poly([P(0, 0, H), P(1, 0, H), P(1, 1, H), P(0, 1, H)], '#4a3a34');
+    for (let q = 1; q < 4; q++) { strip(P(q / 4, 0, 0), P(q / 4, 1, 0), H, '#3a2c28'); }
+    // 총안: 이웃 벽이 없는 가장자리마다 톱니
+    const merl = (a: [number, number, number], b: [number, number, number]) => {
+      for (let q = 0; q < 4; q++) {
+        const t0 = q / 4 + 0.04, t1 = t0 + 0.14;
+        const A = P(a[0] + (b[0] - a[0]) * t0, a[1] + (b[1] - a[1]) * t0, H), B = P(a[0] + (b[0] - a[0]) * t1, a[1] + (b[1] - a[1]) * t1, H);
+        p.poly([[A[0], A[1]], [B[0], B[1]], [B[0], B[1] - 16], [A[0], A[1] - 16]], '#7a3a30');
+        p.poly([[A[0], A[1] - 16], [B[0], B[1] - 16], [B[0] + 3, B[1] - 18], [A[0] + 3, A[1] - 18]], '#9a5a4a');
+      }
+    };
+    if (!nN) merl([0, 0, 0], [1, 0, 0]);
+    if (!nW) merl([0, 0, 0], [0, 1, 0]);
+    if (!nE) merl([1, 0, 0], [1, 1, 0]);
+    if (!nS) merl([0, 1, 0], [1, 1, 0]);
+    if (tower) { const [tx, ty] = P(0.5, 0.5, H); p.L(tx, ty - 4, tx, ty - 40, 2, '#4a4642'); skull(p, tx, ty - 46, 1.3, 1); p.poly([[tx + 1, ty - 40], [tx + 22, ty - 34], [tx + 1, ty - 28]], '#8a1a14'); }
+    else if (r(5) < 0.25) { const [tx, ty] = P(0.5, 0.5, H); p.L(tx, ty - 2, tx, ty - 26, 2, '#5a5652'); if (r(6) < 0.6) skull(p, tx, ty - 31, 1.0, 1); }
+    for (let q = 0; q < 2; q++) if (r(20 + q) < 0.45) { const t = 0.1 + r(22 + q) * 0.8; const x = L0[0] + (B0[0] - L0[0]) * t, y = L0[1] + (B0[1] - L0[1]) * t; p.R(x, y - H + 2, 2, 16 + r(24 + q) * 50, '#6a0a08'); }
+    p.finish([14, 6, 5], 0);
+    return { canvas: p.c, ax: 0.5, ay: cy / (H1 * 2) };
+  }
+  // 언덕 (1층 화산재 · 4층 쇳돌): 칸마다 칸보다 조금 큰 둔덕을 쌓아 이웃과 겹치게 — 높이가 부드럽게 달라져 굽이치는 능선이 된다
+  const ash = theme === 'ash', bog = theme === 'swamp'; // 2층: 이끼 낀 진흙 둔덕
+  const base = ash ? [0x4a, 0x44, 0x3e] : bog ? [0x36, 0x3c, 0x30] : [0x34, 0x2e, 0x2c], lit = ash ? 1.18 : bog ? 1.2 : 1.14, dark = ash ? 0.7 : 0.66;
+  const col = (k: number) => `rgb(${Math.round(base[0] * k)},${Math.round(base[1] * k)},${Math.round(base[2] * k)})`;
+  const Rx = 86 + r(1) * 6; // 칸 반폭(64)보다 크게 — 옆 칸 둔덕과 겹친다
+  for (let z = 0; z <= H; z += 2) {
+    const q = z / H, k = Math.sqrt(Math.max(0, 1 - q * q * 0.94)), rx = Rx * k, ry = rx * 0.5;
+    const y = cy - z;
+    const shade = 0.8 + q * 0.3;
+    p.E(cx, y, rx, ry, col(shade));
+    // 오른쪽(그늘)과 왼쪽 위(빛)
+    p.g.save(); p.g.beginPath(); p.g.rect(cx + rx * 0.18, y - ry - 1, rx + 2, ry * 2 + 2); p.g.clip(); p.E(cx, y, rx, ry, col(shade * dark / 0.78)); p.g.restore();
+    if (q > 0.55) { p.g.save(); p.g.beginPath(); p.g.rect(cx - rx - 2, y - ry - 1, rx * 0.9, ry * 1.1); p.g.clip(); p.E(cx, y, rx, ry, col(shade * lit)); p.g.restore(); }
+  }
+  // 겉면의 결: 가로로 비스듬한 층 금 · 굴러떨어진 돌
+  for (let q = 0; q < 6; q++) { const z = 8 + r(10 + q) * H * 0.8, k = Math.sqrt(1 - (z / H) ** 2) * Rx; const x0 = cx - k * (0.2 + r(16 + q) * 0.6), len = 10 + r(22 + q) * 22; p.L(x0, cy - z + k * 0.2, x0 + len, cy - z + k * 0.2 - len * 0.18, 1, col(0.5)); }
+  for (let q = 0; q < 4; q++) { const x = cx - 60 + r(30 + q) * 120, y = cy + 10 + r(34 + q) * 14; p.E(x, y, 5 + r(38 + q) * 5, 3, col(0.6)); p.E(x - 1, y - 1, 3, 2, col(1.1)); }
+  // 벌건 금: 둔덕 앞면을 타고 구불구불 내려온다
+  const seams = bog ? 0 : ash ? 1 : 2;
+  for (let q = 0; q < seams; q++) if (r(40 + q) < (ash ? 0.55 : 0.85)) {
+    let x = cx + (r(44 + q) - 0.5) * Rx * 0.9;
+    for (let z = H * (0.55 + r(46 + q) * 0.35); z > 4; z -= 2) { x += (r(Math.floor(z * 3 + q * 7)) - 0.5) * 2.6; const k = Math.sqrt(Math.max(0, 1 - (z / H) ** 2)) * Rx; const dx = Math.max(-k * 0.9, Math.min(k * 0.9, x - cx)); const yy = cy - z + Math.sqrt(Math.max(0, 1 - (dx / Math.max(1, k)) ** 2)) * k * 0.5; p.R(cx + dx - 1, yy - 1, 3, 2, z % 6 < 2 ? '#ff8a2a' : '#c2401a'); }
+  }
+  if (ash && r(70) < 0.3) { // 꼭대기의 현무암 기둥
+    const x = cx + (r(71) - 0.5) * 30, y = cy - H + 6; const hh = 26 + r(73) * 36, ww = 11 + r(74) * 7;
+    p.poly([[x - ww, y], [x, y + 5], [x, y - hh + 5], [x - ww, y - hh]], '#2c2624'); p.poly([[x, y + 5], [x + ww, y], [x + ww, y - hh], [x, y - hh + 5]], '#191514'); p.poly([[x - ww, y - hh], [x, y - hh - 5], [x + ww, y - hh], [x, y - hh + 5]], '#4a423e');
+  }
+  if (bog) { // 2층: 흘러내린 이끼 · 물 자국 · 꼭대기의 마른 갈대 · 가끔 죽은 나무 그루터기 · 발치의 웅덩이
+    for (let q = 0; q < 7; q++) { const z = H * (0.35 + r(100 + q) * 0.55), k = Math.sqrt(Math.max(0, 1 - (z / H) ** 2)) * Rx, x = cx - k * 0.85 + r(108 + q) * k * 1.7, len = 6 + r(116 + q) * 16; p.R(x, cy - z + k * 0.35, 2, len, q % 2 ? 'rgba(30,48,26,0.85)' : 'rgba(64,82,44,0.75)'); }
+    for (let q = 0; q < 9; q++) { const x = cx + (r(124 + q) - 0.5) * Rx * 0.9, y = cy - H + 6 + r(134 + q) * 10, h2 = 8 + r(144 + q) * 14; p.L(x, y, x + (r(154 + q) - 0.5) * 6, y - h2, 1, q % 3 ? '#8a7a4a' : '#5e5434'); }
+    if (r(164) < 0.3) { const x = cx + (r(165) - 0.5) * 34, y = cy - H + 8; p.L(x, y, x - 2, y - 26, 5, '#2a2420'); p.L(x - 2, y - 20, x - 12, y - 30, 2, '#2a2420'); p.L(x - 1, y - 24, x + 8, y - 36, 2, '#2a2420'); }
+    p.E(cx + 34, cy + 14, 22, 6, 'rgba(36,52,44,0.85)'); p.E(cx + 30, cy + 12, 10, 2, 'rgba(120,150,120,0.35)');
+  }
+  if (!ash && !bog) { // 4층: 꼭대기에 꽂힌 녹슨 쇠말뚝 · 불티
+    if (r(75) < 0.35) { const x = cx + (r(76) - 0.5) * 40, y = cy - H + 4; p.L(x, y, x + 3, y - 30, 3, '#4a2a1c'); p.L(x + 3, y - 30, x + 5, y - 34, 2, '#6a3a22'); }
+    for (let q = 0; q < 4; q++) { const x = cx + (r(80 + q) - 0.5) * Rx, y = cy - H * (0.4 + r(84 + q) * 0.5); p.R(x, y, 2, 2, r(88 + q) < 0.5 ? '#ff6a1a' : '#c2401a'); }
+  }
+  p.finish([10, 7, 6], 0);
+  return { canvas: p.c, ax: 0.5, ay: cy / (H1 * 2), glow: !ash && !bog && r(90) < 0.25 ? [0, -H / 2] : undefined, glowTint: 0xff5a1a };
+}
+
 function crag(theme: Theme, v: number, o: number, r: (k: number) => number): HPic {
   if (theme === 'ash') {
     // 현무암 기둥 무더기: 육각 기둥 3~5개, 틈마다 용암이 흐르는 금

@@ -208,7 +208,14 @@ function palette(look: Look): Uint8ClampedArray[] {
 }
 
 // ───────────────────────── 어떤 층을 쓰나 ─────────────────────────
-export function layerKeys(look: Look, weapon: string | null, armorIn: string[] = []): { base: string; hair: string | null; weapon: string | null; armor: { key: string; piece: string; tint?: string }[]; mode: Mode; two?: boolean; stab?: boolean } {
+export function layerKeys(look: Look, weapon: string | null, armorIn0: string[] = []): { base: string; hair: string | null; weapon: string | null; armor: { key: string; piece: string; tint?: string }[]; mode: Mode; two?: boolean; stab?: boolean; wtint?: string } {
+  // 45차: 'wtint#쇠빛#나무빛' — 무기의 빛 (방어구 목록에 실려 온다)
+  const wt = armorIn0.find((a) => a.startsWith('wtint#'));
+  const armorIn = wt ? armorIn0.filter((a) => a !== wt) : armorIn0;
+  const r0 = layerKeys0(look, weapon, armorIn);
+  return wt && r0.weapon ? { ...r0, wtint: wt.slice(5) } : r0;
+}
+function layerKeys0(look: Look, weapon: string | null, armorIn: string[] = []): { base: string; hair: string | null; weapon: string | null; armor: { key: string; piece: string; tint?: string }[]; mode: Mode; two?: boolean; stab?: boolean; wtint?: string } {
   // 40차: '그림#색' — 천 색이 있는 겉옷
   const tints = new Map<string, string>();
   const armor = armorIn.map((a) => { const i = a.indexOf('#'); if (i < 0) return a; tints.set(a.slice(0, i), a.slice(i)); return a.slice(0, i); });
@@ -237,6 +244,7 @@ export function layerKeys(look: Look, weapon: string | null, armorIn: string[] =
   // 42차: 지옥으로 데려가는 이들(판초 악마 · 저승사자) · 유내 세 시절 (서기·걷기 · 유내는 앉기도)
   const D42: Record<string, string> = { ponchod: 'b-pd-ponchod-w', reaper: 'b-jr-reaper-w', yunae1: 'b-y1-yunae1-w', yunae2: 'b-y2-yunae2-w', yunae3: 'b-y3-yunae3-w', pashar: 'b-ps-pashar-w', luen: 'b-lu-luen-w', grandpa: 'b-gp-grandpa-w', bulda: 'b-bd-bulda-w',
     yellowwing: 'b-yw-yellowwing-w', maskgirl: 'b-mg-maskgirl-w', kaldrek: 'b-kd-kaldrek-w', obolo: 'b-ob-obolo-w', noeul: 'b-no-noeul-w', mari: 'b-mr-mari-w' }; // 43차
+  if (o === 'noeul' && weapon) return { base: 'b-no-noeul-m', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'm' as Mode }; // 45차: 지옥 정벌에서 함께 싸우는 노을 (장검은 몸에 붙어 있다)
   if (D42[o as string]) return { base: D42[o as string], hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
   if (o === 'succubus') return { base: 'b-q-succubus-w', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
   if (o === 'accubus') return { base: `b-${look.sex === 'm' ? 'i' : 'j'}-accubus-w`, hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
@@ -332,7 +340,7 @@ async function build0(look: Look, keys: ReturnType<typeof layerKeys>, P = PX, pr
   keys.armor.forEach((a, k) => { if (!overHair(a.piece)) order.push(armorLay(k)); });
   order.push({ L: hair, pal });
   keys.armor.forEach((a, k) => { if (overHair(a.piece)) order.push(armorLay(k)); });
-  order.push({ L: weap, pal });
+  { const wp = pal.slice(); if (keys.wtint) { const [m, wd] = keys.wtint.split(/(?=#)/); wp[14] = ramp(m); if (wd) wp[13] = ramp(wd); } order.push({ L: weap, pal: wp }); } // 45차 무기 빛
   // 모든 층에 있는 장면만 (1배·2배가 섞여 어느 층에 상하좌우 공격 장면이 없으면 대각선 장면을 쓴다)
   const names = base ? Object.keys(base.meta).filter((n) => order.every(({ L }) => !L || n in L.meta)) : [];
   // 장면마다 겹친 테두리 상자 (발 기준)
@@ -463,6 +471,11 @@ export function frameOf(cs: CharSet, anim: Anim, dir: Dir, i: number): Frame | u
   const n = cs.counts[anim];
   if (!n) return cs.frames.get(`idle-${dir}-0`) ?? cs.frames.get(`idle-${DIAG[dir] ?? dir}-0`);
   const k = Math.max(0, Math.min(n - 1, i));
+  // 45차: 찌르기는 대각선 넷뿐이다 — 바로 위·아래·옆을 찌를 때는 그 방향 휘두르기 장면으로 (대각선으로 꺾여 엉뚱한 쪽을 찌르지 않게)
+  if (anim === 'stab' && !cs.frames.has(`stab-${dir}-0`) && cs.frames.has(`swing-${dir}-0`)) {
+    const m = cs.counts.swing ?? 1;
+    return cs.frames.get(`swing-${dir}-${Math.min(m - 1, Math.round((k / Math.max(1, n - 1)) * (m - 1)))}`);
+  }
   return cs.frames.get(`${anim}-${dir}-${k}`) ?? cs.frames.get(`${anim}-${DIAG[dir] ?? dir}-${k}`);
 }
 /**
