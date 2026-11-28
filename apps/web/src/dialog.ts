@@ -21,6 +21,7 @@ export class Dialog {
   private nextEl = document.createElement('div');
   private choicesEl = document.createElement('div');
   private panelEl = document.createElement('div');
+  private sideEl = document.createElement('div');
   private advance: (() => void) | null = null;
   private speakerKey = '';
   private typing: ReturnType<typeof setInterval> | undefined;
@@ -49,7 +50,9 @@ export class Dialog {
     this.exitBtn.textContent = '✕';
     this.exitBtn.hidden = true;
     this.exitBtn.onclick = (e) => { e.stopPropagation(); this.cancel(); };
-    box.append(this.nameEl, this.textEl, this.nextEl, this.choicesEl, this.exitBtn);
+    this.sideEl.className = 'dlg-side';
+    this.sideEl.hidden = true;
+    box.append(this.nameEl, this.textEl, this.nextEl, this.choicesEl, this.sideEl, this.exitBtn);
     this.el.append(this.portraitBox, this.panelEl, box);
     host.appendChild(this.el);
     // 화면 어디를 눌러도 다음 줄로 (버튼과 상품 창은 제외)
@@ -183,8 +186,15 @@ export class Dialog {
     });
   }
 
+  /** 55차: 글상자 왼쪽 아래의 작은 버튼 자리 (상품 창의 '대화하기') — 상품 창이 닫히면 함께 사라진다 */
+  setSide(content: HTMLElement | null) {
+    this.sideEl.innerHTML = '';
+    this.sideEl.hidden = !content;
+    if (content) this.sideEl.appendChild(content);
+  }
   /** 상품 목록처럼 대화와 함께 띄우는 창 */
   setPanel(content: HTMLElement | null) {
+    if (!content) this.setSide(null);
     this.panelEl.innerHTML = '';
     this.panelEl.hidden = !content;
     if (content) this.panelEl.appendChild(content);

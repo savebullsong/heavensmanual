@@ -853,3 +853,5 @@ from bodies48 import NEW48   # 48차: 필드 보스 넷 · 걷는 염소대왕
 NEW.update(NEW48)
 from bodies49 import NEW49   # 49차: 수쿰빗 필드 보스 둘
 NEW.update(NEW49)
+from bodies55 import NEW55   # 55차: 오르멧
+NEW.update(NEW55)

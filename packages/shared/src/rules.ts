@@ -157,9 +157,14 @@ export function applyDeed(d: Deeds, key: DeedKey, opt: { floor?: number; share?:
 }
 
 // ───────────────────────── 체력 · 위험 상태 · 사고사 ─────────────────────────
-/** 최대 체력 = 1000 + 생명력 × 20 */
-export function maxHp(vit: number): number {
-  return 1000 + vit * 20;
+/**
+ * 최대 체력 = 1000 + 생명력 × 20 + (영격 − 1) × 8
+ * 55차: 체력은 생명력이 먼저, 영격이 그다음 — 영격 하나(스탯 2점)를 생명력에 다 넣으면 +40, 영격 자체로는 +8
+ */
+export const HP_PER_VIT = 20;
+export const HP_PER_RANK = 8;
+export function maxHp(vit: number, rank = 1): number {
+  return 1000 + vit * HP_PER_VIT + Math.max(0, rank - 1) * HP_PER_RANK;
 }
 /** 체력이 25% 이하로 떨어지면 위험 상태 */
 export const DANGER_RATIO = 0.25;
@@ -206,7 +211,22 @@ export const CRIT_MULTIPLIER = 2;
  */
 export function armorClass(def: number, agi: number): number {
   // 50차: 방어력이 너무 셌다 (4층 방어 35면 괴물이 20이 아니고는 못 맞혔다) — 방어력 ÷ 4 · 민첩 ÷ 6
-  return 10 + Math.floor(def / 4) + Math.floor(agi / 6);
+  // 55차: 그 뒤로 2~5층이 너무 버거웠다 — 방어력 ÷ 3. 민첩은 원거리 공격이 주인 스탯이라 회피는 곁들임 (15마다 1, 최대 +4)
+  return 10 + Math.floor(Math.max(0, def) / 3) + agiDodge(agi);
+}
+/** 55차: 민첩이 주는 회피 등급 — 15마다 1, 최대 4 (민첩 60에서 끝). 방어구와 겹쳐도 근접보다 조금 높은 정도로 */
+export const AGI_DODGE_MAX = 4;
+export function agiDodge(agi: number): number {
+  return Math.min(AGI_DODGE_MAX, Math.floor(Math.max(0, agi) / 15));
+}
+/**
+ * 55차 공격력에 더해지는 스탯: 근접은 힘 × 1.3, 원거리(권총·활·저격총)는 민첩 × 1.8
+ * 근접의 정석은 힘 · 생명력 · 신앙 조금, 원거리의 정석은 민첩 · 신앙(치명타) · 생명력 조금
+ */
+export const STR_MELEE = 1.3;
+export const AGI_RANGED = 1.8;
+export function statDamage(s: { str: number; agi: number }, ranged: boolean): number {
+  return Math.round(ranged ? s.agi * AGI_RANGED : s.str * STR_MELEE);
 }
 /**
  * 50차 사람끼리의 명중 보너스: 치는 쪽 영격(레벨)과 공격력으로 — 2 + 영격 ÷ 3 + 공격력 ÷ 3 (최대 20)
@@ -245,4 +265,22 @@ export function prayerAnswerChance(fai: number): number {
 export const HELL_SHIELD_STUCK_MIN = 30;
 export function hellShieldSeconds(fai: number): number {
   return 60 + fai;
+}
+
+// ───────────────────────── 템브라 강화 (55차: 한계 없음 · 사실상 +12가 끝) ─────────────────────────
+/**
+ * +n으로 올라갈 확률. 평균 시도 횟수 = 1 ÷ 확률
+ * +1~+3 꼭 · +4~+6 열 번 아래 · +7 열 번 안팎 · +8~+9 수십 번 · +10~+12 수백 번 · +13 수천 번 · +15 수만 번 · 그 위로는 단계마다 세 배씩 더 어렵다
+ */
+const ENH_TRIES = [1, 1, 1, 1, 2, 3.5, 6, 10, 30, 70, 150, 300, 650, 3000, 9000, 30000];
+export function enhOdds(n: number): number {
+  if (n <= 0) return 1;
+  if (n < ENH_TRIES.length) return 1 / ENH_TRIES[n];
+  return 1 / (ENH_TRIES[ENH_TRIES.length - 1] * Math.pow(3, n - (ENH_TRIES.length - 1)));
+}
+/** 확률을 보여 줄 글자: 10% 이상은 정수, 그 아래는 두 자리 (3.3 · 0.67 · 0.033) */
+export function fmtOdds(p: number): string {
+  const v = p * 100;
+  if (v >= 10) return String(Math.round(v));
+  return String(Number(v.toPrecision(2)));
 }

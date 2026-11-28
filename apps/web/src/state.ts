@@ -141,6 +141,14 @@ export interface Save {
   debtReset44?: boolean;
   /** 세계마다 우주새에 봉인된 물건 — 그 세계의 우주새에서 되찾는다 */
   vault?: Partial<Record<'real' | 'hell', Stash>>;
+  /** 55차: 지옥에서 떨군 채 아무도 줍지 않은 물건 — 황혼이 거둬 두었다 (수수료를 내고 찾는다) */
+  hlost?: Record<string, number>;
+  /** 55차: 천국에 몇 번째 와 있는가 · 스탯을 다시 빚은 천국행 번호 (천국행 한 번에 한 번) */
+  heavenTrip?: number; statResetTrip?: number;
+  /** 55차 현실 PK: 오늘 해친 사람 수 · 대식자에게 쫓기는 중 · 선한 자의 보호 */
+  pk?: { day: string; n: number; ids: string[] }; resAt?: number;
+  /** 55차 상점 '대화하기': '당신은 누구예요?'를 물은 횟수 (세계마다 답이 이어진다) */
+  chatWho?: Partial<Record<'real' | 'hell' | 'heaven', number>>;
   /** 30차 내구도: 쓰고 있는 장비(열쇠)마다 남은 내구도 — 없으면 새것 */
   dura?: Record<string, number>;
   /** 35차: 내구도 셈이 바뀐 판 (2 = 더 오래 가는 셈, 무기는 바닥나면 박살) */

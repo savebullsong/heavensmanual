@@ -34,6 +34,13 @@ button.primary:hover { background: #e0b437; }
 .dlg-exit { position: absolute; top: -15px; right: 14px; width: 30px; height: 30px; padding: 0; border-radius: 50%; background: #2a1d12; color: #e0b437; border: 2px solid #8a6a3a; font-size: 15px; line-height: 1; cursor: pointer; }
 .dlg-exit:hover { background: #4a3218; }
 .dlg-exit[hidden] { display: none; }
+/* 55차: 상품 창의 '대화하기' — 글상자 왼쪽 아래 */
+.dlg-side { position: absolute; left: 18px; bottom: 10px; }
+.dlg-side[hidden] { display: none; }
+.dlg-side .talk-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px 6px 10px; background: linear-gradient(#3a2814, #24180c); color: #f2d27a; border: 2px solid #8a6a3a; border-radius: 16px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255, 230, 160, 0.18), 0 2px 0 #120c06; }
+.dlg-side .talk-btn:hover { background: linear-gradient(#4e361a, #2e1e0e); }
+.dlg-side .talk-btn i { width: 16px; height: 13px; border-radius: 7px 7px 7px 2px; background: #f2d27a; box-shadow: inset 0 -2px 0 #b8902a; position: relative; }
+.dlg-side .talk-btn i::after { content: '…'; position: absolute; inset: -5px 0 0; color: #3a2814; font-size: 12px; text-align: center; font-style: normal; }
 .dlg-panel { position: absolute; right: max(10px, calc(50% - 490px)); bottom: 168px; width: min(430px, calc(100vw - 20px)); max-height: calc(100vh - 240px); display: flex; }
 
 /* 상품 창 */
