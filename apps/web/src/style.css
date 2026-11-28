@@ -805,7 +805,7 @@ body:has(.bag-panel) .load-chip { display: none; }
 .inv-kinds button { flex: 1 1 0; padding: 5px 6px; border-radius: 8px; font-size: 13px; white-space: nowrap; }
 .inv-kinds button.on { background: #e0b437; color: #2a1e08; border-color: #e0b437; }
 /* 52차 오르멧이 지옥 하늘을 가로지른다 */
-.oremet-fly { position: fixed; left: 0; width: 230px; height: 230px; pointer-events: none; z-index: 12; opacity: 0; animation: oremetfly 6.8s linear forwards; filter: drop-shadow(0 10px 14px rgba(0,0,0,0.55)) blur(0.4px); }
+.oremet-fly { position: fixed; left: 0; width: 240px; height: 252px; pointer-events: none; z-index: 12; opacity: 0; animation: oremetfly 6.8s linear forwards; filter: drop-shadow(0 0 6px rgba(255, 70, 40, 0.75)) drop-shadow(0 0 18px rgba(140, 60, 255, 0.45)) drop-shadow(0 14px 16px rgba(0,0,0,0.55)); }
 .oremet-fly.rev { animation-direction: reverse; }
 .oremet-fly.rev svg { transform: scaleX(-1); }
 .oremet-fly svg { width: 100%; height: 100%; }

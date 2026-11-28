@@ -5358,7 +5358,7 @@ export class WorldScene {
     const open = t0 < 1.4 ? 0 : t0 < 2.2 ? (t0 - 1.4) / 0.8 : t0 < 9.6 ? 1 : t0 < 10.3 ? 1 - (t0 - 9.6) / 0.7 : 0;
     if (!a.dinged && t0 >= 1.3) { a.dinged = true; sfx.chime(); }
     if (!a.w) {
-      const w = this.makeWalker(clerkLook('rebirth', 7), e.i + 1, e.j, 'soul'); w.x = e.i + 1.0; w.y = e.j + 0.55; w.dir = 'sw'; w.cloak = true; w.wait = 1e9; w.speed = 0.6; w.maxHp = w.hp = 99999; w.title = t().admDemon;
+      const w = this.makeWalker(clerkLook('rebirth', 7), e.i + 1, e.j, 'soul'); w.x = e.i + 1.0; w.y = e.j + 0.55; w.dir = 'sw'; w.cloak = true; w.wait = 1e9; w.speed = 0.95; w.maxHp = w.hp = 99999; w.title = t().admDemon;
       this.walkers.push(w); a.w = w;
     }
     const w = a.w;
