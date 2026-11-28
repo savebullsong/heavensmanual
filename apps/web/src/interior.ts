@@ -1190,7 +1190,7 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
   const prod = ['#c9302a', '#2a6aa8', '#e8c02a', '#3a9a5a', '#e87a2a', '#8a4ac9', '#f2f2ea'];
   const pick = (n: number) => prod[(n * 7 + (f.v ?? 0) * 3) % prod.length];
   // 그림자
-  poly([P(i, j1, 0), P(i1, j1, 0), P(i1 + 0.12, j1 + 0.12, 0), P(i + 0.12, j1 + 0.12, 0)], '#000000', 0.18);
+  if (f.kind !== 'hsign') poly([P(i, j1, 0), P(i1, j1, 0), P(i1 + 0.12, j1 + 0.12, 0), P(i + 0.12, j1 + 0.12, 0)], '#000000', 0.18);
   switch (f.kind) {
     case 'fboard': { // 47차 출발 안내판: 검은 판 · 노란 글줄 · 시계
       const yy = j1 - 0.05;
@@ -1765,19 +1765,7 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       if (f.v === 1) { B3(i, j + 0.4, i1, j + 0.6, 0, 8, info.kind === 'hpalace' ? '#e8e2d4' : '#9aa4ac'); poly([P(i, j + 0.6, 8), P(i1, j + 0.6, 8), P(i1, j + 0.6, h - 4), P(i, j + 0.6, h - 4)], '#d8eaf2', 0.5); B3(i, j + 0.4, i1, j + 0.6, h - 4, h, info.kind === 'hpalace' ? '#d8b44a' : '#9aa4ac'); break; } // 51차 i 방향 칸막이
       if (info.kind === 'hpalace') { B3(i + 0.4, j, i + 0.6, j1, 0, 8, '#e8e2d4'); poly([P(i + 0.6, j, 8), P(i + 0.6, j1, 8), P(i + 0.6, j1, h - 4), P(i + 0.6, j, h - 4)], '#d8eaf2', 0.5); B3(i + 0.4, j, i + 0.6, j1, h - 4, h, '#d8b44a'); break; }
       B3(i + 0.4, j, i + 0.6, j1, 0, h, '#9aa4ac'); poly([P(i + 0.6, j, 8), P(i + 0.6, j1, 8), P(i + 0.6, j1, h - 4), P(i + 0.6, j, h - 4)], '#cfe0ea', 0.55); break;
-    case 'hsign': { // 51차 국 이름 명패: 칸막이 위 금테 판 (늘 화면을 바라본다)
-      const names: Record<string, string[]> = { ko: ['사무국', '징벌국', '신앙국', '통행국', '청원국', '화장실', '구내식당', '주민센터', '천사 휴게실'], th: ['สำนักเลขาธิการ', 'สำนักลงทัณฑ์', 'สำนักศรัทธา', 'สำนักผ่านแดน', 'สำนักคำร้อง', 'ห้องน้ำ', 'โรงอาหาร', 'ศูนย์บริการชาวบ้าน', 'ห้องพักเทวดา'], en: ['Secretariat', 'Punishment', 'Faith', 'Passage', 'Petitions', 'Restrooms', 'Cafeteria', "Residents' Center", 'Angel Lounge'] };
-      const txt = (names[lang()] ?? names.en)[f.v ?? 0] ?? '';
-      const [x, y] = P(i + 0.5, j + 0.5, h + 10);
-      g.font = 'bold 10px system-ui, sans-serif';
-      const tw = Math.max(40, g.measureText(txt).width + 14), th2 = 16;
-      g.strokeStyle = '#b8922e'; g.lineWidth = 1; g.beginPath(); g.moveTo(x - tw / 2 + 6, y - th2 / 2); g.lineTo(x - tw / 2 + 10, y - th2 / 2 - 10); g.moveTo(x + tw / 2 - 6, y - th2 / 2); g.lineTo(x + tw / 2 - 10, y - th2 / 2 - 10); g.stroke();
-      g.fillStyle = '#8a6a22'; g.fillRect(Math.round(x - tw / 2) - 1, Math.round(y - th2 / 2) - 1, Math.round(tw) + 2, th2 + 2);
-      g.fillStyle = f.v === 1 ? '#5a1e22' : '#fbf6e6'; g.fillRect(Math.round(x - tw / 2), Math.round(y - th2 / 2), Math.round(tw), th2);
-      g.fillStyle = '#e0b84e'; g.fillRect(Math.round(x - tw / 2), Math.round(y - th2 / 2), Math.round(tw), 2);
-      g.fillStyle = f.v === 1 ? '#f2d27a' : '#4a3a1a'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, x, y + 1);
-      break;
-    }
+    case 'hsign': break; // 52차 후속: 국 이름 명판은 world가 plaqueArt로 3배 해상도로 따로 세운다 (여기서 1배 10px로 찍던 글씨는 휴대폰에서 뭉개졌다)
     case 'skyelev': { // 51차 하늘 승강기: 두 단 둥근 받침 · 금 고리 · 위로 끝없이 이어지는 유리 통 · 안에서 오르내리는 빛 · 둘레를 도는 떠 있는 고리
       const cx = i + w / 2, cy = j + d / 2, R = Math.min(w, d) / 2 - 0.2;
       const ring = (r: number, z: number, n = 28) => Array.from({ length: n }, (_, k) => { const a = (k / n) * Math.PI * 2; return P(cx + Math.cos(a) * r, cy + Math.sin(a) * r, z); });
@@ -2362,4 +2350,68 @@ export function clerkLook(kind: string, seed: number): Look {
     sex: monk ? 'm' : sex, build: 1, skin: seed % 3, hair: monk ? 5 : (seed >> 1) % 6, hairColor: (seed >> 2) % 3, top: 0, bottom: 0, outfit: 'casual',
     cols: { 1: SKIN_COLORS[seed % 3], 2: HAIR_COLORS[(seed >> 2) % 3], 3: top, 4: bottom, 5: '#2a2422', 9: top, 10: SKIN_COLORS[seed % 3] },
   };
+}
+
+// ───────── 52차 후속: 천국의 지붕 빌딩 국 이름 명판 ─────────
+// 금빛 사슬 둘에 매달린 금테 판 · 상아빛 판(징벌국은 검붉은 판) · 위 가운데 작은 후광 장식 · 왼쪽 금빛 원 안의 국 표지 · 새긴 듯한 글씨.
+// 방 그림에 1배로 찍지 않고 S배로 따로 그려 줄여 세운다 — 휴대폰(화면 2~3배)에서도 글씨가 또렷하다.
+const HSIGN_NAMES: Record<string, string[]> = {
+  ko: ['사무국', '징벌국', '신앙국', '통행국', '청원국', '화장실', '구내식당', '주민센터', '천사 휴게실'],
+  th: ['สำนักเลขาธิการ', 'สำนักลงทัณฑ์', 'สำนักศรัทธา', 'สำนักผ่านแดน', 'สำนักคำร้อง', 'ห้องน้ำ', 'โรงอาหาร', 'ศูนย์บริการชาวบ้าน', 'ห้องพักเทวดา'],
+  en: ['Secretariat', 'Punishment', 'Faith', 'Passage', 'Petitions', 'Restrooms', 'Cafeteria', "Residents' Center", 'Angel Lounge'],
+};
+function rrect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+/** 국 표지 (지름 14 원 안, 가운데가 0,0) */
+function plaqueGlyph(g: CanvasRenderingContext2D, v: number, col: string) {
+  g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 1.1; g.lineCap = 'round'; g.lineJoin = 'round';
+  const line = (pts: [number, number][]) => { g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke(); };
+  switch (v) {
+    case 0: g.strokeRect(-2.6, -3.4, 5.2, 6.8); for (const y of [-1.6, 0, 1.6]) line([[-1.4, y], [1.4, y]]); break; // 사무국: 서류
+    case 1: line([[0, -1.6], [0, 3.2]]); g.beginPath(); g.moveTo(-0.9, 2.4); g.lineTo(0, 4.2); g.lineTo(0.9, 2.4); g.fill(); line([[-2.6, -1.8], [2.6, -1.8]]); line([[0, -1.8], [0, -3.6]]); g.beginPath(); g.arc(0, -4.2, 0.9, 0, Math.PI * 2); g.fill(); break; // 징벌국: 아래를 향한 칼
+    case 2: g.fillRect(-1.3, -0.4, 2.6, 4.2); g.beginPath(); g.moveTo(0, -4.6); g.quadraticCurveTo(2, -1.8, 0, -1.1); g.quadraticCurveTo(-2, -1.8, 0, -4.6); g.fill(); break; // 신앙국: 촛불
+    case 3: g.beginPath(); g.arc(-1.7, -1.7, 1.8, 0, Math.PI * 2); g.stroke(); line([[-0.4, -0.4], [3.1, 3.1]]); line([[1.7, 1.7], [2.8, 0.6]]); line([[2.5, 2.5], [3.5, 1.5]]); break; // 통행국: 열쇠
+    case 4: g.strokeRect(-2.1, -3, 4.2, 6); g.beginPath(); g.ellipse(0, -3.1, 3.1, 0.9, 0, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.ellipse(0, 3.1, 3.1, 0.9, 0, 0, Math.PI * 2); g.stroke(); line([[-1, -0.8], [1, -0.8]]); line([[-1, 0.8], [1, 0.8]]); break; // 청원국: 두루마리
+    case 5: g.beginPath(); g.moveTo(0, -4.2); g.bezierCurveTo(3.1, -0.4, 3.1, 3.6, 0, 3.6); g.bezierCurveTo(-3.1, 3.6, -3.1, -0.4, 0, -4.2); g.fill(); break; // 화장실: 물방울
+    case 6: g.beginPath(); g.moveTo(-3.8, 0.2); g.lineTo(3.8, 0.2); g.quadraticCurveTo(3.3, 3.8, 0, 3.8); g.quadraticCurveTo(-3.3, 3.8, -3.8, 0.2); g.fill(); g.beginPath(); g.moveTo(-1, -0.8); g.quadraticCurveTo(-2.1, -2.4, -1, -4.1); g.moveTo(1.2, -0.8); g.quadraticCurveTo(0.1, -2.4, 1.2, -4.1); g.stroke(); break; // 구내식당: 그릇과 김
+    case 7: g.strokeRect(-2.8, -3.6, 5.6, 7.2); g.font = '800 5.5px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('1', 0, 0.4); break; // 주민센터: 번호표
+    default: g.beginPath(); g.moveTo(-3.6, 2.8); g.quadraticCurveTo(-3.8, -3.8, 3.6, -3.6); g.quadraticCurveTo(1.2, -1.6, 2.6, -0.6); g.quadraticCurveTo(0, 0.2, 1.6, 1.3); g.quadraticCurveTo(-1, 2.3, -3.6, 2.8); g.fill(); // 천사 휴게실: 날개
+  }
+}
+export function plaqueArt(v: number, S = 3): { canvas: HTMLCanvasElement; ax: number; ay: number; S: number } {
+  const lg = lang(), txt = (HSIGN_NAMES[lg] ?? HSIGN_NAMES.en)[v] ?? '';
+  const font = lg === 'th' ? '700 12px "Noto Sans Thai", "Leelawadee UI", "Sarabun", system-ui, sans-serif' : '700 12.5px "Noto Serif KR", "Noto Serif CJK KR", "Nanum Myeongjo", "AppleMyungjo", "Batang", Georgia, serif';
+  const m = document.createElement('canvas').getContext('2d')!; m.font = font;
+  const tw = Math.ceil(m.measureText(txt).width);
+  const H = 22, PW = 9 + 14 + 6 + tw + 12, top = 13, x0 = 5, y0 = top;
+  const W = PW + 10, CH = top + H + 5;
+  const c = document.createElement('canvas'); c.width = Math.ceil(W * S); c.height = Math.ceil(CH * S);
+  const g = c.getContext('2d')!; g.scale(S, S);
+  const dark = v === 1;
+  // 사슬 둘
+  for (const cx of [x0 + 11, x0 + PW - 11]) for (let k = 0; k < 5; k++) { g.strokeStyle = k % 2 ? '#9a7a28' : '#ecc96a'; g.lineWidth = 0.9; g.beginPath(); g.ellipse(cx, 1.6 + k * 2.4, k % 2 ? 0.5 : 1.3, 1.4, 0, 0, Math.PI * 2); g.stroke(); }
+  // 그림자 · 금테
+  g.fillStyle = 'rgba(48,34,8,0.28)'; rrect(g, x0 + 1.6, y0 + 2.2, PW, H, 4); g.fill();
+  const gold = g.createLinearGradient(0, y0, 0, y0 + H); gold.addColorStop(0, '#fff0b4'); gold.addColorStop(0.4, '#dcb24c'); gold.addColorStop(1, '#8a661c');
+  g.fillStyle = gold; rrect(g, x0, y0, PW, H, 4); g.fill();
+  // 위 가운데 후광 장식
+  { const cx = x0 + PW / 2; g.fillStyle = gold; g.beginPath(); g.arc(cx, y0 + 0.6, 4.4, Math.PI, 0); g.fill(); g.strokeStyle = '#fff4c8'; g.lineWidth = 0.7; for (let k = 0; k < 5; k++) { const a = Math.PI + (k + 0.5) * (Math.PI / 5); g.beginPath(); g.moveTo(cx + Math.cos(a) * 2, y0 + 0.6 + Math.sin(a) * 2); g.lineTo(cx + Math.cos(a) * 3.8, y0 + 0.6 + Math.sin(a) * 3.8); g.stroke(); } }
+  // 안쪽 판 · 가는 안쪽 금줄
+  const pan = g.createLinearGradient(0, y0, 0, y0 + H);
+  if (dark) { pan.addColorStop(0, '#8e2c32'); pan.addColorStop(1, '#4a1116'); } else { pan.addColorStop(0, '#fffdf7'); pan.addColorStop(1, '#ede0c2'); }
+  g.fillStyle = pan; rrect(g, x0 + 2.2, y0 + 2.2, PW - 4.4, H - 4.4, 2.4); g.fill();
+  g.strokeStyle = dark ? 'rgba(246,214,128,0.6)' : 'rgba(196,154,54,0.6)'; g.lineWidth = 0.6; rrect(g, x0 + 3.5, y0 + 3.5, PW - 7, H - 7, 1.6); g.stroke();
+  g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(x0 + 4, y0 + 2.6, PW - 8, 0.8);
+  // 국 표지
+  const ix = x0 + 9 + 7, iy = y0 + H / 2;
+  const disc = g.createRadialGradient(ix - 2, iy - 2.5, 0.5, ix, iy, 7); disc.addColorStop(0, '#fff2bc'); disc.addColorStop(0.6, '#d9ae46'); disc.addColorStop(1, '#a07a24');
+  g.fillStyle = disc; g.beginPath(); g.arc(ix, iy, 6.8, 0, Math.PI * 2); g.fill();
+  g.save(); g.translate(ix, iy); plaqueGlyph(g, v, dark ? '#4a1116' : '#fffdf6'); g.restore();
+  // 새긴 글씨
+  g.font = font; g.textAlign = 'left'; g.textBaseline = 'middle';
+  const tx = ix + 7 + 6, ty = iy + 0.6;
+  g.fillStyle = dark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.95)'; g.fillText(txt, tx, ty + 0.8);
+  g.fillStyle = dark ? '#f8dc86' : '#3a2a0e'; g.fillText(txt, tx, ty);
+  return { canvas: c, ax: (x0 + PW / 2) / W, ay: (y0 + H / 2) / CH, S };
 }

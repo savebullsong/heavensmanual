@@ -128,7 +128,7 @@ function loadBuildingArt() {
 }
 import { streetProp, type PropPic } from './propgfx.ts';
 import { decorOf } from './decor.ts';
-import { canEnter, drawRoom, drawFurn, clerkLook, grandpaLook, roomKind as roomKindOf } from './interior.ts';
+import { canEnter, drawRoom, drawFurn, clerkLook, grandpaLook, roomKind as roomKindOf, plaqueArt } from './interior.ts';
 import { carHit, isDanger, DANGER_SPEED, critChance, CRIT_MULTIPLIER, regenPerMinute, restRegenPerMinute, OUT_OF_COMBAT_S, armorClass, rollToHit, pvpToHit, maxHp as maxHpFor, newStats, type DeedKey, type Stats } from '../../../packages/shared/src/rules.ts';
 
 function tex(c: HTMLCanvasElement): Texture {
@@ -4299,6 +4299,13 @@ export class WorldScene {
     }
     for (const f of info.furn) {
       if (f.kind === 'shuttle') { this.addShip(f); continue; }
+      if (f.kind === 'hsign') { // 52차 후속: 국 이름 명판은 3배 해상도로 따로 (방 그림에 1배로 찍으면 휴대폰에서 글씨가 뭉개졌다)
+        const pa = plaqueArt(f.v ?? 0), ptx = Texture.from(pa.canvas); ptx.source.scaleMode = 'linear';
+        const ps = new Sprite(ptx); ps.anchor.set(pa.ax, pa.ay); ps.scale.set(1 / pa.S);
+        const [qx, qy] = iso(f.i + 0.5, f.j + 0.5); ps.position.set(Math.round(qx), Math.round(qy - f.h - 12));
+        ps.zIndex = f.i + f.j + 2.2; ps.eventMode = 'none'; this.objects.addChild(ps);
+        continue;
+      }
       const d = drawFurn(f, info, nightIn);
       this.strips(tex(d.canvas), d.x, d.y, f.i, f.j, f.w, f.d, f.h <= 2 ? -40 : -0.2);
     }
@@ -9338,6 +9345,14 @@ export class WorldScene {
       // 50차: 상담이 끝나면 나와 환전상 사이를 본다 (휴대폰에서 환전상 탁자가 화면 밖이었다)
       const c = this.walkers.find((w) => w.kind === 'changer');
       if (c) { const [cx, cy] = iso(c.x, c.y); cpx = px * 0.5 + cx * 0.5; cpy = py * 0.5 + (cy - 40) * 0.5; }
+    }
+    // 52차 후속: 휴대폰 실내는 무엇을 보든(직원 · 문 · 염소대왕 · 환전상) 내 몸이 늘 화면 안전 구역(위 막대 아래 · 조이스틱 위) 안에
+    //   넓은 방(천국의 지붕 빌딩 주민센터 34×56)이나 염소대왕의 방 앞쪽에서는 '나와 방 가운데 사이'가 나에게서 수백 점 떨어져, 폴드 겉화면 같은 좁은 화면에서 걸어도 내가 화면 밖이었다
+    if (this.zone.interior && Math.min(vw, vh) < 600) {
+      const zz = this.wantZoom(), mx = Math.max(0, Math.min(vw / 2 - 56, vw * 0.28) / zz); // 가로: 화면 가운데에서 28% 안 (가장자리에 붙으면 갈 쪽이 안 보인다)
+      cpx = Math.max(px - mx, Math.min(px + mx, cpx));
+      const yMin = 118 + 84 * zz, yMax = vh - 190;
+      if (yMax > yMin) { const lo = py - (yMax - vh / 2 - 20 - lift) / zz, hi = py - (yMin - vh / 2 - 20 - lift) / zz; cpy = Math.max(lo, Math.min(hi, cpy)); } else cpy = py;
     }
     // 39차 시야: 휴대폰은 가까이(1.6배) · 태블릿 1.3배 · PC 1배 (영혼 설정에서 바꾼다)
     const zw = this.wantZoom();
