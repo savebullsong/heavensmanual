@@ -61,8 +61,9 @@ export function hellGroundJob(z: Zone, theme: Theme, i0: number, j0: number): Gr
   const D = im.data;
   const tiles = z.tiles, ZW = z.W, ZH = z.H;
   const bm = z.beyond?.m;
-  const cls = (i: number, j: number) => { const ii = bm !== undefined ? mirror(ZW, bm, i) : i < 0 ? 0 : i >= ZW ? ZW - 1 : i, jj = bm !== undefined ? mirror(ZH, bm, j) : j < 0 ? 0 : j >= ZH ? ZH - 1 : j; return CLASS_OF[TYPE_IDX[tiles[jj * ZW + ii]] ?? 'lot']; }; // 32차: 지도 밖은 거울
-  const sc = new Float32Array(7);
+  const hz = z.hell?.hazard; // 50차 위험한 길: 7 화염길 · 8 용암길 · 9 가시밭길
+  const cls = (i: number, j: number) => { const ii = bm !== undefined ? mirror(ZW, bm, i) : i < 0 ? 0 : i >= ZW ? ZW - 1 : i, jj = bm !== undefined ? mirror(ZH, bm, j) : j < 0 ? 0 : j >= ZH ? ZH - 1 : j; const hk = hz ? hz[jj * ZW + ii] : 0; return hk ? 6 + hk : CLASS_OF[TYPE_IDX[tiles[jj * ZW + ii]] ?? 'lot']; }; // 32차: 지도 밖은 거울
+  const sc = new Float32Array(10);
   let r = 0, gg = 0, b = 0;
   const set = (h: string) => { const v = hexc(h); r = v[0]; gg = v[1]; b = v[2]; };
   const lerp = (h1: string, h2: string, t: number) => { const a = hexc(h1), bb = hexc(h2); t = t < 0 ? 0 : t > 1 ? 1 : t; r = a[0] + (bb[0] - a[0]) * t; gg = a[1] + (bb[1] - a[1]) * t; b = a[2] + (bb[2] - a[2]) * t; };
@@ -82,6 +83,45 @@ export function hellGroundJob(z: Zone, theme: Theme, i0: number, j0: number): Gr
     else if (a3 > 0.55) lerp('#d8520e', '#ffd04a', (a3 - 0.55) * 3.2);
     else { lerp('#1e0e08', '#4a1e0a', a1 * 1.4); if (gr < 0.05) set('#8a3a10'); }
   };
+  // 50차 화염길의 불꽃: 화면 점 격자(11×15)마다 하나씩, 밑동에서 위로 가늘어지는 혀 모양 (가운데 노랗게)
+  const flame = (X: number, Y: number): string | null => {
+    const CW = 17, CH = 19, cx = Math.floor(X / CW), cy = Math.floor(Y / CH);
+    for (let oy = 0; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+      const gx = cx + ox, gy = cy + oy, hh = hash(gx, gy, 41);
+      if (hh > 0.32) continue;
+      const bx = (gx + 0.25 + hash(gx, gy, 42) * 0.5) * CW, by = (gy + 0.4 + hash(gx, gy, 43) * 0.5) * CH;
+      const fh = 10 + hash(gx, gy, 44) * 10, fw = 3 + hash(gx, gy, 45) * 2.4;
+      const dy = by - Y; if (dy < 0 || dy > fh) continue;
+      const q = dy / fh, lean = (hash(gx, gy, 46) - 0.5) * 3 * q * q;
+      const wv = fw * (q < 0.25 ? 0.6 + q * 1.6 : Math.pow(1 - (q - 0.25) / 0.75, 0.8));
+      const dx = Math.abs(X - bx - lean); if (dx > wv) continue;
+      const rr = dx / Math.max(0.5, wv);
+      return rr < 0.45 && q < 0.55 ? '#fff2b0' : rr < 0.75 && q < 0.8 ? '#ffb02a' : '#e0481a';
+    }
+    return null;
+  };
+  // 50차 가시덤불: 격자(14×14, Y는 두 배로 눌러 땅에 눕게)마다 휜 줄기 하나 · 가까운 줄기 9개 중 가장 가까운 것 → 1 줄기 · 2 줄기 윗빛 · 3 가시 끝 · 4 그림자
+  const bramble = (X: number, Yp: number): number => {
+    const CW = 19, cx = Math.floor(X / CW), cy = Math.floor(Yp / CW);
+    let bd = 9, side = 0, tip = false;
+    for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+      const gx = cx + ox, gy = cy + oy;
+      for (let m = 0; m < 2; m++) {
+        if (m ? hash(gx, gy, 37) < 0.62 : hash(gx, gy, 38) < 0.22) continue;
+        const px0 = (gx + 0.15 + hash(gx, gy, 31 + m * 7) * 0.7) * CW, py0 = (gy + 0.15 + hash(gx, gy, 32 + m * 7) * 0.7) * CW;
+        const ang = hash(gx, gy, 33 + m * 7) * Math.PI, len = 11 + hash(gx, gy, 34 + m * 7) * 11, bend = (hash(gx, gy, 35 + m * 7) - 0.5) * 10;
+        const ux = Math.cos(ang), uy = Math.sin(ang), dx = X - px0, dy = Yp - py0;
+        const al = dx * ux + dy * uy; if (al < -len || al > len) continue;
+        const sp = -dx * uy + dy * ux - bend * (1 - (al / len) ** 2);
+        const pd = Math.abs(sp);
+        if (pd < bd) { bd = pd; side = sp; const ph = (((al + 64) % 5) + 5) % 5; tip = ph < 1.4 - (pd - 2.2) * 0.45 && pd > 2.2 && pd < 4.8 && (Math.floor((al + 64) / 5) % 2 ? sp > 0 : sp < 0); }
+      }
+    }
+    if (bd < 2.4) return side < -0.8 ? 2 : 1;
+    if (tip) return 3;
+    if (bd < 4.2 && side > 0) return 4;
+    return 0;
+  };
   const row = (py: number) => {
     const Y = py + minY;
     // 이 줄에서 마름모 안에 드는 x 범위만 (밖의 점은 건너뛴다)
@@ -95,7 +135,7 @@ export function hellGroundJob(z: Zone, theme: Theme, i0: number, j0: number): Gr
       sc[cls(ti, tj)] += (1 - ax) * (1 - ay); sc[cls(ti + 1, tj)] += ax * (1 - ay); sc[cls(ti, tj + 1)] += (1 - ax) * ay; sc[cls(ti + 1, tj + 1)] += ax * ay;
       const Yp = Y * 2;
       let best = 0, bv = -9, second = 0, sv = -9;
-      for (let k = 0; k < 7; k++) {
+      for (let k = 0; k < 10; k++) {
         if (sc[k] <= 0) continue;
         const v = sc[k] + (nz(X + k * 41, Yp + k * 67) - 0.5) * 0.62;
         if (v > bv) { sv = bv; second = best; bv = v; best = k; } else if (v > sv) { sv = v; second = k; }
@@ -105,7 +145,32 @@ export function hellGroundJob(z: Zone, theme: Theme, i0: number, j0: number): Gr
       const grain = hash(X, Y, 3);
       // ③ 높낮이 그림자: 왼쪽 위가 높으면 어둡고, 낮으면 밝다
       const relief = (nz(X - 2, Yp - 3) - n1) * 2.6;
-      if (best === 2) {
+      if (best === 7) {
+        // 50차 화염길: 숯처럼 탄 땅 · 달아오른 불씨 더미 · 군데군데 솟은 불꽃 (칸을 넘어 이어지게 화면 점 기준)
+        lerp('#1a100c', '#2c1a12', n1);
+        if (n3 > 0.62) { const k = (n3 - 0.62) * 6; if (k < 1) lerp('#5a160a', '#ff6a1a', k); else lerp('#ff8a2a', '#ffe08a', Math.min(1, (k - 1) * 1.6)); if (grain < 0.08) shade(0.7); }
+        else if (grain < 0.01) set('#8a8078');
+        const crack = Math.abs(n2 - 0.5); if (crack < 0.01) set('#ff9a3a');
+        const fx = flame(X, Y);
+        if (fx) set(fx);
+        if (edge < 0.1) { const k = 1 - edge / 0.1; r = r * (1 - k * 0.25) + 50 * k; }
+      } else if (best === 8) {
+        // 50차 용암길: 검게 식은 껍질 조각 사이로 달아오른 금 (3층은 핏빛 · 4층은 쇳물빛)
+        const seamA = theme === 'market' ? '#ff5a4a' : theme === 'forge' ? '#fff2b8' : '#ffd27a', seamB = theme === 'market' ? '#c8140e' : theme === 'forge' ? '#ff9a1a' : '#ff6a1a';
+        const cell = Math.abs(Math.sin(fi * 2.3 + n2 * 6) * Math.sin(fj * 2.3 + n3 * 6));
+        if (cell < 0.05) set(seamA); else if (cell < 0.12) set(seamB);
+        else { lerp(theme === 'market' ? '#2a0a08' : '#1c1614', theme === 'market' ? '#3e100c' : '#2e2420', n1 * 1.3); if (cell > 0.7) shade(1.18); if (grain < 0.03) set('#4a3a32'); }
+      } else if (best === 9) {
+        // 50차 가시밭길: 마른 가시덤불 줄기가 이리저리 엉키고, 줄기마다 하얀 가시 (2층 썩은 초록 · 3층 녹슨 빛 · 5층 잿빛)
+        const base0 = theme === 'swamp' ? '#1e2416' : theme === 'market' ? '#2a1612' : theme === 'mask' ? '#3a3834' : '#2a2420';
+        lerp(base0, '#120c0a', n1 * 0.7);
+        const br = bramble(X, Yp);
+        if (br === 1) set(theme === 'swamp' ? '#3e4a26' : theme === 'market' ? '#5e2c1e' : theme === 'mask' ? '#6e6a62' : '#4e3e30');
+        else if (br === 2) set(theme === 'swamp' ? '#66763a' : theme === 'market' ? '#8a4630' : theme === 'mask' ? '#a8a49a' : '#76604a');
+        else if (br === 3) set(theme === 'mask' ? '#f4f0e8' : '#e8dcc0');
+        else if (br === 4) shade(0.62);
+        if (theme === 'market' && br === 0 && grain < 0.008) set('#8a1a14');
+      } else if (best === 2) {
         // 물: 용암 · 늪물 · 핏물
         if (theme === 'ash') {
           const crack = Math.abs(n2 - 0.5), hot = n3;

@@ -43,6 +43,11 @@ export async function ecoSum(days: number): Promise<{ e: Record<string, number>;
   try { const { data, error } = await sb.rpc('hm_eco_sum', { p_token: a.token, p_days: days }); return error ? null : data; } catch { return null; }
 }
 
+/** 50차 게임 설정 (관리자가 고친 층별 드랍 · 금리). 못 읽으면 null */
+export async function fetchConfig(key: 'drops' | 'bank'): Promise<Record<string, unknown> | null> {
+  try { const { data, error } = await sb.rpc('hm_config_get', { p_key: key }); return error ? null : (data as Record<string, unknown>) ?? null; } catch { return null; }
+}
+
 /** 49차 편지: 종교시설 · 속죄의 회당에서 쓴 편지 (비회원은 기기 번호로) */
 export interface Letter { id: number; realm: string; place: string; body: string; at: string; reply?: string | null; replied_at?: string | null; lang?: string; guest?: boolean; who?: string }
 export async function sendLetter(realm: 'real' | 'heaven' | 'hell', place: string, body: string, lang: string): Promise<'ok' | 'wait' | 'bad' | 'net'> {
@@ -173,12 +178,12 @@ let lastTrack = 0;
 export function nudge() { lastTrack = 0; }
 /** 사람끼리 싸움 (PvP): 맞은 쪽 기기가 자기 체력을 계산한다 (때린 쪽은 '때렸다'만 알린다) */
 export interface PvpHooks {
-  hit(from: string, dmg: number, crit: boolean, kind: string): void;
+  hit(from: string, dmg: number, crit: boolean, kind: string, lv?: number, atk?: number): void;
   down(victim: string, by: string, cash: number, wasCriminal: boolean): void;
 }
 let pvp: PvpHooks | null = null;
-export function sendHit(to: string, dmg: number, crit: boolean, kind: string) {
-  channel?.send({ type: 'broadcast', event: 'hit', payload: { from: myId(), to, dmg, crit, kind } });
+export function sendHit(to: string, dmg: number, crit: boolean, kind: string, lv = 0, atk = 0) {
+  channel?.send({ type: 'broadcast', event: 'hit', payload: { from: myId(), to, dmg, crit, kind, lv, atk } }); // 50차: 치는 사람의 영격·공격력 (빗나감 계산)
 }
 export function sendDown(by: string, cash: number, wasCriminal: boolean) {
   channel?.send({ type: 'broadcast', event: 'down', payload: { id: myId(), by, cash, crim: wasCriminal } });
@@ -275,7 +280,7 @@ export function joinZone(zoneId: string, me: () => { info: RemoteInfo; pos: NetP
   ch.on('broadcast', { event: 'p' }, ({ payload }) => { if (payload?.id && payload.id !== id) onPeer(payload.id, null, payload.pos); });
   ch.on('broadcast', { event: 'hit' }, ({ payload }) => {
     if (!payload || payload.to !== id || typeof payload.dmg !== 'number') return;
-    pvp?.hit(String(payload.from), Math.max(0, Math.min(400, payload.dmg)), !!payload.crit, String(payload.kind ?? 'fist'));
+    pvp?.hit(String(payload.from), Math.max(0, Math.min(400, payload.dmg)), !!payload.crit, String(payload.kind ?? 'fist'), Math.max(0, Math.min(99, Number(payload.lv) || 0)), Math.max(0, Math.min(200, Number(payload.atk) || 0)));
   });
   ch.on('broadcast', { event: 'down' }, ({ payload }) => {
     if (!payload?.id || payload.id === id) return;

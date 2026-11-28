@@ -48,6 +48,10 @@ export interface ItemDef {
   tint?: string;
   /** 44차: 투구의 쇠 빛 (같은 모양 투구끼리도 다르게 — 늪 청동 · 그을린 검은 쇠) */
   metal?: string;
+  /** 50차: 등에 두르는 것(망토·외투·판초·담요)과 장신구(반지·목걸이·귀걸이) — 몸에 그리지 않는 칸 */
+  wear?: 'back' | 'ring' | 'neck' | 'ear';
+  /** 50차 등 칸의 특수 기능: regen 싸우지 않을 때 체력이 더 빨리 · swift 걸음이 빠르다 · hazard 불길·용암·가시 피해가 줄어든다 · quiet 괴물이 늦게 알아챈다 (값은 비율) */
+  cape?: { regen?: number; swift?: number; hazard?: number; quiet?: number };
   bloodFloor?: number; // 22차: 물장수가 파는 '그 층 괴물의 피' (그 층에서만 판다)
 }
 
@@ -225,6 +229,14 @@ export const ITEMS: ItemDef[] = [
   { key: 'featherbalm', cat: 'goods', price: 150, heal: 220, heaven: true, store: 'yw', icon: 'bandage', tint: '#f6f0dc', name: { ko: '깃털 연고', th: 'ขี้ผึ้งขนนก', en: 'Feather balm' } },
   { key: 'lifefruit', cat: 'goods', price: 300, heal: 420, heaven: true, store: 'yw', icon: 'donut', name: { ko: '생명나무 열매', th: 'ผลจากต้นไม้แห่งชีวิต', en: 'Fruit of the tree of life' } },
   { key: 'hvrobe', cat: 'armor', price: 1200, def: 2, heaven: true, store: 'yw', sprite: 'trench', icon: 'trench', tint: '#f4f0e6', name: { ko: '흰 세마포 겉옷', th: 'เสื้อคลุมป่านขาว', en: 'White linen robe' } },
+  // 50차 등 칸: 방어력 0~2 · 특수 기능 하나 · 몸에 그리지 않는다
+  { key: 'blanket', cat: 'armor', price: 390, def: 0, wear: 'back', store: 'tools', icon: 'blanket', tint: '#8a5a4a', cape: { regen: 0.25 }, name: { ko: '낡은 모포', th: 'ผ้าห่มเก่า', en: 'Old wool blanket' } },
+  { key: 'poncho', cat: 'armor', price: 650, def: 1, wear: 'back', store: 'tools', icon: 'cape', tint: '#3c6a8a', cape: { swift: 0.05 }, name: { ko: '비옷 판초', th: 'เสื้อปอนโช่กันฝน', en: 'Rain poncho' } },
+  { key: 'wrapcoat', cat: 'armor', price: 4200, def: 2, wear: 'back', store: 'dept', icon: 'cape', tint: '#2a2c34', cape: { quiet: 0.2 }, name: { ko: '어깨에 걸친 외투', th: 'เสื้อคลุมพาดไหล่', en: 'Shoulder-draped overcoat' } },
+  { key: 'hshroud', cat: 'armor', price: 600, def: 1, wear: 'back', hell: true, store: 'hjunk', icon: 'cape', tint: '#6a645c', cape: { hazard: 0.5 }, name: { ko: '재 묻은 수의', th: 'ผ้าห่อศพเปื้อนเถ้า', en: 'Ash-stained shroud' } },
+  { key: 'hpelt', cat: 'armor', price: 1800, def: 2, wear: 'back', hell: true, store: 'hjunk', icon: 'blanket', tint: '#4a3a26', cape: { regen: 0.35 }, name: { ko: '늪짐승 가죽 담요', th: 'ผ้าห่มหนังสัตว์บึง', en: 'Bog-beast hide blanket' } },
+  { key: 'hfeather', cat: 'armor', price: 5200, def: 1, wear: 'back', hell: true, store: 'hjunk', sale: [3, 4, 5], icon: 'cape', tint: '#16141a', cape: { swift: 0.07, quiet: 0.15 }, name: { ko: '검은 깃 망토', th: 'เสื้อคลุมขนนกดำ', en: 'Black-feather cloak' } },
+  { key: 'hvshawl', cat: 'armor', price: 600, def: 1, wear: 'back', heaven: true, store: 'yw', icon: 'cape', tint: '#efe6cc', cape: { regen: 0.3 }, name: { ko: '흰 양털 숄', th: 'ผ้าคลุมไหล่ขนแกะขาว', en: 'White fleece shawl' } },
   { key: 'hvgloves', cat: 'armor', price: 300, def: 1, heaven: true, store: 'yw', sprite: 'gloves', icon: 'gloves', tint: '#f8f4ea', name: { ko: '비단 장갑', th: 'ถุงมือไหม', en: 'Silk gloves' } },
   { key: 'hvsandals', cat: 'armor', price: 400, def: 1, heaven: true, store: 'yw', sprite: 'boots', icon: 'boots', tint: '#e8c870', name: { ko: '금실 샌들', th: 'รองเท้าสานด้ายทอง', en: 'Gold-thread sandals' } },
   { key: 'bareface', cat: 'weapon', price: 38_000, atk: 11, hell: true, floor: 5, sale: [5], sprite: 'rapier', icon: 'rapier', name: { ko: '맨얼굴', th: 'ใบหน้าเปลือย', en: 'Bare Face' } },
@@ -414,8 +426,8 @@ export const STORES: Record<'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'd
   cafe: [{ key: 'coffee', price: 65 }, { key: 'thaitea', price: 45 }, { key: 'cake', price: 80 }, { key: 'water', price: 10 }],
   // 17차: 우주새와 다른 무기를 파는 거리 상인
   // 26차: 현실 값 · 겹치지 않게 (식칼은 우주새)
-  tools: ['pipe', 'hammer', 'sickle', 'crowbar', 'shovel', 'hatchet', 'wrench', 'machete', 'boltcutter', 'sledge', 'fireaxe'].map((key) => ({ key, price: ITEMS.find((x) => x.key === key)!.price })).concat([{ key: 'water', price: 10 }]), // 잡화점·철물점·수리점: 공구와 농기구
-  dept: [{ key: 'bat', price: 800 }, { key: 'metalbat', price: 1500 }, ...['damascus', 'tomahawk'].map((key) => ({ key, price: ITEMS.find((x) => x.key === key)!.price })), { key: 'cola', price: 20 }, { key: 'chips', price: 35 }], // 백화점·쇼핑몰: 운동용품 · 35차 고급 아웃도어 칼·도끼
+  tools: ['pipe', 'hammer', 'sickle', 'crowbar', 'shovel', 'hatchet', 'wrench', 'machete', 'boltcutter', 'sledge', 'fireaxe', 'blanket', 'poncho'].map((key) => ({ key, price: ITEMS.find((x) => x.key === key)!.price })).concat([{ key: 'water', price: 10 }]), // 잡화점·철물점·수리점: 공구와 농기구
+  dept: [{ key: 'bat', price: 800 }, { key: 'metalbat', price: 1500 }, ...['damascus', 'tomahawk', 'wrapcoat'].map((key) => ({ key, price: ITEMS.find((x) => x.key === key)!.price })), { key: 'cola', price: 20 }, { key: 'chips', price: 35 }], // 백화점·쇼핑몰: 운동용품 · 35차 고급 아웃도어 칼·도끼
   antique: ['whip', 'gladius', 'cutlass', 'saber', 'rapier', 'katana', 'spear', 'shinsakuto', 'nihonto', 'meisterblade', 'treasureblade', 'meteorblade', 'legendblade', 'skycleaver'].map((key) => ({ key, price: ITEMS.find((x) => x.key === key)!.price })), // 기념품·골동품 가게: 진열장의 칼
 };
 
@@ -440,6 +452,12 @@ export function effectText(it: ItemDef, l: Lang, skipStats = false): string {
     drain: { ko: '거머리: 준 피해의 2할을 되찾는다', th: 'ปลิง: ดูดคืน 20% ของความเสียหาย', en: 'Leech: regain 20% of damage dealt' } } as Record<string, Record<Lang, string>>)[it.arrowFx][l]); // 44차
   if (it.steal) parts.push(E.steal.replace('{n}', String(Math.round(it.steal * 100))));
   if (it.cross) parts.push(E.cross);
+  if (it.cape) { const C = it.cape, pc = (n: number) => String(Math.round(n * 100));
+    if (C.regen) parts.push(({ ko: '싸우지 않을 때 체력이 {n}% 더 빨리 찬다', th: 'ฟื้นพลังเร็วขึ้น {n}% ตอนไม่ได้ต่อสู้', en: 'HP refills {n}% faster out of combat' } as Record<Lang, string>)[l].replace('{n}', pc(C.regen)));
+    if (C.swift) parts.push(({ ko: '걸음이 {n}% 빨라진다', th: 'เดินเร็วขึ้น {n}%', en: 'Walk {n}% faster' } as Record<Lang, string>)[l].replace('{n}', pc(C.swift)));
+    if (C.hazard) parts.push(({ ko: '불길·용암·가시밭에서 덜 다친다 ({n}% 줄어듦)', th: 'บาดเจ็บน้อยลงบนทางไฟ ลาวา หนาม ({n}%)', en: 'Fire, lava and thorn roads hurt {n}% less' } as Record<Lang, string>)[l].replace('{n}', pc(C.hazard)));
+    if (C.quiet) parts.push(({ ko: '괴물이 {n}% 늦게 알아챈다', th: 'สัตว์ประหลาดสังเกตเห็นช้าลง {n}%', en: 'Monsters notice you {n}% later' } as Record<Lang, string>)[l].replace('{n}', pc(C.quiet)));
+    parts.push(({ ko: '몸에는 보이지 않는다', th: 'ไม่แสดงบนตัว', en: 'Not shown on your body' } as Record<Lang, string>)[l]); }
   if (it.floor) parts.push(({ ko: '지옥 {n}층 고유', th: 'เฉพาะนรกชั้น {n}', en: 'Hell F{n} only' } as Record<Lang, string>)[l].replace('{n}', String(it.floor)));
   return parts.join(' · ');
 }
@@ -851,6 +869,22 @@ export function itemIcon(key: string, tint?: string): HTMLCanvasElement {
       R(15, 6, 2, 22, '#2e3322'); R(16, 6, 1, 22, '#b9b49a'); R(10, 5, 4, 3, '#3a4028'); R(18, 5, 4, 3, '#3a4028');
       for (let y = 10; y < 28; y += 5) { R(8, y, 7, 1, '#3a4028'); R(17, y, 7, 1, '#3a4028'); }
       break;
+    // 50차 등 칸: 어깨에 두르는 망토 (천 색 = tint) · 접어 갠 담요
+    case 'cape': {
+      const C = tint ?? '#3c6a8a', D = shade(C, -0.34), H = shade(C, 0.22);
+      P([[12, 3], [20, 3], [22, 6], [28, 28], [22, 30], [16, 29], [10, 30], [4, 28], [10, 6]], C);
+      P([[12, 3], [16, 7], [20, 3], [19, 9], [13, 9]], D); E(16, 8, 2, 2, '#c9a23e');
+      for (const x of [9, 14, 19, 24]) R(x, 14, 1, 14, D);
+      P([[11, 6], [13, 7], [8, 27], [5, 27]], H);
+      break;
+    }
+    case 'blanket': {
+      const C = tint ?? '#8a5a4a', D = shade(C, -0.32), H = shade(C, 0.2);
+      R(4, 9, 24, 7, C); R(4, 16, 24, 6, D); R(5, 22, 22, 5, C); R(4, 9, 24, 1, H); R(5, 22, 22, 1, H);
+      for (let x = 6; x < 27; x += 4) { R(x, 12, 2, 1, H); R(x + 2, 24, 2, 1, D); }
+      for (let x = 5; x < 27; x += 2) R(x, 27, 1, 2, D);
+      break;
+    }
     // 40차: 긴 겉옷 (천 색 = tint)
     case 'trench': {
       const C = tint ?? '#8a6a44', D = shade(C, -0.32);
@@ -1061,8 +1095,14 @@ const gearW = (k: string, w: number, f: number) => { const it = ITEMS.find((x) =
 const saleLoot = (f: number): [string, number][] => ITEMS.filter((x) => x.hell && x.sale?.includes(f) && (x.cat === 'weapon' || x.cat === 'armor')).map((x) => [x.key, 2]);
 const commonFor = (f: number) => COMMON_LOOT.filter(([k]) => { const it = ITEMS.find((x) => x.key === k); return !it?.sale || it.sale.includes(f); });
 export const HELL_LOOT: Record<number, [string, number][]> = Object.fromEntries([1, 2, 3, 4, 5].map((f) => [f, [...FLOOR_LOOT[f], ...saleLoot(f), ...commonFor(f)].map(([k, w]) => [k, gearW(k, w, f)] as [string, number])]));
-export function rollLoot(floor: number, rnd = Math.random): string {
-  const t = HELL_LOOT[floor] ?? COMMON_LOOT;
+export function rollLoot(floor: number, rnd = Math.random, over?: Record<string, number>): string {
+  let t = HELL_LOOT[floor] ?? COMMON_LOOT;
+  // 50차: 관리자가 고친 무게 (0이면 빼고, 없던 물건은 더한다)
+  if (over && Object.keys(over).length) {
+    const m = new Map(t);
+    for (const [k, w] of Object.entries(over)) { if (!(w > 0)) m.delete(k); else if (ITEMS.some((x) => x.key === k)) m.set(k, w); }
+    if (m.size) t = [...m.entries()];
+  }
   let s = t.reduce((a, [, w]) => a + w, 0) * rnd();
   for (const [k, w] of t) { if ((s -= w) <= 0) return k; }
   return t[0][0];

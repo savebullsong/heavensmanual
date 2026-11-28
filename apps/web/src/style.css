@@ -452,7 +452,7 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 
 /* 20차: 장비 탭의 몸 그림 (위) + 넘겨 보는 목록 (아래) */
 .bag-panel .menu-list { flex: 1 1 auto; min-height: 0; }
-.bag-doll { position: relative; display: grid; grid-template-columns: 1fr 1.1fr 1fr; grid-template-areas: "weapon head offhand" "weapon body offhand" "hands legs ammo" "hands shins ammo" ". feet ." "info info info"; gap: 4px; padding: 8px 10px 6px; border-bottom: 1px solid #4f3a28; flex: 0 0 auto; }
+.bag-doll { position: relative; display: grid; grid-template-columns: 1fr 1.1fr 1fr; grid-template-areas: "weapon head offhand" "weapon body offhand" "hands legs ammo" "hands shins ammo" "back feet ." "acc acc acc" "info info info"; gap: 4px; padding: 8px 10px 6px; border-bottom: 1px solid #4f3a28; flex: 0 0 auto; }
 .bag-doll .doll-fig { position: absolute; left: 50%; top: 8px; height: calc(100% - 14px); transform: translateX(-50%); fill: rgba(224, 180, 55, 0.1); stroke: rgba(224, 180, 55, 0.34); stroke-width: 0.8; stroke-linejoin: round; pointer-events: none; }
 .bag-doll .doll-fig .hair { fill: rgba(224, 180, 55, 0.18); }
 .doll-slot { position: relative; display: flex; align-items: center; gap: 4px; min-height: 34px; padding: 3px 5px; font-size: 11px; text-align: left; background: rgba(32, 23, 17, 0.72); border: 1px dashed #4f3a28; border-radius: 4px; color: #c8b898; overflow: hidden; }
@@ -462,7 +462,7 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 .doll-slot span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-top: 6px; }
 .doll-slot .empty { color: #6a5a48; }
 .ds-weapon { grid-area: weapon; } .ds-offhand { grid-area: offhand; } .ds-head { grid-area: head; } .ds-body { grid-area: body; }
-.ds-ammo { grid-area: ammo; } .ds-hands { grid-area: hands; } .ds-legs { grid-area: legs; } .ds-shins { grid-area: shins; } .ds-feet { grid-area: feet; }
+.ds-ammo { grid-area: ammo; } .ds-back { grid-area: back; } .doll-acc { grid-area: acc; display: flex; gap: 4px; } .doll-acc .doll-slot { flex: 1 1 0; min-width: 0; } .ds-hands { grid-area: hands; } .ds-legs { grid-area: legs; } .ds-shins { grid-area: shins; } .ds-feet { grid-area: feet; }
 /* 25차: ✕를 정확히 눌러야 벗는다 (칸을 누르면 자세한 효과) · 공격력·방어력은 칸에 늘 */
 .doll-slot.on { cursor: pointer; padding-right: 26px; }
 .doll-slot.sel { border-color: #e0b437; box-shadow: 0 0 0 1px rgba(224, 180, 55, 0.45) inset; }
@@ -523,9 +523,29 @@ button.primary { background: linear-gradient(#f2d27a, #c9a23e); color: #1a120c; 
 .tembra-asm .cage-note { text-align: center; margin: 0; }
 .tembra-asm .asm-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .tembra-asm .asm-take[hidden] { display: none; }
-.asm-ring { position: relative; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, #3a1a10 0 30%, #1a0c08 31% 100%); box-shadow: inset 0 0 0 2px #6a4a2a; }
-.asm-ring i { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; transform: rotate(45deg); background: #1a1210; border: 1px solid #6a4a2a; }
-.asm-ring i.on { background: linear-gradient(135deg, #ffd08a, #c84a1a); border-color: #ffb04a; box-shadow: 0 0 6px rgba(255, 140, 60, 0.8); }
+/* 50차 템브라 틀: 비스듬히 누운 청동 원판 위에 깎은 수정 조각이 바깥을 향해 선다 (면마다 빛이 다르다) */
+.asm-stage { perspective: 420px; padding: 4px 0 10px; }
+.asm-ring { position: relative; width: 168px; height: 168px; border-radius: 50%; transform: rotateX(38deg); transform-style: preserve-3d;
+  background: radial-gradient(circle at 50% 50%, #2a120a 0 22%, #140806 23% 58%, #3a2414 59% 61%, #1a0e08 62% 100%);
+  box-shadow: inset 0 0 0 3px #7a5430, inset 0 0 0 6px #2a180c, inset 0 6px 14px rgba(0, 0, 0, 0.85), 0 14px 18px -6px rgba(0, 0, 0, 0.9), 0 0 0 2px #b08040, 0 3px 0 2px #4a2e16; }
+.asm-core { position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #5a2a14, #1a0806 70%); box-shadow: inset 0 0 6px #000; }
+.tembra-asm.done .asm-core { background: radial-gradient(circle at 38% 32%, #fff4c8, #ff9a3a 40%, #b8301a 75%); box-shadow: 0 0 18px 6px rgba(255, 140, 50, 0.75); animation: asm-glow 1.6s ease-out; }
+.asm-ring i { position: absolute; width: 16px; height: 26px; margin: -24px 0 0 -8px; transform-origin: 50% 92%; transform: rotate(var(--r)) rotateX(-38deg); transform-style: preserve-3d; }
+.asm-ring i .facet { position: absolute; inset: 0; clip-path: polygon(50% 0, 100% 30%, 82% 100%, 18% 100%, 0 30%); background: #120a08; box-shadow: inset 0 0 0 1px #4a3222; }
+.asm-ring i:not(.on) .facet { background: linear-gradient(180deg, #0c0604, #24140c); opacity: 0.85; }
+.asm-ring i.on { filter: drop-shadow(0 3px 1px rgba(0, 0, 0, 0.75)) drop-shadow(0 0 5px rgba(255, 130, 50, 0.55)); }
+.asm-ring i.on .facet { background:
+  linear-gradient(118deg, transparent 0 46%, rgba(255, 255, 240, 0.85) 47% 50%, transparent 51%),
+  linear-gradient(90deg, #ffe4a8 0 34%, #ff9a3a 34% 50%, #d0521c 50% 68%, #7a2410 68% 100%);
+}
+.asm-ring i.on .facet::after { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 32%; background: linear-gradient(90deg, rgba(255, 250, 220, 0.9), rgba(255, 190, 110, 0.6) 50%, rgba(140, 40, 16, 0.6)); clip-path: polygon(50% 0, 100% 94%, 0 94%); }
+.asm-ring i.new { animation: asm-drop 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+.asm-ring i.new::before { content: ''; position: absolute; left: 50%; bottom: -2px; width: 34px; height: 34px; margin-left: -17px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 236, 170, 0.95), rgba(255, 120, 40, 0.5) 40%, transparent 70%); animation: asm-spark 0.6s ease-out forwards; pointer-events: none; }
+@keyframes asm-drop { 0% { margin-top: -64px; opacity: 0; } 60% { margin-top: -21px; opacity: 1; } 80% { margin-top: -26px; } 100% { margin-top: -24px; } }
+@keyframes asm-spark { 0%, 45% { opacity: 0; transform: scale(0.3); } 60% { opacity: 1; transform: scale(1.1); } 100% { opacity: 0; transform: scale(1.6); } }
+@keyframes asm-glow { 0% { transform: scale(0.4); filter: brightness(2.2); } 100% { transform: scale(1); filter: brightness(1); } }
+.tembra-asm .asm-all[hidden], .tembra-asm .asm-put[hidden] { display: none; }
+.cage-note.asm-away { color: #e8c87a; text-align: center; }
 /* 34차 관리자: 경제 통계 · 성능 표시 */
 .eco-panel .eco-hold { margin: 4px 0 8px; font-size: 13px; color: #e8dcc0; }
 .eco-box { margin: 8px 0 12px; }
@@ -722,3 +742,41 @@ body:has(.bag-panel) .load-chip { display: none; }
 .letter-panel .letter-card p { margin: 4px 0 0; white-space: pre-wrap; line-height: 1.55; color: #eadfc8; }
 .letter-panel .letter-card .letter-reply { margin-top: 8px; padding-top: 6px; border-top: 1px dashed #5a4424; color: #d8c49a; font-style: italic; }
 .atone-panel .letter-open { margin: 8px 12px 12px; }
+/* 50차 관리자 순간이동 드롭다운 */
+.set-admin .tp-select { flex: 1; min-width: 0; padding: 6px 8px; background: #1d1510; color: #eadfc8; border: 1px solid #5a4424; border-radius: 6px; font: inherit; font-size: 14px; }
+.set-admin .tp-select optgroup { color: #c9a23e; }
+
+/* 50차: 지옥의 물에 스스로 뛰어든 죽음 */
+.death.hell .cause b.suicide { display: inline-block; color: #ff8a6a; font-size: 1.12em; letter-spacing: 0.02em; margin-bottom: 4px; }
+
+/* 50차 은행: 맡기기 · 찾기 · 투자 탭 / 금액 + 초기화 / 더해 가는 단추 */
+.bank-panel .store-tabs { margin: 0 12px 2px; }
+.bank-amt { display: flex; gap: 6px; }
+.bank-amt input { flex: 1; min-width: 0; }
+.bank-amt .b-clear { flex: 0 0 auto; padding: 0 12px; font-size: 13px; }
+.bank-panel .bank-quick .b-all { flex: 1; }
+.bank-panel .b-go { padding: 10px; font-size: 15px; }
+.bank-inv { display: flex; flex-direction: column; gap: 2px; }
+.bank-inv[hidden] { display: none; }
+.bank-inv .inv-row { font-size: 13px; }
+.bank-extra:empty { display: none; }
+.bank-extra .b-ask { width: 100%; padding: 8px; font-size: 13px; border-style: dashed; }
+
+/* 50차 지옥의 사도 오르멧: 공간이 세로로 찢어지고, 검은 날개의 실루엣이 걸어 나와 한 번 벤다 */
+.oremet { position: fixed; inset: 0; z-index: 400; background: radial-gradient(ellipse at 50% 45%, rgba(40, 10, 50, 0.55), rgba(0, 0, 0, 0.92) 70%); opacity: 0; transition: opacity 0.5s; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.oremet.open { opacity: 1; }
+.oremet .om-rift { position: absolute; left: 50%; top: 6%; width: 120px; height: 72%; margin-left: -60px; transform: scaleX(0); transform-origin: 50% 50%; filter: drop-shadow(0 0 24px #b89aff) drop-shadow(0 0 60px #6a3aff); transition: transform 0.9s cubic-bezier(0.2, 0.9, 0.2, 1) 0.2s; }
+.oremet .om-rift svg { width: 100%; height: 100%; }
+.oremet.open .om-rift { transform: scaleX(1.6); }
+.oremet .om-fig { position: absolute; left: 50%; top: 8%; width: min(78vw, 520px); height: 70%; transform: translateX(-50%) scale(0.7); opacity: 0; filter: drop-shadow(0 0 2px #b89aff) drop-shadow(0 0 14px rgba(120, 60, 255, 0.55)); transition: opacity 0.9s 0.9s, transform 1.3s 0.9s; }
+.oremet.open .om-fig { opacity: 1; transform: translateX(-50%) scale(1); }
+.oremet .om-talk { position: absolute; left: 50%; bottom: 7%; transform: translateX(-50%); width: min(92vw, 560px); padding: 12px 16px; background: rgba(10, 6, 14, 0.88); border: 1px solid #5a4078; border-radius: 8px; color: #e8e0f4; opacity: 0; transition: opacity 0.5s 1.4s; }
+.oremet.open .om-talk { opacity: 1; }
+.oremet .om-talk b { color: #c8a8ff; display: block; margin-bottom: 4px; letter-spacing: 0.08em; }
+.oremet .om-talk p { margin: 0; min-height: 1.4em; line-height: 1.5; }
+.oremet .om-slash { position: absolute; left: -20%; top: 50%; width: 140%; height: 6px; background: linear-gradient(90deg, transparent, #fff 30%, #fff 70%, transparent); transform: rotate(-24deg) scaleX(0); opacity: 0; box-shadow: 0 0 30px 10px rgba(255, 255, 255, 0.8); }
+.oremet.cut .om-slash { animation: om-slash 0.35s ease-out forwards; }
+.oremet.cut { animation: om-red 0.9s ease-in forwards; }
+@keyframes om-slash { 0% { opacity: 1; transform: rotate(-24deg) scaleX(0); } 60% { opacity: 1; transform: rotate(-24deg) scaleX(1); } 100% { opacity: 0; transform: rotate(-24deg) scaleX(1); } }
+@keyframes om-red { 0%, 30% { background-color: transparent; } 100% { background-color: rgba(120, 0, 0, 0.85); } }
+.bank-panel .bank-quick button { white-space: nowrap; font-size: 12px; padding: 7px 2px; min-width: 0; letter-spacing: -0.02em; }

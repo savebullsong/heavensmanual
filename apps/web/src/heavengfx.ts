@@ -221,6 +221,92 @@ export function hellPortalTexture(k: number): Texture {
 const bedTex = new Map<number, Texture>();
 const BW = 112, BH = 86, BOX = 39, BOY = 28;
 export const BED_ANCHOR: [number, number] = [BOX / BW, BOY / BH];
+/** 50차 잠든 사람이 있는 침대: 베개에 머리를 묻고, 이불이 몸의 굴곡(어깨 · 허리 · 굽힌 무릎)을 따라 덮는다. 둘이 함께 자는 넓은 침대도.
+ *  예전엔 쓰러지는 동작의 마지막 그림을 눕혀 두어 팔다리를 벌린 채 굳은 사람처럼 보였다 */
+export interface Sleeper { skin: string; hair: string; long: boolean; side: boolean; flip?: boolean }
+const sleepTex = new Map<string, Texture>();
+export const SLEEP_ANCHOR = (double: boolean): [number, number] => (double ? [(BOX + 32) / (BW + 32), BOY / (BH + 16)] : [BOX / BW, BOY / BH]);
+export function sleepBedTexture(v: number, people: Sleeper[]): Texture {
+  const double = people.length > 1, k = v % 4;
+  const key = `${k}|${people.map((p) => `${p.skin}${p.hair}${+p.long}${+p.side}${+!!p.flip}`).join('/')}`;
+  const hit = sleepTex.get(key);
+  if (hit) return hit;
+  const W2 = BW + (double ? 32 : 0), H2 = BH + (double ? 16 : 0), OX = BOX + (double ? 32 : 0);
+  const c = document.createElement('canvas');
+  c.width = W2; c.height = H2;
+  const g = c.getContext('2d')!;
+  const quilt = ['#b8d0ec', '#f2c8d4', '#d8e8c0', '#f2e2b0'][k], quiltD = ['#8aa4c6', '#cf9aaa', '#a8bc8e', '#cdb682'][k], quiltL = ['#dceaf8', '#fbe2ea', '#eef6e2', '#fbf2d6'][k];
+  const P = (i: number, j: number, z: number): [number, number] => [OX + (i - j) * 32, BOY + (i + j) * 16 - z];
+  const poly = (pts: [number, number][], col: string) => { g.fillStyle = col; g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill(); };
+  const hexMix = (a: string, b: string, t: number) => { const pa = [1, 3, 5].map((o) => parseInt(a.slice(o, o + 2), 16)), pb = [1, 3, 5].map((o) => parseInt(b.slice(o, o + 2), 16)); return `rgb(${pa.map((x, n) => Math.round(x + (pb[n] - x) * Math.max(0, Math.min(1, t)))).join(',')})`; };
+  const a0 = 0.08, a1 = 1.92, b0 = 0.14, b1 = double ? 1.86 : 0.86;
+  poly([P(a0, b0 + 0.06, -2), P(a1 + 0.08, b0 + 0.06, -2), P(a1 + 0.08, b1 + 0.1, -2), P(a0, b1 + 0.1, -2)], 'rgba(120,130,160,0.18)');
+  poly([P(a0, b1, 0), P(a1, b1, 0), P(a1, b1, 9), P(a0, b1, 9)], '#8a6a48');
+  poly([P(a1, b0, 0), P(a1, b1, 0), P(a1, b1, 9), P(a1, b0, 9)], '#6e5236');
+  poly([P(a0, b1, 9), P(a1, b1, 9), P(a1, b1, 14), P(a0, b1, 14)], '#e4dfd4');
+  poly([P(a1, b0, 9), P(a1, b1, 9), P(a1, b1, 14), P(a1, b0, 14)], '#d4cec2');
+  poly([P(a0, b0, 14), P(a1, b0, 14), P(a1, b1, 14), P(a0, b1, 14)], '#fbfaf6');
+  // 머리판
+  poly([P(a0, b0, 0), P(a0, b1, 0), P(a0, b1, 26), P(a0, b0, 26)], '#9a7a56');
+  poly([P(a0, b0, 26), P(a0, b1, 26), P(a0, b1, 28), P(a0, b0, 28)], '#b8946a');
+  g.fillStyle = 'rgba(255,255,255,0.28)';
+  for (let f = 0.3; f < b1; f += 0.2) { const [x, y] = P(a0, f, 20); g.beginPath(); g.arc(x, y, 3, 0, Math.PI * 2); g.fill(); }
+  const cjs = double ? [0.52, 1.48] : [0.5];
+  // 베개 · 머리
+  people.forEach((p, n) => {
+    const cj = cjs[n];
+    poly([P(0.16, cj - 0.27, 15), P(0.6, cj - 0.27, 15), P(0.6, cj + 0.27, 15), P(0.16, cj + 0.27, 15)], '#ffffff');
+    poly([P(0.16, cj + 0.27, 15), P(0.6, cj + 0.27, 15), P(0.6, cj + 0.27, 12), P(0.16, cj + 0.27, 12)], '#e8e6e0');
+    const [hx, hy] = P(0.4, cj + (p.side ? (p.flip ? -0.05 : 0.05) : 0), 19);
+    if (p.long) { g.fillStyle = p.hair; g.beginPath(); g.ellipse(hx - 4, hy - 1, 9, 4.5, -0.45, 0, Math.PI * 2); g.fill(); } // 베개에 흩어진 긴 머리
+    g.fillStyle = 'rgba(0,0,0,0.12)'; g.beginPath(); g.ellipse(hx + 1, hy + 3, 7, 3, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = p.hair; g.beginPath(); g.ellipse(hx, hy, 6.2, 5.2, 0, 0, Math.PI * 2); g.fill();
+    // 얼굴: 머리 앞쪽(발치 · 보는 쪽)으로 · 옆으로 누우면 옆얼굴
+    const fx = hx + (p.side ? (p.flip ? 3.4 : -0.6) : 1.6), fy = hy + 1.8;
+    g.fillStyle = p.skin; g.beginPath(); g.ellipse(fx, fy, p.side ? 3.8 : 4.4, 3.4, p.side ? (p.flip ? 0.5 : -0.5) : 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.25)'; g.beginPath(); g.ellipse(fx - 1, fy - 1.2, 1.6, 1, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(40,24,16,0.85)'; g.lineWidth = 0.9; g.lineCap = 'round';
+    const eye = (x: number, y: number) => { g.beginPath(); g.moveTo(x - 1, y); g.quadraticCurveTo(x, y + 0.8, x + 1, y); g.stroke(); }; // 감은 눈
+    if (p.side) eye(fx + (p.flip ? 1.2 : -1.2), fy - 0.4); else { eye(fx - 1.5, fy - 0.6); eye(fx + 1.6, fy - 0.2); }
+    g.fillStyle = p.hair; g.beginPath(); g.ellipse(hx - 1.4, hy - 2, 5.2, 2.8, -0.2, 0, Math.PI * 2); g.fill(); // 이마 위 머리칼
+  });
+  // 이불 바닥면 (어깨부터 발치까지) · 앞과 발치로 흘러내린 자락
+  const q0 = 0.6, Z = 16;
+  poly([P(q0, b0 - 0.03, Z), P(a1 + 0.04, b0 - 0.03, Z), P(a1 + 0.04, b1 + 0.04, Z), P(q0, b1 + 0.04, Z)], quilt);
+  poly([P(q0, b1 + 0.04, Z), P(a1 + 0.04, b1 + 0.04, Z), P(a1 + 0.04, b1 + 0.04, 6), P(q0 + 0.05, b1 + 0.04, 7)], quiltD);
+  poly([P(a1 + 0.04, b0 - 0.03, Z), P(a1 + 0.04, b1 + 0.04, Z), P(a1 + 0.04, b1 + 0.04, 6), P(a1 + 0.04, b0 - 0.03, 7)], hexMix(quiltD, '#000000', 0.08));
+  // 몸의 굴곡: 머리 쪽에서 발치 쪽으로 가는 얇은 단면을 차례로 칠한다 (가까운 것을 나중에)
+  const prof = (p: Sleeper, u: number) => {
+    const bump = (c: number, w: number, h: number) => h * Math.exp(-(((u - c) / w) ** 2));
+    return p.side ? Math.max(bump(0.1, 0.12, 1), bump(0.48, 0.16, 1.15), bump(0.74, 0.13, 0.85), bump(0.95, 0.07, 0.55), 0.55 * (u < 0.97 ? 1 : 0)) : Math.max(bump(0.15, 0.17, 0.8), bump(0.5, 0.2, 0.72), bump(0.93, 0.06, 0.7), 0.5 * (u < 0.96 ? 1 : 0));
+  };
+  const i0 = 0.63, i1 = 1.86;
+  for (let u = 0; u <= 1.0001; u += 0.012) {
+    const ii = i0 + (i1 - i0) * u;
+    people.forEach((p, n) => {
+      const H = p.side ? 7.2 : 5.2, w = p.side ? 0.3 : 0.32;
+      const curl = p.side ? (p.flip ? -1 : 1) * 0.1 * Math.max(0, Math.sin(Math.PI * Math.min(1, Math.max(0, (u - 0.5) / 0.5)))) : 0; // 굽힌 무릎은 앞으로 나온다
+      const cj = cjs[n] + curl, h = prof(p, u);
+      const pts: [number, number][] = [];
+      const N = 12;
+      for (let q = 0; q <= N; q++) { const vv = -1 + (2 * q) / N; pts.push(P(ii, cj + vv * w, Z + H * h * Math.pow(Math.max(0, 1 - vv * vv), 0.6))); }
+      pts.push(P(ii, cj + w, Z), P(ii, cj - w, Z));
+      const slope = prof(p, Math.min(1, u + 0.03)) - prof(p, Math.max(0, u - 0.03));
+      poly(pts, hexMix(quilt, slope > 0.04 ? quiltD : quiltL, Math.min(0.7, Math.abs(slope) * 6 + (slope < 0 ? 0.15 : 0))));
+      if (Math.abs(u * 83 % 1) < 0.02) { g.fillStyle = 'rgba(255,255,255,0.35)'; } // (잔무늬 자리)
+    });
+  }
+  // 몸 사이와 가장자리의 주름
+  g.strokeStyle = hexMix(quiltD, quilt, 0.3); g.lineWidth = 0.8;
+  for (const f of [1.2, 1.6]) { const a = P(f, b0, Z + 0.2), b = P(f + 0.06, b0 + 0.12, Z + 0.2); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
+  // 어깨까지 덮은 이불의 접힌 단 (흰 홑청)
+  poly([P(q0 - 0.02, b0 - 0.03, Z + 3), P(q0 + 0.1, b0 - 0.03, Z + 3.5), P(q0 + 0.1, b1 + 0.04, Z + 3.5), P(q0 - 0.02, b1 + 0.04, Z + 3)], '#ffffff');
+  poly([P(q0 - 0.02, b1 + 0.04, Z + 3), P(q0 + 0.1, b1 + 0.04, Z + 3.5), P(q0 + 0.1, b1 + 0.04, Z - 1), P(q0 - 0.02, b1 + 0.04, Z - 1)], '#e6e2da');
+  const t = Texture.from(c);
+  t.source.scaleMode = 'nearest';
+  sleepTex.set(key, t);
+  return t;
+}
 export function bedTexture(v: number): Texture {
   const k = v % 4;
   const hit = bedTex.get(k);

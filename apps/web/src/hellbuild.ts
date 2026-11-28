@@ -319,8 +319,10 @@ function carcass(b: Building, theme: Theme) {
   // 뒤쪽 갈비 (먼 쪽 = 화면 위) 먼저
   const back = alongI ? -1 : -1;
   for (let k = 0; k < ribs; k++) drawRib(ribPts(k, back), BONE2, BONE3);
-  // 등뼈 (땅 위 6px 높이를 따라 이어진 마디)
-  for (let k = 0; k <= L * 8; k++) { const [x, y] = at(0.3 + k / 8, 0, 6 + Hc * 0.0); R(x - 2, y - 2, 4, 3, k % 2 ? BONE : BONE2); }
+  // 50차 등뼈: 갈비가 솟아오른 꼭대기를 따라 이어진다 (갈비는 등뼈에서 내려와 땅에 닿는다 — 예전엔 등뼈가 땅에 따로 누워 있었다)
+  const ridge = (sv: number) => 6 + Hc * (0.55 + 0.45 * Math.sin(Math.max(0, Math.min(1, (sv - 0.7) / Math.max(0.1, L - 1.4))) * Math.PI)) * 0.98;
+  const spineAt = (sv: number): Pt => sv < 0.7 ? at(sv, 0, 6 + (ridge(0.7) - 6) * (sv / 0.7)) : sv > L - 0.7 ? at(sv, 0, ridge(L - 0.7) + (10 + 6 - ridge(L - 0.7)) * ((sv - (L - 0.7)) / 0.7)) : at(sv, 0, ridge(sv));
+  const vert = (sv: number, k: number) => { const [x, y] = spineAt(sv); const X = Math.round(x), Y = Math.round(y); R(X - 3, Y - 1, 6, 4, BONE3); R(X - 3, Y - 2, 5, 3, k % 2 ? BONE : BONE2); R(X - 1, Y - 5, 2, 3, BONE2); R(X - 1, Y - 5, 1, 2, BONE); }; // 마디 · 위로 솟은 가시돌기
   // 갈비 사이에 늘어진 썩은 살
   for (let k = 0; k < ribs - 1; k++) {
     if (hash(k, 6, seed) < 0.45) continue;
@@ -329,18 +331,37 @@ function carcass(b: Building, theme: Theme) {
     const pts: Pt[] = [...a.slice(t0, t1 + 1), ...bb.slice(t0, t1 + 1).reverse()];
     if (pts.length > 2) { poly(pts, flesh[0]); for (let q = t0; q < t1; q += 2) R(a[q][0] + 2, a[q][1] + 2, 1, 4 + (q % 3) * 2, flesh[1]); }
   }
+  for (let k = 0, sv = 0.25; sv <= L + 0.05; sv += 0.12, k++) vert(sv, k);
   // 앞쪽 갈비 (가까운 쪽)
   for (let k = 0; k < ribs; k++) drawRib(ribPts(k, -back), BONE, BONE2);
   // 앞쪽에도 군데군데 살점
   for (let k = 0; k < ribs; k++) { if (hash(k, 9, seed) < 0.6) continue; const p = ribPts(k, -back); const q = p[Math.min(p.length - 1, 3 + (k % 3))]; R(q[0] - 2, q[1], 5, 4, flesh[0]); R(q[0] - 1, q[1] + 4, 2, 3, flesh[1]); R(q[0] - 1, q[1], 2, 1, flesh[2]); }
-  // 뿔 달린 해골 (머리 쪽 끝)
-  { const [x, y] = at(L - 0.1, 0.1, 10); const X = Math.round(x), Y = Math.round(y);
-    g.fillStyle = BONE2; g.beginPath(); g.ellipse(X, Y, 11, 8, 0, 0, Math.PI * 2); g.fill();
-    g.fillStyle = BONE; g.beginPath(); g.ellipse(X - 2, Y - 2, 8, 5, 0, 0, Math.PI * 2); g.fill();
-    R(X + 4, Y + 1, 10, 6, BONE2); R(X + 5, Y + 1, 8, 2, BONE); // 주둥이
-    R(X - 5, Y - 2, 4, 4, HOLE); R(X + 1, Y - 3, 3, 3, HOLE); R(X + 11, Y + 2, 2, 2, HOLE);
-    for (let t = 0; t < 5; t++) R(X + 5 + t * 2, Y + 7, 1, 2, BONE);
-    for (const sd of [-1, 1]) for (let t = 0; t < 12; t++) { const a = t / 11; R(X - 2 + sd * (6 + a * 9), Y - 6 - Math.sin(a * 2.6) * 12 + a * 4, 3 - a * 1.5, 2, a > 0.8 ? '#efe6cc' : BONE2); } }
+  // 50차 뿔 달린 짐승 해골: 둥근 머리뼈 · 길게 뻗은 주둥이(콧구멍 · 윗니) · 벌어진 아래턱 · 깊은 눈구멍 · 뒤로 휘어 오른 두 뿔. 목뼈로 등뼈에 이어진다
+  { const [x, y] = at(L + 0.15, 0.05, 12); const X = Math.round(x), Y = Math.round(y), f = alongI ? 1 : -1;
+    const Q = (pts: [number, number][], col: string) => poly(pts.map(([px, py]) => [X + px * f, Y + py] as Pt), col);
+    const hornC = theme === 'swamp' ? ['#5a5240', '#8a8064'] : ['#5a4836', '#8e7a5e'];
+    // 먼 쪽 뿔 (먼저)
+    Q([[-4, -6], [-10, -14], [-18, -18], [-24, -16], [-27, -10], [-24, -12], [-18, -14], [-12, -10], [-6, -3]], hornC[0]);
+    // 아래턱 (살짝 벌어짐)
+    Q([[-4, 4], [6, 6], [18, 10], [20, 12], [6, 10], [-4, 8]], BONE3);
+    for (let t = 0; t < 5; t++) R(X + (6 + t * 2.6) * f - (f < 0 ? 1 : 0), Y + 6 + t * 0.7, 1, 2, BONE);
+    // 머리뼈 · 주둥이
+    Q([[-9, -2], [-7, -7], [-1, -9], [5, -7], [10, -3], [22, 2], [24, 5], [21, 7], [8, 5], [-2, 6], [-8, 4]], BONE2);
+    Q([[-7, -6], [-1, -8], [5, -6], [10, -3], [21, 2], [12, 0], [2, -3], [-5, -2]], BONE); // 윗면 빛
+    Q([[-9, 1], [-2, 6], [8, 5], [21, 7], [18, 8], [6, 7], [-3, 8], [-9, 4]], BONE3); // 아랫면 그늘
+    // 눈구멍 · 광대 · 콧구멍 · 윗니
+    g.fillStyle = HOLE; g.beginPath(); g.ellipse(X + 1 * f, Y - 2, 3.2, 2.6, 0, 0, Math.PI * 2); g.fill();
+    R(X + (f > 0 ? -2 : -1), Y + 1, 6, 1, BONE3);
+    Q([[18, 1], [22, 2], [21, 4], [17, 3]], HOLE);
+    for (let t = 0; t < 6; t++) R(X + (8 + t * 2.3) * f - (f < 0 ? 1 : 0), Y + 5 + t * 0.35, 1, 2, '#efe6cc');
+    // 금 · 얼룩
+    R(X - 4 * f, Y - 6, 1, 3, BONE3); R(X - 3 * f, Y - 4, 1, 1, BONE3);
+    // 가까운 쪽 뿔 (굵은 밑동에서 뒤로 휘어 올라 끝이 뾰족하다 · 결이 진다)
+    Q([[-3, -7], [-8, -15], [-15, -21], [-23, -22], [-29, -17], [-30, -10], [-27, -13], [-22, -17], [-15, -16], [-9, -11], [-4, -3]], hornC[1]);
+    for (const [px, py] of [[-8, -13], [-13, -17], [-19, -19], [-24, -18]] as [number, number][]) R(X + px * f, Y + py, 2, 1, hornC[0]);
+    R(X + -29 * f, Y - 12, 1, 2, '#efe6cc');
+    // 목뼈: 머리뼈 뒤에서 등뼈 끝으로
+    for (let t = 0; t <= 4; t++) { const sv = L - 0.55 + t * 0.12; const [vx, vy] = spineAt(Math.min(L, sv)); R(Math.round(vx) - 2, Math.round(vy) - 1, 4, 3, t % 2 ? BONE : BONE2); } }
   // 꼬리뼈
   for (let k = 0; k < 8; k++) { const [x, y] = at(0.3 - k * 0.09, -0.05 * k, 6 - k * 0.6); R(x - 1, y - 1, 3 - k * 0.2, 2, BONE2); }
   // 파리 떼

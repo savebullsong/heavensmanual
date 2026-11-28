@@ -4,6 +4,7 @@
 import { TYPES, finalize, type Zone, type Building, type Prop } from './zone.ts';
 import { TW, TH, iso } from './gfx.ts';
 import type { PropPic } from './propgfx.ts';
+import { lang } from './i18n.ts';
 
 const TI = Object.fromEntries(TYPES.map((t, k) => [t, k])) as Record<(typeof TYPES)[number], number>;
 export const HEAVEN_ID = 'heaven-1';
@@ -115,9 +116,13 @@ export function heavenZone(): Zone {
   }
   // 동물원: 울타리 친 우리 여섯, 우리마다 동물
   const zoo = ZOO_PENS;
+  // 50차: 나무 울타리 → 끝이 뾰족한 높은 쇠창살 (감옥처럼) · 동물원 둘레도 창살로 막고 북쪽 큰길에 정문 하나
+  for (let i = 93; i <= 126; i++) { if (i !== 110 && i !== 111) prop(i, 89, 'zoobar', 0); prop(i, 120, 'zoobar', 0); }
+  for (let j = 90; j <= 119; j++) { prop(93, j, 'zoobar', 1); prop(126, j, 'zoobar', 1); }
+  props.push({ i: 110, j: 89, kind: 'zoogate' as Prop['kind'], o: 0 });
   for (const [a, b, an] of zoo) {
-    for (let i = a; i <= a + 5; i++) { prop(i, b, 'fence', 0); prop(i, b + 6, 'fence', 0); }
-    for (let j = b + 1; j <= b + 5; j++) { prop(a, j, 'fence', 1); prop(a + 5, j, 'fence', 1); }
+    for (let i = a; i <= a + 5; i++) { prop(i, b, 'zoobar', 0); prop(i, b + 6, 'zoobar', 0); }
+    for (let j = b + 1; j <= b + 5; j++) { prop(a, j, 'zoobar', 1); prop(a + 5, j, 'zoobar', 1); }
     for (let n = 0; n < (an === 'flamingo' ? 4 : 2); n++) prop(a + 2 + (n % 2) * 2, b + 2 + Math.floor(n / 2) * 2, an);
   }
   // 43차: 동물원 남쪽 줄 — 지옥에서 데려온 악마 · 괴물, 그리고 죄 지은 인간들의 우리 (사람이 걸어 다니며 구경한다)
@@ -125,8 +130,8 @@ export function heavenZone(): Zone {
   const cages: HeavenMeta['cages'] = [];
   for (const [a, b, kind] of [[94, 112, 'demon'], [104, 112, 'beast'], [114, 112, 'sinner']] as const) {
     rect(a + 1, b + 1, a + 6, b + 5, 'park');
-    for (let i = a; i <= a + 7; i++) { prop(i, b, 'fence', 0); prop(i, b + 6, 'fence', 0); }
-    for (let j = b + 1; j <= b + 5; j++) { prop(a, j, 'fence', 1); prop(a + 7, j, 'fence', 1); }
+    for (let i = a; i <= a + 7; i++) { prop(i, b, 'zoobar', 0); prop(i, b + 6, 'zoobar', 0); }
+    for (let j = b + 1; j <= b + 5; j++) { prop(a, j, 'zoobar', 1); prop(a + 7, j, 'zoobar', 1); }
     cages.push({ i0: a + 1, j0: b + 1, i1: a + 6, j1: b + 5, kind });
   }
   // 광장 분수 · 놀이공원 풍선 수레 · 길가 나무
@@ -142,7 +147,11 @@ export function heavenZone(): Zone {
   // 47차 과소비의 쓰레기장 (남동쪽): 뜯지도 않은 선물 상자 · 쇼핑백 · 멀쩡한 TV · 매트리스 · 금 의자 · 샴페인 병 더미. 관리 천사가 한숨을 쉰다
   const dump = { i0: 173, j0: 80, i1: 190, j1: 97 };
   rect(dump.i0, dump.j0, dump.i1, dump.j1, 'lot'); rect(172, 58, 172, 80, 'walk');
-  for (let j = dump.j0 + 1; j < dump.j1; j += 2) for (let i = dump.i0 + 1; i < dump.i1; i += 2) if ((i * 7 + j * 3) % 7 !== 0) prop(i + (j % 4 === 1 ? 1 : 0), j, 'junkpile'); // 빽빽하게 — 산처럼 쌓였다
+  // 50차: 명품 가방 더미 · 귀금속 더미 · 멀쩡한 TV · 냉장고 · 세탁기가 섞인다
+  for (let j = dump.j0 + 1; j < dump.j1; j += 2) for (let i = dump.i0 + 1; i < dump.i1; i += 2) if ((i * 7 + j * 3) % 7 !== 0) {
+    const hh = ((i * 928371 + j * 1237) >>> 0) % 20;
+    prop(i + (j % 4 === 1 ? 1 : 0), j, hh < 4 ? 'bagpile' : hh < 7 ? 'jewelpile' : hh < 11 ? 'appliance' : 'junkpile'); // 빽빽하게 — 산처럼 쌓였다
+  }
   // 47차 닭 한 마리 (광장 서쪽에서 돌아다닌다)
   const chicken = { i: 88, j: 64 };
   meta = { sancts, palace, base, pools, cages, dump, chicken };
@@ -243,6 +252,24 @@ export function drawHeavenGround(z: Zone, i0: number, j0: number, chunk: number)
       if (o === t || o === 'void') continue;
       if (t === 'walk') edge(i, j, sd, 'rgba(216,184,96,0.85)', 1);
       else edge(i, j, sd, '#ffffff', 2);
+    }
+  }
+  // 50차 섬 가장자리 (뒤쪽 두 면): 칸 모서리가 계단처럼 각져 보이던 것 — 테두리를 따라 뭉게구름을 얹어 둥글게 감싼다
+  for (let j = j0 - 1; j < j1 + 1; j++) for (let i = i0 - 1; i < i1 + 1; i++) {
+    if (at(i, j) === 'void') continue;
+    const sides: [number, number, [number, number], [number, number]][] = [];
+    if (at(i - 1, j) === 'void') sides.push([-1, 0, [i, j], [i, j + 1]]);
+    if (at(i, j - 1) === 'void') sides.push([0, -1, [i, j], [i + 1, j]]);
+    if (at(i - 1, j - 1) === 'void' && at(i - 1, j) !== 'void' && at(i, j - 1) !== 'void') sides.push([-1, -1, [i, j], [i, j]]); // 안쪽으로 꺾인 모서리
+    for (const [di, dj, p0, p1] of sides) {
+      for (const t2 of p0[0] === p1[0] && p0[1] === p1[1] ? [0] : [0.2, 0.7]) {
+        const fi = p0[0] + (p1[0] - p0[0]) * (t2 + r() * 0.1) + di * 0.12, fj = p0[1] + (p1[1] - p0[1]) * (t2 + r() * 0.1) + dj * 0.12;
+        const [x, y] = S(fi, fj);
+        const rx = 13 + r() * 9, ry = 6 + r() * 4;
+        g.fillStyle = 'rgba(214,222,238,0.9)'; g.beginPath(); g.ellipse(x, y + 2, rx, ry, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = 'rgba(255,255,255,0.97)'; g.beginPath(); g.ellipse(x - 2, y - 1, rx * 0.85, ry * 0.8, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = 'rgba(255,255,255,0.6)'; g.beginPath(); g.ellipse(x + rx * 0.5, y - 3, rx * 0.45, ry * 0.55, 0, 0, Math.PI * 2); g.fill();
+      }
     }
   }
   // 섬 가장자리: 아래로 흘러내리는 구름 덩이 (앞쪽 두 면)
@@ -437,7 +464,7 @@ export function drawAttraction(b: Building & { att?: string }) {
 }
 
 // ───────────────────────── 소품 ─────────────────────────
-export const HEAVEN_PROPS = new Set(['sunbed', 'parasol', 'giraffe', 'elephant', 'lion', 'zebra', 'flamingo', 'panda', 'fountain', 'balloons', 'icecream', 'junkpile', 'chicken']);
+export const HEAVEN_PROPS = new Set(['sunbed', 'parasol', 'giraffe', 'elephant', 'lion', 'zebra', 'flamingo', 'panda', 'fountain', 'balloons', 'icecream', 'junkpile', 'chicken', 'zoobar', 'zoogate', 'bagpile', 'jewelpile', 'appliance']);
 function pic(w: number, h: number, ax: number, ay: number, draw: (R: (x: number, y: number, w: number, h: number, c: string) => void, g: CanvasRenderingContext2D) => void): PropPic {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
@@ -446,7 +473,21 @@ function pic(w: number, h: number, ax: number, ay: number, draw: (R: (x: number,
   draw(R, g);
   return { canvas: c, ax: ax / w, ay: ay / h };
 }
-export function heavenProp(kind: string, v: number): PropPic {
+/** 50차 동물 그림 도우미: 채운 다각형 + 윤곽선 · 다리 (위가 굵고 아래가 가는 기둥 + 발굽) · 무늬 얼룩 */
+function shape(g: CanvasRenderingContext2D, pts: [number, number][], fill: string, line: string) {
+  g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath();
+  g.fillStyle = fill; g.fill(); g.strokeStyle = line; g.lineWidth = 1.5; g.lineJoin = 'round'; g.stroke();
+}
+function leg(g: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, w: number, fill: string, line: string) {
+  shape(g, [[x0 - w / 2, y0], [x0 + w / 2, y0], [x1 + w * 0.35, y1 - 3], [x1 - w * 0.35, y1 - 3]], fill, line);
+  g.fillStyle = line; g.fillRect(Math.round(x1 - w * 0.45), y1 - 4, Math.round(w * 0.9) + 1, 4);
+}
+function patch(g: CanvasRenderingContext2D, x: number, y: number, r: number, col: string) {
+  g.fillStyle = col; g.beginPath();
+  for (let k = 0; k < 7; k++) { const a = (k / 7) * Math.PI * 2, rr = r * (0.75 + ((Math.sin(x * 3.1 + y * 1.7 + k * 2.3) + 1) / 2) * 0.45); g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr * 0.85); }
+  g.closePath(); g.fill();
+}
+export function heavenProp(kind: string, v: number, o = 0): PropPic {
   const E = (g: CanvasRenderingContext2D, x: number, y: number, rx: number, ry: number, col: string) => { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); g.fill(); };
   switch (kind) {
     case 'sunbed': return pic(52, 30, 26, 22, (R, g) => {
@@ -461,41 +502,133 @@ export function heavenProp(kind: string, v: number): PropPic {
       R(27, 18, 2, 46, '#e8e0d0');
       for (let k = 0; k < 8; k++) { const a0 = (k / 8) * Math.PI * 2, a1 = ((k + 1) / 8) * Math.PI * 2; g.fillStyle = k % 2 ? '#ffffff' : ['#f28aa8', '#7ac8e8', '#f2c84a'][v % 3]; g.beginPath(); g.moveTo(28, 6); g.lineTo(28 + Math.cos(a0) * 26, 20 + Math.sin(a0) * 9); g.lineTo(28 + Math.cos(a1) * 26, 20 + Math.sin(a1) * 9); g.closePath(); g.fill(); }
     });
-    case 'giraffe': return pic(40, 86, 20, 80, (R, g) => {
-      E(g, 20, 80, 12, 4, 'rgba(0,0,0,0.15)');
-      const Y = '#e8b858', S = '#a8642a';
-      R(10, 52, 18, 12, Y); for (const x of [11, 15, 22, 26]) R(x, 62, 2, 18, Y);
-      R(24, 14, 5, 42, Y); R(23, 8, 10, 7, Y); R(31, 10, 3, 3, Y); R(25, 4, 1, 4, S); R(28, 4, 1, 4, S); R(30, 10, 1, 1, '#2a1a10');
-      for (const [x, y] of [[12, 54], [18, 57], [22, 53], [25, 22], [26, 32], [25, 42], [14, 60]]) R(x, y, 3, 3, S);
+    // 50차 동물을 크게 · 윤곽선 · 그늘 (오른쪽을 본다 — 걸을 때 뒤집힌다)
+    case 'giraffe': return pic(76, 156, 34, 150, (_R, g) => {
+      E(g, 34, 150, 20, 5, 'rgba(0,0,0,0.16)');
+      const Y = '#ecbc5c', S = '#9a5a22', O = '#5a3412', D = '#c8964a';
+      leg(g, 20, 98, 18, 148, 4, D, O); leg(g, 27, 100, 28, 148, 4, Y, O); leg(g, 42, 98, 44, 148, 4, D, O); leg(g, 49, 96, 50, 148, 4, Y, O);
+      shape(g, [[12, 92], [16, 80], [34, 76], [50, 80], [56, 92], [50, 104], [30, 106], [16, 102]], Y, O);
+      shape(g, [[44, 84], [50, 76], [58, 30], [64, 22], [70, 26], [66, 36], [58, 84], [52, 92]], Y, O);
+      g.strokeStyle = '#8a4a1a'; g.lineWidth = 3; g.beginPath(); g.moveTo(52, 80); g.lineTo(59, 30); g.stroke(); // 갈기
+      shape(g, [[58, 22], [64, 14], [74, 16], [76, 22], [72, 26], [62, 28]], Y, O);
+      g.fillStyle = O; g.fillRect(62, 8, 2, 7); g.fillRect(66, 8, 2, 7); E(g, 63, 8, 2, 1.6, '#3a200c'); E(g, 67, 8, 2, 1.6, '#3a200c');
+      E(g, 60, 18, 3, 1.6, D); E(g, 69, 19, 1.4, 1.4, '#1a0e06'); E(g, 75, 22, 1.2, 1, '#3a200c');
+      for (const [x, y, r] of [[22, 86, 4], [32, 82, 4.5], [42, 86, 4], [28, 94, 4], [40, 96, 3.6], [18, 96, 3], [50, 90, 3], [54, 70, 3], [55, 56, 2.8], [57, 42, 2.4], [53, 80, 2.6]] as [number, number, number][]) patch(g, x, y, r, S);
+      g.strokeStyle = O; g.lineWidth = 1.5; g.beginPath(); g.moveTo(13, 92); g.quadraticCurveTo(6, 104, 8, 114); g.stroke(); E(g, 8, 116, 2, 3, '#3a200c');
     });
-    case 'elephant': return pic(58, 52, 29, 46, (R, g) => {
-      E(g, 29, 46, 22, 5, 'rgba(0,0,0,0.15)');
-      E(g, 26, 26, 18, 13, '#a8a8b0'); E(g, 42, 20, 10, 9, '#b0b0b8'); E(g, 36, 20, 7, 10, '#9a9aa4');
-      for (const x of [14, 22, 30, 36]) R(x, 32, 6, 13, '#a0a0a8');
-      R(48, 22, 4, 16, '#a8a8b0'); R(46, 37, 4, 3, '#a8a8b0'); R(45, 16, 2, 2, '#2a2a2e'); R(47, 26, 4, 2, '#f6f2ea');
+    case 'elephant': return pic(124, 100, 60, 94, (_R, g) => {
+      E(g, 60, 94, 40, 7, 'rgba(0,0,0,0.16)');
+      const C = '#a2a2ae', D = '#7e7e8c', L2 = '#c0c0cc', O = '#3e3e48';
+      for (const [x, c] of [[26, D], [38, C], [62, D], [74, C]] as [number, string][]) { shape(g, [[x - 7, 62], [x + 7, 62], [x + 7, 90], [x - 8, 90]], c, O); g.fillStyle = '#e8e6e0'; for (let k = 0; k < 3; k++) g.fillRect(x - 6 + k * 4, 88, 3, 2); }
+      shape(g, [[10, 48], [18, 26], [44, 18], [72, 22], [86, 34], [86, 58], [74, 70], [34, 72], [14, 64]], C, O);
+      E(g, 46, 30, 22, 7, L2);
+      shape(g, [[80, 22], [96, 16], [108, 26], [108, 44], [100, 52], [86, 50]], C, O); // 머리
+      shape(g, [[100, 44], [108, 42], [112, 58], [116, 76], [112, 86], [106, 84], [108, 72], [102, 56]], C, O); // 코
+      for (let k = 0; k < 6; k++) { g.strokeStyle = D; g.lineWidth = 1; g.beginPath(); g.moveTo(103 + k * 0.8, 52 + k * 5); g.lineTo(110 + k * 0.6, 51 + k * 5); g.stroke(); }
+      shape(g, [[78, 24], [92, 26], [94, 52], [84, 62], [72, 54], [70, 34]], D, O); // 귀
+      shape(g, [[98, 48], [104, 52], [102, 62], [96, 58]], '#f4f0e4', '#a8a090'); // 상아
+      E(g, 100, 30, 1.8, 1.8, '#1a1a20'); E(g, 99.4, 29.4, 0.6, 0.6, '#ffffff');
+      g.strokeStyle = O; g.lineWidth = 2; g.beginPath(); g.moveTo(11, 46); g.quadraticCurveTo(4, 56, 6, 66); g.stroke();
     });
-    case 'lion': return pic(46, 40, 23, 34, (R, g) => {
-      E(g, 23, 34, 16, 4, 'rgba(0,0,0,0.15)');
-      E(g, 20, 22, 13, 8, '#d8a050'); for (const x of [10, 15, 24, 29]) R(x, 26, 4, 8, '#d0984a');
-      E(g, 34, 16, 9, 9, '#a8642a'); E(g, 35, 17, 5.5, 5.5, '#e0aa5a'); R(37, 15, 1, 1, '#2a1a10'); R(38, 19, 2, 1, '#6a3a1a');
-      R(4, 18, 6, 2, '#d0984a'); R(2, 16, 3, 3, '#8a4a1a');
+    case 'lion': return pic(98, 78, 46, 72, (_R, g) => {
+      E(g, 46, 72, 30, 5, 'rgba(0,0,0,0.16)');
+      const C = '#dcaa58', D = '#b8863c', M = '#8a4a18', O = '#4a2a0e';
+      leg(g, 22, 44, 20, 70, 5, D, O); leg(g, 30, 46, 32, 70, 5, C, O); leg(g, 58, 46, 58, 70, 5, D, O); leg(g, 66, 44, 68, 70, 5, C, O);
+      shape(g, [[12, 36], [20, 28], [50, 26], [70, 30], [74, 44], [66, 52], [24, 52], [12, 46]], C, O);
+      g.strokeStyle = O; g.lineWidth = 2.2; g.beginPath(); g.moveTo(13, 38); g.quadraticCurveTo(0, 30, 4, 18); g.stroke(); E(g, 4, 16, 3.5, 4.5, M);
+      // 갈기: 들쭉날쭉한 둥근 털 덩어리
+      g.fillStyle = M; g.beginPath(); for (let k = 0; k <= 18; k++) { const a = (k / 18) * Math.PI * 2, r = k % 2 ? 17 : 21; g.lineTo(74 + Math.cos(a) * r, 24 + Math.sin(a) * r * 0.95); } g.closePath(); g.fill(); g.strokeStyle = O; g.lineWidth = 1.4; g.stroke();
+      E(g, 72, 22, 14, 13, '#a8601e');
+      shape(g, [[70, 12], [84, 14], [90, 24], [86, 34], [76, 36], [68, 28]], C, O); // 얼굴
+      E(g, 86, 27, 4, 3, '#f2d8a8'); E(g, 88, 24, 2, 1.4, '#3a1a0a'); E(g, 80, 20, 1.6, 1.6, '#1a0e06'); E(g, 79.5, 19.5, 0.5, 0.5, '#fff');
+      E(g, 72, 12, 3, 3, C);
     });
-    case 'zebra': return pic(44, 44, 22, 38, (R, g) => {
-      E(g, 22, 38, 15, 4, 'rgba(0,0,0,0.15)');
-      R(8, 18, 22, 12, '#fbfaf6'); for (const x of [9, 13, 24, 28]) R(x, 28, 3, 10, '#fbfaf6');
-      R(28, 8, 6, 14, '#fbfaf6'); R(30, 4, 8, 6, '#fbfaf6'); R(36, 7, 3, 3, '#2a2a2e');
-      for (let x = 10; x < 30; x += 4) R(x, 18, 2, 12, '#1e1e22'); for (let y = 9; y < 21; y += 4) R(28, y, 6, 2, '#1e1e22');
+    case 'zebra': return pic(92, 86, 42, 80, (_R, g) => {
+      E(g, 42, 80, 26, 5, 'rgba(0,0,0,0.16)');
+      const W0 = '#fbfaf4', K = '#1c1c22', O = '#2a2a30';
+      leg(g, 20, 48, 18, 78, 4, W0, O); leg(g, 27, 50, 28, 78, 4, W0, O); leg(g, 52, 50, 52, 78, 4, W0, O); leg(g, 59, 48, 61, 78, 4, W0, O);
+      const body: [number, number][] = [[12, 40], [18, 30], [46, 28], [62, 30], [74, 14], [80, 8], [88, 14], [86, 22], [76, 26], [70, 44], [62, 54], [22, 54], [12, 48]];
+      shape(g, body, W0, O);
+      g.save(); g.beginPath(); body.forEach(([x, y], n) => (n ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.clip();
+      g.strokeStyle = K; g.lineWidth = 2.6;
+      for (let x = 14; x < 64; x += 6) { g.beginPath(); g.moveTo(x, 26); g.quadraticCurveTo(x + 3, 40, x - 1, 56); g.stroke(); }
+      for (let k = 0; k < 5; k++) { g.beginPath(); g.moveTo(62 + k * 3, 18 + k); g.lineTo(70 + k * 2.4, 34 + k); g.stroke(); }
+      g.restore();
+      for (const x of [18, 28, 52, 61]) { g.fillStyle = K; for (let y = 58; y < 74; y += 5) g.fillRect(x - 2, y, 4, 2); }
+      g.strokeStyle = K; g.lineWidth = 3; g.beginPath(); g.moveTo(64, 26); g.lineTo(78, 8); g.stroke(); // 갈기
+      E(g, 86, 18, 3, 3, '#3a3a40'); E(g, 80, 13, 1.4, 1.4, '#0a0a0e');
+      g.strokeStyle = O; g.lineWidth = 1.6; g.beginPath(); g.moveTo(13, 42); g.quadraticCurveTo(6, 50, 8, 62); g.stroke(); E(g, 8, 63, 2, 3, K);
     });
-    case 'flamingo': return pic(22, 46, 11, 42, (R, g) => {
-      E(g, 11, 42, 7, 2, 'rgba(0,0,0,0.12)');
-      R(10, 26, 1, 16, '#e87a8a'); R(13, 26, 1, 10, '#e87a8a'); R(12, 36, 3, 1, '#e87a8a');
-      E(g, 11, 22, 7, 5, '#f498a8'); R(14, 8, 2, 13, '#f498a8'); R(13, 5, 5, 4, '#f498a8'); R(17, 7, 3, 2, '#2a2a2e');
+    case 'flamingo': return pic(46, 100, 22, 96, (_R, g) => {
+      E(g, 22, 96, 10, 3, 'rgba(0,0,0,0.14)');
+      const P1 = '#f6a0b2', P2 = '#e8788e', O = '#a8485a';
+      g.strokeStyle = '#d8687e'; g.lineWidth = 2; g.beginPath(); g.moveTo(20, 58); g.lineTo(21, 96); g.stroke(); // 선 다리
+      g.beginPath(); g.moveTo(25, 58); g.lineTo(30, 70); g.lineTo(21, 74); g.stroke(); // 접은 다리
+      shape(g, [[6, 50], [14, 42], [30, 42], [38, 48], [32, 58], [14, 60]], P1, O);
+      shape(g, [[10, 50], [18, 46], [30, 48], [24, 56], [12, 56]], P2, O);
+      g.strokeStyle = P1; g.lineWidth = 4.5; g.lineCap = 'round'; g.beginPath(); g.moveTo(32, 46); g.bezierCurveTo(42, 32, 22, 26, 28, 12); g.stroke();
+      g.strokeStyle = O; g.lineWidth = 1; g.stroke();
+      E(g, 30, 10, 5, 4, P1); shape(g, [[33, 9], [41, 12], [40, 18], [36, 15]], '#f4ece0', O); shape(g, [[38, 13], [41, 12], [40, 18]], '#1a1a1e', '#1a1a1e');
+      E(g, 30, 9, 1.2, 1.2, '#1a1a1e');
     });
-    case 'panda': return pic(40, 36, 20, 30, (R, g) => {
-      E(g, 20, 30, 14, 4, 'rgba(0,0,0,0.15)');
-      E(g, 18, 20, 12, 9, '#fbfaf6'); E(g, 18, 23, 12, 5, '#1e1e22'); E(g, 29, 14, 8, 7, '#fbfaf6');
-      E(g, 24, 8, 3, 3, '#1e1e22'); E(g, 33, 8, 3, 3, '#1e1e22'); E(g, 27, 14, 2, 2, '#1e1e22'); E(g, 32, 14, 2, 2, '#1e1e22');
-      R(31, 23, 6, 3, '#3a7a3a'); R(36, 18, 1, 10, '#4a9a4a');
+    case 'panda': return pic(82, 72, 40, 66, (_R, g) => {
+      E(g, 40, 66, 24, 5, 'rgba(0,0,0,0.16)');
+      const W0 = '#fbfaf4', K = '#1e1e24', O = '#2a2a30';
+      E(g, 26, 58, 11, 8, K); E(g, 50, 60, 10, 7, K); // 앉은 다리
+      shape(g, [[16, 40], [22, 26], [40, 20], [56, 26], [60, 44], [52, 60], [26, 60]], W0, O);
+      E(g, 38, 34, 20, 6, K); // 어깨 띠
+      E(g, 56, 40, 6, 10, K); g.strokeStyle = '#3a7a3a'; g.lineWidth = 3; g.beginPath(); g.moveTo(62, 58); g.lineTo(70, 18); g.stroke(); // 대나무
+      for (const y of [26, 38, 50]) { g.fillStyle = '#2a5a2a'; g.fillRect(64 + (58 - y) * 0.2 - 2, y, 6, 2); }
+      g.fillStyle = '#5aa04a'; g.beginPath(); g.ellipse(74, 22, 7, 2.5, -0.6, 0, Math.PI * 2); g.fill();
+      E(g, 52, 14, 14, 12, W0); g.strokeStyle = O; g.lineWidth = 1.5; g.beginPath(); g.ellipse(52, 14, 14, 12, 0, 0, Math.PI * 2); g.stroke();
+      E(g, 42, 4, 5, 4.5, K); E(g, 61, 4, 5, 4.5, K);
+      g.fillStyle = K; g.beginPath(); g.ellipse(47, 14, 3.6, 4.6, 0.5, 0, Math.PI * 2); g.fill(); g.beginPath(); g.ellipse(58, 14, 3.6, 4.6, -0.5, 0, Math.PI * 2); g.fill();
+      E(g, 47.5, 13.5, 1, 1, '#fff'); E(g, 57.5, 13.5, 1, 1, '#fff'); E(g, 53, 20, 2.4, 1.6, K);
+    });
+    // 50차 동물원 창살: 한 칸마다 쇠기둥 넷 · 위아래 가로대 · 끝은 금빛 창날 (o 0 = i 방향 · 1 = j 방향)
+    case 'zoobar': return pic(44, 100, 22, 92, (_R, g) => {
+      const dx = o ? -16 : 16, dy = 8;
+      const at = (t: number, z: number): [number, number] => [22 + dx * (t * 2 - 1), 92 + dy * (t * 2 - 1) - z];
+      const rail = (z: number, w: number, c: string) => { const [x0, y0] = at(0, z), [x1, y1] = at(1, z); g.strokeStyle = c; g.lineWidth = w; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); };
+      g.fillStyle = 'rgba(40,40,60,0.15)'; { const [x0, y0] = at(0, -1), [x1, y1] = at(1, -1); g.beginPath(); g.moveTo(x0, y0 + 2); g.lineTo(x1, y1 + 2); g.lineTo(x1 + 3, y1 + 5); g.lineTo(x0 + 3, y0 + 5); g.fill(); }
+      rail(2, 3, '#2a2a32');
+      for (const t of [0.125, 0.375, 0.625, 0.875]) {
+        const [x, y] = at(t, 0);
+        g.fillStyle = '#26262e'; g.fillRect(Math.round(x) - 1, y - 72, 3, 72);
+        g.fillStyle = '#6a6a7a'; g.fillRect(Math.round(x) - 1, y - 72, 1, 72);
+        g.fillStyle = '#c9a23e'; g.fillRect(Math.round(x) - 2, y - 74, 5, 2); // 고리
+        g.beginPath(); g.moveTo(x + 0.5, y - 86); g.lineTo(x + 3.5, y - 76); g.lineTo(x + 0.5, y - 73); g.lineTo(x - 2.5, y - 76); g.closePath(); g.fillStyle = '#e8c24e'; g.fill();
+        g.fillStyle = '#fff2b8'; g.fillRect(Math.round(x), y - 83, 1, 6);
+      }
+      rail(30, 2.5, '#2e2e36'); rail(64, 3, '#2a2a32'); rail(64.8, 1, '#7a7a88');
+    });
+    case 'zoogate': return pic(150, 210, 59, 186, (_R, g) => {
+      // 50차 동물원 정문: 흰 돌기둥 둘 · 위로 굽은 쇠 아치(창날 장식) · 금빛 간판 · 기둥 위 등불. 문짝은 활짝 열려 안쪽 창살에 붙어 있다
+      const C = [75, 194] as const, U: [number, number] = [32, 16];
+      const pt = (ti: number, z: number): [number, number] => [C[0] + U[0] * ti, C[1] + U[1] * ti - z];
+      const pillar = (ti: number) => {
+        const [x, y] = pt(ti, 0);
+        g.fillStyle = 'rgba(40,40,60,0.18)'; g.beginPath(); g.ellipse(x + 2, y + 2, 13, 5, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#e8e2d6'; g.fillRect(x - 9, y - 118, 9, 118); g.fillStyle = '#fbf8f0'; g.fillRect(x - 9, y - 118, 4, 118);
+        g.fillStyle = '#cfc8b8'; g.fillRect(x, y - 118, 8, 118);
+        g.fillStyle = '#c9a23e'; g.fillRect(x - 11, y - 124, 21, 6); g.fillRect(x - 10, y - 8, 19, 4);
+        g.fillStyle = '#2a2a32'; g.fillRect(x - 3, y - 140, 6, 16); g.fillStyle = '#fff2b8'; g.fillRect(x - 2, y - 138, 4, 10); // 등불
+        g.fillStyle = 'rgba(255,240,180,0.35)'; g.beginPath(); g.arc(x, y - 133, 10, 0, Math.PI * 2); g.fill();
+      };
+      pillar(-1.5);
+      // 아치
+      const L = pt(-1.5, 112), Rr = pt(1.5, 112);
+      const mx = (L[0] + Rr[0]) / 2, my = (L[1] + Rr[1]) / 2 - 34;
+      g.strokeStyle = '#26262e'; g.lineWidth = 5; g.beginPath(); g.moveTo(L[0], L[1]); g.quadraticCurveTo(mx, my - 16, Rr[0], Rr[1]); g.stroke();
+      g.strokeStyle = '#6a6a7a'; g.lineWidth = 1; g.stroke();
+      for (let k = 1; k < 12; k++) { const t = k / 12, x = (1 - t) * (1 - t) * L[0] + 2 * (1 - t) * t * mx + t * t * Rr[0], y = (1 - t) * (1 - t) * L[1] + 2 * (1 - t) * t * (my - 16) + t * t * Rr[1]; g.fillStyle = '#26262e'; g.fillRect(x - 1, y - 9, 2, 9); g.beginPath(); g.moveTo(x, y - 15); g.lineTo(x + 2.5, y - 9); g.lineTo(x - 2.5, y - 9); g.closePath(); g.fillStyle = '#e8c24e'; g.fill(); }
+      // 간판
+      const sw = 74, sh = 20, sx = mx - sw / 2, sy = my + 4;
+      g.fillStyle = '#7a5a2a'; g.fillRect(sx - 2, sy - 2, sw + 4, sh + 4); g.fillStyle = '#c9a23e'; g.fillRect(sx, sy, sw, sh); g.fillStyle = '#f2d27a'; g.fillRect(sx + 2, sy + 2, sw - 4, 3);
+      g.strokeStyle = '#26262e'; g.lineWidth = 1; g.beginPath(); g.moveTo(sx + 8, sy); g.lineTo(sx + 12, sy - 10); g.moveTo(sx + sw - 8, sy); g.lineTo(sx + sw - 12, sy - 10); g.stroke();
+      g.fillStyle = '#3a240c'; g.font = 'bold 11px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(({ ko: '천국 동물원', th: 'สวนสัตว์สวรรค์', en: 'HEAVEN ZOO' } as Record<string, string>)[lang()] ?? 'HEAVEN ZOO', mx, sy + sh / 2 + 1);
+      pillar(1.5);
     });
     case 'fountain': return pic(76, 70, 38, 56, (R, g) => {
       E(g, 38, 56, 34, 13, '#e8e2d6'); E(g, 38, 54, 30, 11, '#8adcee'); E(g, 38, 52, 26, 9, '#a8e8f4');
@@ -526,6 +659,76 @@ export function heavenProp(kind: string, v: number): PropPic {
       R(26 + r(30) * 20, 40, 8, 10, '#1e1e1e'); R(26 + r(30) * 20, 40, 8, 2, '#c9a23e'); R(27 + r(30) * 20, 37, 6, 3, '#1e1e1e'); // 쇼핑백
       R(50 + r(31) * 10, 44, 6, 3, '#e85a6a'); R(55 + r(31) * 10, 41, 1, 4, '#e85a6a'); // 하이힐
       for (let k = 0; k < 4; k++) E(g, 10 + r(k + 40) * 56, 46 + r(k + 44) * 6, 2.5, 2, ['#f28aa8', '#f2d27a', '#ffffff', '#c8a8f2'][k]); // 시든 꽃잎
+    });
+    // 50차 과소비의 쓰레기장: 명품 가방 더미 (누빔 · 금 사슬 · 손잡이 · 상표 없는 무늬)
+    case 'bagpile': return pic(84, 64, 42, 56, (_R, g) => {
+      E(g, 42, 56, 36, 7, 'rgba(0,0,0,0.13)');
+      const r = (k: number) => { const x = Math.sin((v + 3) * 77.3 + k * 19.1) * 43758.5453; return x - Math.floor(x); };
+      E(g, 42, 48, 34, 11, '#e2dcd0'); E(g, 40, 42, 26, 10, '#ece6dc');
+      const bag = (x: number, y: number, w: number, h: number, body: string, trim: string, kind: number) => {
+        g.fillStyle = 'rgba(0,0,0,0.15)'; g.fillRect(x + 2, y + h - 1, w, 3);
+        g.fillStyle = body; g.beginPath(); g.moveTo(x + 2, y); g.lineTo(x + w - 2, y); g.lineTo(x + w, y + h); g.lineTo(x, y + h); g.closePath(); g.fill();
+        g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 1; g.stroke();
+        if (kind === 0) { g.strokeStyle = 'rgba(255,255,255,0.18)'; for (let q = -h; q < w; q += 4) { g.beginPath(); g.moveTo(x + q, y + h); g.lineTo(x + q + h, y); g.moveTo(x + q, y); g.lineTo(x + q + h, y + h); g.stroke(); } } // 누빔
+        if (kind === 1) { g.fillStyle = trim; for (let yy = y + 2; yy < y + h - 1; yy += 3) for (let xx = x + 2 + ((yy - y) % 6 ? 1.5 : 0); xx < x + w - 1; xx += 3) g.fillRect(Math.round(xx), Math.round(yy), 1, 1); } // 잔무늬
+        g.fillStyle = 'rgba(255,255,255,0.2)'; g.fillRect(x + 2, y + 1, w - 4, 2);
+        g.strokeStyle = kind === 0 ? '#e0b84e' : trim; g.lineWidth = kind === 0 ? 1.2 : 2; g.beginPath(); g.ellipse(x + w / 2, y, w * 0.32, kind === 0 ? 6 : 5, 0, Math.PI, 0); g.stroke(); // 손잡이 · 금 사슬
+        g.fillStyle = '#e8c24e'; g.fillRect(Math.round(x + w / 2 - 2), Math.round(y + h * 0.35), 4, 3); // 잠금 장식
+      };
+      const cols: [string, string, number][] = [['#1e1c1e', '#e0b84e', 0], ['#7a4a2a', '#c89a5a', 1], ['#d8702a', '#8a3a10', 2], ['#b8282e', '#f2d27a', 0], ['#efe4d0', '#a8865a', 2], ['#2a3a5a', '#c9a23e', 1], ['#f2c8d4', '#c9a23e', 0]];
+      for (let k = 0; k < 9; k++) { const c = cols[Math.floor(r(k) * cols.length)]; bag(8 + r(k + 10) * 56, 14 + r(k + 20) * 28, 12 + r(k + 30) * 8, 9 + r(k + 40) * 6, c[0], c[1], c[2]); }
+      for (let k = 0; k < 3; k++) { const x = 10 + r(k + 50) * 60, y = 40 + r(k + 55) * 8; g.fillStyle = ['#f6f2ea', '#1e1e1e', '#e8d6b0'][k]; g.fillRect(x, y, 10, 9); g.fillStyle = '#c9a23e'; g.fillRect(x + 4, y + 3, 2, 2); } // 상자
+    });
+    // 50차 귀금속 더미: 금빛 무더기 · 목걸이 사슬 · 진주 · 보석 반지 · 시계 · 왕관 (반짝임)
+    case 'jewelpile': return pic(70, 52, 35, 44, (_R, g) => {
+      E(g, 35, 44, 30, 6, 'rgba(0,0,0,0.13)');
+      const r = (k: number) => { const x = Math.sin((v + 5) * 63.1 + k * 23.7) * 43758.5453; return x - Math.floor(x); };
+      E(g, 35, 38, 28, 9, '#b8862a'); E(g, 34, 34, 22, 9, '#d8a83a'); E(g, 33, 30, 14, 7, '#f2c84a'); E(g, 30, 27, 6, 3, '#fff0a8');
+      for (let k = 0; k < 40; k++) { const x = 8 + r(k) * 54, y = 24 + r(k + 50) * 20; g.fillStyle = ['#ffe07a', '#c9922a', '#fff4c0'][k % 3]; g.fillRect(Math.round(x), Math.round(y), 2, 1); } // 금 사슬 고리
+      g.strokeStyle = '#ffe07a'; g.lineWidth = 1.2; for (let k = 0; k < 3; k++) { g.beginPath(); g.ellipse(18 + k * 16, 34 - k * 2, 9, 4, 0.2 * k, 0, Math.PI); g.stroke(); }
+      for (let k = 0; k < 9; k++) { const t = k / 8; g.fillStyle = '#fbf8f0'; g.beginPath(); g.arc(14 + t * 20, 40 - Math.sin(t * Math.PI) * 5, 1.6, 0, Math.PI * 2); g.fill(); } // 진주
+      const gem = (x: number, y: number, c: string) => { g.strokeStyle = '#e0b84e'; g.lineWidth = 1.2; g.beginPath(); g.ellipse(x, y + 2, 3, 1.6, 0, 0, Math.PI * 2); g.stroke(); g.fillStyle = c; g.beginPath(); g.moveTo(x, y - 3); g.lineTo(x + 2.4, y); g.lineTo(x, y + 1.4); g.lineTo(x - 2.4, y); g.closePath(); g.fill(); g.fillStyle = 'rgba(255,255,255,0.8)'; g.fillRect(x - 1, y - 2, 1, 1); };
+      gem(22, 26, '#3a7ae8'); gem(44, 30, '#e8283a'); gem(52, 38, '#2ac87a'); gem(28, 36, '#ffffff');
+      g.fillStyle = '#3a3a40'; g.fillRect(46, 22, 8, 6); g.fillStyle = '#e8e6e0'; g.beginPath(); g.arc(50, 25, 2.4, 0, Math.PI * 2); g.fill(); g.fillStyle = '#c9a23e'; g.fillRect(49, 20, 2, 2); g.fillRect(49, 28, 2, 2); // 시계
+      g.fillStyle = '#e8c24e'; g.beginPath(); g.moveTo(26, 22); for (const [x, y] of [[28, 14], [31, 19], [34, 12], [37, 19], [40, 14], [42, 22]]) g.lineTo(x, y); g.closePath(); g.fill(); g.fillStyle = '#e8283a'; g.fillRect(33, 16, 2, 2); // 작은 왕관
+      for (const [x, y] of [[18, 22], [40, 26], [56, 32], [30, 32]]) { g.fillStyle = '#ffffff'; g.fillRect(x, y - 2, 1, 5); g.fillRect(x - 2, y, 5, 1); } // 반짝임
+    });
+    // 50차 멀쩡한 가전: v 0 = 겹쳐 세운 TV · 1 = 양문 냉장고 · 2 = 세탁기 두 대
+    case 'appliance': return pic(72, 76, 36, 68, (_R, g) => {
+      E(g, 36, 68, 30, 6, 'rgba(0,0,0,0.13)');
+      const k = v % 3;
+      // 쿼터뷰 상자: (a, b) 바닥 · h 높이 · 바닥 앞 모서리가 (ox, oy). 윗면 · 왼쪽 앞면(+j) · 오른쪽 앞면(+i)
+      const box = (ox: number, oy: number, a: number, b: number, h: number, top: string, left: string, right: string) => {
+        const S = (i: number, j: number, z: number): [number, number] => [ox + (i - a) - (j - b), oy + (i - a) * 0.5 + (j - b) * 0.5 - z];
+        const f = (pts: [number, number][], c: string) => { g.fillStyle = c; g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill(); g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 0.8; g.stroke(); };
+        f([S(0, b, 0), S(a, b, 0), S(a, b, h), S(0, b, h)], left);
+        f([S(a, 0, 0), S(a, b, 0), S(a, b, h), S(a, 0, h)], right);
+        f([S(0, 0, h), S(a, 0, h), S(a, b, h), S(0, b, h)], top);
+        return S;
+      };
+      if (k === 0) {
+        for (const [ox, oy, tilt] of [[30, 64, 0], [50, 58, 1], [22, 46, 0]] as [number, number, number][]) {
+          const S = box(ox, oy, 26, 3, 17, '#2a2a30', '#141418', '#1e1e24');
+          const p0 = S(1.5, 3, 1.5), p1 = S(24.5, 3, 1.5), p2 = S(24.5, 3, 15.5), p3 = S(1.5, 3, 15.5);
+          g.fillStyle = tilt ? '#2a3e5a' : '#1e2a40'; g.beginPath(); g.moveTo(...p0); g.lineTo(...p1); g.lineTo(...p2); g.lineTo(...p3); g.closePath(); g.fill();
+          g.strokeStyle = 'rgba(180,210,255,0.4)'; g.lineWidth = 1; g.beginPath(); g.moveTo(...S(4, 3, 13)); g.lineTo(...S(10, 3, 9)); g.stroke(); // 화면 반사
+        }
+      } else if (k === 1) {
+        const S = box(40, 66, 18, 16, 46, '#e8ecf0', '#c8ced6', '#a8b0ba');
+        g.strokeStyle = '#8a929c'; g.lineWidth = 1; g.beginPath(); g.moveTo(...S(9, 16, 1)); g.lineTo(...S(9, 16, 45)); g.stroke(); // 양문 틈
+        g.fillStyle = '#6a727c'; for (const [i, z] of [[7.5, 24], [10.5, 24]]) { const [x, y] = S(i, 16, z); g.fillRect(x - 0.5, y - 8, 1.5, 12); } // 손잡이
+        g.fillStyle = '#2a3a4a'; { const [x, y] = S(3, 16, 34); g.fillRect(x, y - 5, 4, 5); g.fillStyle = '#7ad8ff'; g.fillRect(x + 1, y - 4, 2, 1); } // 디스플레이
+        g.fillStyle = 'rgba(255,255,255,0.35)'; { const [x, y] = S(1, 16, 44); g.fillRect(x, y, 2, 30); }
+      } else {
+        for (const [ox, oy] of [[30, 66], [54, 58]] as [number, number][]) {
+          const S = box(ox, oy, 16, 16, 19, '#f6f6f4', '#e2e2de', '#c8c8c2');
+          const [cx, cy] = S(8, 16, 8.5);
+          g.fillStyle = '#9aa0a8'; g.beginPath(); g.ellipse(cx, cy, 6.2, 6.8, -0.45, 0, Math.PI * 2); g.fill();
+          g.fillStyle = '#3a4a5e'; g.beginPath(); g.ellipse(cx, cy, 4.6, 5.2, -0.45, 0, Math.PI * 2); g.fill();
+          g.fillStyle = 'rgba(200,230,255,0.45)'; g.beginPath(); g.ellipse(cx - 1.4, cy - 1.6, 1.6, 2, -0.45, 0, Math.PI * 2); g.fill();
+          g.fillStyle = '#b8bcc2'; { const [x, y] = S(3, 16, 17); g.fillRect(x, y, 10, 2); } g.fillStyle = '#5ac87a'; { const [x, y] = S(12, 16, 17); g.fillRect(x, y, 2, 2); } // 조작판
+        }
+      }
     });
     case 'chicken': return pic(24, 24, 12, 21, (R, g) => {
       // 47차 천국의 닭 한 마리: 흰 몸 · 붉은 볏 · 노란 부리와 다리 (v 1 = 모이 쪼기)

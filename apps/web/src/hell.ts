@@ -821,10 +821,49 @@ export function hellZone(floor: number): Zone {
   for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) region[j * W + i] = j <= LJ + 1 ? 2 : i >= DI && j < DJ ? 1 : MINE && i <= MI && j < MJ ? 3 : 0;
   const villages = [{ i: C.i, j: C.j, r: VR }, ...(OP ? [{ i: OP.i, j: OP.j, r: OR }] : [])];
   const safes: { i: number; j: number; r: number; kind: 'stairUp' | 'stairDown' | 'mine' }[] = [{ ...SU, r: 4, kind: 'stairUp' }, { ...SD, r: 4, kind: 'stairDown' }, ...(MINE ? [{ ...MC, r: 5, kind: 'mine' as const }] : [])];
+  // 50차 위험한 길: 화염길 · 용암길(식은 껍질 사이로 달아오른 금) · 가시밭길 — 들판을 구불구불 가로지른다. 걸을 수 있지만 걸을수록 다친다
+  const hazard = new Uint8Array(W * H);
+  {
+    const onB = new Uint8Array(W * H);
+    for (const b of buildings) for (let j = b.j0 - 2; j < b.j0 + b.d + 2; j++) for (let i = b.i0 - 2; i < b.i0 + b.w + 2; i++) if (i >= 0 && j >= 0 && i < W && j < H) onB[j * W + i] = 1;
+    const kinds: number[] = T === 'ash' ? [1, 1, 1, 2, 2] : T === 'swamp' ? [3, 3, 3, 3, 1] : T === 'market' ? [2, 2, 3, 3, 3] : T === 'forge' ? [2, 2, 2, 1, 1] : [3, 3, 3, 3, 3];
+    const ok = (i: number, j: number) => i > EDGE + 2 && j > EDGE + 2 && i < W - EDGE - 3 && j < H - EDGE - 3 && (at(i, j) === TI.lot || at(i, j) === TI.park) && !onB[j * W + i] && free(i, j, 2);
+    const DIR8: [number, number][] = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+    const strokes = Math.round(12 * A / 2.6);
+    for (let n = 0, tries = 0; n < strokes && tries < strokes * 40; tries++) {
+      let i = 6 + Math.floor(r() * (W - 12)), j = 6 + Math.floor(r() * (H - 12));
+      if (!ok(i, j)) continue;
+      n++;
+      const kind = kinds[Math.floor(r() * kinds.length)], len = 16 + Math.floor(r() * 20), wid = r() < 0.35 ? 3 : 2;
+      let d = Math.floor(r() * 8);
+      for (let k = 0; k < len; k++) {
+        for (let a2 = 0; a2 < wid; a2++) for (let b2 = 0; b2 < wid; b2++) { const ii = i + a2 - (wid >> 1), jj = j + b2 - (wid >> 1); if (ok(ii, jj)) hazard[jj * W + ii] = kind; }
+        if (r() < 0.28) d = (d + (r() < 0.5 ? 1 : 7)) % 8;
+        const ni = i + DIR8[d][0], nj = j + DIR8[d][1];
+        if (!ok(ni, nj)) { d = (d + 2 + Math.floor(r() * 5)) % 8; continue; }
+        i = ni; j = nj;
+      }
+    }
+  }
   const z = finalize({
     id: `hell-${floor}`, W, H, tiles, buildings, props, lanes: [], door, spawn: door,
-    hell: { floor, rest: { i: C.i, j: C.j, r: VR }, up: U, down: D, boss: B, talus: TL ?? undefined, spawns, exit, shape, souls, vendors, posts, region, villages, safes },
+    hell: { floor, rest: { i: C.i, j: C.j, r: VR }, up: U, down: D, boss: B, talus: TL ?? undefined, spawns, exit, shape, souls, vendors, posts, region, villages, safes, hazard },
   });
+  // 50차 물에 들어가기: 뭍에서 몇 칸째인지 (물가 1칸은 다치며 건너고, 그 너머는 죽음 — 지옥인들이 가까운 마을로 가려고 일부러 뛰어든다)
+  {
+    const deep = new Uint8Array(W * H);
+    const q: number[] = [];
+    const isW = (i: number, j: number) => i >= 0 && j >= 0 && i < W && j < H && tiles[j * W + i] === TI.water;
+    for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+      if (!isW(i, j)) continue;
+      if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a2, b2]) => { const ii = i + a2, jj = j + b2; return ii >= 0 && jj >= 0 && ii < W && jj < H && !z.blocked[jj * W + ii]; })) { deep[j * W + i] = 1; q.push(j * W + i); }
+    }
+    for (let h2 = 0; h2 < q.length; h2++) {
+      const k = q[h2], i = k % W, j = (k - i) / W, dv = deep[k];
+      for (const [a2, b2] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const ii = i + a2, jj = j + b2; if (isW(ii, jj) && !deep[jj * W + ii]) { deep[jj * W + ii] = Math.min(250, dv + 1); q.push(jj * W + ii); } }
+    }
+    z.hell!.deep = deep;
+  }
   cache.set(floor, z);
   return z;
 }

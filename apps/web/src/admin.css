@@ -58,3 +58,19 @@ header button { grid-column: 2; grid-row: 1; }
 .letter-list .letter textarea { padding: 8px; background: #1d1510; border: 1px solid #5a4424; border-radius: 4px; color: #eadfc8; font: inherit; resize: vertical; }
 .letter-list .letter .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .letter-list .letter button.danger { color: #e08a7a; }
+
+/* 50차 드랍 · 금리 */
+.card.drops details.floor { border: 1px solid #3a3226; border-radius: 8px; padding: 6px 10px; margin: 8px 0; }
+.card.drops summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+.card.drops h4 { margin: 12px 0 6px; font-size: 13px; opacity: .85; }
+.drop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.drop-grid label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
+.drop-grid input, .drop-table input { width: 100%; box-sizing: border-box; padding: 4px 6px; }
+.drop-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.drop-table th, .drop-table td { border-bottom: 1px solid #2c261d; padding: 4px 6px; text-align: left; }
+.drop-table td:nth-child(3) { width: 90px; }
+.drop-table select { max-width: 260px; }
+.card.drops .actions { display: flex; gap: 10px; align-items: center; margin: 10px 0; }
+.card.drops input, .card.drops select { background: #120d09; color: #eadfc8; border: 1px solid #4a3424; border-radius: 5px; padding: 4px 6px; font-size: 12px; }
+.card.drops input::placeholder { color: #7d6d55; }
+.drop-table td:nth-child(3), .drop-table td:nth-child(4) { width: 96px; }

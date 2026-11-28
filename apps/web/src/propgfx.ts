@@ -24,7 +24,7 @@ export function streetProp(kind: string, v: number, o = 0, night = false, hell =
   const key = `${kind}-${v}-${o}-${night ? 1 : 0}-${hell ? 1 : 0}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  if (HEAVEN_PROPS.has(kind)) { const hp = heavenProp(kind, v); cache.set(key, hp); return hp; } // 35차 천국 1층의 썬베드·파라솔·동물·분수
+  if (HEAVEN_PROPS.has(kind)) { const hp = heavenProp(kind, v, o); cache.set(key, hp); return hp; } // 35차 천국 1층의 썬베드·파라솔·동물·분수
   let out: PropPic;
   if (kind === 'pole') {
     // 콘크리트 전봇대: 가로대·애자·변압기 통, 아래로 처진 전선 뭉치

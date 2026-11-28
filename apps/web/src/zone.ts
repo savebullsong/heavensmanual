@@ -31,7 +31,7 @@ export interface Building {
 /** 지옥: 초가집 · 감옥 · 뼈집 · 대형 짐승 시체 · 뼈 무더기 · 내장 더미 */
 export type HellBuildKind = 'thatch' | 'prison' | 'bonehouse' | 'carcass' | 'bonepile' | 'guts' | 'butcher' | 'stall' | 'burnt' | 'idol' | 'smithy' | 'maskhouse' | 'puppetshop' | 'mineshaft' | 'puppetidol'; // 34차 smithy = 4층 칼드렉의 대장간 · 43차 5층: 안과 밖이 다른 집 · 인형술사 마리의 공방
 /** fence o: 0 = i 방향, 1 = j 방향, 2 = 모서리 기둥 */
-export interface Prop { i: number; j: number; kind: 'tree' | 'lamp' | 'pillar' | 'cart' | 'fence' | 'pole' | 'spirit' | 'moto' | 'plant' | 'bin' | 'stools' | 'pushcart' | HellDecorKind | 'sunbed' | 'parasol' | 'giraffe' | 'elephant' | 'lion' | 'zebra' | 'flamingo' | 'panda' | 'fountain' | 'balloons' | 'icecream'; o?: number }
+export interface Prop { i: number; j: number; kind: 'tree' | 'lamp' | 'pillar' | 'cart' | 'fence' | 'pole' | 'spirit' | 'moto' | 'plant' | 'bin' | 'stools' | 'pushcart' | HellDecorKind | 'sunbed' | 'parasol' | 'giraffe' | 'elephant' | 'lion' | 'zebra' | 'flamingo' | 'panda' | 'fountain' | 'balloons' | 'icecream' | 'zoobar' | 'zoogate'; o?: number }
 /** 지옥 소품: 경계 바위·성벽, 뼈, 해골 더미, 꼬챙이, 가마솥, 철창, 마을 불빛, 고문 장면(움직임) */
 export type HellDecorKind = 'wall' | 'crag' | 'bones' | 'skulls' | 'stake' | 'cauldron' | 'cage' | 'lantern' | 'bonfire' | 'torture' | 'htree' | 'rock' | 'crack' | 'dicetable' | 'campfire' | 'junk' | 'reeds' | 'mattress' | 'anvil' | 'forge' | 'maskpost' | 'tent'; // 46차: 서큐버스의 작은 천막 // 43차: 가면을 줄줄이 건 나무 기둥 (5층)
 /** 차가 달리는 구간: j 행의 i0~i1, dir = +1 이면 +i 방향 */
@@ -108,6 +108,10 @@ export interface HellInfo {
   villages?: { i: number; j: number; r: number }[];
   /** 44차 보호구역: 층계 대기소(위층 길 앞 · 아래층 계단 머리) · 광산 작업장 — 괴물이 못 들어오고 영혼끼리 싸울 수 없다 */
   safes?: { i: number; j: number; r: number; kind: 'stairUp' | 'stairDown' | 'mine' }[];
+  /** 50차 위험한 길 (칸마다): 0 없음 · 1 화염길 · 2 용암길(식은 껍질) · 3 가시밭길 — 걸을 수 있지만 걸을수록 다친다 */
+  hazard?: Uint8Array;
+  /** 50차 물(용암 강 · 늪 · 핏물 · 쇳물 바다)에 들어갈 수 있다: 뭍에서 몇 칸째인지 (1 물가 · 2 이상 깊은 곳 = 죽음). 0 = 들어갈 수 없음 */
+  deep?: Uint8Array;
 }
 
 /** 22차: 지옥 마을 장사꾼 — 고깃간 · 물장수 · 넝마 · 약장수 · 장사꾼 · 무기상 · 지옥호텔 지배인 · 서큐버스 (층마다 한 명씩) */
@@ -148,7 +152,7 @@ export function finalize(z: Omit<Zone, 'blocked'>): Zone {
     // 빈 땅(주차장·공터·광장)은 걸을 수 있다. 건물·물·지도 바깥만 막는다
     blocked[k] = t === 'block' || t === 'void' || t === 'water' || t === 'hill' ? 1 : 0;
   }
-  for (const p of z.props) if (p.kind !== 'tree' && p.kind !== 'bones' && p.kind !== 'crack' && p.kind !== 'reeds' && p.kind !== 'mattress') blocked[p.j * z.W + p.i] = 1; // 나무·흩어진 뼈·땅의 자국은 밟고 지나간다
+  for (const p of z.props) if (p.kind !== 'tree' && p.kind !== 'bones' && p.kind !== 'crack' && p.kind !== 'reeds' && p.kind !== 'mattress' && (p.kind as string) !== 'zoogate') blocked[p.j * z.W + p.i] = 1; // 나무·흩어진 뼈·땅의 자국은 밟고 지나간다
   // 구역 둘레(이웃 거리가 보이기만 하는 곳)는 걸을 수 없다
   const e = z.edges;
   if (e) for (let j = 0; j < z.H; j++) for (let i = 0; i < z.W; i++) if (i < e.i0 || i >= e.i1 || j < e.j0 || j >= e.j1) blocked[j * z.W + i] = 1;
@@ -320,7 +324,8 @@ export function sukhumvitTestZone(): Zone {
   return finalize({ id: 'bkk-sukhumvit-test', W, H, tiles, buildings, props, lanes, door: { i: 16, j: 15 }, spawn: { i: 16, j: 15 } });
 }
 
-export function walkable(z: Zone, i: number, j: number): boolean {
+export function walkable(z: Zone, i: number, j: number): boolean { return walkableTile(z, i, j); }
+function walkableTile(z: Zone, i: number, j: number): boolean {
   return i >= 0 && j >= 0 && i < z.W && j < z.H && !z.blocked[j * z.W + i];
 }
 
@@ -336,7 +341,8 @@ export function randomWalkTileNear(z: Zone, i: number, j: number, r: number, pre
 const DIRS: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
 /** 8방향 너비 우선 탐색 — 출발점과 목표를 감싼 상자 안에서만 찾는다 */
-export function findPath(z: Zone, si: number, sj: number, ti: number, tj: number): [number, number][] | null {
+export function findPath(z: Zone, si: number, sj: number, ti: number, tj: number, ok?: (i: number, j: number) => boolean): [number, number][] | null {
+  const walkable = ok ? (_z: Zone, i: number, j: number) => ok(i, j) : walkableTile; // 50차: 지옥의 물 · 위험한 길을 피하거나 건너는 길 찾기
   if (!walkable(z, ti, tj)) return null;
   const M = 14;
   const x0 = Math.max(0, Math.min(si, ti) - M), y0 = Math.max(0, Math.min(sj, tj) - M);

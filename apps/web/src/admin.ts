@@ -9,6 +9,9 @@ import { drawYuhwang } from './yuhwang.ts';
 import { drawLoanHouse } from './loanhouse.ts';
 import type { Building } from './zone.ts';
 import { dialogBook } from './dialogbook.ts';
+import { FLOORS, MONSTERS, OPEN_FLOORS } from './hell.ts';
+import { HELL_LOOT, ITEMS } from './items.ts';
+import { DROP_DEFAULT, BANK_DEFAULT } from './cfgdefaults.ts';
 import type { Lang } from './i18n.ts';
 
 const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
@@ -64,7 +67,7 @@ const NAMES: Record<PortraitSlot, { name: string; where: string }> = {
   'bld-hell-5': { name: '유황새 · 지옥 5층', where: '가면의 도시 마을 (분칠한 흰 벽·벽에 걸린 가면·흰 종이 등불) · 바닥 2×2칸' },
 };
 
-type Tab = 'portraits' | 'sprites' | 'chars' | 'lines' | 'letters';
+type Tab = 'portraits' | 'sprites' | 'chars' | 'lines' | 'letters' | 'drops';
 const isSprite = (s: PortraitSlot) => (SPRITE_SLOTS as readonly string[]).includes(s);
 
 /** 도트 칸의 지금 기본 그림 (게임이 구운 그림 그대로) */
@@ -175,18 +178,20 @@ async function loadOverrides() {
   }
 }
 
-async function showSlots(tab: Tab = location.hash === '#sprites' ? 'sprites' : location.hash === '#chars' ? 'chars' : location.hash === '#lines' ? 'lines' : location.hash === '#letters' ? 'letters' : 'portraits') {
+async function showSlots(tab: Tab = location.hash === '#sprites' ? 'sprites' : location.hash === '#chars' ? 'chars' : location.hash === '#lines' ? 'lines' : location.hash === '#letters' ? 'letters' : location.hash === '#drops' ? 'drops' : 'portraits') {
   await loadOverrides();
   root.innerHTML = '';
   const head = h('header');
   const tabs = h('nav', 'tabs');
-  for (const [k, label] of [['portraits', '인물 그림 (대화창)'], ['sprites', '도트 그림 (게임 속)'], ['chars', '관리자 캐릭터'], ['lines', '대화문'], ['letters', '편지']] as [Tab, string][]) {
+  for (const [k, label] of [['portraits', '인물 그림 (대화창)'], ['sprites', '도트 그림 (게임 속)'], ['chars', '관리자 캐릭터'], ['lines', '대화문'], ['letters', '편지'], ['drops', '드랍 · 금리']] as [Tab, string][]) {
     const b = h('button', k === tab ? 'tab on' : 'tab', label);
     b.onclick = () => { history.replaceState(null, '', `#${k}`); showSlots(k); };
     tabs.append(b);
   }
   head.append(h('h1', '', "Heaven's Manual 관리자"), tabs,
-    h('p', 'sub', tab === 'letters'
+    h('p', 'sub', tab === 'drops'
+      ? '지옥 층마다 물건 · 템브라 파편이 떨어질 확률, 괴물마다 떨어뜨리는 노전, 보상 물건(무게가 클수록 자주)을 고칩니다. 비워 두면 기본값. 저장하면 10분 안에 모든 접속자에게 적용됩니다. 아래에서 현실 은행 금리도 한 달에 한 번 바꿉니다.'
+      : tab === 'letters'
       ? '현실·천국의 종교시설과 지옥 속죄의 회당에서 영혼들이 쓴 편지입니다. 답을 적으면 그 사람의 \'보낸 편지\' 아래에 조용히 보일 뿐, 게임은 답이 온다고 알리지 않습니다. 참고용으로 읽고 지워도 됩니다.'
       : tab === 'lines'
       ? '게임 안의 말을 인물·몹별로 모은 글 파일입니다. 내려받을 때마다 지금 판의 글을 새로 모읍니다 (인물의 말이 바뀌면 파일도 바뀝니다). 고친 파일을 보내 주시면 그대로 반영합니다.'
@@ -201,6 +206,7 @@ async function showSlots(tab: Tab = location.hash === '#sprites' ? 'sprites' : l
   root.appendChild(head);
   if (tab === 'chars') { root.appendChild(adminChars()); return; }
   if (tab === 'letters') { root.appendChild(adminLetters()); return; }
+  if (tab === 'drops') { root.appendChild(adminDrops()); return; }
   if (tab === 'lines') { root.appendChild(linesCard()); return; }
   const grid = h('div', tab === 'sprites' ? 'grid dots' : 'grid');
   for (const slot of PORTRAIT_SLOTS) {
@@ -282,6 +288,115 @@ function adminChars() {
   on.onclick = () => set(true);
   off.onclick = () => set(false);
   void load();
+  return card;
+}
+
+/** 50차 드랍 · 금리 설정: 층마다 확률 · 괴물별 노전 · 보상 물건 무게, 현실 은행 금리 */
+function adminDrops() {
+  type FD = { item?: number; elite?: number; shard?: number; shardBoss?: number; cashMul?: number; cash?: Record<string, [number, number]>; items?: Record<string, number> };
+  const card = h('section', 'card drops');
+  const stat = h('p', 'status', '불러오는 중…');
+  card.append(stat);
+  const ko = (k: string) => ITEMS.find((x) => x.key === k)?.name.ko ?? k;
+  const numIn = (v: number | undefined, ph: string, step = '0.1') => { const i = h('input') as HTMLInputElement; i.type = 'number'; i.step = step; i.min = '0'; i.placeholder = ph; if (v !== undefined) i.value = String(v); return i; };
+  const pct = (v: number | undefined) => (v === undefined ? undefined : +(v * 100).toFixed(3));
+  const get = async (ck: string) => { const r = await fetch(`api/config?key=${ck}`, { headers: { 'x-admin-key': key } }); if (r.status === 401) { showLogin('다시 로그인해 주세요.'); throw new Error('denied'); } return (await r.json()) ?? {}; };
+  const put = async (ck: string, data: unknown) => { const r = await fetch('api/config', { method: 'POST', headers: { 'x-admin-key': key, 'content-type': 'application/json' }, body: JSON.stringify({ key: ck, data }) }); return r.json().catch(() => ({})); };
+  void (async () => {
+    let drops: { floors?: Record<string, FD>; fbShard?: number } = {}, bank: { th?: number; kr?: number; month?: string } = {};
+    try { [drops, bank] = await Promise.all([get('drops'), get('bank')]); } catch { stat.textContent = '불러오지 못했습니다.'; return; }
+    stat.remove();
+    const readers: (() => void)[] = [];
+    const out: { floors: Record<string, FD>; fbShard?: number } = { floors: {} };
+    for (let f = 1; f <= OPEN_FLOORS; f++) {
+      const fd: FD = drops.floors?.[String(f)] ?? {};
+      const det = h('details', 'floor'); if (f === 1) det.open = true;
+      det.append(h('summary', '', `${f}층 · ${FLOORS[f - 1]?.name.ko ?? ''}`));
+      const grid = h('div', 'drop-grid');
+      const iItem = numIn(pct(fd.item), `${DROP_DEFAULT.item * 100}`), iElite = numIn(pct(fd.elite), `${DROP_DEFAULT.elite * 100}`), iShard = numIn(pct(fd.shard), `${DROP_DEFAULT.shard * 100}`), iShardB = numIn(pct(fd.shardBoss), `${DROP_DEFAULT.shardBoss * 100}`), iMul = numIn(fd.cashMul, `${DROP_DEFAULT.cashMul}`, '0.05');
+      for (const [lab, el] of [['물건 확률 %', iItem], ['사나운 괴물 물건 %', iElite], ['템브라 파편 %', iShard], ['층주 파편 %', iShardB], ['노전 배수', iMul]] as [string, HTMLElement][]) { const l = h('label', ''); l.append(h('span', '', lab), el); grid.append(l); }
+      det.append(grid);
+      // 괴물별 노전
+      const mons = [...(FLOORS[f - 1]?.monsters ?? []), FLOORS[f - 1]?.boss].filter(Boolean) as string[];
+      const mt = h('table', 'drop-table');
+      mt.innerHTML = '<tr><th>괴물</th><th>기본 노전</th><th>최소</th><th>최대</th></tr>';
+      const mIns: [string, HTMLInputElement, HTMLInputElement][] = [];
+      for (const k of mons) {
+        const m = MONSTERS[k]; if (!m) continue;
+        const tr = h('tr'); const c = fd.cash?.[k];
+        const a = numIn(c?.[0], String(m.notes[0]), '1'), b = numIn(c?.[1], String(Math.round(m.notes[1] * 1.8)), '1');
+        const td = (x: Node | string) => { const t2 = h('td'); t2.append(x); return t2; };
+        tr.append(td(`${m.name.ko}${m.boss ? ' (층주)' : ''}`), td(m.boss ? `${m.notes[0]}~${Math.round(m.notes[1] * 1.8)} (층 배수 없음)` : `${m.notes[0]}~${Math.round(m.notes[1] * 1.8)} × ${f}`), td(a), td(b));
+        mt.append(tr); mIns.push([k, a, b]);
+      }
+      det.append(h('h4', '', '괴물마다 떨어뜨리는 노전 (층 배수 전)'), mt);
+      // 보상 물건 무게
+      const base = new Map(HELL_LOOT[f] ?? []);
+      const cur = new Map<string, number>(base);
+      for (const [k, w] of Object.entries(fd.items ?? {})) { if (!(w > 0)) cur.delete(k); else cur.set(k, w); }
+      const it = h('table', 'drop-table');
+      const drawItems = () => {
+        it.innerHTML = '<tr><th>보상 물건</th><th>기본 무게</th><th>무게</th><th></th></tr>';
+        const total = [...cur.values()].reduce((x, y) => x + y, 0) || 1;
+        for (const [k, w] of [...cur.entries()].sort((x, y) => y[1] - x[1])) {
+          const tr = h('tr'); const inp = numIn(+w.toFixed(2), String(base.get(k) ?? '-'), '0.1'); inp.dataset.k = k;
+          inp.oninput = () => { cur.set(k, Math.max(0, Number(inp.value) || 0)); };
+          const del = h('button', 'danger', '빼기'); del.onclick = () => { cur.delete(k); drawItems(); };
+          const td = (x: Node | string) => { const t2 = h('td'); t2.append(x); return t2; };
+          tr.append(td(`${ko(k)} (${((w / total) * 100).toFixed(1)}%)`), td(base.has(k) ? String(+base.get(k)!.toFixed(2)) : '새로'), td(inp), td(del));
+          it.append(tr);
+        }
+        const tr = h('tr'); const sel = h('select') as HTMLSelectElement;
+        for (const x of ITEMS.filter((y) => y.hell && !cur.has(y.key))) { const o = h('option', '', `${x.name.ko} · ${x.key}`) as HTMLOptionElement; o.value = x.key; sel.append(o); }
+        const w0 = numIn(2, '무게', '0.1'); const add = h('button', 'primary', '더하기');
+        add.onclick = () => { if (sel.value) { cur.set(sel.value, Math.max(0.1, Number(w0.value) || 1)); drawItems(); } };
+        const td = (x: Node | string) => { const t2 = h('td'); t2.append(x); return t2; };
+        tr.append(td(sel), td(''), td(w0), td(add)); it.append(tr);
+      };
+      drawItems();
+      det.append(h('h4', '', '보상 물건 (괴물이 물건을 떨어뜨릴 때 이 무게대로 뽑는다)'), it);
+      card.append(det);
+      readers.push(() => {
+        const o: FD = {};
+        const rd = (i: HTMLInputElement, scale = 1) => (i.value.trim() === '' ? undefined : Math.max(0, Number(i.value) || 0) / scale);
+        o.item = rd(iItem, 100); o.elite = rd(iElite, 100); o.shard = rd(iShard, 100); o.shardBoss = rd(iShardB, 100); o.cashMul = rd(iMul);
+        const cash: Record<string, [number, number]> = {};
+        for (const [k, a, b] of mIns) if (a.value.trim() !== '' || b.value.trim() !== '') { const m = MONSTERS[k]; const lo = a.value.trim() === '' ? m.notes[0] : Math.max(0, Math.round(Number(a.value))); const hi = b.value.trim() === '' ? Math.round(m.notes[1] * 1.8) : Math.max(lo, Math.round(Number(b.value))); cash[k] = [lo, hi]; }
+        if (Object.keys(cash).length) o.cash = cash;
+        const items: Record<string, number> = {};
+        for (const [k, w] of base) if (!cur.has(k)) items[k] = 0; else if (Math.abs(cur.get(k)! - w) > 1e-9) items[k] = cur.get(k)!;
+        for (const [k, w] of cur) if (!base.has(k)) items[k] = w;
+        if (Object.keys(items).length) o.items = items;
+        for (const k of Object.keys(o) as (keyof FD)[]) if (o[k] === undefined) delete o[k];
+        out.floors[String(f)] = o;
+      });
+    }
+    const gl = h('div', 'drop-grid'); const iFb = numIn(pct(drops.fbShard), `${DROP_DEFAULT.fbShard * 100}`);
+    { const l = h('label', ''); l.append(h('span', '', '필드 보스 파편 하나하나 %'), iFb); gl.append(l); }
+    card.append(h('h4', '', '모든 층'), gl);
+    const save = h('button', 'primary', '드랍 저장'); const st1 = h('span', 'muted', '');
+    save.onclick = async () => {
+      out.floors = {}; for (const r of readers) r();
+      if (iFb.value.trim() !== '') out.fbShard = Math.max(0, Number(iFb.value) || 0) / 100; else delete out.fbShard;
+      save.disabled = true; st1.textContent = '저장하는 중…';
+      const j = await put('drops', out); st1.textContent = j.ok ? '저장했습니다. 10분 안에 적용됩니다.' : '저장하지 못했습니다.'; save.disabled = false;
+    };
+    const row1 = h('div', 'actions'); row1.append(save, st1); card.append(row1);
+    // 현실 은행 금리 (연 %, 한 달에 한 번)
+    const bg = h('div', 'drop-grid');
+    const iTh = numIn(bank.th, String(BANK_DEFAULT.th), '0.05'), iKr = numIn(bank.kr, String(BANK_DEFAULT.kr), '0.05');
+    for (const [lab, el] of [['태국 연 금리 %', iTh], ['한국 연 금리 %', iKr]] as [string, HTMLElement][]) { const l = h('label', ''); l.append(h('span', '', lab), el); bg.append(l); }
+    card.append(h('h4', '', `현실 은행 금리 (지금 적용: ${bank.month ?? '기본값'})`), bg);
+    const saveB = h('button', 'primary', '금리 저장'); const st2 = h('span', 'muted', '');
+    saveB.onclick = async () => {
+      const d = new Date(); const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const data: Record<string, unknown> = { month };
+      if (iTh.value.trim() !== '') data.th = Math.max(0, Number(iTh.value) || 0);
+      if (iKr.value.trim() !== '') data.kr = Math.max(0, Number(iKr.value) || 0);
+      saveB.disabled = true; const j = await put('bank', data); st2.textContent = j.ok ? `저장했습니다 (${month}).` : '저장하지 못했습니다.'; saveB.disabled = false;
+    };
+    const row2 = h('div', 'actions'); row2.append(saveB, st2); card.append(row2);
+  })();
   return card;
 }
 

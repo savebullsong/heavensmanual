@@ -16,6 +16,9 @@ export interface Save {
   crusade?: { floor: number; at: number; got: Record<string, number>; kills: number; /** 떠나기 전 지옥 진행 (돌아오면 되돌린다) */ snap: unknown; exp0: number; rank0: number };
   /** 은행 통장: 죽어도 남는다 (영혼이 아니라 계정·기기에 붙음) */
   bank?: number;
+  /** 50차: 이자를 마지막으로 셈한 달 ('2026-11') · 한 달 투자 상품 (만기 시각 ms) */
+  bankMon?: string;
+  invest?: { amt: number; at: number; due: number }[];
   bag?: Record<string, number>;
   equip?: Partial<Record<Slot, string>>;
   /** 마지막으로 있던 곳: 다시 열면 그 자리에서 (가게 안에서 일하던 중이면 계속 일한다) */
@@ -85,6 +88,8 @@ export interface Save {
     bossBack?: Record<number, number>;
     /** 지옥 은행에 맡긴 노전 (쓰러져도 남는다) */
     bank?: number;
+    /** 50차: 보관료를 마지막으로 뗀 때(ms) · 지난번 들른 뒤로 빠진 보관료 · 오르멧에게 베여 빠진 몫 (다음에 은행에 가면 보인다) */
+    bankAt?: number; feeSeen?: number; oremetCut?: number;
     /** 속죄의 회당에 층마다 바친 노전 (다 차면 위층으로) */
     atone?: Record<number, number>;
     /** 이번 지옥행에서 통행세를 낸 층 (다시 지나갈 때는 받지 않는다) */
@@ -148,7 +153,7 @@ export interface Save {
   daily?: { d: string; pray: number; read: number; donate: number; /** 45차: 오늘 운동한 분 (헬스장 · 도장) */ train?: number };
 }
 export interface Stash { bag: Record<string, number>; ammo: number; /** 45차: 쓰러져 떨군 채 우리로 온 것 (되찾을 때 원가의 절반) */ lost?: Record<string, number> }
-export type Slot = 'weapon' | 'offhand' | 'head' | 'body' | 'hands' | 'legs' | 'shins' | 'feet';
+export type Slot = 'weapon' | 'offhand' | 'head' | 'body' | 'hands' | 'legs' | 'shins' | 'feet' | 'back' | 'ring' | 'neck' | 'ear'; // 50차: 등(망토·외투·판초·담요) · 장신구 셋 (몸에 그리지 않는다)
 // v2: 작은 캐릭터와 '처음 모습' 시나리오로 바뀌어 예전 저장은 새로 시작한다
 const KEY = 'heavensmanual.save.v2';
 

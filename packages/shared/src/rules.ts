@@ -204,7 +204,15 @@ export const CRIT_MULTIPLIER = 2;
  * 맞으면 피해는 무작위 그대로 (방어력은 피해를 줄이지 않는다 · 피해 감소 물건만 줄인다)
  */
 export function armorClass(def: number, agi: number): number {
-  return 10 + Math.floor(def / 2) + Math.floor(agi / 5);
+  // 50차: 방어력이 너무 셌다 (4층 방어 35면 괴물이 20이 아니고는 못 맞혔다) — 방어력 ÷ 4 · 민첩 ÷ 6
+  return 10 + Math.floor(def / 4) + Math.floor(agi / 6);
+}
+/**
+ * 50차 사람끼리의 명중 보너스: 치는 쪽 영격(레벨)과 공격력으로 — 2 + 영격 ÷ 3 + 공격력 ÷ 3 (최대 20)
+ * 영격 5 · 공격력 9면 6, 영격 20 · 공격력 30이면 18
+ */
+export function pvpToHit(rank: number, atk: number): number {
+  return Math.min(20, 2 + Math.floor(Math.max(0, rank) / 3) + Math.floor(Math.max(0, atk) / 3));
 }
 export function rollToHit(bonus: number, ac: number, roll = 1 + Math.floor(Math.random() * 20)): { hit: boolean; roll: number; nat20: boolean } {
   if (roll === 1) return { hit: false, roll, nat20: false };

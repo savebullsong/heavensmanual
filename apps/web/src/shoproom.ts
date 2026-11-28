@@ -573,8 +573,34 @@ export class ShopRoom {
     this.birdShadow.zIndex = this.bx + this.by - 0.3;
   }
 
+  /** 50차 혼잣말: 미스 황 · 황혼 · 황색날개가 대화가 없을 때 가끔 혼자 중얼거린다 */
+  private mutterLines: string[] = [];
+  private mutterBusy: () => boolean = () => false;
+  private mutterT = 9;
+  private mutterText: Text | null = null;
+  private mutterLeft = 0;
+  setMutter(lines: string[], busy: () => boolean) { this.mutterLines = lines; this.mutterBusy = busy; this.mutterT = 7 + Math.random() * 6; }
+  private updateMutter(dt: number) {
+    if (this.mutterText) {
+      this.mutterLeft -= dt;
+      this.mutterText.alpha = Math.min(1, this.mutterLeft * 2);
+      if (this.mutterLeft <= 0 || this.mutterBusy()) { this.mutterText.destroy(); this.mutterText = null; }
+      return;
+    }
+    if (!this.mutterLines.length || (this.mutterT -= dt) > 0) return;
+    this.mutterT = 22 + Math.random() * 22;
+    if (this.mutterBusy()) return;
+    const line = this.mutterLines[Math.floor(Math.random() * this.mutterLines.length)];
+    const tx = new Text({ text: line, style: { fontFamily: 'system-ui, sans-serif', fontSize: 12, fontWeight: '700', fill: '#fff6d8', stroke: { color: '#1a1410', width: 3 }, wordWrap: true, wordWrapWidth: 220, align: 'center' } });
+    tx.anchor.set(0.5, 1);
+    tx.position.set(this.hwang.x, this.hwang.y - this.hwang.height - 6);
+    tx.zIndex = 1e6;
+    this.objects.addChild(tx);
+    this.mutterText = tx; this.mutterLeft = 4.2;
+  }
   private update(dt: number) {
     this.time += dt;
+    this.updateMutter(dt);
     // 걷기
     let moving = false;
     if (this.path.length) {
