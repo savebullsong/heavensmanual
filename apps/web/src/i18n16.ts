@@ -1358,6 +1358,11 @@ export const more16 = {
     mallEsc: "에스컬레이터 · 안내",
     mallEscLine: "여기는 {f}. 어느 층으로 갈까?",
     mallHere: "여기",
+    hcartVendor: "수레 천사",
+    hcartNames: {"manna": "만나 빵 수레", "cotton": "솜구름 사탕 수레", "fruit": "생명 과일 수레"},
+    hcartMenus: {"manna": ["갓 구운 만나", "꿀 바른 만나", "만나 샌드", "버터 녹인 만나 한 조각"], "cotton": ["분홍 솜구름", "하얀 솜구름", "무지개 솜구름", "별가루 뿌린 솜구름"], "fruit": ["생명 과일 한 알", "금빛 망고 꼬치", "이슬 포도 한 송이", "꿀 수박 한 조각"]},
+    hcartOffer: ["수레에 있는 건 다 공짜예요. 하나 골라요.", "방금 실어 왔어요. 제일 좋은 걸로 골라요.", "손이 비었네요. 하나 들고 가요."],
+    hcartCalls: ["수레 왔어요! 공짜예요!", "하나 집어 가요, 줄 안 서도 돼요.", "천천히 골라요. 여긴 아무도 안 쫓아와요.", "오늘 건 유난히 달아요!"],
     // 52차 끝
   },
   th: {
@@ -2718,6 +2723,11 @@ export const more16 = {
     mallEsc: "บันไดเลื่อน · ประชาสัมพันธ์",
     mallEscLine: "ตอนนี้อยู่ {f} จะไปชั้นไหนดี",
     mallHere: "ที่นี่",
+    hcartVendor: "เทวดารถเข็น",
+    hcartNames: {"manna": "รถเข็นขนมปังมานา", "cotton": "รถเข็นสายไหมเมฆ", "fruit": "รถเข็นผลไม้แห่งชีวิต"},
+    hcartMenus: {"manna": ["มานาอบใหม่", "มานาทาน้ำผึ้ง", "แซนด์วิชมานา", "มานาเนยละลายหนึ่งชิ้น"], "cotton": ["สายไหมเมฆสีชมพู", "สายไหมเมฆสีขาว", "สายไหมเมฆสายรุ้ง", "สายไหมเมฆโรยผงดาว"], "fruit": ["ผลไม้แห่งชีวิตหนึ่งลูก", "มะม่วงสีทองเสียบไม้", "องุ่นน้ำค้างหนึ่งพวง", "แตงโมน้ำผึ้งหนึ่งชิ้น"]},
+    hcartOffer: ["ของบนรถเข็นฟรีหมดเลย เลือกมาสักอย่าง", "เพิ่งขนมาเมื่อกี้ เลือกชิ้นที่ดีที่สุดไปเลย", "มือว่างอยู่นี่ ถือไปสักชิ้นสิ"],
+    hcartCalls: ["รถเข็นมาแล้ว! ฟรีจ้า!", "หยิบไปสักชิ้น ไม่ต้องต่อคิว", "เลือกช้า ๆ ได้ ที่นี่ไม่มีใครเร่ง", "วันนี้หวานเป็นพิเศษ!"],
     // 52차 끝
   },
   en: {
@@ -4078,6 +4088,11 @@ export const more16 = {
     mallEsc: "Escalator · Info",
     mallEscLine: "You are on {f}. Which floor?",
     mallHere: "here",
+    hcartVendor: "Cart Angel",
+    hcartNames: {"manna": "Manna Bread Cart", "cotton": "Cloud Candy Cart", "fruit": "Lifefruit Cart"},
+    hcartMenus: {"manna": ["Fresh-baked manna", "Honey-brushed manna", "Manna sandwich", "A slice of buttered manna"], "cotton": ["Pink cloud candy", "White cloud candy", "Rainbow cloud candy", "Cloud candy with stardust"], "fruit": ["One lifefruit", "Golden mango skewer", "A bunch of dew grapes", "A slice of honey watermelon"]},
+    hcartOffer: ["Everything on the cart is free. Pick one.", "Just loaded it. Pick the best one.", "Your hands are empty. Take one with you."],
+    hcartCalls: ["The cart is here! It's free!", "Grab one, no need to queue.", "Take your time. Nobody rushes you here.", "Today's batch is extra sweet!"],
     // 52차 끝
   },
 };

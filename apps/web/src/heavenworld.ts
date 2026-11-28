@@ -5,6 +5,7 @@ import { TYPES, finalize, type Zone, type Building, type Prop } from './zone.ts'
 import { TW, TH, iso } from './gfx.ts';
 import type { PropPic } from './propgfx.ts';
 import { lang } from './i18n.ts';
+import { drawTableSet, drawCart } from './isoprop.ts';
 
 const TI = Object.fromEntries(TYPES.map((t, k) => [t, k])) as Record<(typeof TYPES)[number], number>;
 export const HEAVEN_ID = 'heaven-1';
@@ -153,7 +154,10 @@ export function heavenZone(): Zone {
   // 52차: 탑이 떠난 광장 한가운데 — 날개 편 천사상과 둥근 꽃밭 (사진 찍는 자리)
   { const [i, j] = [110, 52]; prop(i, j, 'angelstatue'); for (let a2 = -2; a2 <= 2; a2++) for (let b2 = -2; b2 <= 2; b2++) if (a2 || b2) prop(i + a2, j + b2, 'fblock'); }
   for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; prop(Math.round(110 + Math.cos(a) * 6.5), Math.round(52 + Math.sin(a) * 6.5), 'flowerbed', k); }
-  prop(100, 28, 'balloons'); prop(118, 28, 'balloons'); prop(110, 30, 'icecream');
+  prop(100, 28, 'balloons'); prop(118, 28, 'balloons'); // 52차 후속: 장사꾼 없던 납작한 아이스크림 수레는 걷고, 천사가 끄는 솜구름 사탕 수레가 그 자리를 맡는다
+  // 52차 후속: 길 아무 데나 흩어져 있던 손수레(장사꾼도 없이 들판 길에 덩그러니)를 걷어 내고, 사람이 모이는 다섯 자리에만 천사가 끄는 흰 수레를 둔다
+  //   o = 종류 × 2 + 방향 (종류 0 만나 빵 · 1 솜구름 사탕 · 2 생명 과일 / 방향 0 = 길과 나란히 i)
+  for (const [i, j, kind, ax] of [[91, 57, 0, 0], [131, 57, 2, 0], [104, 87, 1, 0], [58, 89, 0, 0], [110, 30, 1, 1]] as const) prop(i, j, 'hcart', kind * 2 + ax);
   for (let i = 8; i < W - 8; i += 6) { if ((i > 88 && i < 130) || i > 180) continue; prop(i, 55, 'tree'); prop(i + 3, 62, 'tree'); }
   // 우주선 기지: 발사대 (계단 대신) · 52차 우주센터 건물(문은 큰길 쪽) · 발사 지원탑 · 연료 탱크 · 레이더 · 유도등
   const ship = { i: 201, j: 51 };
@@ -544,7 +548,10 @@ export function drawAttraction(b: Building & { att?: string }) {
 }
 
 // ───────────────────────── 소품 ─────────────────────────
-export const HEAVEN_PROPS = new Set(['sunbed', 'parasol', 'giraffe', 'elephant', 'lion', 'zebra', 'flamingo', 'panda', 'fountain', 'balloons', 'icecream', 'junkpile', 'chicken', 'zoobar', 'zoogate', 'bagpile', 'jewelpile', 'appliance', 'fblock', 'angelstatue', 'flowerbed', 'gantry', 'fueltank', 'radar', 'padlight', 'flag', 'garbagetruck', 'grabber', 'litter']);
+/** 52차 후속: 천국 수레 종류 (prop o >> 1) */
+export const HCART_KINDS = ['manna', 'cotton', 'fruit'] as const;
+const HCART_GOODS = ['manna', 'cotton', 'lifefruit'] as const;
+export const HEAVEN_PROPS = new Set(['sunbed', 'parasol', 'giraffe', 'elephant', 'lion', 'zebra', 'flamingo', 'panda', 'fountain', 'balloons', 'icecream', 'junkpile', 'chicken', 'zoobar', 'zoogate', 'bagpile', 'jewelpile', 'appliance', 'fblock', 'angelstatue', 'flowerbed', 'gantry', 'fueltank', 'radar', 'padlight', 'flag', 'garbagetruck', 'grabber', 'litter', 'hcafe', 'hcart']);
 function pic(w: number, h: number, ax: number, ay: number, draw: (R: (x: number, y: number, w: number, h: number, c: string) => void, g: CanvasRenderingContext2D) => void): PropPic {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
@@ -1006,6 +1013,10 @@ export function heavenProp(kind: string, v: number, o = 0): PropPic {
       E(g, 11, 13, 6, 5, '#fbfaf6'); E(g, 9, 14, 4, 3, '#ece8e0'); R(4, 9, 3, 5, '#f4f2ee'); R(3, 8, 2, 3, '#ffffff'); // 몸 · 날개 · 꼬리
       E(g, 16, 8 + dn, 3, 3, '#fbfaf6'); R(15, 4 + dn, 3, 2, '#e8322a'); R(16, 3 + dn, 1, 1, '#e8322a'); R(19, 8 + dn, 2, 1, '#f2b23a'); R(16, 10 + dn, 2, 2, '#e8322a'); R(17, 7 + dn, 1, 1, '#1e1a16');
     });
+    // 52차 후속: 식당 · 카페 앞 바깥 자리 (흰 대리석 둥근 탁자 · 금빛 의자 넷 · 찻주전자) — 쿼터뷰 입체
+    case 'hcafe': return pic(72, 52, 36, 38, (_R, g) => drawTableSet(g, 36, 38, 'heaven', v));
+    // 52차 후속: 천사가 끄는 흰 수레 (o = 종류 × 2 + 방향 · 종류 0 만나 빵 · 1 솜구름 사탕 · 2 생명 과일)
+    case 'hcart': return pic(72, 80, 36, 62, (_R, g) => drawCart(g, 36, 62, (o & 1) as 0 | 1, 'heaven', HCART_GOODS[(o >> 1) % 3], v));
     case 'icecream': return pic(44, 56, 22, 50, (R, g) => {
       E(g, 22, 50, 16, 4, 'rgba(0,0,0,0.12)');
       R(8, 30, 28, 18, '#fbfaf6'); R(8, 30, 28, 4, '#8ac8f2'); R(10, 48, 4, 3, '#4a4a4e'); R(30, 48, 4, 3, '#4a4a4e');

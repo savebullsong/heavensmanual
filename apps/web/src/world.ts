@@ -10,7 +10,7 @@ import { drawDalHouse } from './dalgfx.ts';
 import { snowGround, snowBuilding } from './snow.ts';
 import { drownedCanvas, monkLook, shoreF, shoreLine, shoreSkyCanvas, drawShoreChunk, capeRocks, drawCapeRock } from './border.ts';
 import { animalFrames } from './zooart.ts';
-import { drawHeavenGround, drawHeavenPalace, drawAttraction, heavenMeta , ZOO_PENS, PALACE_TOP, palaceHalf, PALACE_BG } from './heavenworld.ts';
+import { drawHeavenGround, drawHeavenPalace, drawAttraction, heavenMeta , ZOO_PENS, PALACE_TOP, palaceHalf, PALACE_BG, HCART_KINDS } from './heavenworld.ts';
 import { drawSanctum, drawMarbleShop, SANCT_TOP, drawPalaceGate, drawShipCenter } from './heavensanct.ts';
 import { wingTexture, cloudTexture, heavenVignette, cloudStairTexture, heavenTowerTexture, terraceSkyTexture, hellPortalTexture, bedTexture, BED_ANCHOR, sleepBedTexture, SLEEP_ANCHOR, batWingTexture, hornTexture, devilTailTexture, succWingTexture, spadeTailTexture, SPADE_ANCHOR, demonArmTexture, ARM_PIVOT } from './heavengfx.ts';
 import { hellDecor } from './hellprops.ts';
@@ -266,6 +266,7 @@ interface Walker {
   /** 52차: 이 사람만 하는 혼잣말 (같은 무리의 줄을 나눠 가진 번호 — 두 사람이 같은 말을 하지 않게) · 이름표 · 순찰 범위 */
   lines?: number[];
   title?: string;
+  cart?: (typeof HCART_KINDS)[number]; // 52차 후속: 천국 수레 천사 (만나 빵 · 솜구름 사탕 · 생명 과일)
   patrol?: [number, number, number, number];
   still?: 'sit' | 'lie' | 'lotus'; // 마을의 지친 영혼: 앉아 있거나 누워 있다 · 24차 가부좌 (경계의 완성자·카드 치는 천사)
   vend?: HellVendor | 'street' | 'massage' | 'bar' | 'heaven'; // 마을 장사꾼 · 19차 현실: 손수레 노점 · 마사지 호객 · 바 호객 · 21차 천국: 먹을 것을 파는 천사
@@ -425,7 +426,7 @@ export interface WorldHooks {
   /** 35차 아큐버스에게 말을 건다 */
   accubus(name: string): void;
   /** 21차 천국: 천사·요리사가 권하는 음식 (먹어도 아무 효과 없다) */
-  heavenFood(from: string): void;
+  heavenFood(from: string, cart?: (typeof HCART_KINDS)[number]): void;
   /** 21차: 안내천사 황색날개를 놓쳤다 */
   ywLost(): void;
   /** 44차: 지옥에서 선 곳이 바뀌었다 (마을 · 층계 대기소 · 광산 작업장 · 깊은 들판 · 층주의 터) */
@@ -1585,7 +1586,8 @@ export class WorldScene {
     let nv = 0;
     for (const pr of props) {
       if (pr.kind !== 'pushcart' || nv >= 16 || !inside(pr.i, pr.j)) continue;
-      const spot = ([[0, -1], [1, 0], [-1, 0], [0, 1]] as const).map(([a, b]) => [pr.i + a, pr.j + b] as [number, number]).find(([a, b]) => walkable(this.zone, a, b));
+      const order = (pr.o ? [[0, 1], [1, 0], [-1, 0], [0, -1]] : [[1, 0], [0, 1], [-1, 0], [0, -1]]) as [number, number][]; // 52차 후속: 손잡이 쪽에 선다
+      const spot = order.map(([a, b]) => [pr.i + a, pr.j + b] as [number, number]).find(([a, b]) => walkable(this.zone, a, b));
       if (!spot) continue;
       const v = this.makeWalker(this.streetLook('street'), spot[0], spot[1], 'vendor');
       v.vend = 'street'; v.speed = 0; v.wait = 1e9; v.dir = dirFromTile(pr.i - spot[0], pr.j - spot[1], 'sw');
@@ -2351,6 +2353,18 @@ export class WorldScene {
         if (faith) { a.preach = k; np++; } else { a.vend = 'heaven'; a.shopK = k; nv++; }
         this.walkers.push(a);
       }
+    }
+    // 52차 후속: 천사가 끄는 흰 수레 다섯 — 손잡이 쪽에 천사가 서서 지나가는 사람을 부른다
+    for (const pr of this.zone.props) {
+      if ((pr.kind as string) !== 'hcart') continue;
+      const o = pr.o ?? 0, order = ((o & 1) ? [[0, 1], [1, 0], [-1, 0], [0, -1]] : [[1, 0], [0, 1], [-1, 0], [0, -1]]) as [number, number][];
+      const spot = order.map(([a, c]) => [pr.i + a, pr.j + c] as [number, number]).find(([a, c]) => walkable(this.zone, a, c));
+      if (!spot) continue;
+      const a = this.makeWalker(this.npcLook('angel'), spot[0], spot[1], 'vendor');
+      this.giveWings(a, 0xf8f4ea);
+      a.speed = 0; a.wait = 1e9; a.dir = dirFromTile(pr.i - spot[0], pr.j - spot[1], 'sw'); a.maxHp = a.hp = 900;
+      a.vend = 'heaven'; a.cart = HCART_KINDS[(o >> 1) % 3];
+      this.walkers.push(a);
     }
     // 도시 끝(이웃 구역이 없는 쪽)의 택시 천사: 아주 큰 날개, 남녀 기사
     if (e) for (const [side, id] of [['w', e.w], ['e', e.e]] as const) {
@@ -7245,7 +7259,7 @@ export class WorldScene {
       if (w.kind === 'sleeper') { this.hooks.say(this.npcName(w), L.sleeperLines[Math.floor(Math.random() * L.sleeperLines.length)]); return; }
       if (w.taxi) { face(); this.hooks.heavenAct('taxi'); return; }
       if (w.preach !== undefined) { face(); this.hooks.heavenAct('ceremony'); return; }
-      if (w.vend === 'heaven' || w.tail?.kind === 'chef') { face(); this.hooks.heavenFood(this.npcName(w)); return; }
+      if (w.vend === 'heaven' || w.tail?.kind === 'chef') { face(); this.hooks.heavenFood(this.npcName(w), w.cart); return; }
       if (w.tail?.kind === 'accubus') { face(); w.tail.t = Math.max(w.tail.t, 20); this.hooks.accubus(this.npcName(w)); return; }
       if (w.tail) { face(); const lines = this.player.look?.sex === 'f' ? L.admireToF : L.admireToM; this.hooks.say(this.npcName(w), lines[Math.floor(Math.random() * lines.length)]); return; }
     }
@@ -7412,6 +7426,7 @@ export class WorldScene {
     if (w.kind === 'elder') return L.elderName[(this.zone.interior?.kind ?? 'temple') as 'temple'];
     if (w.kind === 'pashar') return L.pashar;
     if (w.kind === 'soul') return L.soulTired;
+    if (w.cart) return L.hcartVendor;
     if (w.vend === 'heaven') return L.heavenVendor;
     if (w.ferum) return L.ferumName;
     if (w.kind === 'vendor' && w.vend && w.vend in L.hvName) return L.hvName[w.vend as keyof typeof L.hvName][0];
@@ -7462,6 +7477,7 @@ export class WorldScene {
     if (w.kind === 'talus') return L.talusSub;
     if (w.kind === 'maskgirl') return L.maskGirlSub;
     if (w.kind === 'soul') return L.soulTiredSub;
+    if (w.cart) return L.hcartNames[w.cart];
     if (w.vend === 'heaven') return this.nameOf(this.zone.buildings[w.shopK ?? 0]);
     if (w.ferum) return L.ferumSub;
     if (w.kind === 'vendor' && w.vend && w.vend in L.hvName) return L.hvName[w.vend as keyof typeof L.hvName][1];
@@ -9405,7 +9421,7 @@ export class WorldScene {
       const d = Math.hypot(this.player.x - w.x, this.player.y - w.y);
       if (d < 9 && !w.bubble && Math.random() < dt * (w.vend === 'bar' ? 0.06 + nf * 0.2 : w.vend === 'massage' || w.vend === 'heaven' ? 0.14 : 0.05)) {
         const L = t();
-        const c = w.vend === 'massage' ? L.massageCalls : w.vend === 'bar' ? L.barCalls : w.vend === 'heaven' ? L.heavenVendorCalls : L.streetCalls;
+        const c = w.vend === 'massage' ? L.massageCalls : w.vend === 'bar' ? L.barCalls : w.cart ? L.hcartCalls : w.vend === 'heaven' ? L.heavenVendorCalls : L.streetCalls;
         this.bubble(w, c[Math.floor(Math.random() * c.length)]);
       }
       if (d < 4) w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir);

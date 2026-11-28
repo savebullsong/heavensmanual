@@ -1070,8 +1070,8 @@ const hooks: WorldHooks = {
     if (realm() === 'heaven') { heavenFaint(); return; }
     showDeath(cause);
   },
-  heavenFood(from) {
-    heavenFood(from);
+  heavenFood(from, cart) {
+    heavenFood(from, cart);
   },
   ywLost() {
     state.heaven = { ...state.heaven, ywLost: true };
@@ -5037,13 +5037,13 @@ async function talkToYellowWing() {
   if (jealous) world?.noeulProwl(40); // 46차: 황색날개에게 다정했다 — 노을이 칼을 뽑고 어슬렁거린다
 }
 /** 21차: 천국의 음식 — 가게 앞 천사와 따라다니는 요리사가 권한다. 공짜, 맛있다, 아무 효과도 없다 */
-async function heavenFood(from: string) {
+async function heavenFood(from: string, cart?: 'manna' | 'cotton' | 'fruit') {
   if (busy || dlg.isOpen) return;
   const L = t();
   busy = true;
   dlg.open({ name: from });
-  await dlg.say(pick(L.heavenFoodOffer));
-  const dishes = pickN(L.heavenDishes, 3);
+  await dlg.say(pick(cart ? L.hcartOffer : L.heavenFoodOffer)); // 52차 후속: 수레 천사는 수레에 실린 것만 권한다
+  const dishes = pickN(cart ? L.hcartMenus[cart] : L.heavenDishes, 3);
   const c = await dlg.choose([...dishes, L.heavenFoodNo]);
   if (c >= 0 && c < dishes.length) {
     chime();

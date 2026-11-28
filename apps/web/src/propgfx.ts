@@ -1,6 +1,7 @@
 // 거리의 작은 것들 (점으로 직접 그린다): 전봇대·산프라품(정령의 집)·세워 둔 오토바이·화분·쓰레기통·울타리
 // 모두 1배 그림(거리·건물과 같은 밀도). 화면 근처만 그렸다가 멀어지면 버린다 (world.stream)
 import { HEAVEN_PROPS, heavenProp } from './heavenworld.ts';
+import { drawTableSet, drawCart } from './isoprop.ts';
 export interface PropPic { canvas: HTMLCanvasElement; ax: number; ay: number; top?: [number, number] }
 
 const cache = new Map<string, PropPic>();
@@ -83,33 +84,11 @@ export function streetProp(kind: string, v: number, o = 0, night = false, hell =
       if (v % 2) { R(8, 2, 5, 4, '#e8e4da'); R(6, 3, 3, 3, '#3a3a3a'); }
     });
   } else if (kind === 'stools') {
-    // 식당 바깥 자리: 쇠 탁자 하나와 빨간(가끔 파란) 플라스틱 의자 넷, 탁자 위 양념통·물병
-    const seat = v % 3 === 2 ? ['#2a5ac0', '#4a7ae0'] : ['#c8281e', '#e84a3a'];
-    out = pic(56, 40, 28, 30, (R) => {
-      R(8, 30, 40, 4, 'rgba(0,0,0,0.22)');
-      const stool = (x: number, y: number) => { R(x, y - 8, 9, 3, seat[1]); R(x + 1, y - 5, 7, 2, seat[0]); R(x + 1, y - 3, 1, 4, seat[0]); R(x + 7, y - 3, 1, 4, seat[0]); R(x + 4, y - 3, 1, 3, seat[0]); };
-      stool(6, 22); stool(38, 22);
-      // 탁자: 은빛 판 + 다리
-      R(14, 14, 28, 4, '#c8ccd0'); R(14, 14, 28, 1, '#e8ecf0'); R(14, 18, 28, 1, '#7a7e84');
-      R(16, 19, 2, 9, '#8a8e94'); R(38, 19, 2, 9, '#8a8e94');
-      R(20, 9, 3, 5, '#b8341e'); R(24, 10, 2, 4, '#d8c8a0'); R(27, 8, 3, 6, '#c8e0f0'); R(33, 10, 4, 4, '#e8e4da');
-      stool(10, 34); stool(34, 34);
-    });
+    // 식당 바깥 자리: 쇠 탁자 하나와 빨간(가끔 파랑 · 초록) 플라스틱 의자 넷, 탁자 위 양념통 · 물병 · 그릇 — 52차 후속: 쿼터뷰 입체로 (정면 그림은 표지판처럼 보였다)
+    out = pic(72, 52, 36, 38, (_R, g) => drawTableSet(g, 36, 38, 'street', v));
   } else if (kind === 'pushcart') {
-    // 노점 손수레: 유리 진열장(튀김·꼬치·과일), 아래 가스통, 바퀴 둘. 양산은 없다
-    const goods = [['#d89a3a', '#b8701e'], ['#e84a6a', '#f0c040'], ['#8a5a2a', '#c8902a']][v % 3];
-    out = pic(48, 52, 24, 44, (R) => {
-      R(8, 44, 34, 4, 'rgba(0,0,0,0.25)');
-      R(8, 26, 32, 14, '#9aa2aa'); R(8, 26, 32, 2, '#c8d0d8'); R(8, 39, 32, 1, '#5a6068');
-      R(10, 30, 8, 9, '#3a5a8a'); R(11, 31, 2, 7, '#6a8ac0'); // 가스통
-      R(22, 32, 16, 6, '#7a8088');
-      R(10, 8, 28, 18, '#2a2e34'); R(11, 9, 26, 16, '#cfe4ec'); R(11, 9, 26, 2, '#f2fbff');
-      for (let k = 0; k < 6; k++) R(13 + k * 4, 18 + (k % 2), 3, 3, goods[k % 2]);
-      for (let k = 0; k < 5; k++) R(14 + k * 5, 13, 1, 5, '#8a6a3a'); // 꼬치
-      R(8, 6, 32, 2, '#5a6068');
-      if (o) R(40, 18, 6, 2, '#5a6068'); else R(2, 18, 6, 2, '#5a6068'); // 손잡이
-      for (const x of [12, 34]) { R(x - 3, 40, 7, 7, '#1a1a1a'); R(x - 1, 42, 3, 3, '#6a6a6a'); }
-    });
+    // 노점 손수레: 유리 진열장(꼬치 · 과일 · 튀김), 숯불 석쇠, 가스통, 자전거 바퀴, 손잡이. 양산은 없다 — o = 긴 쪽 방향(0: i · 1: j)
+    out = pic(72, 80, 36, 62, (_R, g) => drawCart(g, 36, 62, o ? 1 : 0, 'street', (['skewer', 'fruit', 'fried'] as const)[v % 3], v));
   } else {
     // 울타리 한 칸: 끝이 뾰족한 말뚝 + 가로대 (지옥은 그을린 나무에 뼈빛 끝)
     const wood = hell ? '#2e221c' : '#6b4a30', woodL = hell ? '#4a3a2e' : '#8a6440', tip = hell ? '#d8ccb4' : '#8a6440';

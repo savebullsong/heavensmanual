@@ -78,18 +78,27 @@ export function decorOf(z: Zone): Decor {
     }
     // 화분
     if (r3 < 0.25) put(fi + si * Math.max(0, len - 1), fj + sj * Math.max(0, len - 1), 'plant', 0, 0);
-    // 먹는 가게 앞: 빨간 플라스틱 의자와 쇠 탁자 (방콕 골목 식당의 바깥 자리)
+    // 먹는 가게 앞: 빨간 플라스틱 의자와 쇠 탁자 (방콕 골목 식당의 바깥 자리) · 천국은 흰 대리석 탁자와 금빛 의자
+    // 52차 후속: 문 바로 앞(가운데)이 아니라 가게 앞 모서리 쪽에 — 문을 막고 선 바리케이드처럼 보였다. 푸드코트는 양쪽 모서리에 두 벌
     const t = kindOf(b);
-    if (['restaurant', 'fast_food', 'food_court', 'cafe', 'bar', 'pub'].includes(t) && r2 > 0.4) {
-      const m = Math.max(0, Math.floor(len / 2));
-      put(fi + si * m + (sj ? 1 : 0), fj + sj * m + (si ? 1 : 0), 'stools', si ? 0 : 1, 0);
+    if (['restaurant', 'fast_food', 'food_court', 'cafe', 'bar', 'pub'].includes(t) && (r2 > 0.4 || z.heavenGen)) {
+      const set: Prop['kind'] = z.heavenGen ? 'hcafe' : 'stools';
+      const at = (m: number) => put(fi + si * m + (sj ? 1 : 0), fj + sj * m + (si ? 1 : 0), set, si ? 0 : 1, 0);
+      if (!at(0) && len > 4) at(len - 1);
+      if (t === 'food_court' && len >= 6) at(len - 1);
     }
   });
   // 3) 노점 손수레: 유리 진열장·가스통 (양산 없이). 큰길 보도에 드문드문
-  for (let j = 1; j < z.H - 1; j++)
+  // 52차 후속: 차도에 붙은 보도에만 (장사꾼은 손님이 지나가는 길가에 선다) · 수레는 길과 나란히 · 서로 여덟 칸 넘게 떨어진다
+  //   천국은 여기서 놓지 않는다 — 장사꾼 없이 들판 길에 덩그러니 서 있었다. 천사가 끄는 수레는 heavenworld에서 자리를 정해 둔다
+  const carts: [number, number][] = [];
+  if (!z.heavenGen) for (let j = 1; j < z.H - 1; j++)
     for (let i = 1; i < z.W - 1; i++) {
-      if (tileAt(z, i, j) !== 'walk' || h01(i, j, 5) > 0.006) continue;
-      put(i, j, 'pushcart', h01(j, i, 6) < 0.5 ? 0 : 1, 2);
+      if (tileAt(z, i, j) !== 'walk' || h01(i, j, 5) > 0.05) continue;
+      const roadI = tileAt(z, i + 1, j) === 'road' || tileAt(z, i - 1, j) === 'road', roadJ = tileAt(z, i, j + 1) === 'road' || tileAt(z, i, j - 1) === 'road';
+      if (!roadI && !roadJ) continue;
+      if (carts.some(([a, b]) => Math.abs(a - i) + Math.abs(b - j) < 9)) continue;
+      if (put(i, j, 'pushcart', roadI ? 1 : 0, 1)) carts.push([i, j]);
     }
   // 4) 쓰레기통: 보도 드문드문
   for (let j = 1; j < z.H - 1; j++)
