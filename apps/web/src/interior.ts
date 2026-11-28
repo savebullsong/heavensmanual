@@ -13,6 +13,7 @@ import { lang } from './i18n.ts';
 export { BESK_LOOK };
 
 const TI = Object.fromEntries(TYPES.map((t, k) => [t, k])) as Record<(typeof TYPES)[number], number>;
+const heavenRoom = (info: InteriorInfo) => !!info.heaven;
 
 /** 들어갈 수 있는 건물: 가게·시설이 있고 문(간판 면)이 있는 곳 */
 /** 45차: 관리자는 아파트·콘도 안에도 들어가 본다 (main이 관리자 로그인 때 켠다) */
@@ -23,6 +24,7 @@ export function canEnter(b: Building) {
   if (b.cat === 'condo' && adminVisit) return true;
   if (b.cat === 'home' || b.cat === 'estate') return true; // 24차 내 집 · 35차 사는 집
   if (b.cat === 'palace') return true; // 46차 천국 본청
+  if (isMall(b)) return true; // 52차 실내 몰
   if (!p || b.cat === 'ujusae') return false;
   // 간판이 없어도 들어갈 수 있는 곳: 종교시설·병원·은행
   // 32차: 물건을 파는 곳·은행은 반드시 안으로 들어가서 산다 (문 앞에서 사던 버그)
@@ -40,13 +42,33 @@ export function streetSeller(b: Building): 'tools' | 'dept' | 'antique' | undefi
   return undefined;
 }
 
+/** 52차 엠쿼티어 · 엠포리움 실내 몰: 층마다 가게 셋 (가게 이름은 지어낸 것 — 실제 상표는 쓰지 않는다) */
+export const MALL_FLOORS: { label: [string, string, string]; shops: { store: 'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'dept' | 'antique'; cuisine?: string; name: [string, string, string]; col: string }[] }[] = [
+  { label: ['지하 푸드홀', 'ฟู้ดฮอลล์ชั้นใต้ดิน', 'Basement food hall'], shops: [
+    { store: 'food', cuisine: 'thai', name: ['쏘이 팟타이 키친', 'ซอยผัดไทยคิทเช่น', 'Soi Pad Thai Kitchen'], col: '#d8642a' },
+    { store: 'cafe', name: ['프롬퐁 커피 바', 'พร้อมพงษ์คอฟฟี่บาร์', 'Phrom Phong Coffee Bar'], col: '#5a3a2a' },
+    { store: 'mart', name: ['고메 마켓', 'กูร์เมต์มาร์เก็ต', 'Gourmet Market'], col: '#2a7a4a' } ] },
+  { label: ['1층 명품관', 'ชั้น 1 แบรนด์หรู', '1F Luxury'], shops: [
+    { store: 'antique', name: ['황금 시계방', 'ร้านนาฬิกาทองคำ', 'Golden Watch House'], col: '#b8922e' },
+    { store: 'dept', name: ['실크 부티크', 'ซิลค์บูติก', 'Silk Boutique'], col: '#7a2a4a' },
+    { store: 'pharmacy', name: ['향수 라운지', 'เลานจ์น้ำหอม', 'Perfume Lounge'], col: '#c88aa8' } ] },
+  { label: ['2층 리빙 · 스포츠', 'ชั้น 2 ของใช้ · กีฬา', '2F Living & Sports'], shops: [
+    { store: 'tools', name: ['홈 앤 툴', 'โฮมแอนด์ทูล', 'Home & Tool'], col: '#3a5a7a' },
+    { store: 'dept', name: ['스포츠 하우스', 'สปอร์ตเฮาส์', 'Sports House'], col: '#2a6a8a' },
+    { store: 'pharmacy', name: ['헬스 드러그', 'เฮลท์ดรัก', 'Health Drug'], col: '#3a8a5a' } ] },
+];
+let mallFloor = 0;
+export function setMallFloor(n: number) { mallFloor = Math.max(0, Math.min(MALL_FLOORS.length - 1, n)); }
+export const isMall = (b: Building) => ['emquartier', 'emqtower', 'emporium'].includes((b as { lmk?: string }).lmk ?? '');
 export function roomKind(b: Building): string {
+  if (isMall(b)) return 'mall'; // 52차 엠쿼티어 · 엠포리움 실내 몰
   if (b.cat === 'loan') return 'loan'; // 지옥 3층 베스크 대부소
   if (b.cat === 'estate') return 'myhome'; // 35차 내가 산 집
   if (b.cat === 'condo' && !mainPoi(b)) return 'condo'; // 45차 아파트·콘도 한 집 (관리자만 들어가 본다)
   if (b.yunae) return 'ysalon'; // 40차 유내 미용실 (회상 속 그 미용실 그대로, 사람만 다르다)
   if (b.cat === 'sanct') { const att = (b as { att?: string }).att; return att === 'temple' ? 'htemple' : att === 'mosque' ? 'hmosque' : 'hchurch'; } // 46차 천국 성소
   if (b.cat === 'cottage') return 'cloudisle'; // 46차 구름 위의 오두막 (옆집 쌍둥이)
+  if (b.cat === 'post') return 'post'; // 52차 우체국 (기원 편지의 답장)
   if (b.cat === 'palace') return 'hpalace'; // 46차 천국 본청 안 (생명책 · 저울 · 접수 천사)
   if (b.cat === 'hhome') return 'hhome'; // 47차 구름 위 내 오두막 안 (천국 가구 · 침대에서 자기)
   if (b.cat === 'airport') return 'airport'; // 47차 공항 (표 사기 · 출입국 심사대)
@@ -83,6 +105,8 @@ export const REST_ROOMS = new Set(['hhome', 'hpalace', 'hchurch', 'htemple', 'hm
 
 const SIZE: Record<string, [number, number]> = {
   hchurch: [19, 16], htemple: [19, 16], hmosque: [19, 16], cloudisle: [20, 15], // 46차
+  post: [12, 9], // 52차 우체국
+  mall: [24, 16], // 52차 실내 몰 (층마다)
   hpalace: [34, 56], // 52차 아주 넓게 (민원실 → 긴 복도 · 좌우 번갈아 방 여덟 → 승강기 홀) · 51차 천국의 지붕 빌딩 1층 (주민센터 · 긴 복도 · 하늘 승강기 · 국 다섯 · 화장실 · 구내식당)
    hhome: [14, 11], airport: [22, 14],
   temple: [13, 11], church: [13, 11], mosque: [12, 11], gurdwara: [12, 11], bank: [14, 11], clinic: [12, 10], pharmacy: [9, 8],
@@ -93,6 +117,8 @@ const LOOKS: Record<string, { floor: string; wall: string; trim: string }> = {
   hchurch: { floor: 'marble', wall: '#f6f2ea', trim: '#c9a23e' }, htemple: { floor: 'temple', wall: '#faf2e2', trim: '#c9a23e' }, hmosque: { floor: 'prayer', wall: '#f8f6f0', trim: '#2a8a80' }, // 46차 천국 성소
   cloudisle: { floor: 'cloud', wall: '#f6f2ea', trim: '#c9a23e' }, // 46차 구름 위 오두막
   hpalace: { floor: 'marble', wall: '#fbf8f0', trim: '#c9a23e' }, // 46차 천국 본청
+  post: { floor: 'pale', wall: '#efeae0', trim: '#c8402e' },
+  mall: { floor: 'marble', wall: '#ece8e2', trim: '#8a7a5a' }, // 52차 실내 몰 // 52차 우체국 (천국은 아래에서 대리석 · 금)
   hhome: { floor: 'wood', wall: '#f8f2e6', trim: '#c9a23e' }, // 47차 구름 위 내 오두막
   airport: { floor: 'marble', wall: '#eef0f2', trim: '#3a6a9a' }, // 47차 공항 출국장
   temple: { floor: 'temple', wall: '#e9dcc0', trim: '#a8322a' }, church: { floor: 'stone', wall: '#e8e2d4', trim: '#6b4a30' },
@@ -194,6 +220,26 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
       for (const [ii, jj] of [[1, 1], [W - 2, 1], [W - 3, 1], [W - 2, 2], [1, H - 2], [2, H - 2], [1, H - 3], [W - 2, H - 2], [W - 3, H - 2], [W - 2, H - 3], [W - 4, H - 2], [W - 2, H - 4]]) tiles[jj * W + ii] = TI.void;
       break;
     }
+    case 'mall': {
+      // 52차 실내 몰: 가운데 에스컬레이터 · 뒤 벽 가게 둘 · 왼쪽 벽 가게 하나 (가게 앞에 서면 그 가게) · 벤치 · 화분 · 기둥
+      const fl = MALL_FLOORS[mallFloor];
+      F(3, 1, 6, 1, 76, 'storefront', 0); F(13, 1, 6, 1, 76, 'storefront', 1); F(1, 5, 1, 6, 76, 'storefront', 2);
+      F(11, 7, 3, 3, 40, 'escalator', mallFloor);
+      for (const [ii, jj] of [[8, 6], [16, 6], [8, 11], [16, 11]] as const) F(ii, jj, 1, 1, 110, 'pillar');
+      F(4, 11, 3, 1, 12, 'bench'); F(17, 12, 3, 1, 12, 'bench'); seats.push([5, 11], [18, 12]);
+      for (const [ii, jj] of [[21, 2], [x1, 9], [2, 13]] as const) F(ii, jj, 1, 1, 30, 'plant');
+      if (mallFloor === 0) for (const [ti, tj] of [[5, 4], [16, 4], [19, 8]] as const) { F(ti, tj, 1, 1, 16, 'table', ti); seats.push([ti + 1, tj]); }
+      clerk = { i: 12, j: 11 }; counter = { i: 12, j: 12 }; void fl;
+      break;
+    }
+    case 'post':
+      // 52차 우체국: 창구(직원) · 벽 가득 사서함 · 소포 선반 · 빨간 우체통(천국은 금빛) · 기다리는 의자
+      F(2, 2, W - 5, 1, 26, 'counter', 4); clerk = { i: mid, j: 1 }; counter = { i: mid, j: 3 };
+      F(1, 4, 1, 3, 54, 'poboxes'); F(x1, 4, 1, 3, 54, 'poboxes', 1);
+      F(W - 3, 1, 1, 1, 50, 'shelf', 6);
+      F(2, y1 - 1, 1, 1, 30, 'mailbox'); F(mid + 1, 5, 3, 1, 12, 'bench'); seats.push([mid + 2, 5]);
+      F(x1, y1, 1, 1, 30, 'plant');
+      break;
     case 'hpalace': {
       // 52차 천국의 지붕 빌딩 1층 (아주 넓다) — 정문을 들어서면 주민센터 민원실(창구 · 번호표 · 기다리는 의자 · 순찰하는 센터장).
       // 민원실을 지나면 긴 복도: 좌우로 번갈아 문이 난다 — 왼 화장실 → 오른 구내식당 → 왼 사무국 → 오른 징벌국 → 왼 신앙국 → 오른 통행국 → 왼 청원국 → 오른 천사 휴게실.
@@ -530,10 +576,11 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
   for (const f of furn) if (f.h > 2) for (let j = f.j; j < f.j + f.d; j++) for (let i = f.i; i < f.i + f.w; i++) tiles[j * W + i] = TI.block;
   const exit = kind === 'goatroom' ? { i: x1, j: y1 } : { i: mid, j: y1 }; // 32차: 염소대왕의 방은 옥좌 맞은편 앞 모서리가 문
   tiles[exit.j * W + exit.i] = TI.walk;
-  const look = kind === 'myhome' && b.estate === 'seoul' ? { floor: 'marble', wall: '#f2eee6', trim: '#9a8a6a' } : hAge === 0 ? { floor: 'sand', wall: '#b8b0a4', trim: '#6a6a66' } : hAge === 1 || kind === 'ysalon' ? { floor: 'checker', wall: '#f2e6e0', trim: '#b85a74' } : hAge === 2 ? { floor: 'pale', wall: '#e6ecea', trim: '#3a8a7a' } : LOOKS[kind];
+  const hvRoom = (b as { att?: string }).att === 'heaven';
+  const look = hvRoom && kind === 'post' ? { floor: 'marble', wall: '#fbf8f0', trim: '#c9a23e' } : kind === 'myhome' && b.estate === 'seoul' ? { floor: 'marble', wall: '#f2eee6', trim: '#9a8a6a' } : hAge === 0 ? { floor: 'sand', wall: '#b8b0a4', trim: '#6a6a66' } : hAge === 1 || kind === 'ysalon' ? { floor: 'checker', wall: '#f2e6e0', trim: '#b85a74' } : hAge === 2 ? { floor: 'pale', wall: '#e6ecea', trim: '#3a8a7a' } : LOOKS[kind];
   const info: InteriorInfo = {
     // 28차: 내 집의 유내 — 거리에서 정해 둔 시절을 따른다. 20대(1)면 방은 비어 있다 (대문 앞에 나가 있거나, 그 사람 만나러 갔다)
-    kind, rest: REST_ROOMS.has(kind), name, ...look, exit, clerk: kind === 'myhome' || kind === 'hhome' || kind === 'condo' || hAge === 3 ? undefined : clerk, counter: kind === 'myhome' || kind === 'hhome' || kind === 'condo' || hAge === 3 ? undefined : counter, furn, age: hAge,
+    kind, heaven: hvRoom || undefined, mallFloor: kind === 'mall' ? mallFloor : undefined, rest: REST_ROOMS.has(kind), name, ...look, exit, clerk: kind === 'myhome' || kind === 'hhome' || kind === 'condo' || hAge === 3 ? undefined : clerk, counter: kind === 'myhome' || kind === 'hhome' || kind === 'condo' || hAge === 3 ? undefined : counter, furn, age: hAge,
     from: { b: k, out, bd: b }, store: kind === 'bank' ? 'bank' : kind === 'furnshop' ? 'furniture' : ['mart', 'pharmacy', 'food', 'cafe'].includes(kind) ? kind : streetSeller(b), cuisine: cuisineOf(b), seats: kind === 'hchurch' || kind === 'htemple' || kind === 'hpalace' ? seats : seats.filter(([i, j]) => tiles[j * W + i] === TI.walk), // 46차: 성소는 의자 · 방석 위가 자리
   };
   return finalize({ id: `in-${k}`, W, H, tiles, buildings: [], props: [], lanes: [], door: exit, spawn: { i: exit.i, j: exit.j - 1 }, interior: info });
@@ -1805,6 +1852,53 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       faceL(i + 0.42, i1 - 0.42, h - 10, h - 6, night ? '#ff4a3a' : '#e8402a');
       faceL(i + 0.4, i1 - 0.4, h - 18, h - 16, '#3a3a3a');
       B3(i + 0.28, j + 0.28, i1 - 0.28, j1 - 0.28, h, h + 3, '#2a5a9a');
+      break;
+    }
+    case 'storefront': { // 52차 몰 가게 앞면: 큰 유리 진열창 · 가게 색 띠 · 이름 간판 · 안쪽 진열대 그림자 · 열린 입구
+      const shop = MALL_FLOORS[info.mallFloor ?? 0]?.shops[f.v ?? 0];
+      const col = shop?.col ?? '#7a6a5a';
+      const alongI = w >= d; // 뒤 벽(j=1)이면 i 방향, 왼쪽 벽(i=1)이면 j 방향
+      if (alongI) {
+        B3(i + 0.05, j + 0.1, i1 - 0.05, j1 - 0.6, 0, h, '#d8d2c8');
+        poly([P(i + 0.2, j1 - 0.58, 4), P(i1 - 0.2, j1 - 0.58, 4), P(i1 - 0.2, j1 - 0.58, h - 18), P(i + 0.2, j1 - 0.58, h - 18)], 'rgba(190,220,235,0.55)');
+        for (let x = i + 0.6; x < i1 - 0.4; x += 0.9) poly([P(x, j1 - 0.57, 8), P(x + 0.5, j1 - 0.57, 8), P(x + 0.5, j1 - 0.57, 26), P(x, j1 - 0.57, 26)], 'rgba(90,70,60,0.35)');
+        poly([P(i, j1 - 0.56, h - 18), P(i1, j1 - 0.56, h - 18), P(i1, j1 - 0.56, h), P(i, j1 - 0.56, h)], col);
+        poly([P(i + (i1 - i) / 2 - 0.7, j1 - 0.55, 0), P(i + (i1 - i) / 2 + 0.7, j1 - 0.55, 0), P(i + (i1 - i) / 2 + 0.7, j1 - 0.55, h - 22), P(i + (i1 - i) / 2 - 0.7, j1 - 0.55, h - 22)], 'rgba(255,248,230,0.75)');
+      } else {
+        B3(i + 0.1, j + 0.05, i1 - 0.6, j1 - 0.05, 0, h, '#cfc8bd');
+        poly([P(i1 - 0.58, j + 0.2, 4), P(i1 - 0.58, j1 - 0.2, 4), P(i1 - 0.58, j1 - 0.2, h - 18), P(i1 - 0.58, j + 0.2, h - 18)], 'rgba(170,205,225,0.55)');
+        for (let y = j + 0.6; y < j1 - 0.4; y += 0.9) poly([P(i1 - 0.57, y, 8), P(i1 - 0.57, y + 0.5, 8), P(i1 - 0.57, y + 0.5, 26), P(i1 - 0.57, y, 26)], 'rgba(90,70,60,0.35)');
+        poly([P(i1 - 0.56, j, h - 18), P(i1 - 0.56, j1, h - 18), P(i1 - 0.56, j1, h), P(i1 - 0.56, j, h)], col);
+        poly([P(i1 - 0.55, j + (j1 - j) / 2 - 0.7, 0), P(i1 - 0.55, j + (j1 - j) / 2 + 0.7, 0), P(i1 - 0.55, j + (j1 - j) / 2 + 0.7, h - 22), P(i1 - 0.55, j + (j1 - j) / 2 - 0.7, h - 22)], 'rgba(255,248,230,0.75)');
+      }
+      if (shop) {
+        const nm = shop.name[lang() === 'ko' ? 0 : lang() === 'th' ? 1 : 2];
+        const [cx, cy] = alongI ? P(i + (i1 - i) / 2, j1 - 0.55, h - 9) : P(i1 - 0.55, j + (j1 - j) / 2, h - 9);
+        g.save(); g.translate(cx, cy); g.transform(1, alongI ? 0.5 : -0.5, 0, 1, 0, 0);
+        g.fillStyle = '#ffffff'; g.font = 'bold 9px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(nm, 0, 0); g.restore();
+      }
+      break;
+    }
+    case 'escalator': { // 52차 몰 에스컬레이터: 위아래로 엇갈린 두 줄 · 유리 난간 · 위층으로 사라지는 계단 (누르면 층 고르기)
+      B3(i + 0.1, j + 0.1, i1 - 0.1, j1 - 0.1, 0, 6, '#b8b2a8');
+      for (let q = 0; q < 6; q++) { const z0 = 6 + q * 6; B3(i + 0.3, j + 0.3 + q * 0.38, i + 1.3, j + 0.68 + q * 0.38, z0, z0 + 3, q % 2 ? '#5a5a62' : '#6a6a72'); B3(i1 - 1.3, j1 - 0.68 - q * 0.38, i1 - 0.3, j1 - 0.3 - q * 0.38, z0, z0 + 3, q % 2 ? '#5a5a62' : '#6a6a72'); }
+      for (const x of [i + 0.25, i + 1.35, i1 - 1.35, i1 - 0.25]) poly([P(x, j + 0.2, 6), P(x, j1 - 0.2, h), P(x, j1 - 0.2, h + 8), P(x, j + 0.2, 14)], 'rgba(200,225,240,0.45)');
+      const [lx, ly] = P(i + (i1 - i) / 2, j + 0.4, h + 18);
+      g.fillStyle = '#2a2a30'; g.fillRect(Math.round(lx) - 14, Math.round(ly) - 7, 28, 13); g.fillStyle = '#ffd86a'; g.font = 'bold 9px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(['B1', '1F', '2F'][f.v ?? 0] ?? '', lx, ly);
+      break;
+    }
+    case 'poboxes': { // 52차 우체국 사서함 벽: 작은 놋쇠 문짝이 줄지어 (번호판)
+      B3(i + 0.1, j + 0.05, i1 - 0.1, j1 - 0.05, 0, h, info.kind === 'post' && heavenRoom(info) ? '#efe6cf' : '#7a6a52');
+      for (let z = 6; z < h - 4; z += 8) for (let y = j + 0.2; y < j1 - 0.2; y += 0.42) { poly([P(i1 - 0.09, y, z), P(i1 - 0.09, y + 0.34, z), P(i1 - 0.09, y + 0.34, z + 6), P(i1 - 0.09, y, z + 6)], '#c9a23e'); poly([P(i1 - 0.08, y + 0.12, z + 2), P(i1 - 0.08, y + 0.22, z + 2), P(i1 - 0.08, y + 0.22, z + 3), P(i1 - 0.08, y + 0.12, z + 3)], '#3a2a14'); }
+      break;
+    }
+    case 'mailbox': { // 52차 우체통: 둥근 몸 · 둥근 지붕 · 투입구 (천국은 금빛)
+      const gold = heavenRoom(info), body = gold ? '#e8c24e' : '#c8302a', dark = gold ? '#b8922e' : '#8a1e1a';
+      B3(i + 0.3, j + 0.3, i1 - 0.3, j1 - 0.3, 0, h - 6, body);
+      const [cx, cy] = P(i + 0.5, j + 0.5, h - 6);
+      g.fillStyle = body; g.beginPath(); g.ellipse(cx, cy, 13, 7, 0, Math.PI, 0); g.fill(); g.fillStyle = dark; g.beginPath(); g.ellipse(cx, cy, 13, 4, 0, 0, Math.PI); g.fill();
+      faceL(i + 0.38, i1 - 0.38, h - 14, h - 11, '#1e1414');
+      faceL(i + 0.42, i1 - 0.42, h - 28, h - 20, '#f6f2ea');
       break;
     }
     case 'atm': B3(i + 0.15, j + 0.15, i1 - 0.15, j1 - 0.15, 0, h, '#5a6a7a'); faceL(i + 0.3, i1 - 0.3, h - 20, h - 8, night ? '#8adcff' : '#6ab8d8'); faceL(i + 0.3, i1 - 0.3, h - 28, h - 24, '#2a2a2a'); break;

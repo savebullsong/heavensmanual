@@ -18,7 +18,7 @@ export interface Save {
   bank?: number;
   /** 50차: 이자를 마지막으로 셈한 달 ('2026-11') · 한 달 투자 상품 (만기 시각 ms) */
   bankMon?: string;
-  invest?: { amt: number; at: number; due: number }[];
+  invest?: { amt: number; at: number; due: number; kind?: 'safe' | 'mid' | 'risky' }[];
   bag?: Record<string, number>;
   equip?: Partial<Record<Slot, string>>;
   /** 마지막으로 있던 곳: 다시 열면 그 자리에서 (가게 안에서 일하던 중이면 계속 일한다) */
@@ -62,6 +62,8 @@ export interface Save {
   /** 52차 천국 1층 주민센터 번호표 (n = 내 번호 · from = 뽑을 때 창구 번호 · at = 불리는 때, 실제 시간 5분 뒤) · 구내식당 배급 받은 때 */
   hticket?: { n: number; from: number; at: number; called?: boolean };
   hmealAt?: number;
+  /** 52차 먹이 주기: 그날 준 횟수 (선행은 하루 세 번까지) */
+  feedDay?: string; feedN?: number;
   /** 52차 휴대전화: 오늘 전화를 받아 준 사람 · 인물들이 보낸 문자 · 다음 문자가 올 때 · 유내를 만났나 */
   phone?: { day?: string; answered?: Record<string, number>; texts?: { from: string; body: string; at: number; seen?: boolean }[]; nextText?: number; yunae?: boolean };
   /** 19차 지옥면죄부: 앞으로 짓는 악행에서 지워 줄 남은 점수 (한 장 = 30, 최대 10장 = 300) */
@@ -94,7 +96,7 @@ export interface Save {
     /** 지옥 은행에 맡긴 노전 (쓰러져도 남는다) */
     bank?: number;
     /** 50차: 보관료를 마지막으로 뗀 때(ms) · 지난번 들른 뒤로 빠진 보관료 · 오르멧에게 베여 빠진 몫 (다음에 은행에 가면 보인다) */
-    bankAt?: number; feeSeen?: number; oremetCut?: number;
+    bankAt?: number; feeSeen?: number; oremetCut?: number; feeFree?: number; // 52차 보관료 면제 증서가 덮는 때까지
     /** 속죄의 회당에 층마다 바친 노전 (다 차면 위층으로) */
     atone?: Record<number, number>;
     /** 이번 지옥행에서 통행세를 낸 층 (다시 지나갈 때는 받지 않는다) */

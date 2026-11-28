@@ -139,6 +139,9 @@ export const ITEMS: ItemDef[] = [
   { key: 'armorsuit', cat: 'armor', price: 2800000, def: 14, sprite: 'combatcoat', icon: 'combatcoat', tint: '#2b2e31', name: { ko: '특수부대 방호복', th: 'ชุดเกราะหน่วยรบพิเศษ', en: 'Special-forces armor suit' } },
   // 40차: 긴 겉옷 — 무릎·허벅지까지 덮어 바지는 가려지고 겉옷이 곧 차림이 된다
   { key: 'trenchcoat', cat: 'armor', price: 2900, def: 3, store: 'dept', sprite: 'trench', icon: 'trench', tint: '#8a6a44', name: { ko: '낙타색 롱 코트', th: 'โค้ทยาวสีอูฐ', en: 'Camel long coat' } },
+  // 52차: 긴 겉옷 더 — 의사 가운(백화점) · 노란 우비 코트(철물점)
+  { key: 'labcoat', cat: 'armor', price: 1800, def: 2, store: 'dept', sprite: 'trench', icon: 'trench', tint: '#f2f4f6', name: { ko: '의사 가운', th: 'เสื้อกาวน์หมอ', en: "Doctor's coat" } },
+  { key: 'raincoatlong', cat: 'armor', price: 390, def: 1, store: 'tools', sprite: 'trench', icon: 'trench', tint: '#e8c23a', name: { ko: '노란 우비 코트', th: 'เสื้อกันฝนยาวสีเหลือง', en: 'Yellow raincoat' } },
   { key: 'leathercoat', cat: 'armor', price: 18000, def: 5, store: 'dept', sprite: 'trench', icon: 'trench', tint: '#2a2624', name: { ko: '검은 가죽 롱코트', th: 'โค้ทหนังยาวสีดำ', en: 'Black leather long coat' } },
   { key: 'firecoat', cat: 'armor', price: 9500, def: 6, store: 'tools', sprite: 'firesuit', icon: 'firesuit', tint: '#b8954a', name: { ko: '방화복 상의', th: 'เสื้อดับเพลิง', en: 'Firefighter turnout coat' } },
   { key: 'combatcoat', cat: 'armor', price: 150000, def: 10, sprite: 'combatcoat', icon: 'combatcoat', tint: '#4e5638', name: { ko: '방탄 전투복', th: 'ชุดรบกันกระสุน', en: 'Armored combat uniform' } },
@@ -426,8 +429,8 @@ export const STORES: Record<'mart' | 'pharmacy' | 'food' | 'cafe' | 'tools' | 'd
   cafe: [{ key: 'coffee', price: 65 }, { key: 'thaitea', price: 45 }, { key: 'cake', price: 80 }, { key: 'water', price: 10 }],
   // 17차: 우주새와 다른 무기를 파는 거리 상인
   // 26차: 현실 값 · 겹치지 않게 (식칼은 우주새)
-  tools: ['pipe', 'hammer', 'sickle', 'crowbar', 'shovel', 'hatchet', 'wrench', 'machete', 'boltcutter', 'sledge', 'fireaxe', 'blanket', 'poncho'].map((key) => ({ key, price: ITEMS.find((x) => x.key === key)!.price })).concat([{ key: 'water', price: 10 }]), // 잡화점·철물점·수리점: 공구와 농기구
-  dept: [{ key: 'bat', price: 800 }, { key: 'metalbat', price: 1500 }, ...['damascus', 'tomahawk', 'wrapcoat'].map((key) => ({ key, price: ITEMS.find((x) => x.key === key)!.price })), { key: 'cola', price: 20 }, { key: 'chips', price: 35 }], // 백화점·쇼핑몰: 운동용품 · 35차 고급 아웃도어 칼·도끼
+  tools: ['pipe', 'hammer', 'sickle', 'crowbar', 'shovel', 'hatchet', 'wrench', 'machete', 'boltcutter', 'sledge', 'fireaxe', 'blanket', 'poncho', 'raincoatlong'].map((key) => ({ key, price: ITEMS.find((x) => x.key === key)!.price })).concat([{ key: 'water', price: 10 }]), // 잡화점·철물점·수리점: 공구와 농기구
+  dept: [{ key: 'bat', price: 800 }, { key: 'metalbat', price: 1500 }, ...['damascus', 'tomahawk', 'wrapcoat', 'labcoat'].map((key) => ({ key, price: ITEMS.find((x) => x.key === key)!.price })), { key: 'cola', price: 20 }, { key: 'chips', price: 35 }], // 백화점·쇼핑몰: 운동용품 · 35차 고급 아웃도어 칼·도끼
   antique: ['whip', 'gladius', 'cutlass', 'saber', 'rapier', 'katana', 'spear', 'shinsakuto', 'nihonto', 'meisterblade', 'treasureblade', 'meteorblade', 'legendblade', 'skycleaver'].map((key) => ({ key, price: ITEMS.find((x) => x.key === key)!.price })), // 기념품·골동품 가게: 진열장의 칼
 };
 

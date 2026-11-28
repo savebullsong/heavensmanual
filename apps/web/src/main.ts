@@ -18,12 +18,12 @@ import { t, lang, setLang, LANGS, type Lang } from './i18n.ts';
 import { load, save, type Slot, type Stash } from './state.ts';
 import { hellZone, OPEN_FLOORS, floorDef, MONSTERS, GUARDS, TOLL, ATONE_GOAL, GURMA_FULL, setRaidForce, FLOORS, FIELD_BOSS } from './hell.ts';
 import type { HellVendor } from './zone.ts';
-import { interiorZone, roomKind as roomKindOf, canEnter, voidZone, drawFurn, setAdminVisit, streetSeller } from './interior.ts';
+import { interiorZone, roomKind as roomKindOf, canEnter, voidZone, drawFurn, setAdminVisit, streetSeller, MALL_FLOORS, setMallFloor, isMall } from './interior.ts';
 import { heavenZone, HEAVEN_ID, heavenPriceMul, heavenMeta } from './heavenworld.ts';
 import { designateHomes, HOME_PRICE, FURN, furnByKey, type FurnDef } from './home.ts';
 import { borderZone } from './border.ts';
 import { TWO, DOT3, setDot3 } from './sprites.ts';
-import { buildingName, hasBank, nameSeoulBanks, bankName, tagLandmarks } from './names.ts';
+import { buildingName, hasBank, nameSeoulBanks, bankName, tagLandmarks, designatePost } from './names.ts';
 import { LANDMARKS } from './landmarks.ts';
 import { bangkokClock, seoulClock } from './clock.ts';
 import { unlockAudio, isMuted, setMuted, plunge, chime } from './sfx.ts';
@@ -187,7 +187,7 @@ function loadZone(id: string): Promise<Zone> {
   if (!p) {
     p = artUrl(`zones/${id}.json`).then((u) => fetch(u))
       .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
-      .then((j) => { const z = decodeZone(j); designateHomes(z); markOwned(z); nameSeoulBanks(z, (i, k) => walkable(z, i, k)); tagLandmarks(z, LANDMARKS); return z; }) // 35차: 아속·강남에 분양 중인 집과 가구점
+      .then((j) => { const z = decodeZone(j); designateHomes(z); markOwned(z); nameSeoulBanks(z, (i, k) => walkable(z, i, k)); designatePost(z as never, (i, k) => walkable(z, i, k)); tagLandmarks(z, LANDMARKS); return z; }) // 35차: 아속·강남에 분양 중인 집과 가구점
       .catch(() => { zoneCache.delete(id); return sukhumvitTestZone(); });
     zoneCache.set(id, p);
   }
@@ -936,8 +936,9 @@ function joinNet(w: WorldScene) {
     hit: (f, id, d, c, k) => w.mobHitIn(f, id, d, c, k),
     strike: (id, d, c, k) => w.mobStrikeIn(id, d, c, k),
     kill: (id, by) => w.mobKillIn(id, by),
+    event: (h, ev) => w.mobEvent(h, ev), // 52차
   });
-  w.mobOut = { snap: net.sendMobSnap, desc: net.sendMobDesc, req: net.sendMobReq, hit: net.sendMobHit, strike: net.sendMobStrike, kill: net.sendMobKill };
+  w.mobOut = { snap: net.sendMobSnap, desc: net.sendMobDesc, req: net.sendMobReq, hit: net.sendMobHit, strike: net.sendMobStrike, kill: net.sendMobKill, event: net.sendMobEvent };
 }
 
 function leaveShop() {
@@ -1079,6 +1080,7 @@ const hooks: WorldHooks = {
   },
   hutDoor(which) { void hutDoor(which); },
   palaceSpot(kind) { void palaceSpot(kind); }, // 52차 주민센터 번호표 · 창구 · 배식대
+  mallSpot(kind) { void mallSpot(kind); }, // 52차 실내 몰
   airport() { void airportAsk(); },
   immig() { void immigration(); },
   promo(username) { promoTap(username); },
@@ -1267,6 +1269,10 @@ const hooks: WorldHooks = {
     save(state);
     return { gave, total: h.fed, full: h.fed >= GURMA_FULL };
   },
+  beskDebt() { return state.debt ?? 0; },
+  karmaPct() { const d = state.deeds ?? { good: 0, evil: 0 }; const tot = d.good + d.evil; return tot > 0 ? (d.evil / tot) * 100 : 0; },
+  hasHeavenFood() { return realm() === 'heaven' && !!heavenFoodKey(); },
+  fed(who) { return feedWith(who); },
   hasFood() {
     const bag = state.bag ?? {};
     return HELL_FOOD.some((k) => (bag[k] ?? 0) > 0);
@@ -1308,8 +1314,11 @@ function enterInterior(k: number, out: { i: number; j: number }, chaser: { monst
   yunaeAlone = age === 0 && Math.random() < 0.3;
   // 43차: 지금의 빈집으로 들어설 때 드물게, 뱃속의 어둠 (태어나자마자 죽었던 그때)
   if (b.cat === 'home' && age === 3 && Math.random() < 0.14) wombPending = true;
+  if (isMall(b)) setMallFloor(1); // 52차: 몰은 1층으로 들어선다
   if (b.cat === 'estate' && b.estate && !state.homes?.[b.estate]) { void talkToAgent(k, out); return; } // 35차: 아직 내 집이 아니면 분양 사무소 직원이 맞는다
   openRoom(interiorZone(b, k, out, b.cat === 'estate' ? L0.myHomeName.replace('{name}', buildingName(b, lang())) : b.cat === 'loan' ? L0.beskHouse : b.cat === 'hbank' ? L0.hbankName : b.cat === 'atone' ? L0.atoneName : b.cat === 'rebirth' ? L0.rebirthName : roomKindOf(b) === 'bank' && bankName(b, lang()) ? bankName(b, lang()) : b.cat === 'home' ? (age === 3 ? L0.homeName : L0.flashTag.replace('{place}', L0.yunaePlace[age])) : buildingName(b, lang()), b.cat === 'home' ? age : undefined, state.furn ?? []), chaser, work);
+  // 52차: 이곳에서 띄운 기원에 답이 달렸으면 촛불 하나가 켜져 있다 (답장은 우체국에서)
+  if (world?.zone.interior && letterCache.some((l) => l.reply && l.place === world!.zone.interior!.name)) world.lightCandle();
   // 40차 유내 미용실: 처음엔 꼭, 그다음엔 가끔 짧은 혼잣말
   if (b.yunae && !busy && (!state.ysSeen || Math.random() < 0.35)) {
     const first = !state.ysSeen;
@@ -1808,6 +1817,118 @@ async function palaceSpot(kind: 'ticket' | 'counter' | 'buffet') {
   const fed = () => { world?.heal(maxHp()); state.hp = maxHp(); save(state); renderHud(); toast(L.palaceMealDone, 'good'); };
   if (!world?.palaceEat(fed)) fed();
 }
+/** 52차 엠쿼티어 · 엠포리움 실내 몰: 가게 앞에 서면 그 가게 · 에스컬레이터 앞에 서면 층 고르기 */
+async function mallSpot(kind: number | 'esc') {
+  const info = world?.zone.interior;
+  if (!info || info.kind !== 'mall' || busy || dlg.isOpen) return;
+  const fl = info.mallFloor ?? 1, li = lang() === 'ko' ? 0 : lang() === 'th' ? 1 : 2;
+  if (kind !== 'esc') { const sh = MALL_FLOORS[fl]?.shops[kind]; if (sh) openStore(sh.store, sh.name[li], sh.cuisine); return; }
+  await mallGuide(fl);
+}
+async function mallGuide(fl: number) {
+  const L = t(), li = lang() === 'ko' ? 0 : lang() === 'th' ? 1 : 2;
+  busy = true;
+  dlg.open({ name: L.mallEsc, exit: true });
+  await dlg.say(L.mallEscLine.replace('{f}', MALL_FLOORS[fl].label[li]));
+  const opts = MALL_FLOORS.map((m, k) => (k === fl ? `· ${m.label[li]} (${L.mallHere})` : m.label[li]));
+  const c = await dlg.choose([...opts, L.palaceLater]);
+  endTalk();
+  if (c < 0 || c >= MALL_FLOORS.length || c === fl) return;
+  mallGo(c);
+}
+function mallGo(floor: number) {
+  const info0 = world?.zone.interior, outer = street;
+  if (!world || !info0 || !outer) return;
+  const b = outer.zone.buildings[info0.from.b];
+  closeMenus();
+  world.destroy();
+  world = outer;
+  street = null;
+  setMallFloor(floor);
+  openRoom(interiorZone(b, info0.from.b, info0.from.out, info0.name), null, false, true);
+  const li = lang() === 'ko' ? 0 : lang() === 'th' ? 1 : 2;
+  showPlace(info0.name, MALL_FLOORS[floor].label[li]);
+  world?.placeNear(12, 12, state.hp ?? maxHp());
+}
+/** 52차 내가 띄운 편지들 (촛불 · 우체국) — 시작할 때와 5분마다, 편지를 보낸 뒤 */
+let letterCache: net.Letter[] = [];
+const refreshLetters = async () => { const ls = await net.myLetters(); if (ls.length || !letterCache.length) letterCache = ls; };
+void refreshLetters();
+setInterval(() => { if (!document.hidden) void refreshLetters(); }, 300000);
+/** 52차 우체국 창구: 기원 편지의 답장을 찾는다 (지옥엔 우체국이 없다 — 죄인은 답장을 받을 자격이 없다) */
+async function postTalk() {
+  const L = t();
+  busy = true;
+  dlg.open({ name: L.postClerk, exit: true });
+  await dlg.say(pick(L.postGreet));
+  const c = await dlg.choose([L.postFind, L.postBye]);
+  if (c !== 0 || dlg.cancelled) { endTalk(); return; }
+  await refreshLetters();
+  const got = letterCache.filter((l) => l.reply);
+  if (!got.length) { await dlg.say(pick(L.postNone)); endTalk(); return; }
+  await dlg.say(L.postHere.replace('{n}', String(got.length)));
+  endTalk();
+  openPostBox(got);
+}
+function openPostBox(ls: net.Letter[]) {
+  closeMenus();
+  document.querySelector('.store-panel')?.remove();
+  const L = t();
+  const el = document.createElement('div');
+  el.className = 'store-panel shop-menu letter-panel';
+  el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close">✕</button></div><p class="store-line"></p><div class="menu-list"></div>`;
+  el.querySelector('.menu-head b')!.textContent = L.postBoxTitle;
+  el.querySelector('.store-line')!.textContent = L.postBoxLine;
+  (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
+  const list = el.querySelector('.menu-list')!;
+  for (const l of ls) {
+    const card = document.createElement('div'); card.className = 'letter-card';
+    const head = document.createElement('small'); head.textContent = `${new Date(l.replied_at ?? l.at).toLocaleDateString(lang() === 'ko' ? 'ko-KR' : lang() === 'th' ? 'th-TH' : 'en-US')} · ${l.place || (l.realm === 'hell' ? L.letterPlaceHell : L.letterPlaceFaith)}`;
+    const body = document.createElement('p'); body.className = 'letter-mine'; body.textContent = l.body.length > 140 ? l.body.slice(0, 140) + '…' : l.body;
+    const r = document.createElement('p'); r.className = 'letter-reply'; r.textContent = l.reply ?? '';
+    card.append(head, body, r);
+    list.appendChild(card);
+  }
+  panelAt(el);
+}
+/** 52차 황색날개 가게: 물건이 날마다 바뀐다 (천국 날짜로 섞어 갈래마다 셋에 둘쯤 — 회복품 하나는 늘 있다) */
+function ywToday(cat: string): ItemDef[] {
+  const all = ITEMS.filter((x) => x.cat === cat && x.store === 'yw');
+  if (all.length <= 2) return all;
+  const day = svcDayKey();
+  let h = 0; for (const ch of day + cat) h = (h * 131 + ch.charCodeAt(0)) >>> 0;
+  const rnd = () => ((h = (h * 1103515245 + 12345) >>> 0) / 4294967296);
+  const keep = all.filter(() => rnd() < 0.62);
+  if (!keep.length) keep.push(all[Math.floor(rnd() * all.length)]);
+  const cheapHeal = all.filter((x) => (x.heal ?? 0) > 0).sort((a, b) => a.price - b.price)[0];
+  if (cheapHeal && !keep.includes(cheapHeal)) keep.unshift(cheapHeal);
+  return keep;
+}
+/** 52차 깔고 쉬는 천의 색 (물건마다) */
+function campColor(k: string): number {
+  const m: Record<string, number> = { blanket: 0x8a4a3a, poncho: 0xc8742a, wrapcoat: 0x4a4a5a, hshroud: 0x3a3438, hpelt: 0x6a4a32, hfeather: 0x2a2a30, hvshawl: 0x6a1e2a };
+  return m[k] ?? 0x6a5a4a;
+}
+/** 52차 먹이 주기: 내가 산 천국 음식 하나 (회복 물건) */
+function heavenFoodKey(): string | null {
+  for (const [k, n] of Object.entries(state.bag ?? {})) { const it = itemByKey(k); if (n > 0 && it?.heaven && (it.heal ?? 0) > 0 && it.cat !== 'weapon' && it.cat !== 'armor') return k; }
+  return null;
+}
+function feedWith(who: 'animal' | 'sinner' | 'monster'): boolean {
+  const k = heavenFoodKey();
+  if (!k) { toast(t().feedNone); return false; }
+  const it = itemByKey(k)!;
+  state.bag![k] -= 1; if (state.bag![k] <= 0) delete state.bag![k];
+  const day = svcDayKey();
+  if (state.feedDay !== day) { state.feedDay = day; state.feedN = 0; }
+  state.feedN = (state.feedN ?? 0) + 1;
+  save(state);
+  if ((state.feedN ?? 0) <= 3) recordDeed('feed'); // 아주 작은 선행 (하루 세 번까지)
+  const L = t();
+  toast((who === 'animal' ? L.feedAnimal : who === 'sinner' ? L.feedSinnerToast : L.feedMonsterToast).replace('{item}', it.name[lang()]));
+  if (document.querySelector('.bag-panel')) renderBag();
+  return true;
+}
 /** 방의 직원: 업종마다 할 수 있는 것 */
 function clerkTalk() {
   const info = world?.zone.interior;
@@ -1825,6 +1946,8 @@ function clerkTalk() {
   if (info.kind === 'home') { talkToYunae(); return; }
   if (info.kind === 'ysalon') { void talkToSalon(); return; } // 40차 유내 미용실
   if (info.kind === 'hpalace') { void palaceTalk(); return; } // 46차 천국 본청 접수 천사
+  if (info.kind === 'post') { void postTalk(); return; } // 52차 우체국 (답장 찾기)
+  if (info.kind === 'mall') { void mallGuide(info.mallFloor ?? 1); return; } // 52차 몰 안내원
   if (info.kind === 'airport') { void airportCounter(); return; } // 47차 항공사 카운터
   if (info.store === 'bank') { openBank(info.name); return; }
   if (info.store === 'furniture') { void openFurnStore(info.name); return; }
@@ -3310,7 +3433,7 @@ function pickItem(hell: boolean, start: ShopTab, heaven = false): Promise<{ it: 
         }
         return;
       }
-      if (heaven) { for (const it of ITEMS.filter((x) => x.cat === cat && x.store === 'yw')) list.appendChild(itemRow(it, priceText(it.price, false), () => done({ it, sell: false, tab: cat }), money < it.price)); return; } // 48차: 천국에서는 훔치지 않는다
+      if (heaven) { for (const it of ywToday(cat)) list.appendChild(itemRow(it, priceText(it.price, false), () => done({ it, sell: false, tab: cat }), money < it.price)); return; } // 48차: 천국에서는 훔치지 않는다
       const shelf = ITEMS.filter((x) => x.cat === cat && !x.store && !!x.hell === hell && onSale(x)); // 31차: 층 장비는 그 층에서만
       for (const it of shelf) list.appendChild(withSteal(itemRow(it, priceText(it.price, hell), () => done({ it, sell: false, tab: cat }), money < it.price), it, it.price, shelf.map((x) => ({ it: x, price: x.price })), () => done({ it, sell: false, tab: cat, steal: true })));
     };
@@ -3998,6 +4121,12 @@ const isGearItem = (it: ItemDef) => it.cat === 'weapon' || it.cat === 'armor' ||
 const USE_CD_MS = 1000;
 let useReadyAt = 0;
 const itemCooling = () => performance.now() < useReadyAt;
+/** 52차: 회복품마다 다음에 쓸 수 있기까지 — 비싼 것일수록 짧다 (현실 · 천국은 바트 값, 지옥은 노전 값 기준) */
+function itemCd(it: ItemDef): number {
+  const p = it.price ?? 0;
+  const [a, b, c] = it.hell ? [3, 8, 20] : [20, 50, 150];
+  return p <= a ? 4000 : p <= b ? 2500 : p <= c ? 1500 : USE_CD_MS * 0.8;
+}
 function useItem(k: string): boolean | 'wait' {
   const bag = state.bag ?? {};
   const it = itemByKey(k);
@@ -4005,7 +4134,9 @@ function useItem(k: string): boolean | 'wait' {
   if (crusading()) { toast(t().crusadeNoHeal); return false; } // 45차: 정벌 중엔 지옥·천국 회복품 모두 못 쓴다
   if (!worldOk(it)) { toast(t().otherWorldItem); return false; }
   if (itemCooling()) return 'wait';
-  useReadyAt = performance.now() + USE_CD_MS;
+  const cd = itemCd(it);
+  useReadyAt = performance.now() + cd;
+  quickBtn.style.setProperty('--cd', `${cd / 1000}s`);
   quickBtn.classList.remove('cd'); void quickBtn.offsetWidth; quickBtn.classList.add('cd');
   bag[k] -= 1;
   if (world && scene === 'world') world.heal(it.heal);
@@ -4109,6 +4240,22 @@ function renderBag() {
   const info = document.createElement('div');
   info.className = 'bag-info';
   info.hidden = true; // 23차: 화살·탄약은 장비 몸 그림의 칸과 공격 버튼 위에만 (같은 것을 두 번 보이지 않게)
+  // 52차: 등 칸(망토 · 외투 · 판초 · 담요)을 걸쳤으면 들판에 깔고 쉬기
+  { const bk = state.equip?.back, bi = bk ? itemByKey(bk) : null;
+    if (bi && bagTab === 'use' && worldOk(bi) && !broken(bk!)) {
+      const cb = document.createElement('button');
+      cb.className = 'bag-kerberos bag-camp';
+      cb.textContent = world?.camping ? L.campUp : L.campBtn.replace('{item}', bi.name[lang()]);
+      cb.onclick = () => {
+        if (!world || scene !== 'world') return;
+        if (world.camping) { world.campStop(); el.remove(); return; }
+        const r = world.campStart(campColor(bk!));
+        if (r === 'ok') { el.remove(); toast(L.campOn.replace('{item}', bi.name[lang()]), 'good'); }
+        else toast(r === 'fight' ? L.campFight : L.campHere);
+      };
+      info.hidden = false;
+      info.appendChild(cb);
+    } }
   // 19차 켈베로스 호출 (지옥 로비에서 사 온 것): 현실에서만 부를 수 있다
   if ((state.kerberos ?? 0) > 0 && bagTab === 'use') {
     const kb = document.createElement('button');
@@ -5568,7 +5715,21 @@ function openHellBank() {
       toast((dir === 1 ? L.hbankDone : L.hbankTook).replace('{n}', n.toLocaleString('en-US')), 'good');
       return true;
     },
-    extra: (box, close) => { const b = document.createElement('button'); b.className = 'b-ask'; b.textContent = L.hbankAskBtn; b.onclick = () => { close(); void hbankProtest(); }; box.appendChild(b); },
+    extra: (box, close) => {
+      const b = document.createElement('button'); b.className = 'b-ask'; b.textContent = L.hbankAskBtn; b.onclick = () => { close(); void hbankProtest(); }; box.appendChild(b);
+      // 52차 보관료 면제 증서: 석 달 동안 1%를 떼지 않는다 (값은 맡긴 돈의 2.5%, 적어도 300닢 — 은행은 결국 이긴다)
+      const fb = document.createElement('button'); fb.className = 'b-ask';
+      const price = () => Math.max(300, Math.ceil((h.bank ?? 0) * 0.025));
+      const drawF = () => { const until = h.feeFree ?? 0; fb.textContent = until > Date.now() ? L.hbankFreeHave.replace('{d}', new Date(until).toLocaleDateString(lang() === 'ko' ? 'ko-KR' : lang() === 'th' ? 'th-TH' : 'en-US')) : L.hbankFreeBuy.replace('{n}', price().toLocaleString('en-US')); fb.disabled = until > Date.now(); };
+      fb.onclick = () => {
+        const n = price();
+        if (Math.floor(h.notes) < n) { toast(L.hwNoMoney); return; }
+        h.notes -= n; h.feeFree = Math.max(Date.now(), h.feeFree ?? 0) + 3 * MONTH_MS;
+        ecoLog('spend', 'feefree', n, true);
+        save(state); updateHud(); drawF(); toast(L.hbankFreeDone, 'good');
+      };
+      drawF(); box.appendChild(fb);
+    },
   });
 }
 /** 50차: 은행원에게 묻고 따진다 → '보관료입니다' → 끝내 손을 대면 지옥의 사도 오르멧이 공간을 가르고 나와 단칼에 벤다 */
@@ -5590,6 +5751,25 @@ async function hbankProtest() {
   endTalk();
   await oremetScene();
 }
+/** 52차: 오르멧이 드물게 지옥 하늘을 가로지른다 (어느 층이든 — 복선). 지옥의 열두 사도 중 하나 · 서열 10위 · 빚진 것을 돌려받는 자 */
+let oremetNext = Date.now() + (params.has('oremet') ? 5e3 : (6 + Math.random() * 8) * 60e3);
+function oremetFlyBy() {
+  const el = document.createElement('div');
+  el.className = 'oremet-fly' + (Math.random() < 0.5 ? ' rev' : '');
+  el.style.top = `${8 + Math.random() * 22}%`;
+  el.innerHTML = oremetSvg();
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 7200);
+  const L = t();
+  setTimeout(() => { toast(L.oremetFly); world?.nearbySay(pick(L.oremetFlySay)); }, 1600);
+  try { sfx.thud(sfx.spot(0, -200)); } catch { /* 무시 */ }
+}
+setInterval(() => {
+  if (scene !== 'world' || document.hidden || !inHell() || !world || world.zone.interior || busy || dlg.isOpen) return;
+  if (Date.now() < oremetNext) return;
+  oremetNext = Date.now() + (8 + Math.random() * 10) * 60e3;
+  oremetFlyBy();
+}, 5000);
 /** 오르멧의 실루엣: 깃털이 겹겹인 검은 날개 둘 · 넓은 어깨 · 치켜든 검은 검 · 붉은 눈 */
 function oremetSvg() {
   const P = (x: number, y: number) => `${x.toFixed(1)} ${y.toFixed(1)}`;
@@ -5694,7 +5874,7 @@ function openLetter(realm: 'real' | 'heaven' | 'hell', place: string) {
         if (!body) return;
         send.disabled = true;
         const r = await net.sendLetter(realm, place, body, lang());
-        if (r === 'ok') { draft = ''; toast(realm === 'hell' ? L.letterSentHell : L.letterSent, 'good'); sfx.thud(sfx.spot(0, 0)); mode = 'sent'; draw(); return; }
+        if (r === 'ok') { draft = ''; void refreshLetters(); toast(realm === 'hell' ? L.letterSentHell : L.letterSent, 'good'); sfx.thud(sfx.spot(0, 0)); mode = 'sent'; draw(); return; }
         toast(r === 'wait' ? L.letterWait : L.letterFail);
         send.disabled = false;
       };
@@ -5713,7 +5893,7 @@ function openLetter(realm: 'real' | 'heaven' | 'hell', place: string) {
         const head = document.createElement('small'); head.textContent = `${new Date(l.at).toLocaleDateString(lang() === 'ko' ? 'ko-KR' : lang() === 'th' ? 'th-TH' : 'en-US')} · ${l.place || (l.realm === 'hell' ? L.letterPlaceHell : L.letterPlaceFaith)}`;
         const body = document.createElement('p'); body.textContent = l.body;
         card.append(head, body);
-        if (l.reply) { const r = document.createElement('p'); r.className = 'letter-reply'; r.textContent = l.reply; card.appendChild(r); }
+        if (l.reply) { const r = document.createElement('p'); r.className = 'letter-note'; r.textContent = L.letterReplyPost; card.appendChild(r); } // 52차: 답장은 우체국에서
         list.appendChild(card);
       }
     });
@@ -6641,13 +6821,15 @@ function settleBank(): string[] {
   }
   const due = (state.invest ?? []).filter((v) => Date.now() >= v.due);
   for (const v of due) {
-    // 반은 오르고(1~18%) 넷은 잃고(1~20%) 하나는 크게 흔들린다(±25~45%) — 기대는 거의 본전
-    const q = Math.random();
-    const pct = q < 0.5 ? 0.01 + Math.random() * 0.17 : q < 0.9 ? -(0.01 + Math.random() * 0.19) : (Math.random() < 0.5 ? 1 : -1) * (0.25 + Math.random() * 0.2);
+    // 52차: 상품마다 — 안정형(거의 늘 조금 오른다) · 균형형(반은 오르고 넷은 잃고 하나는 크게 흔들린다) · 고위험형(크게 벌거나 크게 잃는다, 드물게 대박)
+    const q = Math.random(), r = Math.random();
+    const pct = v.kind === 'safe' ? (q < 0.85 ? 0.005 + r * 0.025 : -(0.005 + r * 0.015))
+      : v.kind === 'risky' ? (q < 0.05 ? 1.5 + r : q < 0.42 ? 0.15 + r * 0.55 : -(0.25 + r * 0.55))
+      : q < 0.5 ? 0.01 + r * 0.17 : q < 0.9 ? -(0.01 + r * 0.19) : (Math.random() < 0.5 ? 1 : -1) * (0.25 + r * 0.2);
     const back = Math.max(0, Math.round(v.amt * (1 + pct)));
     state.bank = (state.bank ?? 0) + back;
     ecoLog(back >= v.amt ? 'earn' : 'spend', 'invest', Math.abs(back - v.amt));
-    out.push((back >= v.amt ? L.investUp : L.investDown).replace('{a}', moneyText(v.amt)).replace('{b}', moneyText(back)).replace('{p}', `${pct >= 0 ? '+' : ''}${(pct * 100).toFixed(1)}%`));
+    out.push((v.kind ? `[${L.investKinds[v.kind]}] ` : '') + (back >= v.amt ? L.investUp : L.investDown).replace('{a}', moneyText(v.amt)).replace('{b}', moneyText(back)).replace('{p}', `${pct >= 0 ? '+' : ''}${(pct * 100).toFixed(1)}%`));
   }
   if (due.length) state.invest = (state.invest ?? []).filter((v) => !due.includes(v));
   save(state);
@@ -6661,7 +6843,10 @@ function settleHellBank() {
   const k = Math.floor((Date.now() - h.bankAt) / MONTH_MS);
   if (k <= 0) return;
   const before = h.bank ?? 0;
-  h.bank = before * Math.pow(0.99, Math.min(k, 600));
+  // 52차 보관료 면제 증서: 증서가 덮는 달은 떼지 않는다
+  let free = 0;
+  for (let q = 0; q < Math.min(k, 600); q++) if ((h.feeFree ?? 0) > h.bankAt + (q + 1) * MONTH_MS - 1) free++;
+  h.bank = before * Math.pow(0.99, Math.min(k, 600) - free);
   h.bankAt += k * MONTH_MS;
   const fee = Math.floor(before) - Math.floor(h.bank);
   if (fee > 0) { h.feeSeen = (h.feeSeen ?? 0) + fee; ecoLog('spend', 'bankfee', fee, true); }
@@ -6723,18 +6908,26 @@ function bankPanel(cfg: BankUi) {
   for (const dv of qs) { const n = Math.max(1, Math.round(dv / u0)); const b = document.createElement('button'); b.textContent = `+${cfg.fmt(n)}`; b.onclick = () => setAmt(typed() + n); quick.appendChild(b); }
   { const b = document.createElement('button'); b.className = 'b-all'; b.textContent = L.bankAll; b.onclick = () => setAmt(maxFor()); quick.appendChild(b); }
   { const b = el.querySelector('.b-clear') as HTMLButtonElement; b.textContent = L.bankClear; b.onclick = () => { amt.value = ''; amt.focus(); }; }
+  // 52차 투자 상품 셋: 안정형 · 균형형 · 고위험형
+  let ik: 'safe' | 'mid' | 'risky' = 'mid';
+  const kinds = document.createElement('div'); kinds.className = 'inv-kinds';
+  const kBtn: Record<string, HTMLButtonElement> = {};
+  for (const k of ['safe', 'mid', 'risky'] as const) { const b = document.createElement('button'); b.textContent = L.investKinds[k]; b.onclick = () => { ik = k; draw(); }; kinds.appendChild(b); kBtn[k] = b; }
+  inv.before(kinds);
   const draw = () => {
     for (const [k, b] of Object.entries(tabBtn)) b.classList.toggle('on', k === tab);
+    kinds.hidden = tab !== 'inv';
+    for (const [k, b] of Object.entries(kBtn)) b.classList.toggle('on', k === ik);
     el.querySelector('.b-wallet')!.textContent = cfg.fmt(cfg.hand());
     el.querySelector('.b-bank')!.textContent = cfg.fmt(cfg.book());
     go.textContent = tab === 'in' ? L.bankTabIn : tab === 'out' ? L.bankTabOut : L.investGo;
-    note.textContent = tab === 'inv' ? L.investLine.replace('{m}', moneyText(INVEST_MIN)).replace('{k}', String(INVEST_MAX_N)) : cfg.note;
+    note.textContent = tab === 'inv' ? `${L.investKindNote[ik]} · ${L.investLine.replace('{m}', moneyText(INVEST_MIN)).replace('{k}', String(INVEST_MAX_N))}` : cfg.note;
     inv.innerHTML = '';
     inv.hidden = tab !== 'inv' || !(state.invest ?? []).length;
     if (tab === 'inv') for (const v of state.invest ?? []) {
       const r = document.createElement('div'); r.className = 'bank-row inv-row';
       const d = new Date(v.due);
-      const a = document.createElement('span'); a.textContent = L.investHeld.replace('{d}', `${d.getMonth() + 1}/${d.getDate()}`);
+      const a = document.createElement('span'); a.textContent = `${L.investKinds[v.kind ?? 'mid']} · ` + L.investHeld.replace('{d}', `${d.getMonth() + 1}/${d.getDate()}`);
       const b = document.createElement('b'); b.textContent = cfg.fmt(v.amt);
       r.append(a, b); inv.appendChild(r);
     }
@@ -6747,7 +6940,7 @@ function bankPanel(cfg: BankUi) {
       if ((state.invest ?? []).length >= INVEST_MAX_N) { toast(L.investFull.replace('{k}', String(INVEST_MAX_N))); return; }
       if (n > Math.floor(state.wallet ?? 0)) { toast(L.noMoney); return; }
       state.wallet = (state.wallet ?? 0) - n;
-      (state.invest ??= []).push({ amt: n, at: Date.now(), due: Date.now() + MONTH_MS });
+      (state.invest ??= []).push({ amt: n, at: Date.now(), due: Date.now() + MONTH_MS, kind: ik });
       ecoLog('spend', 'investIn', n);
       toast(L.investDone.replace('{n}', moneyText(n)), 'good');
     } else if (!cfg.move(tab === 'in' ? 1 : -1, n)) return;

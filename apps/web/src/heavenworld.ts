@@ -116,7 +116,7 @@ export function heavenZone(): Zone {
   buildings.push({ i0: 61, j0: 77, w: 11, d: 10, h: 130, cat: 'sanct', att: 'mosque', sign: 'left', color: '#ffffff', pois: [P('place_of_worship', '새벽빛 모스크', 'มัสยิดรุ่งอรุณ', 'Mosque of Dawn', 'mosque')] });
   // 52차 천국 우체국 (성소 앞길 동쪽 끝): 기원 편지의 답장은 현실 · 천국의 우체국에서만 받는다
   const post = buildings.length;
-  buildings.push({ i0: 76, j0: 80, w: 7, d: 7, h: 110, cat: 'post' as Building['cat'], sign: 'left', color: '#ffffff', pois: [P('post_office', '구름 우체국', 'ไปรษณีย์เมฆ', 'Cloud Post Office')] });
+  buildings.push({ i0: 76, j0: 80, w: 7, d: 7, h: 110, cat: 'post' as Building['cat'], att: 'heaven', sign: 'left', color: '#ffffff', pois: [P('post_office', '구름 우체국', 'ไปรษณีย์เมฆ', 'Cloud Post Office')] });
   // 소품
   const props: Prop[] = [];
   const prop = (i: number, j: number, kind: string, o = 0) => { if (tiles[j * W + i] !== TI.water && tiles[j * W + i] !== TI.void) props.push({ i, j, kind: kind as Prop['kind'], o }); };

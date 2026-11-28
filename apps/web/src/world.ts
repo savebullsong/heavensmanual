@@ -206,6 +206,11 @@ interface Walker {
   cloak?: boolean;
   /** 49차: 은행 경비원 */
   bankGuard?: boolean;
+  /** 52차: 베스크의 빚을 알고 이승까지 쫓아온 수금원 · 거니는 염소대왕이 업 비율을 말했나 */
+  besk?: boolean;
+  /** 52차 지옥 괴물의 새 휘두르기 자세: 크게 젖혔다가(뒤로 기울며 물러섬) 몸을 실어 내리친다 */
+  lunge?: { t: number; dur: number; hit: number; ux: number; uy: number };
+  karmaSaid?: boolean;
   mdef?: MonsterDef; // 지옥 괴물
   gdef?: GuardDef; // 휴식 마을 경비병
   post?: number; // 경비병 번호 (순찰로)
@@ -329,6 +334,8 @@ export interface MobOut {
   hit(id: number, dmg: number, crit: boolean, kind: string): void;
   strike(to: string, id: number, dmg: number, crit: boolean, kind: string): void;
   kill(id: number, by: string): void;
+  /** 52차: 방장 → 손님 — 몹의 말풍선 · 필드 보스 예고(땅의 붉은 표식) · 소매치기 */
+  event?(ev: Record<string, unknown>): void;
 }
 
 /** main.ts 가 받는 일들 */
@@ -350,6 +357,8 @@ export interface WorldHooks {
   hutDoor(which: 'mine' | 'twins'): void; // 46차 구름 위 오두막 문 앞
   /** 52차 천국의 지붕 빌딩: 번호표 기계 앞 · 창구 앞 · 배식대 앞에 섰을 때 */
   palaceSpot(kind: 'ticket' | 'counter' | 'buffet'): void;
+  /** 52차 실내 몰: 가게 앞(0 · 1 · 2) · 에스컬레이터 앞에 섰을 때 */
+  mallSpot(kind: number | 'esc'): void;
   twinsTalk(): void; // 46차 쌍둥이와 이야기
   /** 31차 필드 보스: 이 구역에 나와 있어야 할 보스 (자리·체력이 있으면 그대로) */
   fieldBoss(zoneId: string): { key: string; i?: number; j?: number; hp?: number }[];
@@ -445,6 +454,12 @@ export interface WorldHooks {
   feedGurma(): { gave: number; total: number; full: boolean };
   /** 가방에 먹을 것이 있는가 (구르마가 덤비지 않고 조른다) */
   hasFood(): boolean;
+  /** 52차: 천국 음식을 갖고 있나 · 먹이를 줬다 (동물 · 우리 안의 인간 · 괴물) — 하나 줄이고 true */
+  hasHeavenFood(): boolean;
+  /** 52차: 베스크에게 진 빚 (노전) · 악행 비율(%) */
+  beskDebt(): number;
+  karmaPct(): number;
+  fed(who: 'animal' | 'sinner' | 'monster'): boolean;
 }
 export interface Gear { /** 50차 등 칸: 위험 지형 피해를 줄이는 비율 · 괴물이 알아채는 거리를 줄이는 비율 */ hazard?: number; quiet?: number; /** 44차 시위에 건 화살의 효과 */ arrowFx?: 'pierce' | 'fire' | 'slow' | 'drain'; atk: number; def: number; dr?: number; /** 42차: 강화 3단계마다 공격 간격이 짧아진다 (0.98 · 0.96 …) */ haste?: number; ranged: boolean; /** 31차: 쏘는 무기인데 화살·탄약·연료가 없다 (휘둘러 치지 않는다) */ dry?: boolean; flame?: boolean; range?: number; rate?: number; /** 35차: 채찍·창 — 근접인데 이만큼 떨어져서 때린다 */ reach?: number; weapon: string | null; armor: string[] }
 
@@ -697,6 +712,8 @@ export class WorldScene {
   private door = new Graphics();
   private doorFor: number | null = null; // 아이콘이 떠 있는 건물 (-1 = 우주새)
   private doorAt = { x: 0, y: 0 };
+  private doorBase = { x: 0, y: 0 }; // 52차: 문이 있는 면의 밑동 (방향키로 밀어 들어가기)
+  private keyPush = 0;
   private talkIcon = new Graphics();
   private fronts = new Map<number, [number, number] | null>();
   // 길게 누르기 (0.25초) = 무조건 이동, 누른 채 움직이면 목적지가 따라온다
@@ -1634,7 +1651,7 @@ export class WorldScene {
    * 나보다 조금 빨라 쫓기 어렵지만, 때려 눕히면 훔친 돈이 고스란히 떨어진다. 18초쯤 달아나다 멀어지면 사라진다
    */
   private thinkPickpocket(w: Walker, dt: number) {
-    const p = this.player;
+    const p = this.netRole === 'host' ? this.nearestBody(w) : this.player; // 52차: 방장의 소매치기는 손님도 노린다
     const pick = (a: string[]) => a[Math.floor(Math.random() * a.length)];
     const d = Math.hypot(p.x - w.x, p.y - w.y);
     const hidden = !!this.working?.on || this.invisible;
@@ -1656,6 +1673,13 @@ export class WorldScene {
       if (hidden || d > 12 || w.stalk > 25) { w.stalk = 0; w.aggroCool = 25; w.path = []; return; }
       if (d < 0.95) {
         w.stalk = 0; w.path = [];
+        if (p.kind === 'remote' && p.rid) { // 손님의 지갑은 손님 기기가 센다
+          w.nid ??= ++this.nidSeq;
+          this.mobOut?.event?.({ e: 'pick', id: w.nid, to: p.rid, p: 0.04 + Math.random() * 0.05 });
+          w.pick = { stolen: w.pick?.stolen ?? 0, flee: 14 };
+          this.bubble(w, pick(this.gangText('pickpocket', 'Demand') as string[]));
+          return;
+        }
         const wallet = this.hooks.cash();
         const want = Math.min(900, Math.max(wallet > 20 ? 8 : 0, Math.round(wallet * (0.04 + Math.random() * 0.05))));
         const got = want > 0 ? this.hooks.stolen(want) : 0;
@@ -2102,6 +2126,55 @@ export class WorldScene {
   /** 48차: 연락이 와도 되는 한가한 때 — 싸움 · 쓰러짐 · 타는 중 · 날아가는 몸이 없을 때 */
   get calm() { const p = this.player; return !this.dead && p.down <= 0 && !p.target && !p.act && this.attackersOnMe() === 0 && !this.riding && !this.walkers.some((w) => w.target === p && w.down <= 0); }
   /** 48차: 한 시간에 한 번 황색날개가 날아와 곁에 내린다 (따라다니던 중이면 그 자리에서) */
+  /** 52차 등 칸 쉬기: 망토 · 판초 · 담요를 땅에 깔고 앉는다 — 피가 더 빨리 찬다 (움직이거나 싸움이 붙으면 일어난다) */
+  private camp: { g: Graphics } | null = null;
+  campStart(color: number): 'ok' | 'fight' | 'here' {
+    if (this.zone.interior || this.dead || this.riding || this.seat) return 'here';
+    if (this.combatT < OUT_OF_COMBAT_S || this.hzKind) return 'fight';
+    const p = this.player;
+    const g = new Graphics();
+    const c2 = (color & 0xfefefe) >> 1;
+    g.poly([-30, 2, 0, -13, 30, 2, 0, 17]).fill(color).stroke({ color: c2, width: 1.5 });
+    g.poly([-22, 2, 0, -9, 22, 2, 0, 13]).stroke({ color: 0xffffff, width: 1, alpha: 0.25 });
+    for (let k = -2; k <= 2; k++) g.moveTo(-26 + (k + 2) * 2, 2 + k * 3).lineTo(-24 + (k + 2) * 2, 4 + k * 3).stroke({ color: c2, width: 1 });
+    const [x, y] = iso(p.x, p.y);
+    g.position.set(x, y + 2); g.zIndex = p.x + p.y - 0.6; g.eventMode = 'none';
+    this.objects.addChild(g);
+    this.camp = { g };
+    this.seatPlayer({ i: Math.floor(p.x), j: Math.floor(p.y), pose: 'sit', dir: p.dir });
+    return 'ok';
+  }
+  campStop() {
+    if (!this.camp) return;
+    this.camp.g.destroy(); this.camp = null;
+    this.seatPlayer(null);
+  }
+  get camping() { return !!this.camp; }
+  /** 52차: 기원에 답이 달린 시설 — 제단(없으면 직원) 곁에 촛불 하나 */
+  lightCandle() {
+    const info = this.zone.interior;
+    if (!info || this.candle) return;
+    const f = info.furn.find((x) => ['altar', 'mihrab', 'lampstand', 'candle', 'counter', 'teller'].includes(x.kind));
+    const at = f ? { i: f.i + f.w + 0.3, j: f.j + f.d - 0.3, z: Math.min(f.h, 30) } : info.clerk ? { i: info.clerk.i + 1.2, j: info.clerk.j + 0.6, z: 0 } : null;
+    if (!at) return;
+    const c = new Container(); c.eventMode = 'none';
+    const g = new Graphics();
+    g.rect(-2.5, -14, 5, 14).fill(0xfbf6ea); g.rect(-2.5, -14, 5, 2).fill(0xe8e0cc); g.rect(-0.5, -17, 1, 3).fill(0x3a2a1a);
+    g.ellipse(0, -21, 2.6, 4.6).fill(0xffd36a); g.ellipse(0, -20, 1.2, 2.4).fill(0xffffff);
+    const glow = new Sprite(this.glowTex()); glow.anchor.set(0.5); glow.tint = 0xffc860; glow.blendMode = 'add'; glow.alpha = 0.55; glow.scale.set(0.7); glow.position.set(0, -20);
+    c.addChild(glow, g);
+    const [x, y] = iso(at.i, at.j);
+    c.position.set(x, y - at.z); c.zIndex = at.i + at.j + 0.6;
+    this.objects.addChild(c);
+    this.candle = { c, glow, t: 0 };
+  }
+  private candle: { c: Container; glow: Sprite; t: number } | null = null;
+  /** 52차: 곁의 영혼 하나가 한마디 (오르멧이 하늘을 지날 때 등) */
+  nearbySay(text: string) {
+    const p = this.player;
+    const w = this.walkers.filter((x) => !x.isPlayer && (x.kind === 'soul' || x.kind === 'passer' || x.kind === 'vendor') && x.down <= 0 && !x.bubble).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
+    if (w && Math.hypot(w.x - p.x, w.y - p.y) < 12) this.bubble(w, text);
+  }
   /** 52차 휴대전화: 그 사람이 곁에 있나 (전화할 필요가 없다) */
   nearKind(kind: 'noeul' | 'yellowwing', r: number) {
     const w = this.walkers.find((x) => x.kind === kind);
@@ -2848,6 +2921,22 @@ export class WorldScene {
     c.s.zIndex = c.x + c.y + 0.49;
   }
   // ───── 46차 천국 동물원: 우리 안을 천천히 걷다 서다 한다 (가는 쪽을 바라본다 · 걸을 때 살짝 들썩) ─────
+  /** 52차 먹이 주기: 우리 안의 인간은 고마워 울고, 괴물은 먹고 나서 천사나 인간을 달라고 한다 */
+  private feedCaged(w: Walker) {
+    const human = w.cage?.kind === 'sinner';
+    if (!this.hooks.fed(human ? 'sinner' : 'monster')) return;
+    const L = t();
+    w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir);
+    const pool = human ? L.feedSinner : L.feedMonster;
+    this.bubble(w, pool[Math.floor(Math.random() * pool.length)]);
+    if (human) for (let k = 0; k < 6; k++) { const [sx, sy] = iso(w.x, w.y); this.sparks.push({ x: sx + (Math.random() - 0.5) * 8, y: sy - 40, vx: (Math.random() - 0.5) * 10, vy: 20 + Math.random() * 20, t: 0.7, col: 0x8ad0ff }); }
+  }
+  /** 52차: 우리 안 동물을 눌렀나 (먹이 주기) */
+  private zooAnimalAt(gx: number, gy: number) {
+    const { wx, wy } = this.toWorld(gx, gy);
+    for (const a of this.zooAnimals) { if (a.s.destroyed) continue; const b = a.s.getBounds(); const lx = (gx - b.x), ly = (gy - b.y); if (lx >= 0 && ly >= 0 && lx <= b.width && ly <= b.height) return a; void wx; void wy; }
+    return null;
+  }
   private zooAnimals: { s: Sprite; x: number; y: number; tx: number; ty: number; wait: number; pen: [number, number]; sp: number; ph: number; frames?: Texture[]; rest: boolean }[] = [];
   private updateZoo(dt: number) {
     for (const a of this.zooAnimals) {
@@ -3012,6 +3101,14 @@ export class WorldScene {
       this.gkVisitT = 900 + Math.random() * 900; // 한참 뒤 또
       return;
     }
+    if (d < 4 && !w.karmaSaid && !w.bubble) { // 52차: 마주친 영혼에게 업 비율 한마디 (한 번)
+      w.karmaSaid = true;
+      const pct = Math.round(this.hooks.karmaPct()), L = t();
+      const pool = L.gkWalkKarma[pct < 20 ? 0 : pct < 50 ? 1 : pct < 80 ? 2 : 3];
+      w.dir = dirFromTile(p.x - w.x, p.y - w.y, w.dir);
+      this.bubble(w, pool[Math.floor(Math.random() * pool.length)].replace('{p}', String(pct)));
+      if (w.bubble) w.bubbleT = 4.5;
+    }
     if (d < 6 && !w.bubble && Math.random() < dt * 0.05) { const c = t().gkWalkIdle; this.bubble(w, c[Math.floor(Math.random() * c.length)]); }
     if (d < 2.2 && !moving) { w.dir = dirFromTile(p.x - w.x, p.y - w.y, w.dir); return; }
     w.wait -= dt;
@@ -3145,17 +3242,25 @@ export class WorldScene {
     const inside = (x: number, y: number, r: number) => Math.hypot(p.x - x, p.y - y) <= r;
     w.path = [];
     const L = t();
+    // 52차: 방장의 필드 보스 예고를 손님도 본다 — 표식이 떨어지는 때 손님 기기가 제 몸이 그 안에 있는지 본다
+    const share = (rings: [number, number, number][], dur: number, mult: number, line?: [number, number, number, number]) => {
+      if (this.netRole !== 'host' || !this.mobOut?.event) return;
+      w.nid ??= ++this.nidSeq;
+      this.mobOut.event({ e: 'warn', id: w.nid, r: rings.map(([x, y, r]) => [Math.round(x * 100), Math.round(y * 100), Math.round(r * 100)]), d: dur, c: col, l: line?.map((v) => Math.round(v * 100)), dmg: mult > 0 ? Math.round(rand(def.dmg[0], def.dmg[1]) * mult * FB_HIT) : 0 });
+    };
     const shoutKey = w.fb ?? w.mdef?.key ?? '';
     const shouts = (w.fb ? (L.fbShout as Record<string, string[]>)[shoutKey] : (L.bossShout as Record<string, string[]>)[shoutKey]) ?? null;
     if (shouts?.length) this.bubble(w, shouts[def.patterns.indexOf(pat)] ?? shouts[0]);
     if (pat === 'ring') {
       const cx = w.x, cy = w.y;
       this.fbMark((g) => this.fbRing(g, cx, cy, 3.2, col), 1.25, () => { if (inside(cx, cy, 3.2)) this.fbHitPlayer(w, 1.2); this.burst(cx, cy, col, 22); });
+      share([[cx, cy, 3.2]], 1.25, 1.2);
     } else if (pat === 'charge') {
       const dx = p.x - w.x, dy = p.y - w.y, d = Math.hypot(dx, dy) || 1;
       let tx = w.x, ty = w.y;
       for (let k = 1; k <= 16; k++) { const nx = w.x + (dx / d) * k * 0.5, ny = w.y + (dy / d) * k * 0.5; if (!walkable(this.zone, Math.floor(nx), Math.floor(ny))) break; tx = nx; ty = ny; }
       const fx = w.x, fy = w.y;
+      share([], 1.1, 1.35, [fx, fy, tx, ty]);
       this.fbMark((g) => {
         const nx = -dy / d * 0.6, ny = dx / d * 0.6;
         const pts = [iso(fx + nx, fy + ny), iso(tx + nx, ty + ny), iso(tx - nx, ty - ny), iso(fx - nx, fy - ny)];
@@ -3169,6 +3274,7 @@ export class WorldScene {
       });
     } else if (pat === 'pull') {
       const cx = w.x, cy = w.y;
+      share([[cx, cy, 6.5]], 1.3, 0.6);
       this.fbMark((g) => this.fbRing(g, cx, cy, 6.5, col), 1.3, () => {
         if (!inside(cx, cy, 6.5)) return;
         // 보스 쪽으로 끌려간다 (막히면 그 자리에서 멈춘다)
@@ -3179,6 +3285,7 @@ export class WorldScene {
       });
     } else if (pat === 'leap') {
       const tx = p.x, ty = p.y;
+      share([[tx, ty, 2.2]], 1.15, 1.25);
       this.fbMark((g) => this.fbRing(g, tx, ty, 2.2, col), 1.15, () => {
         if (walkable(this.zone, Math.floor(tx), Math.floor(ty))) { w.x = tx; w.y = ty; w.path = []; }
         if (inside(tx, ty, 2.2)) { this.fbHitPlayer(w, 1.25); p.slowT = 3; }
@@ -3188,6 +3295,7 @@ export class WorldScene {
       const spots: [number, number][] = [[p.x, p.y]];
       for (let k = 0; k < (pat === 'coins' ? 5 : 3); k++) spots.push([p.x + (Math.random() - 0.5) * 6, p.y + (Math.random() - 0.5) * 6]);
       const r = pat === 'coins' ? 1.0 : 1.2;
+      share(spots.map(([x, y]) => [x, y, r]), pat === 'coins' ? 1.3 : 1.15, pat === 'coins' ? 0.9 : 1.15);
       this.fbMark((g) => { for (const [x, y] of spots) this.fbRing(g, x, y, r, col); }, pat === 'coins' ? 1.3 : 1.15, () => {
         if (spots.some(([x, y]) => inside(x, y, r))) this.fbHitPlayer(w, pat === 'coins' ? 0.9 : 1.15);
         for (const [x, y] of spots) this.burst(x, y, col, 8);
@@ -3198,6 +3306,7 @@ export class WorldScene {
       const n = Math.max(0, Math.min(3, 6 - live));
       const spots: [number, number][] = [];
       for (let k = 0; k < n; k++) { const to = randomWalkTileNear(this.zone, Math.floor(w.x), Math.floor(w.y), 3, ['lot', 'walk', 'soi', 'park']); if (to) spots.push(to); }
+      share(spots.map(([x, y]) => [x + 0.5, y + 0.5, 0.7]), 1.0, 0);
       this.fbMark((g) => { for (const [x, y] of spots) this.fbRing(g, x + 0.5, y + 0.5, 0.7, col); }, 1.0, () => {
         const m = MONSTERS[w.mdef?.key === 'ashgal' ? 'ashen' : floorDef(this.zone.hell?.floor ?? 1).monsters[0]];
         for (const [x, y] of spots) {
@@ -3215,17 +3324,59 @@ export class WorldScene {
       for (let k = 0; k < 6; k++) spots.push([p.x + (Math.random() - 0.5) * 7, p.y + (Math.random() - 0.5) * 7]);
       spots.forEach(([x, y], k) => {
         this.fbMark((g) => this.fbRing(g, x, y, 1.1, col), 1.0 + k * 0.18, () => { if (inside(x, y, 1.1)) this.fbHitPlayer(w, 0.7); this.burst(x, y, col, 10); });
+        share([[x, y, 1.1]], 1.0 + k * 0.18, 0.7);
       });
     } else if (pat === 'slam') {
       const d = Math.hypot(p.x - w.x, p.y - w.y) || 1;
       const cx = w.x + ((p.x - w.x) / d) * Math.min(1.6, d), cy = w.y + ((p.y - w.y) / d) * Math.min(1.6, d);
       this.fbMark((g) => this.fbRing(g, cx, cy, 2.3, col), 0.95, () => { if (inside(cx, cy, 2.3)) this.fbHitPlayer(w, 1.4); this.burst(cx, cy, col, 18); });
+      share([[cx, cy, 2.3]], 0.95, 1.4);
     }
   }
   /** 불티·먼지 */
   private burst(x: number, y: number, col: number, n: number) {
     const [bx, by] = iso(x, y);
     for (let k = 0; k < n; k++) { const a = Math.random() * Math.PI * 2, v = 60 * (0.4 + Math.random()); this.sparks.push({ x: bx, y: by - 6, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.6 - 30, t: 0.35, col }); }
+  }
+  /** 52차: 손님 기기는 방장이 나눠 준 예고 표식만 센다 */
+  private tickFbWarns(dt: number) {
+    for (let k = this.fbWarns.length - 1; k >= 0; k--) {
+      const m = this.fbWarns[k];
+      m.t += dt;
+      m.g.alpha = 0.15 + 0.85 * Math.min(1, m.t / m.dur) * (0.75 + 0.25 * Math.sin(this.time * 18));
+      if (m.t >= m.dur) { m.g.destroy(); this.fbWarns.splice(k, 1); if (!this.dead) m.fire(); }
+    }
+  }
+  /** 52차 손님: 방장이 보낸 일 — 몹의 말풍선 · 필드 보스 예고 · 소매치기 */
+  mobEvent(host: string, ev: Record<string, unknown>) {
+    if (this.netRole !== 'guest' || host !== this.netHost) return;
+    const id = Number(ev.id) || 0;
+    const m = this.mirrors.get(id);
+    if (ev.e === 'say' && m && typeof ev.s === 'string') { if (this.showBubbles) { m.bubble?.destroy(); m.bubble = new Text({ text: ev.s.slice(0, 120), style: { fontFamily: 'system-ui, sans-serif', fontSize: 12, fontWeight: '700', fill: '#fff6d8', stroke: { color: '#1a1410', width: 3 } } }); m.bubble.anchor.set(0.5, 1); m.bubble.zIndex = 1e6 - 2; this.objects.addChild(m.bubble); m.bubbleT = Math.min(4.2, 1.6 + Math.max(0, ev.s.length - 12) * 0.07); } return; }
+    if (ev.e === 'pick' && ev.to === this.myNetId) {
+      const pct = Math.max(0.01, Math.min(0.12, Number(ev.p) || 0.05));
+      const wallet = this.hooks.cash();
+      const want = Math.min(900, Math.max(wallet > 20 ? 8 : 0, Math.round(wallet * pct)));
+      const got = want > 0 ? this.hooks.stolen(want) : 0;
+      if (got > 0) this.float(this.player, `−${moneyText(got)}`, '#ff8a6a');
+      return;
+    }
+    if (ev.e === 'warn') {
+      const rings = (Array.isArray(ev.r) ? ev.r : []).map((r) => (Array.isArray(r) ? [Number(r[0]) / 100, Number(r[1]) / 100, Number(r[2]) / 100] : null)).filter(Boolean) as [number, number, number][];
+      const line = Array.isArray(ev.l) && ev.l.length === 4 ? (ev.l as number[]).map((v) => Number(v) / 100) : null;
+      const col = Number(ev.c) || 0xff4a2a, dur = Math.max(0.3, Math.min(3, Number(ev.d) || 1)), dmg = Math.max(0, Math.min(400, Number(ev.dmg) || 0));
+      this.fbMark((g) => {
+        for (const [x, y, r] of rings) this.fbRing(g, x, y, r, col);
+        if (line) { const [fx, fy, tx, ty] = line, d = Math.hypot(tx - fx, ty - fy) || 1, nx = -(ty - fy) / d * 0.6, ny = (tx - fx) / d * 0.6; const pts = [iso(fx + nx, fy + ny), iso(tx + nx, ty + ny), iso(tx - nx, ty - ny), iso(fx - nx, fy - ny)]; g.poly(pts.flat()).fill({ color: col, alpha: 0.3 }).stroke({ color: col, width: 2, alpha: 0.9 }); }
+      }, dur, () => {
+        if (!dmg) return;
+        const p = this.player;
+        let hitMe = rings.some(([x, y, r]) => Math.hypot(p.x - x, p.y - y) <= r);
+        if (!hitMe && line) { const [fx, fy, tx, ty] = line, ux = tx - fx, uy = ty - fy, L2 = ux * ux + uy * uy || 1, s0 = Math.max(0, Math.min(1, ((p.x - fx) * ux + (p.y - fy) * uy) / L2)); hitMe = Math.hypot(p.x - (fx + ux * s0), p.y - (fy + uy * s0)) <= 1.0; }
+        for (const [x, y] of rings) this.burst(x, y, col, 10);
+        if (hitMe) this.mobStrikeIn(id, dmg, false, 'blunt');
+      });
+    }
   }
   private updateFieldBosses(dt: number) {
     for (let k = this.fbWarns.length - 1; k >= 0; k--) {
@@ -4002,6 +4153,20 @@ export class WorldScene {
     }
     return false;
   }
+  private mallAt = '';
+  private updateMall() {
+    const p = this.player;
+    let key = '';
+    if (!p.path.length) {
+      const pi = Math.floor(p.x), pj = Math.floor(p.y);
+      if (pj === 2 && pi >= 3 && pi <= 8) key = '0';
+      else if (pj === 2 && pi >= 13 && pi <= 18) key = '1';
+      else if (pi === 2 && pj >= 5 && pj <= 10) key = '2';
+      else if (pi >= 10 && pi <= 14 && pj >= 6 && pj <= 10) key = 'esc';
+    }
+    if (key && key !== this.mallAt) this.hooks.mallSpot(key === 'esc' ? 'esc' : Number(key));
+    this.mallAt = key;
+  }
   private bedAt = '';
   private checkBed() {
     const info = this.zone.interior;
@@ -4130,7 +4295,8 @@ export class WorldScene {
       this.spawnTwins();
     } else     if (info.kind === 'goatroom' && info.clerk) { this.setupGoatFx(this.placeGoatKing(info.clerk.i, info.clerk.j)); this.placeChanger(13, 2); } // 32차: 뒤 모서리 흑요석 단 한가운데의 옥좌 · 33차: 오른쪽 벽가 환전 탁자 뒤의 환전상
     else if (info.clerk) {
-      const w = this.makeWalker(this.grandpa ? grandpaLook(info.kind === 'rebirth') : info.kind === 'home' ? yunaeLook((info.age ?? 1) as 0 | 1 | 2) : clerkLook(info.kind, info.from.b), info.clerk.i, info.clerk.j, 'clerk');
+      const w = this.makeWalker(this.grandpa ? grandpaLook(info.kind === 'rebirth') : info.kind === 'home' ? yunaeLook((info.age ?? 1) as 0 | 1 | 2) : info.heaven ? this.npcLook('angel') : clerkLook(info.kind, info.from.b), info.clerk.i, info.clerk.j, 'clerk');
+      if (info.heaven) this.giveWings(w, 0xf4efe4); // 52차 천국 우체국의 천사
       w.dir = 'sw';
       w.wait = 1e9;
       this.walkers.push(w);
@@ -4146,7 +4312,16 @@ export class WorldScene {
         if (info.age === 1) w.dir = 'w';
         w.murmur = info.age;
       }
-      if (info.kind === 'shore') { this.dotArt(w, 'sprite-bulda'); w.dir = 'se'; }
+      if (info.kind === 'mall') { // 52차: 몰을 거니는 손님들
+      for (let k = 0; k < 7; k++) {
+        const s0 = randomWalkTileNear(this.zone, 12, 9, 9, ['walk']);
+        if (!s0) continue;
+        const a = this.makeWalker(this.npcLook('passer'), s0[0], s0[1], 'passer');
+        a.wait = 1 + Math.random() * 4; a.speed = 0.55; a.patrol = [2, 3, this.zone.W - 3, this.zone.H - 3]; a.maxHp = a.hp = 99999;
+        this.walkers.push(a);
+      }
+    }
+    if (info.kind === 'shore') { this.dotArt(w, 'sprite-bulda'); w.dir = 'se'; }
       if (info.kind === 'terrace' && !this.grandpa) this.giveWings(w, 0xf4efe4); // 루엔의 흰 날개
       if (this.grandpa) this.wearGlasses(w);
     }
@@ -4279,6 +4454,16 @@ export class WorldScene {
       const gd = this.makeWalker({ sex: 'm', build: 1, skin: info.from.b % 3, hair: 0, hairColor: 0, top: 0, bottom: 0, outfit: 'casual', cols: { 3: '#2a3a5a', 4: '#1e2a40', 5: '#101010' } }, gx, gy, 'soul', null, ['cap']);
       gd.dir = 'ne'; gd.wait = 1e9; gd.speed = 0; gd.maxHp = gd.hp = 99999; gd.bankGuard = true;
       this.walkers.push(gd);
+      // 52차: 창구 직원 셋(가운데는 말을 거는 직원) · 옆 창구 앞 손님 · 줄 선 손님들
+      const mid = Math.floor(this.zone.W / 2), L = t();
+      const stand = (w: Walker, d: Dir) => { w.dir = d; w.wait = 1e9; w.speed = 0; w.maxHp = w.hp = 99999; this.walkers.push(w); return w; };
+      for (const [k, di] of [[1, -3], [2, 3]] as const) {
+        const ti = mid + di;
+        if (walkable(this.zone, ti, 2)) { const tw = stand(this.makeWalker(clerkLook('bank', info.from.b + k * 7), ti, 2, 'soul'), 'sw'); tw.mut = 'bteller'; tw.title = L.bankTeller; }
+        if (walkable(this.zone, ti, 4)) { const cw = stand(this.makeWalker(this.npcLook('passer'), ti, 4, 'soul'), 'ne'); cw.mut = 'bcust'; cw.title = L.bankCustomer; }
+      }
+      for (let q = 0; q < 3; q++) { const qi = 5, qj = 5 + q; if (walkable(this.zone, qi, qj) && !(qi === info.exit.i && qj === info.exit.j)) { const cw = stand(this.makeWalker(this.npcLook('passer'), qi, qj, 'soul'), 'ne'); cw.mut = 'bcust'; cw.title = L.bankCustomer; } }
+      this.dealLines();
     }
     if (chaser) this.chaserDue = { t: 2.5, ...chaser };
   }
@@ -4286,6 +4471,7 @@ export class WorldScene {
   /** 방: 쫓아오던 대식자가 문으로 들어온다 (쉬는 곳이면 문턱에서 멈췄다가 돌아간다) · 나가는 매트 */
   private updateInterior(dt: number) {
     const info = this.zone.interior!;
+    if (this.candle) { const cd = this.candle; cd.t += dt; cd.glow.alpha = 0.45 + Math.sin(cd.t * 7) * 0.08 + Math.sin(cd.t * 13.3) * 0.05; cd.glow.scale.set(0.68 + Math.sin(cd.t * 5.1) * 0.04); }
     const p = this.player;
     const ch = this.chaserDue;
     if (ch) {
@@ -5127,6 +5313,63 @@ export class WorldScene {
       this.walkers.push(k);
     }
   }
+  /** 52차: 지옥에서 베스크에게 빚을 졌으면 — 이승까지 장부를 들고 쫓아오는 수금원 (몇 분마다) */
+  private beskT = 150 + Math.random() * 150;
+  private updateBeskCollector(dt: number) {
+    if (this.realm !== 'real' || this.zone.interior || this.netRole === 'guest' || this.dead) return;
+    if ((this.beskT -= dt) > 0) return;
+    this.beskT = 260 + Math.random() * 260;
+    if (this.hooks.beskDebt() <= 0 || this.walkers.some((w) => w.besk && w.down <= 0)) return;
+    const p = this.player;
+    let s0: [number, number] | null = null;
+    for (let n = 0; n < 10 && !s0; n++) { const c = randomWalkTileNear(this.zone, Math.floor(p.x), Math.floor(p.y), 14, ['walk', 'soi', 'cross']); if (c && Math.hypot(c[0] - p.x, c[1] - p.y) > 8) s0 = c; }
+    if (!s0) return;
+    const w = this.makeWalker(this.npcLook('thug', undefined, 'collector'), s0[0], s0[1], 'thug', this.npcWeapon('thug', 'collector'));
+    this.makeGang(w, 'collector');
+    w.besk = true; w.maxHp = w.hp = 520; w.target = this.player;
+    this.walkers.push(w);
+    const L = t();
+    this.bubble(w, L.beskCollectCall[Math.floor(Math.random() * L.beskCollectCall.length)]);
+    this.hooks.notice(L.beskCollectNotice);
+  }
+  /** 52차 지옥 엘리베이터: 가끔 층주 대신 관리자 악마가 내려 둘레를 훑어보고 다시 타 사라진다 (층주 자리 근처에 있을 때) */
+  private admElevT = 200 + Math.random() * 200;
+  private admElev: { e: { i: number; j: number; back: Graphics; front: Graphics }; t: number; w: Walker | null; dinged: boolean; said: boolean; back: boolean } | null = null;
+  private updateAdminElev(dt: number) {
+    const h = this.zone.hell;
+    if (!h || this.zone.interior || this.netRole === 'guest') return;
+    if (!this.admElev) {
+      if ((this.admElevT -= dt) > 0 || this.elev) return;
+      const i = h.boss.i - 1, j = h.boss.j - 2;
+      if (Math.hypot(this.player.x - (i + 1), this.player.y - (j + 1)) > 18) { this.admElevT = 20; return; }
+      this.admElevT = 300 + Math.random() * 300;
+      const back = new Graphics(), front = new Graphics();
+      back.zIndex = i + j + 0.5; front.zIndex = i + j + 2.6;
+      this.objects.addChild(back, front);
+      this.admElev = { e: { i, j, back, front }, t: 0, w: null, dinged: false, said: false, back: false };
+      sfx.impact('blunt', this.spotAt(i + 1, j + 0.7), true, 'bones', 0.4, 2.2);
+      return;
+    }
+    const a = this.admElev, e = a.e;
+    a.t += dt;
+    const t0 = a.t;
+    // 0~1.2 나타남 · 1.3 띵 · 1.4~2.2 문 열림 · 2.2 내림 · 3~8 둘러봄(한마디) · 8 다시 탐 · 9.6~10.3 문 닫힘 · 10.4~11.4 사라짐
+    const alpha = t0 < 1.2 ? Math.min(1, t0 / 1.2) * (0.55 + 0.45 * (Math.sin(t0 * 47) > -0.2 ? 1 : 0.3)) : t0 > 10.4 ? Math.max(0, 1 - (t0 - 10.4)) * (Math.sin(t0 * 41) > -0.4 ? 1 : 0.35) : 1;
+    const open = t0 < 1.4 ? 0 : t0 < 2.2 ? (t0 - 1.4) / 0.8 : t0 < 9.6 ? 1 : t0 < 10.3 ? 1 - (t0 - 9.6) / 0.7 : 0;
+    if (!a.dinged && t0 >= 1.3) { a.dinged = true; sfx.chime(); }
+    if (!a.w) {
+      const w = this.makeWalker(clerkLook('rebirth', 7), e.i + 1, e.j, 'soul'); w.x = e.i + 1.0; w.y = e.j + 0.55; w.dir = 'sw'; w.cloak = true; w.wait = 1e9; w.speed = 0.6; w.maxHp = w.hp = 99999; w.title = t().admDemon;
+      this.walkers.push(w); a.w = w;
+    }
+    const w = a.w;
+    if (w.cloak && t0 >= 2.2) { w.cloak = false; w.path = [[e.i + 1, e.j + 2]]; }
+    if (!a.said && t0 >= 3.4 && !w.sprite.destroyed) { a.said = true; const L = t().admDemonSay; w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); this.bubble(w, L[Math.floor(Math.random() * L.length)]); }
+    if (t0 >= 5.6 && t0 < 5.7) w.dir = 'se';
+    if (!a.back && t0 >= 8) { a.back = true; w.path = [[e.i + 1, e.j]]; }
+    if (t0 >= 9.5 && !w.cloak) { w.cloak = true; }
+    if (t0 >= 11.4 || this.zone.hell?.floor === undefined) { e.back.destroy(); e.front.destroy(); this.removeWalker(w); this.admElev = null; return; }
+    this.drawElevator(e, open, alpha, t0);
+  }
   /** 49차 지옥 엘리베이터: 관리자들이 타는 승강기 — 천장을 뚫지 않고 그 층에 '나타났다' 사라진다. 문이 열리면 층주가 걸어 나온다 */
   private bossByElevator() {
     const h = this.zone.hell;
@@ -5757,12 +6000,31 @@ export class WorldScene {
       // 손님이 되었다: 내 기기가 만든 몹은 걷어 내고 방장의 것을 비춘다
       for (const w of this.walkers.slice()) if (this.isShared(w)) { if (this.player.target === w) this.player.target = null; this.removeWalker(w); }
       this.mirrors.clear();
+      this.preloadMobArt(); // 52차: 이 층 · 이 거리에 나올 몹 그림을 미리 불러 둔다 (방장의 몹이 처음 몇 초 안 보이던 것)
     } else if (prev === 'guest') {
-      // 방장이 되었다 (먼저 온 사람이 떠났다): 비추던 것을 걷고 내 기기가 새로 채운다
-      for (const w of this.mirrors.values()) { if (this.player.target === w) this.player.target = null; this.removeWalker(w); }
+      // 방장이 되었다 (먼저 온 사람이 떠났다) — 52차: 비추던 것을 걷지 않고 그 자리 그대로 내 몹으로 이어받는다 (몹이 한꺼번에 사라졌다 새로 나타나던 것)
+      let kept = 0;
+      for (const w of this.mirrors.values()) {
+        if (w.down > 0 || w.sprite.destroyed) { if (this.player.target === w) this.player.target = null; this.removeWalker(w); continue; }
+        w.mirror = undefined; w.path = []; w.target = null; w.home = [Math.floor(w.x), Math.floor(w.y)]; w.wait = Math.random() * 2; w.act = null;
+        if (w.mdef) { w.speed = w.mdef.speed; }
+        kept++;
+      }
       this.mirrors.clear();
-      this.populateShared();
+      this.sentSig.clear();
+      if (!kept) this.populateShared(); else this.topT = 0.5; // 모자라면 곧 채운다
     }
+  }
+  private preloadMobArt() {
+    const h = this.zone.hell;
+    if (h) {
+      const def = floorDef(h.floor);
+      for (const k of [...def.monsters, def.boss]) { const m = MONSTERS[k]; if (m) void charSet(this.monsterLook(m), m.weapon === undefined ? null : m.weapon ?? null); }
+      return;
+    }
+    if (this.realm !== 'real') return;
+    for (const g of ['robber', 'mafia', 'pickpocket', 'collector', this.zone.city === 'seoul' ? 'enforcer' : 'boxer'] as const) void charSet(this.npcLook('thug', undefined, g), this.npcWeapon('thug', g));
+    for (let k = 0; k < 4; k++) void charSet(this.npcLook('passer'));
   }
   private populateShared() {
     if (this.zone.interior || this.realm === 'ghost' || this.realm === 'border') return;
@@ -6355,6 +6617,7 @@ export class WorldScene {
     if (w.mdef?.key === 'gurma') opts.push({ label: w.asleep ? L.act.look : L.gurmaFeedBtn, act: () => this.approach(w, 'talk') });
     if (!w.mdef) opts.push({ label: L.act.talk, act: () => this.approach(w, 'talk') });
     opts.push({ label: L.act.look, act: () => this.approach(w, 'look') });
+    if (w.kind === 'caged' && this.hooks.hasHeavenFood()) opts.push({ label: L.feedBtn, act: () => this.feedCaged(w) }); // 52차 먹이 주기
     if (w.kind === 'passer' || w.kind === 'angel' || w.kind === 'yellowwing' || w.kind === 'noeul' || w.kind === 'officer' || w.kind === 'soul' || w.kind === 'vendor' || w.kind === 'fighter') opts.push({ label: L.act.force, danger: true, act: () => (this.realm === 'heaven' ? this.hooks.heavenAct('assault') : this.attack(w)) });
     this.hooks.menu(this.npcName(w), this.npcSub(w), opts, sx * this.zoom + this.camera.x, (sy - 44 * BODY_K) * this.zoom + this.camera.y);
   }
@@ -6444,6 +6707,7 @@ export class WorldScene {
   }
 
   private onTap(gx: number, gy: number, force: boolean) {
+    if (this.camp) this.campStop(); // 52차: 깔고 쉬다가 누르면 일어난다
     if (this.seat) { if (!this.player.bubble) this.bubble(this.player, t().svcStay); return; } // 46차: 예배 중에는 가만히
     if (this.riding) return; // 46차: 놀이기구를 타는 동안
     { const u = this.promoAt(gx, gy); if (u) { this.hooks.promo(u); return; } } // 47차: 홍보 말풍선을 누르면 그 사람의 프로필
@@ -6516,6 +6780,19 @@ export class WorldScene {
       }
       this.openPersonMenu(w);
       return;
+    }
+    // 52차: 동물원 동물 — 곁에 서서 누르면 먹이 주기 (천국 음식이 있을 때)
+    if (this.zooAnimals.length && this.realm === 'heaven') {
+      const a = this.zooAnimalAt(gx, gy);
+      if (a) {
+        const near = Math.hypot(a.x - this.player.x, a.y - this.player.y) < 4.5;
+        if (near && this.hooks.hasHeavenFood()) {
+          const [sx, sy] = iso(a.x, a.y);
+          this.hooks.menu(L.zooAnimal, '', [{ label: L.feedBtn, act: () => { if (this.hooks.fed('animal')) { a.wait = 3; a.tx = a.x; a.ty = a.y; for (let k = 0; k < 5; k++) this.sparks.push({ x: sx + (Math.random() - 0.5) * 20, y: sy - 50, vx: (Math.random() - 0.5) * 16, vy: -20 - Math.random() * 20, t: 0.9, col: 0xff7a9a }); } } }], sx * this.zoom + this.camera.x, (sy - 60) * this.zoom + this.camera.y);
+          return;
+        }
+        if (!near) { const tgt = this.nearestWalkable(Math.floor(a.x), Math.floor(a.y) + 4); if (tgt && this.walkTo(tgt[0], tgt[1])) { this.rippleAt(tgt[0], tgt[1]); return; } }
+      }
     }
     // 3) 떨어진 돈
     const c = this.coinAt(gx, gy);
@@ -6980,7 +7257,7 @@ export class WorldScene {
     if (w.kind === 'dog') { this.hooks.say(L.dogName, pd.kind === 'look' ? L.dogLook : L.dogGrowl[0]); return; }
     if (w.kind === 'goatking') { w.path = []; w.dir = this.player.x - w.x - (this.player.y - w.y) >= 0 ? 'e' : 'w'; if (pd.kind === 'look') this.hooks.say(L.gkName, L.gkLook); else this.hooks.goatKing(); return; }
     if (w.kind === 'changer') { w.path = []; if (pd.kind === 'look') this.hooks.say(L.xchName, L.xchSub); else this.hooks.changer(); return; }
-    if (w.bankGuard) { w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); const ls = t().bankGuardLines; this.hooks.say(L.bankGuard, pd.kind === 'look' ? L.bankGuardLook : ls[Math.floor(Math.random() * ls.length)]); return; } // 49차 은행 경비원
+    if (w.bankGuard) { w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); const ls = Math.random() < 0.65 ? t().bankGuardTips : t().bankGuardLines; this.hooks.say(L.bankGuard, pd.kind === 'look' ? L.bankGuardLook : ls[Math.floor(Math.random() * ls.length)]); return; } // 49차 은행 경비원 · 52차 이용 팁
     if (w.kind === 'gkwalk') { w.path = []; w.wait = 12; w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); if (pd.kind === 'look') this.hooks.say(L.gkName, L.gkWalkLook); else this.hooks.goatKingWalk(); return; } // 48차: 층을 거니는 염소대왕
     if (w.dumpAngel) { const ls = pd.kind === 'look' ? [L.dumpLook] : L.dumpLines; this.hooks.say(this.npcName(w), ls[Math.floor(Math.random() * ls.length)]); return; } // 47차 쓰레기장 천사
     if (w.mut && pd.kind === 'talk') { const pool = (t().mutter as Record<string, string[]>)[w.mut] ?? []; if (pool.length) { w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); this.hooks.say(this.npcName(w), w.lines && !w.lines.length ? t().palaceBusy : this.lineOf(w, pool)); return; } } // 51차 · 52차 몫의 말
@@ -7542,7 +7819,7 @@ export class WorldScene {
     } // 31차: 헛방 — 글자 없이 (휘두름만 있고 타격음·번쩍임·움찔이 없다)
     if (to.isPlayer) this.lastHitBy = from.kind === 'remote' ? (from.rid ?? null) : null;
     // 30차 내구도: 내가 때리면 무기가, 맞으면 입은 방어구가 닳는다
-    if (from.gang === 'collector' && to.isPlayer && dmg > 0 && Math.random() < 0.55) { const want = Math.min(1500, Math.max(5, Math.round(this.hooks.cash() * (0.02 + Math.random() * 0.03)))); const got = this.hooks.cash() > 0 ? this.hooks.stolen(want) : 0; if (got > 0) { from.pick = { stolen: (from.pick?.stolen ?? 0) + got, flee: 0 }; this.float(to, `−${moneyText(got)}`, '#ff8a6a'); if (!from.bubble) this.bubble(from, (this.gangText('collector', 'Interest') as string[])[Math.floor(Math.random() * 3)]); } } // 48차: 맞을 때마다 '이자'를 떼 간다 — 쓰러뜨리면 고스란히 떨어진다
+    if (from.gang === 'collector' && to.isPlayer && dmg > 0 && Math.random() < 0.55) { const want = Math.min(1500, Math.max(5, Math.round(this.hooks.cash() * (0.02 + Math.random() * 0.03)))); const got = this.hooks.cash() > 0 ? this.hooks.stolen(want) : 0; if (got > 0) { from.pick = { stolen: (from.pick?.stolen ?? 0) + got, flee: 0 }; this.float(to, `−${moneyText(got)}`, '#ff8a6a'); if (!from.bubble) { const il = from.besk ? t().beskCollectHit : (this.gangText('collector', 'Interest') as string[]); this.bubble(from, il[Math.floor(Math.random() * il.length)]); } } } // 48차: 맞을 때마다 '이자'를 떼 간다 — 쓰러뜨리면 고스란히 떨어진다
     if (to.untilHit && from.isPlayer) { to.untilHit = false; to.target = from; to.firstBy ??= from; this.bubble(to, t().torturerAngry[Math.floor(Math.random() * t().torturerAngry.length)]); } // 48차: 고문하던 괴물은 맞고서야 돌아선다
     if (from.isPlayer && to.stiffBoss && !to.firstBy) { to.firstBy = from; to.wait = 0; to.target = from; this.hooks.deed('firstStrike'); this.markCrime(); this.bubble(to, t().stiffBossFight[Math.floor(Math.random() * t().stiffBossFight.length)]); } // 47차: 사장을 먼저 치면 악행
     if (from.isPlayer && from !== to && this.gear.weapon) this.hooks.wear('weapon');
@@ -8244,6 +8521,7 @@ export class WorldScene {
     }
   }
   private bubble(w: Walker, text: string) {
+    if (this.netRole === 'host' && !w.isPlayer && w.kind !== 'remote' && this.isShared(w) && w.nid && this.mobOut?.event) this.mobOut.event({ e: 'say', id: w.nid, s: text.slice(0, 120) }); // 52차: 손님도 같은 말풍선
     if (!this.showBubbles && !w.isPlayer) return;
     w.bubble?.destroy();
     w.bubble = new Text({ text, style: { fontFamily: 'system-ui, sans-serif', fontSize: 12, fontWeight: '700', fill: '#fff6d8', stroke: { color: '#1a1410', width: 3 } } });
@@ -8352,7 +8630,7 @@ export class WorldScene {
       const [fx, fy] = iso(from.x, from.y);
       const dir = Math.atan2(ay - fy, ax - fx); // 화면에서 상대 쪽
       const big = (anim === 'heavy' ? 1.3 : 1) * (from.noeulAlly ? 1.5 : 1); // 46차: 대천사 노을의 칼질은 크고 금빛 — 두 번 엇갈려 베인다
-      const glowC = from.noeulAlly ? 0xffd86a : 0xfff6d8, coreC = from.noeulAlly ? 0xfffbe8 : 0xffffff;
+      const glowC = from.noeulAlly ? 0xffd86a : from.mdef ? 0xff6a3a : 0xfff6d8, coreC = from.noeulAlly ? 0xfffbe8 : from.mdef ? 0xffd8b0 : 0xffffff; // 52차: 지옥 괴물의 칼질은 잉걸불 빛
       if (anim === 'stab') {
         const ux = Math.cos(dir), uy = Math.sin(dir) * 0.6;
         g.moveTo(-ux * 16, -uy * 16).lineTo(ux * 12, uy * 12).stroke({ color: 0xfff6d8, width: 2.4, alpha: 0.95 });
@@ -8422,6 +8700,16 @@ export class WorldScene {
     const [sx, sy] = iso(w.x, w.y);
     w.sprite.position.set(sx, sy);
     w.sprite.zIndex = w.x + w.y;
+    if (w.lunge) { // 52차: 괴물의 휘두르기 — 젖힘(뒤로 기울며 반 걸음) → 몸을 실어 앞으로 → 제자리
+      const L = w.lunge; L.t += dt;
+      const wind = L.hit * 0.68, side = L.ux >= 0 ? 1 : -1;
+      let off: number, rot: number;
+      if (L.t < wind) { const q = L.t / wind; off = -7 * q; rot = -0.16 * q; }
+      else if (L.t < L.hit + 0.06) { const q = Math.min(1, (L.t - wind) / (L.hit + 0.06 - wind)); off = -7 + 22 * q * q; rot = -0.16 + 0.32 * q; }
+      else { const q = Math.min(1, (L.t - L.hit - 0.06) / Math.max(0.05, L.dur - L.hit - 0.06)); off = 15 * (1 - q); rot = 0.16 * (1 - q); }
+      w.sprite.x += L.ux * off; w.sprite.y += L.uy * off * 0.6; w.sprite.rotation = rot * side;
+      if (L.t >= L.dur || w.down > 0) { w.lunge = undefined; w.sprite.rotation = 0; }
+    }
     // 42차 먼 사람 잔상: 40칸 넘게 떨어진 사람은 흐릿하게 (소식도 드물게 온다)
     const far = Math.hypot(w.x - this.player.x, w.y - this.player.y) > 40;
     w.sprite.alpha = far ? 0.35 : 1;
@@ -8558,6 +8846,7 @@ export class WorldScene {
     const alt = anim === 'punch' && !(w.isPlayer && this.gear.armor.includes('shield')) ? (w.punchAlt = !w.punchAlt) : false;
     w.act = { anim, t: 0, alt };
     w.pend = { to: tg, dmg, at: (IMPACT[anim] ?? 1) / ANIM_FPS[anim], crit };
+    if (w.mdef && !w.isPlayer) { const [fx, fy] = iso(w.x, w.y), [tx, ty] = iso(tg.x, tg.y), d = Math.hypot(tx - fx, ty - fy) || 1, hit = w.pend.at; w.lunge = { t: 0, dur: hit + 0.34, hit, ux: (tx - fx) / d, uy: (ty - fy) / d }; }
     sfx.swing(this.kindOf(w), this.spotOf(w));
   }
 
@@ -8662,12 +8951,15 @@ export class WorldScene {
     if (this.mutterT > 0) this.mutterT -= dt;
     if (this.bossBackT > 0 && (this.bossBackT -= dt) <= 0) { this.bossBackT = -1; this.bossByElevator(); } // 49차: 층주가 엘리베이터를 타고 돌아온다
     if (this.elev) this.updateElevator(dt);
+    if (this.zone.hell) this.updateAdminElev(dt); // 52차 관리자 악마
+    if (this.realm === 'real') this.updateBeskCollector(dt); // 52차 베스크의 수금원
     if (this.gkVisitT > 0 && (this.gkVisitT -= dt) <= 0) { this.gkVisitT = -1; this.spawnGkWalk(); } // 48차: 염소대왕이 가끔 층을 거닌다
     if (this.dogT > 0 && (this.dogT -= dt) <= 0) { this.dogT = -1; if (!this.walkers.some((x) => x.kind === 'dog' && x.down <= 0)) this.spawnDogs(); }
     if (this.realm === 'real' && !this.zone.interior && this.netRole !== 'guest' && (this.brawlT -= dt) <= 0) { this.brawlT = 70 + Math.random() * 80; this.startBrawl(); } // 42차: 거리 싸움은 드물게
     if (this.kerb) this.updateKerberos(dt);
     if (this.guide) this.updateGuide(dt);
     if (this.netRole !== 'guest' && (this.fbWarns.length || this.walkers.some((w) => w.fb || (w.mdef?.boss && BOSS_SK[w.mdef.key])))) this.updateFieldBosses(dt);
+    else if (this.netRole === 'guest' && this.fbWarns.length) this.tickFbWarns(dt); // 52차
     if (this.netRole === 'host') this.hostTick(dt);
     else if (this.netRole === 'guest') this.guestTick();
     this.updateLandmarks(dt);
@@ -8923,11 +9215,12 @@ export class WorldScene {
     }
     // 체력: 싸움이 끝나고 잠시 지나면 찬다. 휴식처(지옥 마을·우주새 앞·쉬는 시설 안)에서는 바로, 아주 빠르게
     this.combatT += dt;
+    if (this.camp && this.combatT < 0.5) this.campStop(); // 52차: 싸움이 붙으면 일어난다
     const resting = this.restAt(p.x, p.y);
     if (this.zone.hell && !this.zone.interior) this.updateHazard(dt, p); else if (this.wadeSink || this.hzKind) { this.wadeSink = 0; this.hzKind = 0; this.wadeRing?.destroy(); this.wadeRing = null; }
     if (!this.dead && !this.hzKind && (resting || this.combatT > OUT_OF_COMBAT_S) && p.hp < p.maxHp) {
       const before = Math.floor(p.hp);
-      if (!this.noRegen) p.hp = Math.min(p.maxHp, p.hp + ((resting ? restRegenPerMinute(p.maxHp, this.stats.fai) : regenPerMinute(p.maxHp, this.stats.fai)) / 60) * dt * this.load.regen); // 47차: 무거우면 회복이 더디다
+      if (!this.noRegen) p.hp = Math.min(p.maxHp, p.hp + ((resting ? restRegenPerMinute(p.maxHp, this.stats.fai) : regenPerMinute(p.maxHp, this.stats.fai)) / 60) * dt * this.load.regen * (this.camp && !resting ? 2.6 : 1)); // 47차: 무거우면 회복이 더디다 · 52차 깔고 쉬면 빨리
       if (Math.floor(p.hp) !== before) this.hooks.hp(p.hp, p.maxHp);
     }
     if (this.criminalT > 0) this.criminalT -= dt;
@@ -9045,6 +9338,7 @@ export class WorldScene {
     this.checkHutDoor(); // 46차 구름 위 오두막 문
     this.checkBed(); // 47차 침대
     if (this.zone.interior?.kind === 'hpalace') this.updatePalace(dt); // 52차 번호판 · 번호표 · 창구 · 배식
+    if (this.zone.interior?.kind === 'mall') this.updateMall(); // 52차 몰 가게 앞 · 에스컬레이터
     this.checkImmig(); this.checkAirportStop(); // 47차 공항
     this.updateRide(dt); // 46차 놀이기구
     if (this.stiffMark) this.updateStiffMark(); // 47차 떼먹은 사장의 칼 표시
@@ -9385,10 +9679,24 @@ export class WorldScene {
   private updateKeys() {
     const k = this.keyDir;
     if (!k.on || this.dead || this.workIn || this.time < k.next) return;
+    if (this.camp) this.campStop(); // 52차: 쉬다가 방향키를 누르면 일어난다
     k.next = this.time + 0.12;
     const p = this.player;
     const [sx, sy] = iso(p.x, p.y);
     const n = Math.hypot(k.x, k.y) || 1;
+    // 52차: 방향키로 드나들기 — 문 앞에서 문 쪽으로 밀면 들어간다 · 방 안에선 나가는 문 쪽으로 밀면 곧장 문으로
+    {
+      const kx = k.x / n, ky = k.y / n;
+      const info = this.zone.interior;
+      if (info && !this.workIn) {
+        const [ex, ey] = iso(info.exit.i + 0.5, info.exit.j + 0.5), dx = ex - sx, dy = ey - sy, d = Math.hypot(dx, dy);
+        if (d > 4 && d < 110 && (dx * kx + dy * ky) / d > 0.55) { this.keyPush = 0; if (this.walkTo(info.exit.i, info.exit.j)) return; }
+      } else if (this.doorFor !== null) {
+        const dx = this.doorBase.x - sx, dy = this.doorBase.y - sy, d = Math.hypot(dx, dy);
+        if (d < 80 && (d < 6 || (dx * kx + dy * ky) / d > 0.5)) { this.keyPush += 0.12; if (this.keyPush >= 0.24) { this.keyPush = 0; this.interact(this.doorFor); return; } }
+        else this.keyPush = 0;
+      } else this.keyPush = 0;
+    }
     const tx = sx * this.zoom + this.camera.x + (k.x / n) * 110 * this.zoom, ty = sy * this.zoom + this.camera.y + (k.y / n) * 62 * this.zoom;
     const keep = this.keepKite();
     p.path = p.path.slice(0, 1);
@@ -9611,6 +9919,7 @@ export class WorldScene {
         if (found === -1) this.hooks.place(this.zone.hell ? t().hellShop : t().shopLabel, '');
         const [x, y] = iso(fx, fy);
         this.doorAt = { x, y: y - 74 };
+        this.doorBase = { x, y };
       }
     }
     this.door.visible = found !== null;

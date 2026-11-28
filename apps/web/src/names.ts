@@ -120,6 +120,25 @@ export function nameSeoulBanks(z: { city?: string; buildings: Building[] }, walk
     p.n = ko; p.nko = ko; p.nth = th; p.nen = en; delete p.b;
   }
 }
+/**
+ * 52차 우체국: 기원 편지의 답장을 받는 곳 (현실 · 천국에만 — 지옥의 죄인은 답장을 받을 자격이 없다).
+ * 방콕 아속은 지도 자료의 우체국 건물, 서울 강남은 정문 가까운 길가 건물 하나. 이름은 동네 이름만 (실제 기관명은 쓰지 않는다)
+ */
+export function designatePost(z: { id: string; city?: string; buildings: Building[]; door: { i: number; j: number } }, walk: (i: number, j: number) => boolean) {
+  const bs = z.buildings as B[];
+  let b = bs.find((x) => (x.pois ?? []).some((p) => p.t === 'post_office'));
+  let nm: [string, string, string] = ['아속 우체국', 'ไปรษณีย์อโศก', 'Asok Post Office'];
+  if (!b && z.id === 'seoul-gangnam') {
+    const cands = bs.filter((x) => x.sign && ['generic', 'office', 'shop'].includes(x.cat) && x.w >= 4 && x.d >= 4 && x.w <= 12 && x.d <= 12 && !(x as { landmark?: unknown }).landmark)
+      .sort((a, c) => Math.hypot(a.i0 - z.door.i, a.j0 - z.door.j) - Math.hypot(c.i0 - z.door.i, c.j0 - z.door.j));
+    b = cands[2] ?? cands[0];
+    nm = ['강남 우체국', 'ไปรษณีย์คังนัม', 'Gangnam Post Office'];
+  }
+  if (!b) return;
+  b.cat = 'post';
+  b.pois = [{ t: 'post_office', n: nm[2], nko: nm[0], nth: nm[1], nen: nm[2] } as unknown as Poi];
+  if (!b.sign) { const okL = [0, 1, -1].some((d) => walk(b!.i0 + Math.floor(b!.w / 2) + d, b!.j0 + b!.d)); b.sign = okL ? 'left' : 'right'; }
+}
 /** 46차: 건물에 든 은행의 이름 (은행이 대표 가게가 아니어도 — 호텔 1층 은행 같은) */
 export function bankName(b: Building, l: Lang): string {
   const p = ((b as B).pois ?? []).find((q) => q.t === 'bank');

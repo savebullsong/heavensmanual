@@ -113,6 +113,7 @@ export const DEED_TABLE = {
   pray: { kind: 'good', points: 1, exp: 5, note: '종교시설 기도 (하루 3번)' },
   readScripture: { kind: 'good', points: 1, exp: 10, note: '종교시설에서 읽기 5분 (하루 1번)' },
   hellAtone: { kind: 'good', points: 1, exp: 10, note: '지옥 속죄의 회당에 노전 1,000닢을 바칠 때마다' },
+  feed: { kind: 'good', points: 1, exp: 3, note: '천국 동물원의 동물 · 우리 안의 인간 · 괴물에게 먹이 주기 (하루 3번) — 52차' },
   // 악행
   firstStrike: { kind: 'evil', points: 2, exp: 10, note: '먼저 공격하기' },
   extort: { kind: 'evil', points: 3, exp: 30, note: '갈취 성공' },

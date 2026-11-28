@@ -225,6 +225,8 @@ export interface MobHooks {
   strike(id: number, dmg: number, crit: boolean, kind: string): void;
   /** 방장 → 모두: 몹이 쓰러졌다 (by = 쓰러뜨린 사람) */
   kill(id: number, by: string): void;
+  /** 52차 방장 → 모두: 몹의 말풍선 · 필드 보스 예고 · 소매치기 */
+  event?(host: string, ev: Record<string, unknown>): void;
 }
 let mob: MobHooks | null = null;
 let joinedAt = 0;
@@ -248,6 +250,7 @@ export function sendMobReq(ids: number[]) { bsend('mq', { from: myId(), to: curH
 export function sendMobHit(id: number, dmg: number, crit: boolean, kind: string) { bsend('mh', { from: myId(), to: curHost, id, dmg, crit, kind }); }
 export function sendMobStrike(to: string, id: number, dmg: number, crit: boolean, kind: string) { bsend('mx', { h: myId(), to, id, dmg, crit, kind }); }
 export function sendMobKill(id: number, by: string) { bsend('mk', { h: myId(), id, by }); }
+export function sendMobEvent(ev: Record<string, unknown>) { bsend('mv', { ...ev, h: myId() }); }
 
 /** 시험용 (?loopnet): 같은 브라우저의 탭끼리 BroadcastChannel로 서로 보이고 싸운다 (서버 없이 PvP 확인) */
 function loopChannel(name: string, key: string) {
@@ -313,6 +316,7 @@ export function joinZone(zoneId: string, me: () => { info: RemoteInfo; pos: NetP
   ch.on('broadcast', { event: 'mh' }, ({ payload }) => { if (payload?.to === id && isHost() && payload.from) mob?.hit(String(payload.from), num(payload.id, 0, 1e9), num(payload.dmg, 0, 400), !!payload.crit, String(payload.kind ?? 'fist')); });
   ch.on('broadcast', { event: 'mx' }, ({ payload }) => { if (payload?.to === id && payload.h === curHost) mob?.strike(num(payload.id, 0, 1e9), num(payload.dmg, 0, 400), !!payload.crit, String(payload.kind ?? 'fist')); });
   ch.on('broadcast', { event: 'mk' }, ({ payload }) => { if (payload?.h && payload.h === curHost) mob?.kill(num(payload.id, 0, 1e9), String(payload.by ?? '')); });
+  ch.on('broadcast', { event: 'mv' }, ({ payload }) => { if (payload?.h && payload.h === curHost && !isHost() && typeof payload === 'object') mob?.event?.(payload.h, payload as Record<string, unknown>); });
   let lastPos = '';
   lastTrack = 0;
   ch.subscribe((status) => {

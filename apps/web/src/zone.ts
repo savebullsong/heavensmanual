@@ -71,6 +71,8 @@ export interface Beyond { m: number; lanes: Lane[] }
 /** 방의 가구: 바닥 사각형(타일)과 높이(px), 무엇인지 */
 export interface Furn { i: number; j: number; w: number; d: number; h: number; kind: string; v?: number }
 export interface InteriorInfo {
+  heaven?: boolean; // 52차: 천국 건물의 방 (우체국 — 대리석 · 금빛)
+  mallFloor?: number; // 52차 엠쿼티어 · 엠포리움 안: 몇 층 (0 = 지하 푸드홀 · 1 · 2)
   kind: string; // temple · church · mosque · gurdwara · bank · clinic · pharmacy · mart · food · cafe · bar · salon · massage · laundry · lobby · shop
   rest: boolean; // 쉬는 곳 (싸움 불가 · 빠른 회복)
   name: string;
