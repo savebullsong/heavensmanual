@@ -4383,6 +4383,7 @@ export class WorldScene {
   private palaceSpotAt = '';
   private eatWant: { ci: number; cj: number; ti: number; tj: number; t: number; seated: boolean; done: () => void; back?: boolean } | null = null;
   private deptWant: { j: number; dept: number } | null = null; // 53차: 복도 문으로 걸어가는 중
+  resetSpot() { this.palaceSpotAt = ''; }
   setPalaceTicket(tk: { n: number; from: number; at: number; called?: boolean } | null) { this.palaceTicket = tk; }
   private setupPalaceBoard() {
     // 53차: 번호 전광판은 민원실 뒤 벽의 검은 판 위에 (벽면을 따라 비스듬히) — 허공에 뜬 글씨가 아니다

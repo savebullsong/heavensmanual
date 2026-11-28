@@ -161,6 +161,40 @@ def ashgal(self, g):
         c = hc + Vector(((k - 3) * .018 * s, .03 * s, .095 * s))
         limb(P, c, c + Vector((0, .03 * s, (.05 + (k % 3) * .025) * s)), [(0, .012, .012), (1, .002, .002)], lava, None, segs=4)
     ob = finish(P); bind(ob, self.arm, lambda co: {'head': smooth(co.z, 1.44 * s, 1.5 * s), 'spine': 1 - smooth(co.z, 1.44 * s, 1.5 * s)}); self.add(g, ob)
+    # 54차 전용 몸 손질 — 환생 앞 마지막 관문다운 거인: 가슴의 녹은 심장 · 등에 사슬로 멘 불탄 성문 조각 · 어깨에서 늘어진 재 망토 · 불씨 왕관 · 바위 주먹
+    P = Part(g + '.boss54')
+    core = V(0, -.17, 1.27)
+    blob(P, core, (.07 * s, .035 * s, .075 * s), lava, None, segs=12, rings=8)          # 녹은 심장
+    blob(P, core + Vector((0, -.012 * s, 0)), (.045 * s, .03 * s, .05 * s), rmat('eye', .2, .9), None, segs=10, rings=6)
+    for k in range(8):                                                                    # 심장에서 뻗는 금
+        a = k / 8 * math.pi * 2
+        limb(P, core + Vector((math.cos(a) * .06 * s, -.01 * s, math.sin(a) * .06 * s)), core + Vector((math.cos(a) * .16 * s, .02 * s, math.sin(a) * .15 * s)), [(0, .012, .012), (1, .004, .004)], lava, None, segs=4)
+    # 등의 성문 조각: 두꺼운 쇠판 · 리벳 · 그을린 나무 띠 · 어깨에 건 사슬
+    gate = V(0, .2, 1.18)
+    limb(P, gate + Vector((0, 0, -.22 * s)), gate + Vector((0, 0, .22 * s)), [(0, .24 * s, .035 * s), (1, .22 * s, .035 * s)], dark, None, segs=4)
+    for zz in (-.15, 0, .15):
+        limb(P, gate + Vector((-.24 * s, .02 * s, zz * s)), gate + Vector((.24 * s, .02 * s, zz * s)), [(0, .025 * s, .02 * s), (1, .025 * s, .02 * s)], horn, None, segs=4)
+        for sx in (-.18, -.06, .06, .18): blob(P, gate + Vector((sx * s, .045 * s, zz * s)), (.016 * s, .012 * s, .016 * s), chain, None, segs=6, rings=4)
+    for sx in (1, -1):
+        for n in range(8):
+            t = n / 7
+            blob(P, V(sx * (.2 - t * .05), .05 + t * .12, 1.44 - t * .12), (.02 * s, .014 * s, .026 * s), chain, None, segs=6, rings=4)
+    # 재 망토: 어깨 뒤에서 무릎까지 해진 자락 다섯
+    for k in range(5):
+        x0 = (k - 2) * .11
+        limb(P, V(x0, .14, 1.42), V(x0 * 1.3, .24 + (k % 2) * .03, .62 + (k % 3) * .06), [(0, .06 * s, .012 * s), (.7, .055 * s, .01 * s), (1, .02 * s, .006 * s)], cloth, None, segs=5)
+    # 불씨 왕관: 뿔 사이로 솟은 가시 다섯
+    for k in range(5):
+        a = (k - 2) * .38
+        c = hc + Vector((math.sin(a) * .07 * s, .01 * s, .1 * s))
+        limb(P, c, c + Vector((math.sin(a) * .05 * s, .0, (.12 - abs(k - 2) * .025) * s)), [(0, .02 * s, .02 * s), (1, .003, .003)], lava, None, segs=5)
+    ob = finish(P); bind(ob, self.arm, lambda co: {'head': smooth(co.z, 1.5 * s, 1.56 * s), 'spine': 1 - smooth(co.z, 1.5 * s, 1.56 * s)}); self.add(g, ob)
+    for k in 'LR':                                                                         # 바위 주먹
+        P = Part(f'{g}.fist.{k}')
+        wr, hd = self.bones[f'forearm.{k}'][1], self.bones[f'hand.{k}'][1]
+        for n in range(4):
+            blob(P, (wr + hd) / 2 + Vector(((n - 1.5) * .022 * s, -.04 * s, -.01 * s)), (.024 * s, .02 * s, .024 * s), dark, None, segs=8, rings=5)
+        ob = finish(P); bind(ob, self.arm, rigid(f'hand.{k}')); self.add(g, ob)
 
 # ───────── 구르마 (2층 층주): 굶주린 프렛의 왕. 산처럼 부푼 배, 바늘처럼 가는 목, 바늘구멍 입, 막대 같은 팔다리 ─────────
 def gurma(self, g):
