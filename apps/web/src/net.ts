@@ -93,6 +93,69 @@ export async function msgRead() {
   try { await sb.rpc('hm_msg_read', { p_token: a.token }); } catch { /* 무시 */ }
 }
 
+// ───────── 54차: 지하 감옥 낙서 · 소포 · 떨군 물건 나누기 · 버린 돈 총액 · 생명책 · 망원경 ─────────
+/** 낙서 한 획: 색 번호 · 굵기 · 점들(0~1000 정수, x y 번갈아) */
+export interface Stroke { c: number; w: number; p: number[] }
+export async function graffitiPost(stay: string, strokes: Stroke[]): Promise<'ok' | 'dup' | 'wait' | 'bad' | 'net'> {
+  try { const { data, error } = await sb.rpc('hm_graffiti_post', { p_token: account()?.token ?? '', p_guest: guestId(), p_stay: stay, p_strokes: strokes }); if (error) return 'net'; return data?.ok ? 'ok' : (data?.error ?? 'bad'); } catch { return 'net'; }
+}
+export interface GraffitiList { authors: number; total: number; items: { id: number; nick: string | null; at: string }[] }
+export async function graffitiList(before?: number): Promise<GraffitiList | null> {
+  try { const { data, error } = await sb.rpc('hm_graffiti_list', { p_before: before ?? null }); return error ? null : data; } catch { return null; }
+}
+export async function graffitiGet(id: number): Promise<{ id: number; nick: string | null; at: string; strokes: Stroke[] } | null> {
+  try { const { data, error } = await sb.rpc('hm_graffiti_get', { p_id: id }); return error ? null : data; } catch { return null; }
+}
+export async function graffitiDelete(id: number): Promise<boolean> {
+  const a = account(); if (!a) return false;
+  try { const { data, error } = await sb.rpc('hm_graffiti_delete', { p_token: a.token, p_id: id }); return !error && !!data; } catch { return false; }
+}
+export interface ParcelBox { inbox: { id: number; from: string; item: string; qty: number; extra: unknown; note: string; at: string }[]; coming: number; sent: { to: string; item: string; qty: number; at: string }[] }
+export async function parcelSend(to: string, item: string, qty: number, extra: unknown, note: string): Promise<'ok' | 'login' | 'nouser' | 'self' | 'hell' | 'wait' | 'bad' | 'net'> {
+  const a = account(); if (!a) return 'login';
+  try { const { data, error } = await sb.rpc('hm_parcel_send', { p_token: a.token, p_to: to, p_item: item, p_qty: qty, p_extra: extra ?? null, p_note: note }); if (error) return 'net'; return data?.ok ? 'ok' : (data?.error ?? 'bad'); } catch { return 'net'; }
+}
+export async function parcelBox(): Promise<ParcelBox | null> {
+  const a = account(); if (!a) return null;
+  try { const { data, error } = await sb.rpc('hm_parcel_box', { p_token: a.token }); return error || data?.error ? null : data; } catch { return null; }
+}
+export async function parcelClaim(id: number): Promise<{ item: string; qty: number; extra: unknown } | null> {
+  const a = account(); if (!a) return null;
+  try { const { data, error } = await sb.rpc('hm_parcel_claim', { p_token: a.token, p_id: id }); return !error && data?.ok ? data : null; } catch { return null; }
+}
+export interface SharedDrop { id: number; x: number; y: number; kind: 'item' | 'notes'; item: string; qty: number; owner: string; left: number }
+export async function dropPut(zone: string, x: number, y: number, kind: 'item' | 'notes', item: string, qty: number, life: number): Promise<number | null> {
+  try { const { data, error } = await sb.rpc('hm_drop_put', { p_who: myId(), p_zone: zone, p_x: x, p_y: y, p_kind: kind, p_item: item, p_qty: qty, p_life: Math.round(life) }); return error ? null : (data ?? null); } catch { return null; }
+}
+export async function dropList(zone: string): Promise<SharedDrop[] | null> {
+  try { const { data, error } = await sb.rpc('hm_drop_list', { p_zone: zone }); return error ? null : (data ?? []); } catch { return null; }
+}
+export async function dropTake(id: number): Promise<{ ok: boolean; kind?: string; item?: string; qty?: number } | null> {
+  try { const { data, error } = await sb.rpc('hm_drop_take', { p_who: myId(), p_id: id }); return error ? null : data; } catch { return null; }
+}
+export async function counterAdd(key: 'discard', n: number): Promise<number | null> {
+  try { const { data, error } = await sb.rpc('hm_counter_add', { p_key: key, p_n: Math.round(n) }); return error ? null : Number(data); } catch { return null; }
+}
+export async function counterGet(key: 'discard'): Promise<number | null> {
+  try { const { data, error } = await sb.rpc('hm_counter_get', { p_key: key }); return error ? null : Number(data); } catch { return null; }
+}
+export interface LifeLine { nick: string | null; realm: string | null; good: number; evil: number; rank: number; region: string | null; at: string }
+export async function lifebookPeek(): Promise<LifeLine[] | null> {
+  try { const { data, error } = await sb.rpc('hm_lifebook_peek', { p_token: account()?.token ?? '' }); return error ? null : (data ?? []); } catch { return null; }
+}
+/** 망원경: 다른 구역(현실 거리)에 지금 있는 사람들 — 그 구역 실시간 방을 잠깐 엿본다 (나를 알리지 않고 듣기만) */
+export async function peekZone(zoneId: string, ms = 2600): Promise<{ id: string; info: RemoteInfo; pos: NetPos }[]> {
+  if (LOOP) return [];
+  return new Promise((done) => {
+    const ch = sb.channel(`zone:${zoneId}`, { config: { presence: { key: `peek-${Math.random().toString(36).slice(2, 8)}` } } });
+    let out: { id: string; info: RemoteInfo; pos: NetPos }[] = [];
+    const read = () => { try { const st = ch.presenceState() as Record<string, { info: RemoteInfo; pos: NetPos }[]>; out = Object.entries(st).filter(([, v]) => v[0]?.info && v[0]?.pos).map(([id, v]) => ({ id, info: v[0].info, pos: v[0].pos })); } catch { /* 무시 */ } };
+    ch.on('presence', { event: 'sync' }, read);
+    ch.subscribe();
+    setTimeout(() => { read(); void sb.removeChannel(ch); done(out); }, ms);
+  });
+}
+
 type Err = 'bad_id' | 'bad_pw' | 'taken' | 'bad' | 'wait' | 'net' | 'session';
 async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T | { error: Err }> {
   try {

@@ -8,7 +8,7 @@ import { TW, TH } from './gfx.ts';
 import { BESK_LOOK, YELLOW_WING_LOOK } from './sprites.ts';
 import { drawShore, drawShoreFurn, BULDA_LOOK } from './border.ts';
 import { menuFor, itemByKey } from './items.ts';
-import { furnishHome, furnishShowroom } from './home.ts';
+import { furnishHome, furnishShowroom, getHutPos } from './home.ts';
 import { lang } from './i18n.ts';
 export { BESK_LOOK };
 
@@ -19,9 +19,12 @@ const heavenRoom = (info: InteriorInfo) => !!info.heaven;
 /** 45차: 관리자는 아파트·콘도 안에도 들어가 본다 (main이 관리자 로그인 때 켠다) */
 let adminVisit = false;
 export function setAdminVisit(v: boolean) { adminVisit = v; }
+/** 54차: 콘도 · 아파트를 산 사람(내 집이 있는 사람)도 둘레의 콘도 · 아파트에 입주민 카드로 들어간다 */
+let ownerVisit = false;
+export function setOwnerVisit(v: boolean) { ownerVisit = v; }
 export function canEnter(b: Building) {
   const p = mainPoi(b);
-  if (b.cat === 'condo' && adminVisit) return true;
+  if (b.cat === 'condo' && (adminVisit || ownerVisit)) return true;
   if (b.cat === 'home' || b.cat === 'estate') return true; // 24차 내 집 · 35차 사는 집
   if (b.cat === 'palace') return true; // 46차 천국 본청
   if (isMall(b)) return true; // 52차 실내 몰
@@ -323,6 +326,7 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
       for (const ii of [5, 10]) F(ii, 1, 1, 4, 66, 'cellbars', 2);
       F(1, 1, 2, 1, 16, 'bunk'); F(6, 1, 2, 1, 16, 'bunk'); F(11, 1, 2, 1, 16, 'bunk');
       F(4, 1, 1, 1, 14, 'bucket');
+      F(3, 1, 1, 1, 70, 'scrawl'); // 54차: 내 칸 뒷벽의 낙서 (곁에 서면 낙서하기 · 보기)
       F(11, 7, 2, 1, 22, 'cdesk'); F(x1, 7, 1, 1, 30, 'keyrack');
       clerk = { i: 12, j: 8 }; counter = { i: 3, j: 4 };
       break;
@@ -452,7 +456,7 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
     }
     case 'hhome': { // 47차: 천국에서 산 가구가 놓인다. 침대를 안 샀으면 구름 침대 하나 (여기서 잔다)
       const own = owned ?? [];
-      furnishHome(own, W, H, F);
+      furnishHome(own, W, H, F, getHutPos()); // 54차: 옮긴 자리
       if (!own.some((k) => ['mattress', 'queenbed', 'kingbed'].includes(k))) F(W - 4, 1, 2, 3, 12, 'cbed');
       F(1, 1, 1, 1, 40, 'skywin'); F(3, 0, 2, 1, 40, 'skywin', 1);
       break;
@@ -2016,6 +2020,18 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       break;
     }
     case 'bucket': { const [bx, by] = P(i + 0.5, j + 0.5, 0); g.fillStyle = '#8a8e96'; g.fillRect(Math.round(bx) - 6, Math.round(by) - 12, 12, 12); g.fillStyle = '#5a5e66'; g.beginPath(); g.ellipse(bx, by - 12, 6, 2.5, 0, 0, Math.PI * 2); g.fill(); g.strokeStyle = '#6a6e76'; g.lineWidth = 1; g.beginPath(); g.arc(bx, by - 14, 6, Math.PI, 0); g.stroke(); break; }
+    case 'scrawl': { // 54차 감옥 뒷벽의 분필 낙서: 날짜 세기 · 날개 · 하트 · 창살 밖의 해 · 바닥의 분필 토막
+      const on = (u: number, z: number) => P(i + u, j + 0.04, z);
+      const st = (pts: [number, number][], c: string, wd = 1.4) => { g.strokeStyle = c; g.lineWidth = wd; g.lineCap = 'round'; g.beginPath(); pts.forEach(([u, z], n) => { const [x, y] = on(u, z); if (n) g.lineTo(x, y); else g.moveTo(x, y); }); g.stroke(); };
+      for (let q = 0; q < 4; q++) st([[0.12 + q * 0.07, 58], [0.14 + q * 0.07, 46]], 'rgba(242,238,230,0.85)');
+      st([[0.08, 49], [0.4, 55]], 'rgba(242,238,230,0.85)');
+      for (let q = 0; q < 3; q++) st([[0.5 + q * 0.07, 60], [0.52 + q * 0.07, 49]], 'rgba(242,238,230,0.7)');
+      st([[0.2, 32], [0.32, 40], [0.44, 34], [0.4, 26], [0.32, 30], [0.24, 26], [0.2, 32]], 'rgba(242,168,184,0.9)'); // 하트
+      st([[0.55, 30], [0.68, 40], [0.8, 34], [0.7, 30], [0.62, 22], [0.55, 30]], 'rgba(154,208,240,0.85)'); st([[0.68, 40], [0.7, 18]], 'rgba(154,208,240,0.85)'); // 날개
+      st([[0.78, 62], [0.86, 66], [0.92, 60], [0.86, 55], [0.78, 62]], 'rgba(242,210,122,0.85)'); // 해
+      { const [x, y] = P(i + 0.45, j + 0.6, 0); g.fillStyle = '#f2eee6'; g.fillRect(Math.round(x) - 3, Math.round(y) - 2, 6, 2); } // 분필 토막
+      break;
+    }
     case 'keyrack': {
       // 53차 간수의 열쇠장: 작은 나무 장 · 열쇠 꾸러미
       B3(i + 0.25, j + 0.3, i1 - 0.25, j1 - 0.3, 0, h, '#8a6a42');

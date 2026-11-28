@@ -21,6 +21,8 @@ export interface ItemDef {
   cross?: boolean;
   /** 25차: 쓴 세계(현실·지옥)에서 훔치기 확률이 오른다 (0.02 = 2%) */
   steal?: number;
+  /** 54차 짐꾼 가방 · 리어카: 가지고 있으면 무게 한도가 는다 (리어카는 걸음이 조금 느려진다) */
+  carry?: number; slow?: number;
   name: Record<Lang, string>;
   store?: 'puppet' | 'antique' | 'maskgirl' | 'mart' | 'pharmacy' | 'food' | 'cafe' | 'talus' | 'hmeat' | 'tools' | 'dept' | 'hjunk' | 'drop' | 'hwater' | 'hmed' | 'harms' | 'heaven' | 'yw' | 'craft'; // 22차: 지옥 물장수 · 약장수 · 무기상 // drop = 어디서도 팔지 않는다 (괴물이 떨어뜨릴 뿐) // 우주새가 아니라 거리 가게(철물점·백화점) · 지옥 탈루스·고깃간·넝마장수에서 파는 것
   now?: boolean; // 가게에서 바로 먹는다 (가방에 넣지 않음)
@@ -233,6 +235,9 @@ export const ITEMS: ItemDef[] = [
   { key: 'lifefruit', cat: 'goods', price: 300, heal: 420, heaven: true, store: 'yw', icon: 'donut', name: { ko: '생명나무 열매', th: 'ผลจากต้นไม้แห่งชีวิต', en: 'Fruit of the tree of life' } },
   { key: 'hvrobe', cat: 'armor', price: 1200, def: 2, heaven: true, store: 'yw', sprite: 'trench', icon: 'trench', tint: '#f4f0e6', name: { ko: '흰 세마포 겉옷', th: 'เสื้อคลุมป่านขาว', en: 'White linen robe' } },
   // 50차 등 칸: 방어력 0~2 · 특수 기능 하나 · 몸에 그리지 않는다
+  { key: 'porterbag', cat: 'goods', price: 1800, store: 'tools', carry: 20, icon: 'porterbag', name: { ko: '짐꾼 가방', th: 'เป้คนแบกของ', en: "Porter's pack" } }, // 54차 무게 한도 +20
+  { key: 'handcart', cat: 'goods', price: 6800, store: 'tools', carry: 60, slow: 0.1, icon: 'handcart', name: { ko: '리어카', th: 'รถเข็นของ', en: 'Handcart' } }, // 54차 무게 한도 +60 · 걸음 −10%
+  { key: 'hporterbag', cat: 'goods', price: 90, hell: true, store: 'hjunk', carry: 20, icon: 'porterbag', tint: '#5a3a2a', name: { ko: '넝마 짐 보따리', th: 'ห่อผ้าขี้ริ้วแบกของ', en: 'Rag bundle pack' } }, // 54차 지옥 넝마장수
   { key: 'blanket', cat: 'armor', price: 390, def: 0, wear: 'back', store: 'tools', icon: 'blanket', tint: '#8a5a4a', cape: { regen: 0.25 }, name: { ko: '낡은 모포', th: 'ผ้าห่มเก่า', en: 'Old wool blanket' } },
   { key: 'poncho', cat: 'armor', price: 650, def: 1, wear: 'back', store: 'tools', icon: 'cape', tint: '#3c6a8a', cape: { swift: 0.05 }, name: { ko: '비옷 판초', th: 'เสื้อปอนโช่กันฝน', en: 'Rain poncho' } },
   { key: 'wrapcoat', cat: 'armor', price: 4200, def: 2, wear: 'back', store: 'dept', icon: 'cape', tint: '#2a2c34', cape: { quiet: 0.2 }, name: { ko: '어깨에 걸친 외투', th: 'เสื้อคลุมพาดไหล่', en: 'Shoulder-draped overcoat' } },
@@ -461,6 +466,8 @@ export function effectText(it: ItemDef, l: Lang, skipStats = false): string {
     if (C.hazard) parts.push(({ ko: '불길·용암·가시밭에서 덜 다친다 ({n}% 줄어듦)', th: 'บาดเจ็บน้อยลงบนทางไฟ ลาวา หนาม ({n}%)', en: 'Fire, lava and thorn roads hurt {n}% less' } as Record<Lang, string>)[l].replace('{n}', pc(C.hazard)));
     if (C.quiet) parts.push(({ ko: '괴물이 {n}% 늦게 알아챈다', th: 'สัตว์ประหลาดสังเกตเห็นช้าลง {n}%', en: 'Monsters notice you {n}% later' } as Record<Lang, string>)[l].replace('{n}', pc(C.quiet)));
     parts.push(({ ko: '몸에는 보이지 않는다', th: 'ไม่แสดงบนตัว', en: 'Not shown on your body' } as Record<Lang, string>)[l]); }
+  if (it.carry) parts.push(({ ko: '가지고 있으면 무게 한도 +{n}', th: 'มีติดตัวแล้วรับน้ำหนักได้ +{n}', en: 'Carry limit +{n} while you have it' } as Record<Lang, string>)[l].replace('{n}', String(it.carry))); // 54차
+  if (it.slow) parts.push(({ ko: '걸음이 {n}% 느려진다', th: 'เดินช้าลง {n}%', en: 'Walk {n}% slower' } as Record<Lang, string>)[l].replace('{n}', String(Math.round(it.slow * 100))));
   if (it.floor) parts.push(({ ko: '지옥 {n}층 고유', th: 'เฉพาะนรกชั้น {n}', en: 'Hell F{n} only' } as Record<Lang, string>)[l].replace('{n}', String(it.floor)));
   return parts.join(' · ');
 }
@@ -879,6 +886,18 @@ export function itemIcon(key: string, tint?: string): HTMLCanvasElement {
       P([[12, 3], [16, 7], [20, 3], [19, 9], [13, 9]], D); E(16, 8, 2, 2, '#c9a23e');
       for (const x of [9, 14, 19, 24]) R(x, 14, 1, 14, D);
       P([[11, 6], [13, 7], [8, 27], [5, 27]], H);
+      break;
+    }
+    case 'porterbag': { // 54차 짐꾼 가방: 불룩한 캔버스 배낭 · 멜빵 · 묶은 줄
+      const C = tint ?? '#8a6a3a', D = shade(C, -0.35), H = shade(C, 0.22);
+      E(16, 18, 10, 11, C); R(8, 20, 16, 9, D); R(9, 10, 14, 2, H); R(10, 7, 12, 4, D);
+      R(11, 14, 2, 14, D); R(19, 14, 2, 14, D); R(7, 22, 18, 2, '#3a2a1a'); R(14, 23, 4, 3, '#c9a23e');
+      break;
+    }
+    case 'handcart': { // 54차 리어카: 짐칸 · 손잡이 · 큰 바퀴 둘
+      R(4, 12, 22, 9, '#6a7a8a'); R(4, 12, 22, 2, '#8a9aaa'); R(4, 19, 22, 2, '#4a5a6a'); R(25, 10, 6, 2, '#3a3a40'); R(29, 8, 2, 4, '#3a3a40');
+      E(9, 24, 5, 5, '#2a2a2e'); E(9, 24, 2, 2, '#b8bcc4'); E(21, 24, 5, 5, '#2a2a2e'); E(21, 24, 2, 2, '#b8bcc4');
+      R(6, 9, 4, 3, '#c89a5a'); R(12, 8, 6, 4, '#8a6a3a'); R(19, 9, 5, 3, '#a8a49c');
       break;
     }
     case 'blanket': {

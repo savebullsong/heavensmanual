@@ -18,9 +18,9 @@ import { t, lang, setLang, LANGS, type Lang } from './i18n.ts';
 import { load, save, type Slot, type Stash } from './state.ts';
 import { hellZone, OPEN_FLOORS, floorDef, MONSTERS, GUARDS, TOLL, ATONE_GOAL, GURMA_FULL, setRaidForce, FLOORS, FIELD_BOSS } from './hell.ts';
 import type { HellVendor } from './zone.ts';
-import { interiorZone, roomKind as roomKindOf, canEnter, voidZone, drawFurn, setAdminVisit, streetSeller, MALL_FLOORS, setMallFloor, isMall, deptName } from './interior.ts';
+import { interiorZone, roomKind as roomKindOf, canEnter, voidZone, drawFurn, setAdminVisit, setOwnerVisit, streetSeller, MALL_FLOORS, setMallFloor, isMall, deptName } from './interior.ts';
 import { heavenZone, HEAVEN_ID, heavenPriceMul, heavenMeta, TAXI_STOPS } from './heavenworld.ts';
-import { designateHomes, HOME_PRICE, FURN, furnByKey, type FurnDef } from './home.ts';
+import { designateHomes, HOME_PRICE, FURN, furnByKey, hutLayout, setHutPos, type FurnDef } from './home.ts';
 import { borderZone } from './border.ts';
 import { TWO, DOT3, setDot3 } from './sprites.ts';
 import { buildingName, hasBank, nameSeoulBanks, bankName, tagLandmarks, designatePost } from './names.ts';
@@ -29,6 +29,8 @@ import { bangkokClock, seoulClock } from './clock.ts';
 import { unlockAudio, isMuted, setMuted, plunge, chime } from './sfx.ts';
 import { hellPassage, heavenPassage, borderPassage, type Passage } from './passage.ts';
 import { artUrl } from './art.ts';
+import { openScrawl } from './scrawl.ts';
+import { openTelescope } from './telescope.ts';
 import * as sfx from './sfx.ts';
 import { bgmMode, setBgmMode, setIndoor, bgmVolume, setBgmVolume, type BgmMode } from './bgm.ts';
 import { applyDeed, karmaPoints, fmtKarma, armorClass, addSoulExp, judge, evilRatio, HELL_START, prayerAnswerChance, restRegenPerMinute, isDanger, DEED_TABLE, newStats, soulExpToNext, maxHp as maxHpFor, POINTS_PER_RANK, STAT_KEYS, STAT_MAX, type DeedKey, type StatKey } from '../../../packages/shared/src/rules.ts';
@@ -86,6 +88,9 @@ function newLife(kind?: Arrival) {
   delete state.wallets; // 45차: 지난 생의 지갑(천국 돈 포함)은 남지 않는다
   // 26차: 세계를 건너도 몸에 남는 물건(검은 마스크)은 새 생에도 그대로
   const cross = (k: string) => !!itemByKey(k)?.cross;
+  // 54차: 지난 생에 몸에 지녔던 것 몇 점을 기억해 둔다 (천국 쓰레기장 더미에서 가끔 다시 나온다)
+  { const past = Object.values(state.equip ?? {}).filter((k): k is string => !!k && !itemByKey(k)?.cross).map((k) => k.replace(/^hv:/, '')).filter((k) => !!itemByKey(k) && !itemByKey(k)!.hell);
+    if (past.length) state.pastItems = [...(state.pastItems ?? []), ...past].slice(-12); }
   // 45차: 천국의 물건은 어디에도 맡겨지지 않고 사라진다 (환생하면 다 사라진다)
   for (const k of Object.keys(state.bag ?? {})) if (itemByKey(k)?.heaven) delete state.bag![k];
   for (const [slot, k] of Object.entries(state.equip ?? {})) if (k && itemByKey(k)?.heaven) delete state.equip![slot as Slot];
@@ -632,6 +637,7 @@ function enterShop(fromStreet: boolean) {
 
 async function enterWorld(at: 'door' | [number, number] = 'door', zoneId?: string) {
   setAdminVisit(!!net.account()?.admin); // 45차: 관리자는 아파트·콘도에도 들어가 본다
+  setOwnerVisit(Object.keys(state.homes ?? {}).length > 0); // 54차: 집을 산 사람도
   restInShop();
   dropInterior();
   // 어느 구역: 우주새 문 = 아속. 자리로 들어가면 주어진 구역 → 지금 서 있던 현실 구역 → 아속 (모르는 구역(옛 저장)이면 우주새 문 앞)
@@ -1082,6 +1088,16 @@ const hooks: WorldHooks = {
   palaceSpot(kind) { void palaceSpot(kind); }, // 52차 주민센터 번호표 · 창구 · 배식대
   deptDoor(dept) { void enterDept(dept); }, // 53차 지붕 빌딩 복도의 문
   discard(name) { openDiscard(name); }, // 53차 쓰레기장 천사
+  sparEnd(win) { sparEnd(win); },
+  ferrisDate(mode) { void ferrisDate(mode); }, // 54차 // 54차 도장 대련 끝
+  pastItem() { const ps = state.pastItems ?? []; if (!ps.length || state.pastFoundDay === today() || Math.random() > 0.5) return null; return ps[Math.floor(Math.random() * ps.length)]; }, // 54차 쓰레기장의 지난 생 물건 (하루 한 번쯤)
+  pastFound(key) { state.pastFoundDay = today(); const ps = state.pastItems ?? []; const k = ps.indexOf(key); if (k >= 0) ps.splice(k, 1); save(state); const it = itemByKey(key); setTimeout(() => { if (busy || dlg.isOpen) return; busy = true; dlg.open({ name: '', monologue: true }); void dlg.say(pick(t().pastLines).replace('{item}', it ? it.name[lang()] : key)).then(() => { dlg.close(); busy = false; }); }, 400); },
+  arrowBack() { addArrows(state.arrowKey ?? 'arrows', 1); renderAmmo(); save(state); }, // 54차 화살 다시 줍기
+  telescope() { openTelescope({ L: t(), zones: ALL_ZONES, start: homeZone(), load: loadZone, peek: (id) => net.peekZone(id) }); }, // 54차 망원경
+  dropShare(x, y, kind, item, qty, life) { return net.dropPut(world?.zone.id ?? '', x, y, kind, item, qty, life); }, // 54차 떨군 물건 나누기
+  dropList() { return world ? net.dropList(world.zone.id) : Promise.resolve(null); },
+  dropTake(id) { return net.dropTake(id); },
+  dumpGoldAsk() { void net.counterGet('discard').then((n) => { if (n !== null && world?.zone.heavenGen) world.setDumpGold(n); }); }, // 54차 금빛 더미
   heavenTaxi(stop) { void heavenTaxi(stop); }, // 53차 천국 택시 천사
   mallSpot(kind) { void mallSpot(kind); }, // 52차 실내 몰
   airport() { void airportAsk(); },
@@ -1599,6 +1615,11 @@ function openRoom(z: Zone, chaser: { monster: boolean; hp: number } | null, work
 function leaveInterior(force = false) {
   if (!world?.zone.interior || !street) return;
   if (!force && world.zone.interior.kind === 'cloudisle') { void flyBack(); return; } // 46차: 구름 위 섬은 황색날개가 안고 내려간다
+  if (!force && world.zone.interior.kind === 'hhome' && state.twinLock) { // 54차 쌍둥이 장난: 밖에서 문을 잠갔다 — 두 번 더 밀면 열어 준다
+    state.twinLock -= 1; save(state);
+    if (state.twinLock > 0) { toast(pick(t().twinLocked).replaceAll('{sib}', bodyLook().sex === 'f' ? '누나' : '형아')); return; }
+    delete state.twinLock; save(state); toast(pick(t().twinUnlock), 'good');
+  }
   if (!force && world.zone.interior.kind === 'hhome') { void roomSwap(isleZone, { i: 4, j: 6 }); return; } // 47차: 오두막을 나서면 섬의 문 앞
   if (!force && world.zone.interior.kind === 'hdept') { void roomSwap(palaceZone, deptBack ?? undefined); return; } // 53차: 국 방을 나서면 지붕 빌딩 복도의 그 문 앞
   if (!force && world.zone.interior.kind === 'hprison') { toast(t().prisonLocked); return; } // 53차: 감옥 문은 잠겨 있다
@@ -1675,6 +1696,81 @@ function gainSoulExp(n: number) {
   const up = addSoulExp(soul.rank, soul.exp, n);
   state.soul = { ...soul, rank: up.rank, exp: up.exp };
   if (up.rank > soul.rank) rankUpShow(up.rank);
+}
+/** 54차 아큐버스와 대관람차: 곤돌라 안에서 하늘로 오른다 — 꼭대기에서 섬 전체와 허공, 사이에 따라 다른 말 (일반 탑승은 없다) */
+async function ferrisDate(mode: 'lover' | 'friend' | 'family' | 'alone') {
+  if (busy || dlg.isOpen) return;
+  const L = t();
+  busy = true;
+  dlg.open({ name: L.accName ?? 'Accubus', exit: true });
+  await dlg.say(pick(L.ferrisAsk));
+  const c = await dlg.choose([L.ferrisYes, L.ferrisNo]);
+  dlg.close();
+  if (c !== 0 || dlg.cancelled) { busy = false; return; }
+  const el = document.createElement('div');
+  el.className = 'sleep-cover heaven ferris-cover';
+  el.innerHTML = '<canvas></canvas><p></p>';
+  const p = el.querySelector('p')!;
+  const cv = el.querySelector('canvas') as HTMLCanvasElement;
+  const W = Math.min(420, innerWidth - 24), H = Math.min(560, innerHeight - 140), dpr = Math.min(2, devicePixelRatio || 1);
+  cv.width = W * dpr; cv.height = H * dpr; cv.style.width = `${W}px`; cv.style.height = `${H}px`;
+  const g = cv.getContext('2d')!; g.scale(dpr, dpr);
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  const lines = (L.ferrisTalk as Record<string, string[]>)[mode] ?? L.ferrisTalk.friend;
+  const T = 16, t0 = performance.now();
+  let stop = false, said = -1;
+  const clouds = Array.from({ length: 16 }, () => ({ x: Math.random() * W, y: Math.random() * H * 2, r: 30 + Math.random() * 60 }));
+  const frame = (now: number) => {
+    if (stop || !el.isConnected) return;
+    const tt = (now - t0) / 1000, k = Math.min(1, tt / T), up = Math.sin(k * Math.PI); // 0 → 1(꼭대기) → 0
+    const sky = g.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, up > 0.7 ? '#3a5aa8' : '#6a9ad8'); sky.addColorStop(1, '#f2e6c8'); g.fillStyle = sky; g.fillRect(0, 0, W, H);
+    // 꼭대기 가까이: 아래로 구름섬 전체 (흰 대지 · 금빛 탑 · 가장자리 너머 허공)
+    const iy = H * (1.25 - up * 0.55);
+    g.fillStyle = 'rgba(255,255,255,0.9)'; g.beginPath(); g.ellipse(W / 2, iy, W * 0.55, H * 0.16, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#e8e0c8'; g.beginPath(); g.ellipse(W / 2, iy - 4, W * 0.48, H * 0.12, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#a8d088'; for (let q = 0; q < 9; q++) { g.fillRect(W * 0.2 + q * W * 0.07, iy - 12 + (q % 3) * 6, 10, 6); }
+    g.fillStyle = '#7ac8e8'; g.fillRect(W * 0.62, iy - 6, 22, 10);
+    const tg = g.createLinearGradient(0, 0, 0, iy); tg.addColorStop(0, 'rgba(255,246,214,0)'); tg.addColorStop(1, '#f2dc98'); g.fillStyle = tg; g.fillRect(W * 0.46, 0, 14, iy - 20); // 끝이 안 보이는 탑
+    for (const c of clouds) { const y = ((c.y + up * H * 1.4) % (H * 2)) - H * 0.4; g.fillStyle = 'rgba(255,255,255,0.55)'; g.beginPath(); g.ellipse(c.x, y, c.r, c.r * 0.4, 0, 0, Math.PI * 2); g.fill(); }
+    // 곤돌라 창틀 · 맞은편 좌석의 아큐버스 실루엣 (흰 날개)
+    g.strokeStyle = '#e8c24e'; g.lineWidth = 10; g.strokeRect(5, 5, W - 10, H - 10);
+    g.fillStyle = '#f6f0e2'; g.fillRect(0, H - 70, W, 70); g.fillStyle = '#d8c8a8'; g.fillRect(0, H - 74, W, 6);
+    g.fillStyle = 'rgba(255,255,255,0.92)'; g.beginPath(); g.ellipse(W * 0.3, H - 96, 46, 30, -0.5, 0, Math.PI * 2); g.fill(); g.beginPath(); g.ellipse(W * 0.7, H - 96, 46, 30, 0.5, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#2a2026'; g.beginPath(); g.ellipse(W / 2, H - 112, 15, 18, 0, 0, Math.PI * 2); g.fill(); g.fillRect(W / 2 - 22, H - 96, 44, 30);
+    g.strokeStyle = '#f2dc98'; g.lineWidth = 2; g.beginPath(); g.ellipse(W / 2, H - 136, 13, 4, 0, 0, Math.PI * 2); g.stroke();
+    const li = Math.min(lines.length - 1, Math.floor(k * lines.length));
+    if (li !== said) { said = li; p.textContent = lines[li]; }
+    if (tt < T + 1.2) requestAnimationFrame(frame); else stop = true;
+  };
+  requestAnimationFrame(frame);
+  await new Promise((r) => setTimeout(r, (T + 1.4) * 1000));
+  stop = true;
+  el.classList.remove('show'); setTimeout(() => el.remove(), 900);
+  busy = false;
+  accDate('ferris');
+}
+/** 54차 도장 관장과 맨손 대련: 값을 내면 관장이 도복 띠를 고쳐 매고 덤빈다 — 어느 쪽이든 체력이 3할 아래면 끝 (죽지 않는다). 이기면 하루 한 번 영혼 경험치 */
+const SPAR_FEE = 300;
+let sparring = false;
+function startSpar() {
+  const L = t();
+  if (sparring || !world?.zone.interior) return;
+  if ((state.hp ?? maxHp()) < maxHp() * 0.6) { toast(L.sparTired); return; }
+  if (!pay(SPAR_FEE)) return;
+  const r = state.soul?.rank ?? 1;
+  world.setGear({ ...gear(), weapon: null, ranged: false, atk: 0, reach: undefined, dry: false });
+  if (!world.startSpar(240 + r * 60, [5 + r * 2, 10 + r * 3])) { world.setGear(gear()); return; }
+  sparring = true; closeMenus();
+  toast(L.sparGo);
+}
+function sparEnd(win: boolean) {
+  const L = t();
+  sparring = false;
+  world?.setGear(gear());
+  const dd = daily();
+  if (win && !dd.sparWon) { dd.sparWon = true; gainSoulExp(4); save(state); toast(L.sparWin, 'good'); }
+  else toast(win ? L.sparWinAgain : L.sparLose);
 }
 function startTraining(kind: 'gym' | 'dojo') {
   const L = t();
@@ -1763,9 +1859,10 @@ async function palaceTalk() {
 }
 /** 52차 천국 1층 주민센터: 번호표 뽑기 · 불린 번호로 창구에서 한 번 묻기 · 구내식당 배급 */
 const pad4 = (n: number) => String(n).padStart(4, '0');
-async function palaceSpot(kind: 'ticket' | 'counter' | 'buffet') {
+async function palaceSpot(kind: 'ticket' | 'counter' | 'buffet' | 'scrawl') {
   if (busy || dlg.isOpen || scene !== 'world') return;
   const L = t();
+  if (kind === 'scrawl') { await scrawlAsk(); return; }
   if (kind === 'ticket') {
     const tk = state.hticket;
     if (tk) { toast(L.palaceHaveTicket.replace('{n}', pad4(tk.n))); return; }
@@ -1792,6 +1889,7 @@ async function palaceSpot(kind: 'ticket' | 'counter' | 'buffet') {
     const c = await dlg.choose([...L.palaceQ]);
     if (c >= 0 && c < L.palaceA.length && !dlg.cancelled) {
       state.hticket = undefined; save(state); world?.setPalaceTicket(null); // 번호표 하나에 한 번만 묻는다
+      if (c === 3) { state.repairDue = Date.now() + (2 + Math.random() * 4) * 3600_000; state.repairDone = false; save(state); } // 54차: 한참 뒤 수리 천사가 정말 온다
       await dlg.say(L.palaceA[c]);
     }
     endTalk();
@@ -1853,7 +1951,9 @@ async function postTalk() {
   busy = true;
   dlg.open({ name: L.postClerk, exit: true });
   await dlg.say(pick(L.postGreet));
-  const c = await dlg.choose([L.postFind, L.postBye]);
+  const c = await dlg.choose([L.postFind, L.parcelSendQ, L.parcelFindQ, L.postBye]);
+  if (c === 1 && !dlg.cancelled) { await parcelSendTalk(); return; } // 54차 소포 부치기
+  if (c === 2 && !dlg.cancelled) { await parcelFindTalk(); return; } // 54차 소포 찾기
   if (c !== 0 || dlg.cancelled) { endTalk(); return; }
   await refreshLetters();
   const got = letterCache.filter((l) => l.reply);
@@ -1861,6 +1961,98 @@ async function postTalk() {
   await dlg.say(L.postHere.replace('{n}', String(got.length)));
   endTalk();
   openPostBox(got);
+}
+/** 54차 소포 부치기: 가입한 사람만 · 하루 다섯 개 · 내일 이맘때 도착 · 받는 사람이 지옥이면 못 부친다 */
+async function parcelSendTalk() {
+  const L = t();
+  if (!net.account()) { await dlg.say(L.parcelLogin); endTalk(); return; }
+  await dlg.say(L.parcelHow);
+  endTalk();
+  closeMenus();
+  document.querySelector('.store-panel')?.remove();
+  const el = document.createElement('div');
+  el.className = 'store-panel shop-menu parcel-panel';
+  el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close">✕</button></div><p class="store-line"></p><div class="menu-list"></div>`;
+  el.querySelector('.menu-head b')!.textContent = L.parcelTitle;
+  el.querySelector('.store-line')!.textContent = L.parcelLine;
+  (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
+  const list = el.querySelector('.menu-list')!;
+  const form = (it: ItemDef, n: number) => {
+    list.innerHTML = '';
+    const head = document.createElement('p'); head.className = 'scrawl-head'; head.textContent = `${it.name[lang()]} ×${n}`;
+    const to = document.createElement('input'); to.className = 'parcel-input'; to.maxLength = 32; to.placeholder = L.parcelTo;
+    const note = document.createElement('input'); note.className = 'parcel-input'; note.maxLength = 80; note.placeholder = L.parcelNote;
+    const foot = document.createElement('div'); foot.className = 'scrawl-foot';
+    const back = document.createElement('button'); back.textContent = L.scrawlBack; back.onclick = () => draw();
+    const go = document.createElement('button'); go.className = 'primary'; go.textContent = L.parcelGo;
+    go.onclick = async () => {
+      const who = to.value.trim(); if (!who) { to.focus(); return; }
+      if (sellFree(it.key) < n) { toast(L.parcelGone); draw(); return; }
+      go.disabled = true;
+      const r = await net.parcelSend(who, it.key, n, null, note.value.trim());
+      if (r === 'ok') { sellTake(it.key, n); save(state); updateHud(); renderQuick(); sfx.thud(sfx.spot(0, 0)); toast(L.parcelSent.replace('{who}', who), 'good'); el.remove(); return; }
+      toast(r === 'nouser' ? L.parcelNoUser : r === 'self' ? L.parcelSelf : r === 'hell' ? L.parcelHell : r === 'wait' ? L.parcelWait : r === 'login' ? L.parcelLogin : L.letterFail);
+      go.disabled = false;
+    };
+    foot.append(back, go);
+    list.append(head, to, note, foot);
+    setTimeout(() => to.focus(), 50);
+  };
+  const draw = () => {
+    list.innerHTML = '';
+    const bag = state.bag ?? {};
+    const keys = [...Object.keys(bag).filter((k) => bag[k] > 0 && sellFree(k) > 0), ...ammoKinds().map((it) => it.key).filter((k) => sellFree(k) > 0 && !(bag[k] > 0))]
+      .filter((k) => { const it = itemByKey(k); return !!it && worldOf(it) !== 'hell' && it.use !== 'diary'; });
+    if (!keys.length) { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = L.parcelNothing; list.appendChild(p); return; }
+    for (const k of keys) {
+      const it = itemByKey(k); if (!it) continue;
+      list.appendChild(itemRow(it, `×${sellFree(k)}`, async () => {
+        const n = await askQty(it, 0, sellFree(k), 'store');
+        if (n > 0) form(it, n);
+      }));
+    }
+  };
+  draw();
+  document.body.appendChild(el);
+}
+/** 54차 소포 찾기: 도착한 것을 하나씩 받는다 (오는 중인 것은 수만 알려 준다) */
+async function parcelFindTalk() {
+  const L = t();
+  if (!net.account()) { await dlg.say(L.parcelLogin); endTalk(); return; }
+  const box = await net.parcelBox();
+  if (!box) { await dlg.say(L.letterFail); endTalk(); return; }
+  if (!box.inbox.length) { await dlg.say(box.coming ? L.parcelComing.replace('{n}', String(box.coming)) : L.parcelNone); endTalk(); return; }
+  await dlg.say(L.parcelHere.replace('{n}', String(box.inbox.length)));
+  endTalk();
+  closeMenus();
+  document.querySelector('.store-panel')?.remove();
+  const el = document.createElement('div');
+  el.className = 'store-panel shop-menu letter-panel';
+  el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close">✕</button></div><div class="menu-list"></div>`;
+  el.querySelector('.menu-head b')!.textContent = L.parcelBoxTitle;
+  (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
+  const list = el.querySelector('.menu-list')!;
+  for (const p of box.inbox) {
+    const it = itemByKey(p.item.replace(/^hv:/, '')) ?? itemByKey(p.item);
+    const card = document.createElement('div'); card.className = 'letter-card';
+    const head = document.createElement('small'); head.textContent = L.parcelFrom.replace('{who}', p.from);
+    const what = document.createElement('p'); what.className = 'letter-reply'; what.textContent = `${it ? it.name[lang()] : p.item} ×${p.qty}`;
+    const note = document.createElement('p'); note.className = 'letter-mine'; note.textContent = p.note ? `“${p.note}”` : '';
+    const take = document.createElement('button'); take.className = 'primary'; take.textContent = L.parcelTake;
+    take.onclick = async () => {
+      take.disabled = true;
+      const r = await net.parcelClaim(p.id);
+      if (!r) { toast(L.letterFail); take.disabled = false; return; }
+      const got = itemByKey(r.item.replace(/^hv:/, '')) ?? itemByKey(r.item);
+      if (got) for (let q = 0; q < Math.min(9999, r.qty); q++) addToBag(got);
+      save(state); updateHud(); renderQuick();
+      toast(L.parcelGot.replace('{item}', got ? got.name[lang()] : r.item), 'good');
+      card.remove(); if (!list.children.length) el.remove();
+    };
+    card.append(head, what, note, take);
+    list.appendChild(card);
+  }
+  document.body.appendChild(el);
 }
 function openPostBox(ls: net.Letter[]) {
   closeMenus();
@@ -1987,6 +2179,7 @@ function clerkTalk() {
     // 45차: 헬스장 · 도장 — 한 번 값을 내면 한 시간 운동. 1분마다 영혼 경험치 1 (하루 세 시간까지 · 아주 조금씩)
     const dd = daily();
     opts.push({ label: (info.kind === 'gym' ? L.trainGym : L.trainDojo).replace('{p}', moneyText(TRAIN_FEE)).replace('{n}', String(Math.max(0, TRAIN_CAP - (dd.train ?? 0)))), act: () => startTraining(info.kind as 'gym' | 'dojo') });
+    if (info.kind === 'dojo') opts.push({ label: L.sparBtn.replace('{p}', moneyText(SPAR_FEE)), act: () => startSpar() }); // 54차 관장과 맨손 대련
   } else if (info.kind === 'massage') {
     // 21차: 마사지 — 체력을 가득 채우고 넘치게 (최대 체력의 40%만큼 더, 맞으면 먼저 깎이고 10분에 걸쳐 빠진다)
     opts.push({ label: L.massageBtn, act: () => { if (pay(250)) { healFull(); world?.addOverHp(Math.round(maxHp() * 0.4)); toast(L.massaged, 'good'); } } });
@@ -3571,6 +3764,7 @@ function openDiscard(name: string) {
         const n = c < amts.length ? amts[c] : cash;
         state.wallet = Math.max(0, (state.wallet ?? 0) - n); save(state); updateHud();
         toast(L.discardedMoney.replace('{p}', priceText(n, false))); draw();
+        void net.counterAdd('discard', n).then((v) => { if (v !== null && world?.zone.heavenGen) world.setDumpGold(v); }); // 54차: 금빛 더미가 자란다
       };
       list.appendChild(b);
     }
@@ -3734,7 +3928,13 @@ function itemWeight(it: ItemDef | undefined): number {
 }
 function loadCap() {
   const st = stats();
-  return Math.round((50 + st.str * 3 + st.vit * 1.5 + (state.soul?.rank ?? 1) * 0.5) * 10) / 10; // 48차: 기본 30 → 50 (장비 한 벌에 소비품 여러 가지를 들어도 눕지 않게)
+  return Math.round((50 + st.str * 3 + st.vit * 1.5 + (state.soul?.rank ?? 1) * 0.5 + carryBonus().carry) * 10) / 10; // 48차: 기본 30 → 50 (장비 한 벌에 소비품 여러 가지를 들어도 눕지 않게)
+}
+/** 54차 짐꾼 가방 · 리어카: 가지고 있는 것 중 이 세계에서 쓸 수 있는 것마다 한 번씩 (같은 것 여럿은 하나로) */
+function carryBonus() {
+  let carry = 0, slow = 0;
+  for (const [k, n] of Object.entries(state.bag ?? {})) { if (n <= 0) continue; const it = itemByKey(k); if (!it?.carry || !worldOk(it)) continue; carry += it.carry; slow = Math.max(slow, it.slow ?? 0); }
+  return { carry, slow };
 }
 function loadNow() {
   let w = 0;
@@ -3753,7 +3953,7 @@ let loadWas = 0;
 function applyLoad() {
   const e = loadEffect();
   const bk = state.equip?.back, cp = bk && worldOk(itemByKey(bk)) && !broken(bk) ? itemByKey(bk)?.cape : undefined; // 50차 등 칸: 걸음 · 쉬며 차는 피
-  const sp = e.crawl ? e.speed : e.speed * (1 + (cp?.swift ?? 0)), rg = e.regen * (1 + (cp?.regen ?? 0));
+  const sp = e.crawl ? e.speed : e.speed * (1 + (cp?.swift ?? 0)) * (1 - carryBonus().slow), rg = e.regen * (1 + (cp?.regen ?? 0));
   world?.setLoad(sp, rg, e.crawl);
   shop?.setLoad(sp, e.crawl); // 48차: 우주새·유황새 가게 안에서도
   const lvl = e.crawl ? 2 : e.r > 1 ? 1 : 0;
@@ -4214,7 +4414,7 @@ function useMarionette(k: string) {
   if (!m || !(bag[k] > 0)) return;
   if (!inHell() || !world || world.zone.interior || world.isDead) { toast(L.marionetteNo); return; }
   if (world.marionetteLeft > 0) { toast(L.marionetteOne); return; }
-  if (!world.summonMarionette(m.hp, m.dmg, m.cols, 180)) { toast(L.marionetteNo); return; }
+  if (!world.summonMarionette(m.hp, m.dmg, m.cols, 180, Number(k.slice(-1)) || 0)) { toast(L.marionetteNo); return; } // 54차: 1 병정 · 2 무희 · 3 기사의 고유 기술
   bag[k] -= 1;
   save(state);
   renderQuick();
@@ -5326,7 +5526,7 @@ type Sanct = 'church' | 'temple' | 'mosque';
 const svcClock = () => (state.region === 'seoul' ? seoulClock() : bangkokClock());
 const svcDayKey = () => new Date(Date.now() + (state.region === 'seoul' ? 9 : 7) * 3600e3).toISOString().slice(0, 10);
 const svcTime = () => `${String(SVC_HOUR).padStart(2, '0')}:00`;
-let svc: { kind: Sanct; end: number; chip: HTMLElement; next: number; mur: number; k: number } | null = null;
+let svc: { kind: Sanct; end: number; chip: HTMLElement; next: number; mur: number; k: number; part?: number; ser?: string[]; si?: number } | null = null;
 let svcBell = '';
 let svcForce = false; // 개발용: 지금이 예배 시간인 것으로
 let svcGoing = false; // 데려가는 중 (겹쳐 부르지 않게)
@@ -5424,8 +5624,15 @@ function svcRun() {
   if (!world || !world.zone.interior || !SANCT_ROOMS.includes(world.zone.interior.kind) || left <= 0) { svcFinish(left <= 0); return; }
   const mm = Math.floor(left / 60000), ss = Math.floor((left % 60000) / 1000);
   s.chip.textContent = L.svcChip.replace('{t}', `${mm}:${String(ss).padStart(2, '0')}`);
-  if (Date.now() >= s.next) { const ls = L.svcLines[s.kind]; world.officiantSay(ls[s.k++ % ls.length]); s.next = Date.now() + 14000 + Math.random() * 6000; }
-  if (Date.now() >= s.mur) { world.congregationSay(pick(L.svcMurmur)); s.mur = Date.now() + 6000 + Math.random() * 7000; }
+  // 54차: 성소마다 다른 순서 — 여는 말 → 그날의 설교(성소마다 다른 이야기) → 찬송 · 염불 · 낭송 장면 → 맺는 말
+  const f = 1 - left / SVC_LEN_MS, part = f < 0.14 ? 0 : f < 0.56 ? 1 : f < 0.82 ? 2 : 3;
+  if (part !== s.part) { s.part = part; s.next = Date.now() + 1200; world.serviceScene(s.kind, part === 2); if (part === 2) world.officiantSay(L.svcHymnCall[s.kind]); if (part === 1) { const ser = L.svcSermons[s.kind]; s.ser = ser[(Math.floor(Date.now() / 86400000) + s.kind.length) % ser.length]; s.si = 0; world.officiantSay(s.ser[0]); s.si = 1; s.next = Date.now() + 9000; } }
+  if (Date.now() >= s.next) {
+    if (part === 1 && s.ser && (s.si ?? 0) < s.ser.length) { world.officiantSay(s.ser[s.si!]); s.si = (s.si ?? 0) + 1; s.next = Date.now() + 10000 + Math.random() * 3000; }
+    else if (part === 2) { world.congregationSay(pick(L.svcHymn[s.kind])); s.next = Date.now() + 3500 + Math.random() * 2000; }
+    else { const ls = L.svcLines[s.kind]; world.officiantSay(ls[s.k++ % ls.length]); s.next = Date.now() + 14000 + Math.random() * 6000; }
+  }
+  if (part !== 2 && Date.now() >= s.mur) { world.congregationSay(pick(L.svcMurmur)); s.mur = Date.now() + 6000 + Math.random() * 7000; }
 }
 function svcFinish(done: boolean) {
   const s = svc;
@@ -5436,6 +5643,7 @@ function svcFinish(done: boolean) {
   const L = t();
   world?.seatPlayer(null);
   world?.setService(false);
+  world?.serviceScene(s.kind, false);
   if (!done) return;
   world?.officiantSay(L.svcBless[s.kind]);
   state.heaven = { ...state.heaven, svcDay: svcDayKey(), adapted: true, rites: (state.heaven?.rites ?? 0) + 1 };
@@ -5487,9 +5695,29 @@ async function deptTalk(dept: number) {
   busy = true;
   const L = t();
   dlg.open({ name: deptName(dept), exit: true });
-  const c = await dlg.choose([L.deptAsk, L.deptBye]);
+  const c = await dlg.choose(dept === 0 ? [L.deptAsk, L.lifebookAsk, L.deptBye] : [L.deptAsk, L.deptBye]);
   if (c === 0 && !dlg.cancelled) await dlg.say((L.deptWhere as Record<string, string>)[String(dept)] ?? '');
+  if (dept === 0 && c === 1 && !dlg.cancelled) await lifebookPeekTalk(); // 54차 생명책 엿보기
   endTalk();
+}
+/** 54차 사무국의 생명책: 직원이 잠깐 자리를 비운 사이 펼쳐진 쪽을 엿본다 — 다른 영혼 몇의 한 줄 (게임 속 이름 · 있는 곳 · 선 · 악 · 영격) */
+async function lifebookPeekTalk() {
+  const L = t();
+  await dlg.say(pick(L.lifebookClerk));
+  const ls = await net.lifebookPeek();
+  dlg.close();
+  dlg.open({ name: L.lifebookTitle, monologue: true, exit: true });
+  if (!ls) { await dlg.say(L.letterFail); return; }
+  if (!ls.length) { await dlg.say(L.lifebookEmpty); return; }
+  await dlg.say(L.lifebookOpen);
+  for (const x of ls.slice(0, 5)) {
+    const where = x.realm === 'hell' ? L.lifebookHell : x.realm === 'heaven' ? L.lifebookHeaven : L.lifebookReal;
+    const g = Math.round(x.good * 10) / 10, e = Math.round(x.evil * 10) / 10;
+    const tone = e > g * 2 ? L.lifebookDark : g > e * 3 ? L.lifebookBright : L.lifebookGrey;
+    await dlg.say(L.lifebookLine.replace('{who}', x.nick || L.scrawlUnnamed).replace('{where}', where).replace('{g}', String(g)).replace('{e}', String(e)).replace('{r}', String(x.rank)).replace('{tone}', pick(tone)));
+    if (dlg.cancelled) return;
+  }
+  await dlg.say(L.lifebookClose);
 }
 /** 53차 천국 택시 천사: 정류장 넷(시작 지점 · 천국의 지붕 빌딩 앞 · 종교시설 구역 · 쓰레기장) 사이를 안고 난다 — 값은 없다 */
 async function heavenTaxi(stop: number) {
@@ -5541,6 +5769,7 @@ function isleZone() {
   return interiorZone(b, -6, { ...isleOut }, t().cottageName);
 }
 function hhomeZone() {
+  setHutPos(state.hfurnPos ?? {}); // 54차: 옮긴 가구 자리
   const b = { i0: isleOut.i, j0: isleOut.j, w: 1, d: 1, h: 0, cat: 'hhome', color: '#ffffff' } as unknown as Building;
   return interiorZone(b, -7, { ...isleOut }, t().hhomeName, undefined, state.hfurn ?? []);
 }
@@ -5581,7 +5810,108 @@ async function hutDoor(which: 'mine' | 'twins') {
   const go = c === 0 && !dlg.cancelled;
   dlg.close();
   busy = false;
-  if (go) void roomSwap(hhomeZone);
+  if (go) void roomSwap(hhomeZone).then(() => hutEvents());
+}
+/** 54차 오두막 가구 옮기기: 위에서 내려다본 배치도에서 가구를 끌어 다른 칸으로 (벽 · 부엌 · 문 앞 · 다른 가구와 겹치면 제자리로) */
+function openFurnPlanner() {
+  closeMenus();
+  document.querySelector('.store-panel')?.remove();
+  const L = t(), W = 14, H = 11, C = Math.max(20, Math.min(30, Math.floor((innerWidth - 60) / W)));
+  const own = state.hfurn ?? [];
+  const pos: Record<string, [number, number]> = { ...(state.hfurnPos ?? {}) };
+  const lay = hutLayout(own, W, H, pos);
+  const el = document.createElement('div');
+  el.className = 'store-panel shop-menu furn-plan';
+  el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close">✕</button></div><p class="store-line"></p><div class="plan-wrap"><canvas></canvas></div><div class="scrawl-foot"><button class="plan-reset"></button><button class="plan-save primary"></button></div>`;
+  el.querySelector('.menu-head b')!.textContent = L.planTitle;
+  el.querySelector('.store-line')!.textContent = lay.length ? L.planLine : L.planEmpty;
+  (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
+  const cv = el.querySelector('canvas') as HTMLCanvasElement, dpr = Math.min(2, devicePixelRatio || 1);
+  cv.width = W * C * dpr; cv.height = H * C * dpr; cv.style.width = `${W * C}px`; cv.style.height = `${H * C}px`; cv.style.touchAction = 'none';
+  const g = cv.getContext('2d')!; g.scale(dpr, dpr);
+  const COL = ['#e8b8a8', '#a8c8e8', '#c8e0a8', '#e8d8a0', '#d0b8e8', '#a8e0d8', '#f0c890', '#b8c0c8'];
+  const door: [number, number] = [Math.floor(W / 2), H - 2];
+  const cells = (k: number, off: [number, number]) => lay[k].rects.map(([i, j, w, d]) => [i + off[0], j + off[1], w, d] as [number, number, number, number]);
+  const okAt = (k: number, off: [number, number]) => {
+    for (const [i, j, w, d] of cells(k, off)) {
+      if (i < 1 || j < 1 || i + w > W - 1 || j + d > H - 1) return false;
+      if (j < 2 && i < 4) return false; // 붙박이 부엌
+      if (door[0] >= i && door[0] < i + w && door[1] >= j && door[1] < j + d) return false; // 문 앞은 비워 둔다
+      for (let q = 0; q < lay.length; q++) { if (q === k) continue; for (const [a, b, c, e] of cells(q, lay[q].off)) if (i < a + c && a < i + w && j < b + e && b < j + d) return false; }
+    }
+    return true;
+  };
+  let drag: { k: number; sx: number; sy: number; off0: [number, number]; bad?: boolean } | null = null;
+  const paint = () => {
+    g.clearRect(0, 0, W * C, H * C);
+    g.fillStyle = '#efe6d2'; g.fillRect(0, 0, W * C, H * C);
+    g.fillStyle = '#c8b89a'; g.fillRect(0, 0, W * C, C); g.fillRect(0, 0, C, H * C); // 뒤 두 벽
+    g.strokeStyle = 'rgba(120,100,70,0.18)'; g.lineWidth = 1;
+    for (let i = 1; i < W; i++) { g.beginPath(); g.moveTo(i * C, C); g.lineTo(i * C, H * C); g.stroke(); }
+    for (let j = 1; j < H; j++) { g.beginPath(); g.moveTo(C, j * C); g.lineTo(W * C, j * C); g.stroke(); }
+    g.fillStyle = '#b8a888'; g.fillRect(1 * C, 1 * C, 3 * C, C); g.fillStyle = '#5a4a3a'; g.font = `600 ${Math.round(C * 0.4)}px system-ui`; g.textAlign = 'center'; g.fillText(L.planKitchen, 2.5 * C, 1.65 * C);
+    g.fillStyle = '#e0b437'; g.fillRect(door[0] * C + 3, (H - 1) * C, C - 6, C * 0.5); g.fillStyle = '#5a4a3a'; g.fillText(L.planDoor, (door[0] + 0.5) * C, (H - 1) * C - 4);
+    lay.forEach((f, k) => {
+      const live = drag?.k === k;
+      for (const [i, j, w, d] of cells(k, f.off)) { g.fillStyle = live && drag?.bad ? '#e8707a' : COL[k % COL.length]; g.fillRect(i * C + 2, j * C + 2, w * C - 4, d * C - 4); g.strokeStyle = live ? '#2a2010' : 'rgba(60,40,20,0.5)'; g.lineWidth = live ? 2 : 1; g.strokeRect(i * C + 2, j * C + 2, w * C - 4, d * C - 4); }
+      const [i, j, w, d] = cells(k, f.off)[0];
+      g.fillStyle = '#2a2010'; g.font = `600 ${Math.round(C * 0.34)}px system-ui`; g.textAlign = 'center';
+      const nm = f.name[lang()]; g.fillText(nm.length > 7 ? nm.slice(0, 7) + '…' : nm, (i + w / 2) * C, (j + d / 2) * C + 4);
+    });
+  };
+  const at = (e: PointerEvent): [number, number] => { const r = cv.getBoundingClientRect(); return [((e.clientX - r.left) / r.width) * W, ((e.clientY - r.top) / r.height) * H]; };
+  cv.onpointerdown = (e) => {
+    const [x, y] = at(e);
+    const k = lay.findIndex((f, q) => cells(q, f.off).some(([i, j, w, d]) => x >= i && x < i + w && y >= j && y < j + d));
+    if (k < 0) return;
+    cv.setPointerCapture(e.pointerId); drag = { k, sx: x, sy: y, off0: [...lay[k].off] as [number, number] }; paint();
+  };
+  cv.onpointermove = (e) => {
+    if (!drag) return;
+    const [x, y] = at(e), off: [number, number] = [drag.off0[0] + Math.round(x - drag.sx), drag.off0[1] + Math.round(y - drag.sy)];
+    lay[drag.k].off = off; drag.bad = !okAt(drag.k, off); paint();
+  };
+  const drop = () => { if (!drag) return; if (drag.bad) { lay[drag.k].off = drag.off0; toast(L.planBad); } drag = null; paint(); };
+  cv.onpointerup = drop; cv.onpointercancel = drop;
+  (el.querySelector('.plan-reset') as HTMLButtonElement).textContent = L.planReset;
+  (el.querySelector('.plan-reset') as HTMLButtonElement).onclick = () => { for (const f of lay) f.off = [0, 0]; paint(); };
+  (el.querySelector('.plan-save') as HTMLButtonElement).textContent = L.planSave;
+  (el.querySelector('.plan-save') as HTMLButtonElement).onclick = () => {
+    const out: Record<string, [number, number]> = {};
+    for (const f of lay) if (f.off[0] || f.off[1]) out[f.slot] = f.off;
+    state.hfurnPos = out; save(state); el.remove();
+    toast(L.planSaved, 'good');
+    if (world?.zone.interior?.kind === 'hhome') { const p = world.playerTile(); void roomSwap(hhomeZone, p); }
+  };
+  document.body.appendChild(el);
+  paint();
+}
+/** 오두막 안에 있을 때만 보이는 '가구 옮기기' 단추 */
+setInterval(() => {
+  const inHut = scene === 'world' && world?.zone.interior?.kind === 'hhome';
+  let b = document.querySelector('.furn-move-btn') as HTMLButtonElement | null;
+  if (!inHut) { b?.remove(); return; }
+  if (!b) { b = document.createElement('button'); b.className = 'furn-move-btn'; b.textContent = t().planBtn; b.onclick = () => openFurnPlanner(); document.body.appendChild(b); }
+}, 800);
+/** 54차 오두막에 들어서면: 부른 지 한참 지난 수리 천사가 공구를 들고 고치고 있다 (번호표 창구에서 '물이 안 나와요') */
+async function hutEvents() {
+  if (!world || world.zone.interior?.kind !== 'hhome') return;
+  const L = t();
+  const hid = state.twinHid;
+  if (hid?.told) { // 54차: 쌍둥이가 숨긴 물건 — 일러 준 대로 침대 밑에서
+    const it = itemByKey(hid.key);
+    if (it) { state.bag = state.bag ?? {}; state.bag[hid.key] = (state.bag[hid.key] ?? 0) + hid.n; }
+    delete state.twinHid; save(state); updateHud(); renderQuick();
+    busy = true; dlg.open({ name: '', monologue: true }); await dlg.say(L.twinFound.replace('{item}', it ? it.name[lang()] : hid.key)); dlg.close(); busy = false;
+  }
+  if (state.twinLockDay !== today() && Math.random() < 0.2) { state.twinLockDay = today(); state.twinLock = 3; save(state); } // 하루 한 번쯤
+  if (state.repairDue && !state.repairDone && Date.now() >= state.repairDue) {
+    state.repairDone = true; state.hutWater = true; save(state);
+    world.spawnRepairAngel();
+    busy = true;
+    dlg.open({ name: '', monologue: true }); await dlg.say(L.repairArrive); dlg.close();
+    busy = false;
+  }
 }
 // ───────────────────────── 47차 공항: 서울 ↔ 방콕 ─────────────────────────
 // 도시 맨 끝 길가의 공항 정류장(또는 끝 구역의 가장자리) → 공항 출국장 → 항공사 카운터에서 표 사기 → 출입국 심사대로 걸어가면 건너간다
@@ -5629,12 +5959,10 @@ async function immigration() {
   endTalk();
   if (!ok) return;
   busy = true;
-  const el = document.createElement('div');
-  el.className = 'sleep-cover'; el.innerHTML = '<p></p>';
-  el.querySelector('p')!.textContent = L.flightLine[to === 'seoul' ? 0 : 1];
+  const el = planeWindow(L.flightLine[to === 'seoul' ? 0 : 1], L.flightTower); // 54차: 비행기 창밖 — 구름 사이로 천국의 지붕 빌딩이 잠깐 스친다
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add('show'));
-  await new Promise((r) => setTimeout(r, 3200));
+  await new Promise((r) => setTimeout(r, 6200));
   delete state.ticket;
   state.region = to;
   save(state);
@@ -5644,6 +5972,44 @@ async function immigration() {
   await enterWorld('door');
   el.classList.remove('show'); setTimeout(() => el.remove(), 900);
   toast(L.landed[to === 'seoul' ? 0 : 1], 'good');
+}
+/** 54차 비행기 창: 둥근 창 너머로 구름이 흐르고, 한가운데쯤 끝이 보이지 않는 금빛 탑이 구름 사이로 잠깐 지나간다 */
+function planeWindow(line: string, towerLine: string) {
+  const el = document.createElement('div');
+  el.className = 'sleep-cover plane-cover';
+  el.innerHTML = '<canvas class="plane-win"></canvas><p></p>';
+  const p = el.querySelector('p')!; p.textContent = line;
+  const cv = el.querySelector('canvas') as HTMLCanvasElement;
+  const W = 240, H = 340, dpr = Math.min(2, devicePixelRatio || 1);
+  cv.width = W * dpr; cv.height = H * dpr; cv.style.width = `${W}px`; cv.style.height = `${H}px`;
+  const g = cv.getContext('2d')!; g.scale(dpr, dpr);
+  const clouds = Array.from({ length: 14 }, () => ({ x: Math.random() * W * 1.6, y: 40 + Math.random() * (H - 60), r: 26 + Math.random() * 50, v: 40 + Math.random() * 70, near: Math.random() < 0.4 }));
+  const t0 = performance.now(); let said = false;
+  const frame = (now: number) => {
+    if (!el.isConnected) return;
+    const t = (now - t0) / 1000;
+    g.save();
+    g.beginPath(); g.roundRect(14, 14, W - 28, H - 28, 90); g.clip();
+    const sky = g.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#4a78c8'); sky.addColorStop(0.6, '#9cc0ec'); sky.addColorStop(1, '#e8f0fa'); g.fillStyle = sky; g.fillRect(0, 0, W, H);
+    for (const c of clouds) if (!c.near) { const x = ((c.x - t * c.v * 0.5) % (W * 1.6) + W * 1.6) % (W * 1.6) - W * 0.3; g.fillStyle = 'rgba(255,255,255,0.55)'; g.beginPath(); g.ellipse(x, c.y, c.r, c.r * 0.38, 0, 0, Math.PI * 2); g.fill(); }
+    // 탑: 2.2초쯤 오른쪽에서 들어와 왼쪽으로 (먼 곳이라 느리게) — 위는 구름 위로 끝없이
+    const tx = W + 60 - (t - 1.6) * 70;
+    if (tx > -80 && tx < W + 80) {
+      const a = Math.max(0, Math.min(1, (t - 1.6) * 0.8, (W + 80 - tx) / 60, (tx + 80) / 60)) * 0.85;
+      for (let k = 0; k < 9; k++) { const w = 46 - k * 4.2, y1 = H - 20 - k * 38, y0 = y1 - 38; const gr = g.createLinearGradient(tx - w / 2, 0, tx + w / 2, 0); gr.addColorStop(0, `rgba(255,246,214,${a})`); gr.addColorStop(0.55, `rgba(236,214,150,${a})`); gr.addColorStop(1, `rgba(190,160,90,${a})`); g.fillStyle = gr; g.fillRect(tx - w / 2, y0, w, 38); g.fillStyle = `rgba(255,230,140,${a})`; g.fillRect(tx - w / 2 - 2, y1 - 3, w + 4, 3); for (let q = 0; q < 3; q++) { g.fillStyle = `rgba(255,250,220,${a * 0.9})`; g.fillRect(tx - w / 2 + 4 + q * (w - 10) / 3, y0 + 10, 3, 14); } }
+      const beam = g.createLinearGradient(0, 0, 0, H * 0.5); beam.addColorStop(0, `rgba(255,248,210,${a * 0.6})`); beam.addColorStop(1, 'rgba(255,248,210,0)'); g.fillStyle = beam; g.fillRect(tx - 5, 0, 10, H * 0.5);
+      if (!said && t > 2.6) { said = true; p.textContent = towerLine; }
+    }
+    for (const c of clouds) if (c.near) { const x = ((c.x - t * c.v) % (W * 1.6) + W * 1.6) % (W * 1.6) - W * 0.3; g.fillStyle = 'rgba(255,255,255,0.92)'; g.beginPath(); g.ellipse(x, c.y, c.r * 1.3, c.r * 0.5, 0, 0, Math.PI * 2); g.fill(); g.beginPath(); g.ellipse(x + c.r * 0.5, c.y - c.r * 0.25, c.r * 0.7, c.r * 0.4, 0, 0, Math.PI * 2); g.fill(); }
+    g.restore();
+    // 창틀 (두 겹) · 창 덮개
+    g.lineWidth = 14; g.strokeStyle = '#e8e4dc'; g.beginPath(); g.roundRect(7, 7, W - 14, H - 14, 96); g.stroke();
+    g.lineWidth = 3; g.strokeStyle = '#b8b2a6'; g.beginPath(); g.roundRect(15, 15, W - 30, H - 30, 88); g.stroke();
+    g.fillStyle = '#efebe3'; g.beginPath(); g.roundRect(18, 14, W - 36, 34, [86, 86, 6, 6]); g.fill();
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+  return el;
 }
 /** 47차 침대: 구름 위 내 오두막에서는 잔다(체력 가득 · 꿈 한 조각). 현실의 집에서는 잠이 오지 않는다 — 호텔에 가면 잘 수 있다 */
 async function bedAsk(room: string) {
@@ -5681,9 +6047,23 @@ async function twinsTalk() {
   const sib = bodyLook().sex === 'f' ? '누나' : '형아';
   busy = true;
   dlg.open({ name: `${L.twinBoy} · ${L.twinGirl}` });
+  { // 54차: 숨긴 물건 묻기 · 술래잡기 끼기
+    const hid = state.twinHid;
+    const opts = [L.twinJoinTag, ...(hid && !hid.told ? [L.twinWhere] : []), L.twinJustTalk];
+    const c = await dlg.choose(opts);
+    if (dlg.cancelled || c < 0) { endTalk(); return; }
+    if (opts[c] === L.twinWhere && hid) { for (const line of L.twinConfess) await dlg.say(line.replaceAll('{sib}', sib)); hid.told = true; save(state); endTalk(); return; }
+    if (opts[c] === L.twinJoinTag) { await dlg.say(pick(L.twinTagYes).replaceAll('{sib}', sib)); endTalk(); world?.startTag(); return; }
+  }
   const conv = pick(L.twinTalk);
   for (const line of conv) await dlg.say(line.replaceAll('{sib}', sib));
-  if (Math.random() < 0.25) { await dlg.say(pick(L.twinPrank)); await dlg.say(L.twinReturn); }
+  if (Math.random() < 0.25 && !state.twinHid) { // 54차: 진짜로 가방에서 하나를 숨긴다 (먹고 쓰는 것 중 하나 · 장착한 것은 손대지 않는다)
+    const bag = state.bag ?? {}, eq = new Set(Object.values(state.equip ?? {}));
+    const ks = Object.keys(bag).filter((k) => bag[k] > 0 && !eq.has(k) && itemByKey(k)?.cat === 'goods' && itemByKey(k)?.use !== 'diary');
+    await dlg.say(pick(L.twinPrank));
+    if (ks.length) { const k = ks[Math.floor(Math.random() * ks.length)]; bag[k] -= 1; if (bag[k] <= 0) delete bag[k]; state.twinHid = { key: k, n: 1 }; save(state); updateHud(); renderQuick(); }
+    else await dlg.say(L.twinReturn);
+  }
   dlg.close();
   busy = false;
 }
@@ -5740,7 +6120,7 @@ async function heavenAssault() {
   if (n < 3) { void w.guardsLeave(); return; }
   hs.n = 0;
   if (hs.last) { hs.last = false; save(state); await burnToHell(); return; }
-  hs.prison = Date.now() + 3600_000; save(state);
+  hs.prison = Date.now() + 3600_000; hs.prisonAt = Date.now(); save(state);
   await toPrison();
 }
 function prisonZone() {
@@ -5761,6 +6141,20 @@ async function toPrison() {
   fx.done();
   dlg.open({ name: '', monologue: true }); await dlg.say(L.prisonWake); dlg.close();
   busy = false;
+}
+/** 54차 감옥 뒷벽: 낙서하기(갇힐 때마다 하나) · 다른 영혼들의 낙서 보기 */
+async function scrawlAsk() {
+  const L = t();
+  busy = true;
+  dlg.open({ name: '', monologue: true, exit: true });
+  await dlg.say(L.scrawlWall);
+  const c = await dlg.choose([L.scrawlDraw, L.scrawlView, L.scrawlLeave]);
+  dlg.close(); busy = false;
+  if (c < 0 || c === 2 || dlg.cancelled) return;
+  const hs = state.hstrike, stay = String(hs?.prisonAt ?? hs?.prison ?? 'free');
+  openScrawl({ L, mode: c === 0 ? 'draw' : 'view', stay, posted: !!hs && hs.scrawled === stay, admin: !!net.account()?.admin, lang: lang(),
+    leftMin: () => (state.hstrike?.prison ? Math.max(1, Math.ceil((state.hstrike.prison - Date.now()) / 60000)) : null),
+    toast, onPosted: () => { if (state.hstrike) { state.hstrike.scrawled = stay; save(state); } } });
 }
 /** 1초마다: 감옥에 있어야 하는데 밖이면 데려가고 · 한 시간이 지나면 징벌 천사가 온다 */
 let judging = false;
@@ -7654,6 +8048,11 @@ function phoneCall(kind: 'first' | 'real' | 'hell' = 'first') {
     el.remove();
     busy = true;
     dlg.open({ name: who, portrait: face });
+    { // 54차: 거절한 횟수만큼 말투가 바뀐다 (받으면 반쯤 풀린다)
+      const nd = state.callDeclined ?? 0, tier = nd >= 10 ? 3 : nd >= 5 ? 2 : nd >= 2 ? 1 : 0;
+      if (tier && kind !== 'first') await dlg.say(pick((hellCall ? [L.declineHell1, L.declineHell2, L.declineHell3] : [L.decline1, L.decline2, L.decline3])[tier - 1]).replace('{n}', String(nd)));
+      state.callDeclined = Math.floor(nd / 2); save(state);
+    }
     if (kind === 'first') {
       await dlg.say(L.callLine);
       const yes = await dlg.choose([L.yes, L.no]);
@@ -7673,7 +8072,7 @@ function phoneCall(kind: 'first' | 'real' | 'hell' = 'first') {
     await dlg.say(pick(L.cbNo));
     dlg.close(); busy = false;
   };
-  dec.onclick = () => { el.remove(); if (kind !== 'first' && Math.random() < 0.5) toast(pick(t().callMissed)); };
+  dec.onclick = () => { el.remove(); state.callDeclined = (state.callDeclined ?? 0) + 1; save(state); if (kind !== 'first' && (state.callDeclined ?? 0) >= 10) toast(pick(t().declineToast3)); else if (kind !== 'first' && Math.random() < 0.5) toast(pick(t().callMissed)); }; // 54차 거절 횟수
   document.body.appendChild(el);
 }
 

@@ -66,10 +66,18 @@ export function bestFurn(owned: string[]): FurnDef[] {
   return [...best.values()];
 }
 /** 내 집 방에 가구를 놓는다 (붙박이 주방은 처음부터 있다) */
-export function furnishHome(owned: string[], W: number, H: number, put: (i: number, j: number, w: number, d: number, h: number, kind: string, v?: number) => void) {
+export function furnishHome(owned: string[], W: number, H: number, put: (i: number, j: number, w: number, d: number, h: number, kind: string, v?: number) => void, pos?: Record<string, [number, number]>) {
   put(1, 1, 3, 1, 24, 'kitchen', 0);
-  for (const f of bestFurn(owned)) for (const s of spotOf(f, W, H)) put(...s);
+  for (const f of bestFurn(owned)) { const o = pos?.[f.slot] ?? [0, 0]; for (const s of spotOf(f, W, H)) put(s[0] + o[0], s[1] + o[1], s[2], s[3], s[4], s[5], s[6]); } // 54차: 옮긴 자리
 }
+/** 54차 가구 배치도: 자리마다 놓인 가구의 칸들 (옮긴 만큼 밀어서) — 배치 창에서 끌어 옮긴다 */
+export function hutLayout(owned: string[], W: number, H: number, pos: Record<string, [number, number]>) {
+  return bestFurn(owned).map((f) => { const o = pos[f.slot] ?? [0, 0]; return { slot: f.slot as string, name: f.name, off: [o[0], o[1]] as [number, number], rects: spotOf(f, W, H).map((s) => [s[0], s[1], s[2], s[3]] as [number, number, number, number]) }; });
+}
+/** 54차 천국 오두막에서 옮긴 가구 자리 (main이 방을 지을 때 넣어 준다) */
+let hutPos: Record<string, [number, number]> = {};
+export function setHutPos(p: Record<string, [number, number]>) { hutPos = p; }
+export function getHutPos() { return hutPos; }
 /** 가구점 진열: 크고 눈에 띄는 것 몇 점 */
 export function furnishShowroom(W: number, H: number, put: (i: number, j: number, w: number, d: number, h: number, kind: string, v?: number) => void) {
   const y1 = H - 2;
