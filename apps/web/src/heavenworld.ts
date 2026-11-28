@@ -40,7 +40,10 @@ export function heavenPriceMul(name: string): number {
   return [1, 2, 3, 5, 10, 50, 200][h % 7];
 }
 
-export interface HeavenMeta { sancts: Record<'church' | 'temple' | 'mosque', number>; palace: number; base: { i: number; j: number }; pools: [number, number, number, number][]; cages: { i0: number; j0: number; i1: number; j1: number; kind: 'demon' | 'beast' | 'sinner' }[]; dump: { i0: number; j0: number; i1: number; j1: number }; chicken: { i: number; j: number } }
+/** 52차: 천국의 지붕 빌딩 — 섬 북쪽 끝 너머 하늘에 선 배경 탑(지도 칸 밖, 그림만) · 섬 가장자리의 정문 현관(들어가는 건물) */
+export const PALACE_BG = { i0: 90, j0: -14, w: 18, d: 18 };
+export const PALACE_GATE = { i0: 96, j0: 4, w: 6, d: 5 };
+export interface HeavenMeta { sancts: Record<'church' | 'temple' | 'mosque', number>; palace: number; base: { i: number; j: number }; ship: { i: number; j: number }; ctr: number; post: number; pools: [number, number, number, number][]; cages: { i0: number; j0: number; i1: number; j1: number; kind: 'demon' | 'beast' | 'sinner' }[]; dump: { i0: number; j0: number; i1: number; j1: number }; chicken: { i: number; j: number } }
 let meta: HeavenMeta | null = null;
 export const heavenMeta = () => meta;
 
@@ -56,6 +59,8 @@ export function heavenZone(): Zone {
     const r = ((i - cx) / (cx - 3)) ** 2 + ((j - cy) / (cy - 3)) ** 2;
     if (r < 1 + wob) set(i, j, 'park');
   }
+  // 52차: 천국의 지붕 빌딩은 섬 북쪽 끝 너머 하늘에 선 배경 — 그 뒤(화면 위)에 걸을 수 있는 땅이 남지 않게 깎는다
+  for (let j = 0; j < PALACE_BG.j0 + PALACE_BG.d; j++) for (let i = PALACE_BG.i0 - 5 + j; i < PALACE_BG.i0 + PALACE_BG.w; i++) set(i, j, 'void');
   // 큰길(동서) · 상점가 뒷길 · 남북 길
   rect(6, 56, W - 6, 61, 'walk');
   rect(24, 69, 90, 71, 'walk');
@@ -68,8 +73,8 @@ export function heavenZone(): Zone {
   // 동쪽 휴양지: 수영장 여럿 (물가는 흰 타일 바닥)
   const pools: [number, number, number, number][] = [[134, 64, 145, 72], [150, 66, 162, 76], [134, 80, 146, 90], [152, 84, 162, 94], [134, 40, 146, 48], [150, 36, 162, 46]];
   for (const [a, b, c, d] of pools) { rect(a - 2, b - 2, c + 2, d + 2, 'lot'); rect(a, b, c, d, 'water'); }
-  // 동쪽 끝 우주선 기지
-  rect(184, 44, 204, 74, 'lot'); rect(168, 56, 184, 61, 'walk');
+  // 동쪽 끝 우주선 기지 — 52차: 발사대 옆 '천국 우주센터' 건물로 들어가야 환생 로비(테라스)가 나온다
+  rect(182, 42, 206, 76, 'lot'); rect(168, 56, 184, 61, 'walk'); rect(184, 57, 196, 60, 'walk');
   // 건물
   const buildings: B[] = [];
   // 우주새: 도착하는 문 (서쪽 끝)
@@ -87,9 +92,11 @@ export function heavenZone(): Zone {
     buildings.push({ i0: i, j0: 62, w: 6, d: 7, h: 78 + ((i * 5) % 4) * 20, cat: 'shop', sign: 'left', color: ['#f4f0f8', '#f6f0e4', '#eef6ee', '#eef2f6'][s % 4], pois: [SHOPS[s]] });
     s++;
   }
-  // 천국 본청: 광장 한가운데 (들어가지 않는다 — 올려다볼 뿐)
+  // 52차: 천국의 지붕 빌딩은 광장 한가운데가 아니라 섬 북쪽 끝 너머에 선 배경(PALACE_BG). 섬 가장자리의 금빛 정문(현관)으로 들어간다
+  //   (광장 한가운데 서 있으니 뒤를 걸으면 탑 위를 걷는 것처럼 보였고, 뒤쪽 놀이공원 · 오락실을 통째로 가렸다)
   const palace = buildings.length;
-  buildings.push({ i0: 101, j0: 43, w: 18, d: 18, h: 520, cat: 'palace', color: '#ffffff', pois: [P('palace', '천국의 지붕 빌딩', 'ตึกหลังคาสวรรค์', 'Roof of Heaven Building')] }); // 51차: 본청 → 천국의 지붕 빌딩 (사무국 · 천사들의 사무실과 숙소 · 위층으로 가는 승강기)
+  buildings.push({ i0: PALACE_GATE.i0, j0: PALACE_GATE.j0, w: PALACE_GATE.w, d: PALACE_GATE.d, h: 170, cat: 'palace', sign: 'left', color: '#ffffff', pois: [P('palace', '천국의 지붕 빌딩', 'ตึกหลังคาสวรรค์', 'Roof of Heaven Building')] });
+  rect(PALACE_GATE.i0 + 1, PALACE_GATE.j0 + PALACE_GATE.d, PALACE_GATE.i0 + PALACE_GATE.w - 2, 12, 'walk');
   // 놀이공원 · 오락실
   buildings.push({ i0: 94, j0: 13, w: 8, d: 8, h: 300, cat: 'attraction', att: 'ferris', color: '#ffffff', pois: [P('attraction', '구름 대관람차', 'ชิงช้าสวรรค์เมฆ', 'Cloud Ferris Wheel')] });
   buildings.push({ i0: 105, j0: 15, w: 6, d: 6, h: 90, cat: 'attraction', att: 'carousel', color: '#ffffff', pois: [P('attraction', '날개 회전목마', 'ม้าหมุนปีก', 'Winged Carousel')] });
@@ -107,6 +114,9 @@ export function heavenZone(): Zone {
   buildings.push({ i0: 42, j0: 77, w: 11, d: 10, h: 120, cat: 'sanct', att: 'temple', sign: 'left', color: '#ffffff', pois: [P('place_of_worship', '연화 불당', 'วิหารดอกบัว', 'Lotus Hall', 'temple')] });
   sancts.mosque = buildings.length;
   buildings.push({ i0: 61, j0: 77, w: 11, d: 10, h: 130, cat: 'sanct', att: 'mosque', sign: 'left', color: '#ffffff', pois: [P('place_of_worship', '새벽빛 모스크', 'มัสยิดรุ่งอรุณ', 'Mosque of Dawn', 'mosque')] });
+  // 52차 천국 우체국 (성소 앞길 동쪽 끝): 기원 편지의 답장은 현실 · 천국의 우체국에서만 받는다
+  const post = buildings.length;
+  buildings.push({ i0: 76, j0: 80, w: 7, d: 7, h: 110, cat: 'post' as Building['cat'], sign: 'left', color: '#ffffff', pois: [P('post_office', '구름 우체국', 'ไปรษณีย์เมฆ', 'Cloud Post Office')] });
   // 소품
   const props: Prop[] = [];
   const prop = (i: number, j: number, kind: string, o = 0) => { if (tiles[j * W + i] !== TI.water && tiles[j * W + i] !== TI.void) props.push({ i, j, kind: kind as Prop['kind'], o }); };
@@ -140,10 +150,20 @@ export function heavenZone(): Zone {
   // 51차: 분수를 크게 — 둘레 여덟 칸도 막아 수반 위로 걸어 들어가지 않게
   const fountain = (i: number, j: number) => { prop(i, j, 'fountain'); for (let a2 = -1; a2 <= 1; a2++) for (let b2 = -1; b2 <= 1; b2++) if (a2 || b2) prop(i + a2, j + b2, 'fblock' as string); };
   fountain(98, 70); fountain(122, 70); fountain(98, 38); fountain(122, 38);
+  // 52차: 탑이 떠난 광장 한가운데 — 날개 편 천사상과 둥근 꽃밭 (사진 찍는 자리)
+  { const [i, j] = [110, 52]; prop(i, j, 'angelstatue'); for (let a2 = -2; a2 <= 2; a2++) for (let b2 = -2; b2 <= 2; b2++) if (a2 || b2) prop(i + a2, j + b2, 'fblock'); }
+  for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; prop(Math.round(110 + Math.cos(a) * 6.5), Math.round(52 + Math.sin(a) * 6.5), 'flowerbed', k); }
   prop(100, 28, 'balloons'); prop(118, 28, 'balloons'); prop(110, 30, 'icecream');
   for (let i = 8; i < W - 8; i += 6) { if ((i > 88 && i < 130) || i > 180) continue; prop(i, 55, 'tree'); prop(i + 3, 62, 'tree'); }
-  // 우주선 기지: 발사대 (계단 대신)
-  const base = { i: 194, j: 58 };
+  // 우주선 기지: 발사대 (계단 대신) · 52차 우주센터 건물(문은 큰길 쪽) · 발사 지원탑 · 연료 탱크 · 레이더 · 유도등
+  const ship = { i: 201, j: 51 };
+  const ctr = buildings.length;
+  buildings.push({ i0: 186, j0: 47, w: 9, d: 8, h: 150, cat: 'shipctr' as Building['cat'], sign: 'left', color: '#ffffff', pois: [P('shipctr', '천국 우주센터', 'ศูนย์อวกาศสวรรค์', 'Heaven Space Center')] });
+  const base = { i: 190, j: 55 };
+  for (let a2 = -1; a2 <= 1; a2++) for (let b2 = -1; b2 <= 1; b2++) prop(ship.i + a2, ship.j + b2, 'fblock'); // 우주선 밑은 지나가지 못한다
+  prop(203, 63, 'fueltank'); prop(204, 67, 'fueltank', 1); prop(200, 64, 'fueltank'); prop(184, 66, 'radar'); prop(188, 70, 'radar');
+  for (let k = 0; k < 6; k++) { prop(192 + k * 2, 73, 'padlight'); prop(185, 62 + k * 2, 'padlight'); }
+  for (const [i, j] of [[183, 44], [183, 74], [205, 44]]) prop(i, j, 'flag', i + j);
   const door = { i: 17, j: 55 };
   // 성소 앞길의 나무 · 분수
   for (let i = 30; i <= 90; i += 5) { if (i >= 55 && i <= 60) continue; prop(i, 92, 'tree'); }
@@ -152,13 +172,23 @@ export function heavenZone(): Zone {
   const dump = { i0: 173, j0: 80, i1: 190, j1: 97 };
   rect(dump.i0, dump.j0, dump.i1, dump.j1, 'lot'); rect(172, 58, 172, 80, 'walk');
   // 50차: 명품 가방 더미 · 귀금속 더미 · 멀쩡한 TV · 냉장고 · 세탁기가 섞인다
-  for (let j = dump.j0 + 1; j < dump.j1; j += 2) for (let i = dump.i0 + 1; i < dump.i1; i += 2) if ((i * 7 + j * 3) % 7 !== 0) {
-    const hh = ((i * 928371 + j * 1237) >>> 0) % 20;
-    prop(i + (j % 4 === 1 ? 1 : 0), j, hh < 4 ? 'bagpile' : hh < 7 ? 'jewelpile' : hh < 11 ? 'appliance' : 'junkpile'); // 빽빽하게 — 산처럼 쌓였다
+  // 52차: 줄 맞춘 더미가 아니라 뒤죽박죽 — 크고 작은 더미가 제멋대로 흩어지고, 낱개 쓰레기가 그 사이에 굴러다닌다. 쓰레기차가 와서 쏟고 집게 굴삭기가 집어 올린다
+  { const rr = rnd(5252); const taken = new Set<string>();
+    const free = (i: number, j: number) => !taken.has(`${i},${j}`) && tiles[j * W + i] === TI.lot;
+    const claim = (i: number, j: number, r0 = 1) => { for (let a2 = -r0; a2 <= r0; a2++) for (let b2 = -r0; b2 <= r0; b2++) taken.add(`${i + a2},${j + b2}`); };
+    claim(176, 92, 2); claim(186, 84, 2); claim(181, 81, 1);
+    prop(176, 92, 'garbagetruck'); prop(186, 84, 'grabber'); prop(181, 82, 'junkpile', 7);
+    for (let n = 0; n < 320; n++) {
+      const i = dump.i0 + 1 + Math.floor(rr() * (dump.i1 - dump.i0 - 1)), j = dump.j0 + 1 + Math.floor(rr() * (dump.j1 - dump.j0 - 1));
+      if (!free(i, j)) continue;
+      const hh = rr();
+      const kind = hh < 0.16 ? 'bagpile' : hh < 0.27 ? 'jewelpile' : hh < 0.42 ? 'appliance' : hh < 0.62 ? 'litter' : 'junkpile';
+      prop(i, j, kind, Math.floor(rr() * 97)); claim(i, j, kind === 'appliance' && rr() < 0.4 ? 1 : 0);
+    }
   }
   // 47차 닭 한 마리 (광장 서쪽에서 돌아다닌다)
   const chicken = { i: 88, j: 64 };
-  meta = { sancts, palace, base, pools, cages, dump, chicken };
+  meta = { sancts, palace, base, ship, ctr, post, pools, cages, dump, chicken };
   return finalize({ id: HEAVEN_ID, W, H, tiles, buildings, props, lanes: [], door, spawn: door, heavenGen: true } as unknown as Omit<Zone, 'blocked'>);
 }
 
@@ -514,7 +544,7 @@ export function drawAttraction(b: Building & { att?: string }) {
 }
 
 // ───────────────────────── 소품 ─────────────────────────
-export const HEAVEN_PROPS = new Set(['sunbed', 'parasol', 'giraffe', 'elephant', 'lion', 'zebra', 'flamingo', 'panda', 'fountain', 'balloons', 'icecream', 'junkpile', 'chicken', 'zoobar', 'zoogate', 'bagpile', 'jewelpile', 'appliance', 'fblock']);
+export const HEAVEN_PROPS = new Set(['sunbed', 'parasol', 'giraffe', 'elephant', 'lion', 'zebra', 'flamingo', 'panda', 'fountain', 'balloons', 'icecream', 'junkpile', 'chicken', 'zoobar', 'zoogate', 'bagpile', 'jewelpile', 'appliance', 'fblock', 'angelstatue', 'flowerbed', 'gantry', 'fueltank', 'radar', 'padlight', 'flag', 'garbagetruck', 'grabber', 'litter']);
 function pic(w: number, h: number, ax: number, ay: number, draw: (R: (x: number, y: number, w: number, h: number, c: string) => void, g: CanvasRenderingContext2D) => void): PropPic {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
@@ -843,6 +873,130 @@ export function heavenProp(kind: string, v: number, o = 0): PropPic {
           g.fillStyle = '#b8bcc2'; { const [x, y] = S(3, 16, 17); g.fillRect(x, y, 10, 2); } g.fillStyle = '#5ac87a'; { const [x, y] = S(12, 16, 17); g.fillRect(x, y, 2, 2); } // 조작판
         }
       }
+    });
+    // ── 52차: 광장의 천사상 · 꽃밭 · 우주센터 마당 · 쓰레기장의 쓰레기차 · 집게 굴삭기 · 낱개 쓰레기 ──
+    case 'angelstatue': return pic(255, 357, 128, 299, (_R, g) => {
+      g.scale(1.7, 1.7);
+      E(g, 75, 176, 62, 22, 'rgba(0,0,0,0.12)');
+      const oct = (cy: number, rx: number, ry: number, hgt: number, top: string, side: string) => {
+        const pts: [number, number][] = []; for (let q = 0; q < 8; q++) { const a = (q / 8) * Math.PI * 2 + Math.PI / 8; pts.push([75 + Math.cos(a) * rx, cy + Math.sin(a) * ry]); }
+        g.fillStyle = side; g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (const [x, y] of pts) g.lineTo(x, y); for (const [x, y] of pts.slice().reverse()) g.lineTo(x, y - hgt); g.closePath(); g.fill();
+        g.fillStyle = side; g.fillRect(75 - rx, cy - hgt, rx * 2, hgt);
+        g.fillStyle = top; g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, y - hgt) : g.moveTo(x, y - hgt))); g.closePath(); g.fill();
+      };
+      oct(172, 58, 22, 8, '#fbf9f4', '#ddd5c6'); oct(164, 46, 17, 8, '#f6f2ea', '#d4ccbc'); oct(156, 22, 9, 30, '#fbf8f0', '#e6e0d4');
+      g.fillStyle = '#e0b84e'; g.fillRect(53, 122, 44, 3); g.fillRect(53, 148, 44, 2);
+      // 날개 (뒤) — 깃털 줄
+      for (const s of [-1, 1]) for (let q = 0; q < 7; q++) { g.fillStyle = q % 2 ? '#f4f0e8' : '#ffffff'; g.beginPath(); g.moveTo(75 + s * 6, 70); g.quadraticCurveTo(75 + s * (26 + q * 5), 38 - q * 4, 75 + s * (34 + q * 4), 44 + q * 9); g.lineTo(75 + s * (24 + q * 3), 58 + q * 7); g.closePath(); g.fill(); }
+      g.strokeStyle = 'rgba(150,140,120,0.45)'; g.lineWidth = 0.8; for (const s of [-1, 1]) for (let q = 0; q < 6; q++) { g.beginPath(); g.moveTo(75 + s * 8, 70); g.quadraticCurveTo(75 + s * (22 + q * 5), 46 - q * 3, 75 + s * (30 + q * 4), 52 + q * 9); g.stroke(); }
+      // 몸 (옷자락) · 머리 · 들어 올린 팔과 별
+      g.fillStyle = '#f2eee6'; g.beginPath(); g.moveTo(66, 122); g.quadraticCurveTo(68, 92, 71, 70); g.lineTo(79, 70); g.quadraticCurveTo(82, 92, 84, 122); g.closePath(); g.fill();
+      g.fillStyle = '#e4ded2'; g.beginPath(); g.moveTo(75, 76); g.quadraticCurveTo(77, 100, 80, 122); g.lineTo(84, 122); g.quadraticCurveTo(82, 96, 79, 72); g.closePath(); g.fill();
+      for (let q = 0; q < 4; q++) { g.strokeStyle = 'rgba(140,130,110,0.35)'; g.beginPath(); g.moveTo(69 + q * 3, 84); g.lineTo(68 + q * 4, 121); g.stroke(); }
+      g.fillStyle = '#f6f2ea'; g.beginPath(); g.arc(75, 63, 6.5, 0, Math.PI * 2); g.fill(); g.fillStyle = '#e8e2d6'; g.beginPath(); g.arc(77, 64, 5, -0.6, 1.6); g.fill();
+      g.strokeStyle = '#e8c24e'; g.lineWidth = 1.6; g.beginPath(); g.ellipse(75, 54, 7, 2.2, 0, 0, Math.PI * 2); g.stroke();
+      g.strokeStyle = '#efe9dd'; g.lineWidth = 4; g.beginPath(); g.moveTo(79, 74); g.lineTo(88, 50); g.lineTo(90, 34); g.stroke();
+      g.fillStyle = '#f2d27a'; g.beginPath(); for (let q = 0; q < 10; q++) { const a = (q / 10) * Math.PI * 2 - Math.PI / 2, rr = q % 2 ? 3 : 7; g.lineTo(90 + Math.cos(a) * rr, 27 + Math.sin(a) * rr); } g.closePath(); g.fill();
+      const gl = g.createRadialGradient(90, 27, 1, 90, 27, 18); gl.addColorStop(0, 'rgba(255,246,200,0.8)'); gl.addColorStop(1, 'rgba(255,240,180,0)'); g.fillStyle = gl; g.beginPath(); g.arc(90, 27, 18, 0, Math.PI * 2); g.fill();
+    });
+    case 'flowerbed': return pic(122, 68, 61, 48, (_R, g) => {
+      g.scale(1.6, 1.6);
+      E(g, 38, 30, 34, 11, '#e6e0d4'); E(g, 38, 28, 31, 10, '#fbf8f0'); E(g, 38, 27, 28, 8.5, '#7ab86a'); E(g, 38, 26, 24, 7, '#8ac87a');
+      const cols = [['#f28aa8', '#ffffff'], ['#f2d27a', '#ffffff'], ['#c8a8f2', '#f2d27a'], ['#ffffff', '#f28aa8'], ['#f2a87a', '#ffe0a0'], ['#8ac8f2', '#ffffff'], ['#e85a6a', '#f2d27a'], ['#ffffff', '#c8a8f2']][v % 8];
+      for (let q = 0; q < 34; q++) { const a = q * 2.399, rr = Math.sqrt(q / 34); const x = 38 + Math.cos(a) * rr * 24, y = 26 + Math.sin(a) * rr * 6.5 - 2; g.fillStyle = cols[q % 2]; g.beginPath(); g.arc(x, y, 1.8, 0, Math.PI * 2); g.fill(); if (q % 5 === 0) { g.fillStyle = '#f2d27a'; g.fillRect(Math.round(x), Math.round(y), 1, 1); } }
+    });
+    case 'gantry': return pic(110, 270, 55, 250, (_R, g) => {
+      E(g, 55, 250, 40, 12, 'rgba(0,0,0,0.13)');
+      g.fillStyle = '#e0e2e8'; g.beginPath(); g.moveTo(20, 250); g.lineTo(55, 262); g.lineTo(90, 250); g.lineTo(55, 238); g.closePath(); g.fill();
+      for (const x of [36, 62]) { g.fillStyle = x < 50 ? '#f4f5f8' : '#d4d8e0'; g.fillRect(x, 20, 10, 230); }
+      g.strokeStyle = '#c9a23e'; g.lineWidth = 1.2; for (let y = 30; y < 246; y += 14) { g.beginPath(); g.moveTo(36, y); g.lineTo(72, y + 14); g.moveTo(72, y); g.lineTo(36, y + 14); g.stroke(); }
+      for (let y = 26; y < 250; y += 28) { g.fillStyle = '#e8c24e'; g.fillRect(34, y, 40, 3); }
+      for (const y of [70, 150, 210]) { g.fillStyle = '#eceef2'; g.fillRect(6, y, 32, 5); g.fillStyle = '#c9a23e'; g.fillRect(6, y + 5, 32, 2); } // 우주선 쪽으로 뻗은 팔
+      g.fillStyle = '#e8322a'; g.beginPath(); g.arc(54, 14, 3, 0, Math.PI * 2); g.fill(); g.strokeStyle = '#b8bcc6'; g.beginPath(); g.moveTo(54, 20); g.lineTo(54, 10); g.stroke();
+    });
+    case 'fueltank': return pic(84, 124, 42, 110, (_R, g) => {
+      E(g, 42, 110, 34, 10, 'rgba(0,0,0,0.13)');
+      if (v % 2) {
+        for (const [x, y] of [[20, 108], [64, 108], [30, 112], [54, 112]]) { g.fillStyle = '#b8bcc6'; g.fillRect(x - 1, y - 40, 3, 40); }
+        const gr = g.createRadialGradient(34, 46, 6, 42, 58, 36); gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.7, '#e6e8ee'); gr.addColorStop(1, '#b8bfcc');
+        g.fillStyle = gr; g.beginPath(); g.arc(42, 58, 32, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = '#e0b84e'; g.lineWidth = 2; g.beginPath(); g.ellipse(42, 58, 32, 6, 0, 0, Math.PI); g.stroke();
+      } else {
+        const gr = g.createLinearGradient(14, 0, 70, 0); gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.6, '#e6e8ee'); gr.addColorStop(1, '#b0b8c4');
+        g.fillStyle = gr; g.fillRect(14, 22, 56, 86); E(g, 42, 108, 28, 7, '#c4cad4'); E(g, 42, 22, 28, 7, '#f6f7fa');
+        for (const y of [40, 72]) { g.fillStyle = '#e0b84e'; g.fillRect(14, y, 56, 4); }
+        g.fillStyle = '#2a3a5a'; g.fillRect(30, 50, 24, 14); g.fillStyle = '#f6e2a0'; g.font = 'bold 9px system-ui'; g.textAlign = 'center'; g.fillText('H₂', 42, 61);
+      }
+    });
+    case 'radar': return pic(84, 116, 42, 104, (_R, g) => {
+      E(g, 42, 104, 26, 8, 'rgba(0,0,0,0.13)');
+      g.fillStyle = '#d4d8e0'; g.fillRect(36, 60, 12, 44); g.fillStyle = '#f4f5f8'; g.fillRect(36, 60, 6, 44); E(g, 42, 104, 16, 5, '#c4cad4');
+      g.save(); g.translate(42, 46); g.rotate(-0.45);
+      const gr = g.createLinearGradient(-34, 0, 34, 0); gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, '#c2c8d4');
+      g.fillStyle = gr; g.beginPath(); g.ellipse(0, 0, 34, 20, 0, 0, Math.PI * 2); g.fill(); g.strokeStyle = '#e0b84e'; g.lineWidth = 2; g.stroke();
+      g.fillStyle = '#dfe3ea'; g.beginPath(); g.ellipse(0, 2, 24, 13, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = '#9aa2ae'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(0, 2); g.lineTo(0, -22); g.stroke(); g.fillStyle = '#e8322a'; g.beginPath(); g.arc(0, -23, 2.2, 0, Math.PI * 2); g.fill();
+      g.restore();
+    });
+    case 'padlight': return pic(14, 16, 7, 12, (_R, g) => {
+      E(g, 7, 12, 5, 2, 'rgba(0,0,0,0.15)'); g.fillStyle = '#c9a23e'; g.fillRect(5, 6, 4, 6);
+      const gl = g.createRadialGradient(7, 6, 0.5, 7, 6, 6); gl.addColorStop(0, '#fffbe0'); gl.addColorStop(1, 'rgba(255,230,150,0)'); g.fillStyle = gl; g.beginPath(); g.arc(7, 6, 6, 0, Math.PI * 2); g.fill();
+    });
+    case 'flag': return pic(40, 96, 6, 92, (_R, g) => {
+      E(g, 6, 92, 5, 2, 'rgba(0,0,0,0.15)'); g.fillStyle = '#e0e2e8'; g.fillRect(5, 6, 2, 86); g.fillStyle = '#e8c24e'; g.beginPath(); g.arc(6, 5, 2.5, 0, Math.PI * 2); g.fill();
+      const wv = v % 3;
+      g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(7, 9); for (let x = 0; x <= 30; x += 3) g.lineTo(7 + x, 9 + Math.sin(x * 0.25 + wv) * 2); for (let x = 30; x >= 0; x -= 3) g.lineTo(7 + x, 29 + Math.sin(x * 0.25 + wv) * 2); g.closePath(); g.fill();
+      g.strokeStyle = 'rgba(0,0,0,0.12)'; g.stroke();
+      g.fillStyle = '#e0b84e'; g.beginPath(); g.moveTo(22, 19); for (let q = 0; q < 4; q++) g.lineTo(22 - 3 - q * 2, 15 + q * 2.5); g.lineTo(22, 22); for (let q = 3; q >= 0; q--) g.lineTo(22 + 3 + q * 2, 15 + q * 2.5); g.closePath(); g.fill();
+    });
+    case 'litter': return pic(44, 28, 22, 20, (_R, g) => {
+      E(g, 22, 20, 16, 4, 'rgba(0,0,0,0.1)');
+      const k = v % 6;
+      if (k === 0) { g.fillStyle = '#1e1e1e'; g.fillRect(10, 10, 9, 10); g.fillStyle = '#c9a23e'; g.fillRect(10, 10, 9, 2); g.fillStyle = '#f2c8d4'; g.fillRect(24, 13, 9, 7); } // 쇼핑백 둘
+      else if (k === 1) { g.fillStyle = '#e85a6a'; g.fillRect(12, 16, 8, 3); g.fillRect(18, 11, 2, 6); g.fillStyle = '#2a5a3a'; g.fillRect(26, 9, 3, 11); g.fillStyle = '#e0b84e'; g.fillRect(26, 7, 2, 2); } // 하이힐 · 샴페인 병
+      else if (k === 2) { g.fillStyle = '#f28aa8'; g.fillRect(8, 9, 12, 10); g.fillStyle = '#ffffff'; g.fillRect(13, 9, 2, 10); g.fillRect(8, 13, 12, 2); g.fillStyle = '#8ac8f2'; g.fillRect(24, 12, 10, 8); g.fillStyle = '#c9a23e'; g.fillRect(28, 12, 2, 8); } // 뜯지 않은 선물 상자
+      else if (k === 3) { g.fillStyle = '#1e1e24'; g.beginPath(); g.moveTo(6, 18); g.lineTo(30, 20); g.lineTo(38, 14); g.lineTo(14, 12); g.closePath(); g.fill(); g.fillStyle = '#2a3e5a'; g.beginPath(); g.moveTo(9, 17); g.lineTo(29, 18.6); g.lineTo(35, 14); g.lineTo(15, 12.6); g.closePath(); g.fill(); } // 엎어진 TV
+      else if (k === 4) { g.fillStyle = '#fbfaf6'; g.fillRect(6, 12, 30, 7); g.fillStyle = '#e8e4dc'; g.fillRect(6, 12, 30, 2); for (let x = 8; x < 34; x += 4) { g.fillStyle = '#d8d4cc'; g.fillRect(x, 14, 1, 4); } } // 매트리스
+      else { g.fillStyle = '#7a4a2a'; g.fillRect(10, 12, 10, 8); g.fillStyle = '#c89a5a'; g.fillRect(11, 13, 8, 1); g.strokeStyle = '#e0b84e'; g.beginPath(); g.ellipse(15, 12, 3, 3, 0, Math.PI, 0); g.stroke(); g.fillStyle = '#ffe07a'; for (let q = 0; q < 6; q++) g.fillRect(24 + q * 2, 17 - (q % 2), 2, 1); } // 가방 · 금 사슬
+    });
+    case 'garbagetruck': return pic(170, 120, 84, 102, (_R, g) => {
+      E(g, 84, 102, 70, 14, 'rgba(0,0,0,0.14)');
+      // 쿼터뷰 상자: 길이 방향 = +i (오른쪽 아래). 바닥 앞 모서리 (ox, oy)
+      const S = (i: number, j: number, z: number): [number, number] => [30 + i * 1.6 - j * 1.6, 70 + i * 0.8 + j * 0.8 - z];
+      const f = (pts: [number, number][], c: string) => { g.fillStyle = c; g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill(); g.strokeStyle = 'rgba(0,0,0,0.22)'; g.lineWidth = 0.8; g.stroke(); };
+      const bx = (i0: number, j0: number, i1: number, j1: number, z0: number, z1: number, top: string, left: string, right: string) => { f([S(i0, j1, z0), S(i1, j1, z0), S(i1, j1, z1), S(i0, j1, z1)], left); f([S(i1, j0, z0), S(i1, j1, z0), S(i1, j1, z1), S(i1, j0, z1)], right); f([S(i0, j0, z1), S(i1, j0, z1), S(i1, j1, z1), S(i0, j1, z1)], top); };
+      // 바퀴
+      for (const i of [8, 30, 40]) for (const j of [0, 18]) { const [x, y] = S(i, j + (j ? 0.5 : 0), 5); g.fillStyle = '#1e1e22'; g.beginPath(); g.ellipse(x, y, 5, 6, -0.5, 0, Math.PI * 2); g.fill(); g.fillStyle = '#c9c9c9'; g.beginPath(); g.ellipse(x, y, 2, 2.4, -0.5, 0, Math.PI * 2); g.fill(); }
+      bx(0, 0, 46, 18, 6, 9, '#4a4a50', '#3a3a40', '#2e2e34'); // 차대
+      bx(0, 1, 32, 17, 9, 38, '#f4f5f8', '#e2e4ea', '#c8ccd6'); // 압축 적재함 (흰색 · 금 띠)
+      f([S(0, 17, 22), S(32, 17, 22), S(32, 17, 25), S(0, 17, 25)], '#e0b84e');
+      bx(33, 2, 46, 16, 9, 30, '#f8f9fc', '#eceef2', '#d4d8e0'); // 운전석
+      f([S(38, 16, 20), S(45, 16, 20), S(45, 16, 28), S(38, 16, 28)], '#8ab0d8'); f([S(46, 4, 20), S(46, 14, 20), S(46, 14, 28), S(46, 4, 28)], '#6a90b8');
+      // 뒤쪽 뚜껑이 열리고 쏟아지는 더미
+      f([S(-2, 1, 38), S(-2, 17, 38), S(-6, 17, 26), S(-6, 1, 26)], '#d8dbe2');
+      const r = (k: number) => { const x = Math.sin(k * 77.7 + 3.3) * 43758.5; return x - Math.floor(x); };
+      for (let q = 0; q < 18; q++) { const [x, y] = S(-10 - r(q) * 12, 2 + r(q + 30) * 14, 2 + r(q + 60) * 10); g.fillStyle = ['#f28aa8', '#8ac8f2', '#f2d27a', '#1e1e1e', '#ffffff', '#7a4a2a', '#e85a6a'][q % 7]; g.fillRect(Math.round(x) - 3, Math.round(y) - 3, 5 + (q % 3) * 2, 4 + (q % 2) * 2); }
+      { const [x, y] = S(20, 17, 30); g.fillStyle = '#c9a23e'; g.font = 'bold 7px system-ui'; g.fillText('♲', x - 3, y); }
+    });
+    case 'grabber': return pic(200, 210, 96, 186, (_R, g) => {
+      E(g, 96, 186, 70, 16, 'rgba(0,0,0,0.14)');
+      // 무한궤도 · 몸통 · 운전석
+      g.fillStyle = '#2a2a2e'; g.beginPath(); g.moveTo(40, 176); g.lineTo(136, 194); g.lineTo(156, 182); g.lineTo(60, 164); g.closePath(); g.fill();
+      g.fillStyle = '#3a3a40'; g.beginPath(); g.moveTo(40, 176); g.lineTo(136, 194); g.lineTo(136, 186); g.lineTo(40, 168); g.closePath(); g.fill();
+      for (let q = 0; q < 10; q++) { g.fillStyle = '#55555c'; g.fillRect(44 + q * 9.4, 170 + q * 1.8, 3, 6); }
+      g.fillStyle = '#e8c24e'; g.beginPath(); g.moveTo(60, 160); g.lineTo(124, 172); g.lineTo(140, 160); g.lineTo(76, 148); g.closePath(); g.fill();
+      g.fillStyle = '#c9a23e'; g.beginPath(); g.moveTo(60, 160); g.lineTo(124, 172); g.lineTo(124, 150); g.lineTo(60, 138); g.closePath(); g.fill();
+      g.fillStyle = '#d9b44a'; g.beginPath(); g.moveTo(124, 172); g.lineTo(140, 160); g.lineTo(140, 138); g.lineTo(124, 150); g.closePath(); g.fill();
+      g.fillStyle = '#f6dc8a'; g.beginPath(); g.moveTo(60, 138); g.lineTo(124, 150); g.lineTo(140, 138); g.lineTo(76, 126); g.closePath(); g.fill();
+      g.fillStyle = '#efc848'; g.fillRect(96, 104, 30, 40); g.fillStyle = '#8ab0d8'; g.fillRect(100, 108, 22, 18); g.fillStyle = '#b8d4f0'; g.fillRect(100, 108, 22, 5); g.fillStyle = '#c9a23e'; g.fillRect(126, 104, 6, 40);
+      // 붐 · 암 · 집게 (쓰레기를 집어 올린 채)
+      g.strokeStyle = '#d9b44a'; g.lineCap = 'round'; g.lineWidth = 11; g.beginPath(); g.moveTo(92, 132); g.lineTo(60, 52); g.stroke();
+      g.strokeStyle = '#efc848'; g.lineWidth = 8; g.beginPath(); g.moveTo(60, 52); g.lineTo(28, 96); g.stroke();
+      g.strokeStyle = '#3a3a40'; g.lineWidth = 3; g.beginPath(); g.moveTo(84, 120); g.lineTo(64, 66); g.stroke();
+      g.fillStyle = '#55555c'; g.beginPath(); g.arc(60, 52, 6, 0, Math.PI * 2); g.fill(); g.beginPath(); g.arc(28, 96, 5, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = '#4a4a50'; g.lineWidth = 3; for (let q = 0; q < 5; q++) { const a = -2.2 + q * 0.55; g.beginPath(); g.moveTo(28, 98); g.quadraticCurveTo(28 + Math.cos(a) * 16, 106 + Math.sin(a) * 4, 28 + Math.cos(a) * 12, 124); g.stroke(); }
+      for (let q = 0; q < 9; q++) { g.fillStyle = ['#f28aa8', '#1e1e24', '#8ac8f2', '#f2d27a', '#7a4a2a', '#ffffff'][q % 6]; g.fillRect(18 + (q * 7) % 20, 108 + (q * 5) % 12, 6, 5); }
+      g.fillStyle = 'rgba(255,255,255,0.55)'; for (let q = 0; q < 4; q++) g.fillRect(22 + q * 5, 128 + q * 6, 2, 2); // 떨어지는 부스러기
     });
     case 'chicken': return pic(24, 24, 12, 21, (R, g) => {
       // 47차 천국의 닭 한 마리: 흰 몸 · 붉은 볏 · 노란 부리와 다리 (v 1 = 모이 쪼기)

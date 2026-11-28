@@ -83,7 +83,7 @@ export const REST_ROOMS = new Set(['hhome', 'hpalace', 'hchurch', 'htemple', 'hm
 
 const SIZE: Record<string, [number, number]> = {
   hchurch: [19, 16], htemple: [19, 16], hmosque: [19, 16], cloudisle: [20, 15], // 46차
-  hpalace: [40, 30], // 51차 천국의 지붕 빌딩 1층 (주민센터 · 긴 복도 · 하늘 승강기 · 국 다섯 · 화장실 · 구내식당)
+  hpalace: [34, 56], // 52차 아주 넓게 (민원실 → 긴 복도 · 좌우 번갈아 방 여덟 → 승강기 홀) · 51차 천국의 지붕 빌딩 1층 (주민센터 · 긴 복도 · 하늘 승강기 · 국 다섯 · 화장실 · 구내식당)
    hhome: [14, 11], airport: [22, 14],
   temple: [13, 11], church: [13, 11], mosque: [12, 11], gurdwara: [12, 11], bank: [14, 11], clinic: [12, 10], pharmacy: [9, 8],
   mart: [11, 9], food: [12, 10], cafe: [10, 9], bar: [10, 9], salon: [9, 8], ysalon: [10, 9], massage: [10, 9], laundry: [9, 8], lobby: [11, 9], shop: [9, 8], loan: [10, 8],
@@ -195,44 +195,51 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
       break;
     }
     case 'hpalace': {
-      // 51차 천국의 지붕 빌딩 1층 — 문을 들어서면 주민센터(창구 · 번호표 · 기다리는 민원인), 가운데 긴 복도 끝에 하늘 승강기(천사가 지켜 지나갈 수 없다).
-      // 복도 왼쪽: 사무국(생명책) · 징벌국(저울) · 신앙국 · 화장실 / 오른쪽: 통행국(출발 안내판) · 청원국 · 구내식당. 유리 칸막이로 나뉘고 국마다 금 명패
+      // 52차 천국의 지붕 빌딩 1층 (아주 넓다) — 정문을 들어서면 주민센터 민원실(창구 · 번호표 · 기다리는 의자 · 순찰하는 센터장).
+      // 민원실을 지나면 긴 복도: 좌우로 번갈아 문이 난다 — 왼 화장실 → 오른 구내식당 → 왼 사무국 → 오른 징벌국 → 왼 신앙국 → 오른 통행국 → 왼 청원국 → 오른 천사 휴게실.
+      // 복도 끝 넓은 홀 한가운데 하늘 승강기 (칼 든 천사 둘이 지켜 지나갈 수 없다)
       const wallJ = (i: number, j0: number, j1: number, gaps: number[]) => { for (let j = j0; j <= j1; j++) if (!gaps.includes(j)) F(i, j, 1, 1, 44, 'partition'); }; // j 방향 칸막이
       const wallI = (j: number, i0: number, i1: number, gaps: number[]) => { for (let i = i0; i <= i1; i++) if (!gaps.includes(i)) F(i, j, 1, 1, 44, 'partition', 1); }; // i 방향 칸막이
-      // 복도 양쪽 벽 (국으로 드나드는 틈)
-      wallJ(16, 1, 18, [4, 5, 13, 14]); wallJ(24, 1, 18, [4, 5, 13, 14]);
-      // 왼쪽: 사무국 | 징벌국 (뒤) · 신앙국 | 화장실 (앞)
-      wallJ(8, 1, 17, [4, 5]); wallI(9, 1, 15, [4, 5]); wallI(18, 1, 15, [3, 4]);
-      // 오른쪽: 통행국 | 청원국 (뒤) · 구내식당 (앞)
-      wallJ(32, 1, 8, [4, 5]); wallI(9, 25, 38, [35, 36]); wallI(18, 25, 38, [30, 31]);
-      // 명패 (칸막이 위에 걸린다)
-      for (const [ii, jj, v] of [[16, 3, 1], [8, 3, 0], [16, 12, 5], [8, 12, 2], [24, 3, 3], [32, 3, 4], [24, 12, 6]] as const) F(ii, jj, 1, 1, 60, 'hsign', v);
-      // 하늘 승강기 · 복도 기둥 · 깔개
-      F(17, 1, 6, 5, 110, 'skyelev');
-      for (const jj of [8, 12, 16]) { F(17, jj, 1, 1, 120, 'pillar'); F(23, jj, 1, 1, 120, 'pillar'); }
-      F(19, 6, 3, 21, 1, 'rug', 0);
-      // 사무국: 생명책 · 책상
-      F(2, 1, 4, 2, 46, 'lifebook'); F(1, 5, 2, 1, 22, 'cdesk'); F(5, 5, 2, 1, 22, 'cdesk'); F(1, 7, 1, 1, 50, 'shelf', 3);
-      // 징벌국: 금 저울 · 책상 · 장부
-      F(11, 1, 3, 2, 44, 'hscale'); F(9, 5, 2, 1, 22, 'cdesk'); F(13, 5, 2, 1, 22, 'cdesk'); F(9, 7, 1, 1, 30, 'ledgers');
-      // 신앙국: 등잔대 · 책상
-      F(2, 11, 1, 1, 34, 'lampstand'); F(6, 11, 1, 1, 34, 'lampstand'); F(2, 14, 2, 1, 22, 'cdesk'); F(5, 14, 2, 1, 22, 'cdesk');
-      // 화장실: 칸 다섯 · 세면대
-      F(9, 10, 5, 1, 52, 'stalls'); F(10, 16, 3, 1, 24, 'sinks');
-      // 통행국: 출발 안내판 · 책상
-      F(26, 1, 4, 1, 40, 'fboard'); F(25, 5, 2, 1, 22, 'cdesk'); F(29, 5, 2, 1, 22, 'cdesk');
-      // 청원국: 서류 더미 · 책상
-      F(33, 1, 2, 1, 30, 'ledgers'); F(36, 1, 2, 1, 30, 'ledgers'); F(33, 5, 2, 1, 22, 'cdesk'); F(36, 5, 2, 1, 22, 'cdesk');
-      // 구내식당: 배식대 · 식탁과 의자
-      F(26, 11, 9, 1, 26, 'buffet');
-      for (const [ti, tj] of [[26, 14], [30, 14], [34, 14], [26, 16], [30, 16], [34, 16]] as const) { F(ti, tj, 2, 1, 22, 'mtable'); F(ti, tj - 1, 1, 1, 16, 'chair'); F(ti + 1, tj + 1, 1, 1, 16, 'chair', 1); }
-      // 주민센터: 창구 · 명패 · 번호표 기계 · 기다리는 의자 (민원인 자리)
-      F(5, 20, 10, 1, 26, 'teller'); F(9, 20, 1, 1, 64, 'hsign', 7);
-      clerk = { i: 10, j: 19 }; counter = { i: 10, j: 21 };
-      F(16, 25, 1, 1, 30, 'qticket');
-      for (const jj of [23, 25, 27]) { F(3, jj, 5, 1, 12, 'cbench'); F(9, jj, 5, 1, 12, 'cbench'); for (let ii = 3; ii < 8; ii++) seats.push([ii, jj]); for (let ii = 9; ii < 14; ii++) seats.push([ii, jj]); }
-      for (const jj of [21, 23, 25]) { F(26, jj, 5, 1, 12, 'cbench'); F(32, jj, 5, 1, 12, 'cbench'); for (let ii = 26; ii < 31; ii++) seats.push([ii, jj]); for (let ii = 32; ii < 37; ii++) seats.push([ii, jj]); }
-      for (const [ii, jj] of [[1, 20], [x1, 20], [1, y1], [x1, y1]] as const) F(ii, jj, 1, 1, 30, 'plant');
+      const CL = 14, CR = 20; // 복도 벽 (복도 i 15..19)
+      const cor = [15, 16, 17, 18, 19];
+      wallI(42, 1, x1, cor); // 민원실 | 복도 · 방들
+      wallI(9, 1, x1, cor); // 방들 | 승강기 홀
+      for (const jj of [34, 26, 18]) { wallI(jj, 1, CL - 1, []); wallI(jj, CR + 1, x1, []); } // 방 사이
+      // 문: 왼쪽은 방 앞쪽(민원실 쪽), 오른쪽은 방 뒤쪽 — 걸어 들어가면 왼 · 오 · 왼 · 오 번갈아 나온다
+      wallJ(CL, 10, 41, [39, 40, 31, 32, 23, 24, 15, 16]);
+      wallJ(CR, 10, 41, [35, 36, 27, 28, 19, 20, 11, 12]);
+      for (const [ii, jj, v] of [[CL, 41, 5], [CR, 37, 6], [CL, 33, 0], [CR, 29, 1], [CL, 25, 2], [CR, 21, 3], [CL, 17, 4], [CR, 13, 8]] as const) F(ii, jj, 1, 1, 60, 'hsign', v);
+      // 복도: 금실 깔개 · 기둥
+      F(15, 6, 5, 36, 1, 'rug', 0);
+      for (const jj of [12, 20, 28, 36]) { F(CL + 1, jj, 1, 1, 110, 'pillar'); F(CR - 1, jj, 1, 1, 110, 'pillar'); }
+      // 승강기 홀
+      F(14, 1, 6, 5, 110, 'skyelev');
+      for (const [ii, jj] of [[9, 2], [25, 2], [5, 6], [29, 6]] as const) F(ii, jj, 1, 1, 120, 'pillar');
+      for (const [ii, jj] of [[1, 1], [x1, 1], [1, 8], [x1, 8]] as const) F(ii, jj, 1, 1, 30, 'plant');
+      // 왼1 화장실: 칸 열 · 세면대
+      F(1, 35, 5, 1, 52, 'stalls'); F(7, 35, 5, 1, 52, 'stalls'); F(2, 41, 4, 1, 24, 'sinks'); F(12, 41, 1, 1, 30, 'plant');
+      // 오른1 구내식당: 배식대(뒤 벽) · 식탁 여섯과 의자
+      F(22, 36, 9, 1, 26, 'buffet');
+      for (const ti of [22, 26, 30]) { F(ti, 39, 2, 1, 22, 'mtable'); F(ti, 38, 1, 1, 16, 'chair'); F(ti + 1, 40, 1, 1, 16, 'chair', 1); F(ti, 41, 2, 1, 22, 'mtable'); F(ti, 40, 1, 1, 16, 'chair'); }
+      // 왼2 사무국: 생명책 · 책상 · 서가
+      F(3, 27, 4, 2, 46, 'lifebook'); F(2, 31, 2, 1, 22, 'cdesk'); F(6, 31, 2, 1, 22, 'cdesk'); F(10, 31, 2, 1, 22, 'cdesk'); F(12, 27, 1, 1, 50, 'shelf', 3);
+      // 오른2 징벌국: 금 저울 · 책상 · 장부
+      F(25, 27, 3, 2, 44, 'hscale'); F(22, 31, 2, 1, 22, 'cdesk'); F(26, 31, 2, 1, 22, 'cdesk'); F(30, 31, 2, 1, 22, 'cdesk'); F(31, 27, 1, 1, 30, 'ledgers');
+      // 왼3 신앙국: 등잔대 · 촛대 · 책상
+      F(2, 19, 1, 1, 34, 'lampstand'); F(6, 19, 1, 1, 34, 'lampstand'); F(10, 19, 1, 1, 34, 'lampstand'); F(12, 19, 1, 1, 22, 'candle'); F(3, 23, 2, 1, 22, 'cdesk'); F(8, 23, 2, 1, 22, 'cdesk');
+      // 오른3 통행국: 출발 안내판 · 책상
+      F(24, 19, 4, 1, 40, 'fboard'); F(22, 23, 2, 1, 22, 'cdesk'); F(26, 23, 2, 1, 22, 'cdesk'); F(30, 23, 2, 1, 22, 'cdesk');
+      // 왼4 청원국: 서류 더미 · 책상
+      F(2, 10, 2, 1, 30, 'ledgers'); F(6, 10, 2, 1, 30, 'ledgers'); F(10, 10, 2, 1, 30, 'ledgers'); F(3, 14, 2, 1, 22, 'cdesk'); F(8, 14, 2, 1, 22, 'cdesk');
+      // 오른4 천사 휴게실: 소파 · 탁자 · 물통 · 화분
+      F(22, 11, 1, 3, 14, 'sofa'); F(24, 12, 1, 1, 16, 'table', 2); F(31, 10, 1, 1, 40, 'cooler'); F(31, 16, 1, 1, 30, 'plant'); F(27, 10, 3, 1, 14, 'sofa');
+      // 주민센터 민원실: 창구(뒤에 직원 셋) · 명패 · 번호표 기계 · 기다리는 의자 · 화분
+      F(3, 44, 11, 1, 26, 'teller'); F(8, 44, 1, 1, 64, 'hsign', 7);
+      clerk = { i: 17, j: 47 }; counter = { i: 8, j: 45 };
+      F(13, 52, 1, 1, 30, 'qticket');
+      for (const jj of [46, 48, 50]) { F(22, jj, 5, 1, 12, 'cbench'); F(27, jj, 5, 1, 12, 'cbench'); for (let ii = 22; ii < 32; ii++) seats.push([ii, jj]); }
+      for (const jj of [48, 50]) { F(3, jj, 4, 1, 12, 'cbench'); F(8, jj, 4, 1, 12, 'cbench'); for (const ii of [3, 4, 5, 6, 8, 9, 10, 11]) seats.push([ii, jj]); }
+      for (const [ii, jj] of [[1, 43], [x1, 43], [1, y1], [x1, y1], [20, 52]] as const) F(ii, jj, 1, 1, 30, 'plant');
       break;
     }
     // ── 46차 천국 성소: 하루 한 번 예배. 자리(seats)는 앉는 곳 — 많은 영혼이 채운다 ──
@@ -1712,7 +1719,7 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       if (info.kind === 'hpalace') { B3(i + 0.4, j, i + 0.6, j1, 0, 8, '#e8e2d4'); poly([P(i + 0.6, j, 8), P(i + 0.6, j1, 8), P(i + 0.6, j1, h - 4), P(i + 0.6, j, h - 4)], '#d8eaf2', 0.5); B3(i + 0.4, j, i + 0.6, j1, h - 4, h, '#d8b44a'); break; }
       B3(i + 0.4, j, i + 0.6, j1, 0, h, '#9aa4ac'); poly([P(i + 0.6, j, 8), P(i + 0.6, j1, 8), P(i + 0.6, j1, h - 4), P(i + 0.6, j, h - 4)], '#cfe0ea', 0.55); break;
     case 'hsign': { // 51차 국 이름 명패: 칸막이 위 금테 판 (늘 화면을 바라본다)
-      const names: Record<string, string[]> = { ko: ['사무국', '징벌국', '신앙국', '통행국', '청원국', '화장실', '구내식당', '주민센터'], th: ['สำนักเลขาธิการ', 'สำนักลงทัณฑ์', 'สำนักศรัทธา', 'สำนักผ่านแดน', 'สำนักคำร้อง', 'ห้องน้ำ', 'โรงอาหาร', 'ศูนย์บริการชาวบ้าน'], en: ['Secretariat', 'Punishment', 'Faith', 'Passage', 'Petitions', 'Restrooms', 'Cafeteria', "Residents' Center"] };
+      const names: Record<string, string[]> = { ko: ['사무국', '징벌국', '신앙국', '통행국', '청원국', '화장실', '구내식당', '주민센터', '천사 휴게실'], th: ['สำนักเลขาธิการ', 'สำนักลงทัณฑ์', 'สำนักศรัทธา', 'สำนักผ่านแดน', 'สำนักคำร้อง', 'ห้องน้ำ', 'โรงอาหาร', 'ศูนย์บริการชาวบ้าน', 'ห้องพักเทวดา'], en: ['Secretariat', 'Punishment', 'Faith', 'Passage', 'Petitions', 'Restrooms', 'Cafeteria', "Residents' Center", 'Angel Lounge'] };
       const txt = (names[lang()] ?? names.en)[f.v ?? 0] ?? '';
       const [x, y] = P(i + 0.5, j + 0.5, h + 10);
       g.font = 'bold 10px system-ui, sans-serif';

@@ -13,6 +13,7 @@ export type Category =
   | 'home' // 24차 서울 달동네 골목 끝의 내 집 (유내)
   | 'palace' | 'attraction' // 35차 천국 1층: 천국 본청 · 놀이공원 탈것
   | 'estate' // 35차 사서 들어가 사는 집: 방콕 아속의 콘도 · 서울 역삼의 아파트
+  | 'shipctr' | 'post' // 52차 천국 우주센터(안으로 들어가면 환생 로비) · 우체국(현실 · 천국 — 기원 편지의 답장)
   | 'sanct' | 'cottage' | 'hhome' | 'airport'; // 46차 천국: 성소(교회 · 불당 · 모스크) · 구름 위의 오두막 · 47차 오두막 안
 
 export interface Building {
@@ -152,7 +153,7 @@ export function finalize(z: Omit<Zone, 'blocked'>): Zone {
     // 빈 땅(주차장·공터·광장)은 걸을 수 있다. 건물·물·지도 바깥만 막는다
     blocked[k] = t === 'block' || t === 'void' || t === 'water' || t === 'hill' ? 1 : 0;
   }
-  for (const p of z.props) if (p.kind !== 'tree' && p.kind !== 'bones' && p.kind !== 'crack' && p.kind !== 'reeds' && p.kind !== 'mattress' && (p.kind as string) !== 'zoogate') blocked[p.j * z.W + p.i] = 1; // 나무·흩어진 뼈·땅의 자국은 밟고 지나간다
+  for (const p of z.props) if (p.kind !== 'tree' && p.kind !== 'bones' && p.kind !== 'crack' && p.kind !== 'reeds' && p.kind !== 'mattress' && (p.kind as string) !== 'zoogate' && (p.kind as string) !== 'padlight' && (p.kind as string) !== 'litter') blocked[p.j * z.W + p.i] = 1; // 나무·흩어진 뼈·땅의 자국은 밟고 지나간다
   // 구역 둘레(이웃 거리가 보이기만 하는 곳)는 걸을 수 없다
   const e = z.edges;
   if (e) for (let j = 0; j < z.H; j++) for (let i = 0; i < z.W; i++) if (i < e.i0 || i >= e.i1 || j < e.j0 || j >= e.j1) blocked[j * z.W + i] = 1;

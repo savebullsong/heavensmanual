@@ -59,6 +59,11 @@ export interface Save {
   adminTrip?: 'real' | 'ghost' | 'heaven' | 'hell'; // 관리자가 시찰(지옥 층 이동·천국)을 떠나기 전의 세계 (돌아갈 곳)
   /** 천국: 환생할 때 받을 선행 보너스 (영혼 경험치) */
   heaven?: { met?: boolean; admin?: boolean; adapted?: boolean; ywLost?: boolean; rites?: number; noeulMet?: boolean; acc?: 'lover' | 'friend' | 'family' | 'alone'; svcDay?: string; homeSeen?: boolean; praise?: number; gifts?: number; dates?: { day: string; keys: string[]; n: number } }; // 35차 acc = 아큐버스와 정한 사이 // 21차: 행사에 다녀와 익숙해졌나 · 안내천사를 따돌렸나 · 다녀온 행사 수
+  /** 52차 천국 1층 주민센터 번호표 (n = 내 번호 · from = 뽑을 때 창구 번호 · at = 불리는 때, 실제 시간 5분 뒤) · 구내식당 배급 받은 때 */
+  hticket?: { n: number; from: number; at: number; called?: boolean };
+  hmealAt?: number;
+  /** 52차 휴대전화: 오늘 전화를 받아 준 사람 · 인물들이 보낸 문자 · 다음 문자가 올 때 · 유내를 만났나 */
+  phone?: { day?: string; answered?: Record<string, number>; texts?: { from: string; body: string; at: number; seen?: boolean }[]; nextText?: number; yunae?: boolean };
   /** 19차 지옥면죄부: 앞으로 짓는 악행에서 지워 줄 남은 점수 (한 장 = 30, 최대 10장 = 300) */
   absolve?: number;
   /** 33차: 염소대왕의 방 환전상 — 이번 지옥길(gk = 상담 번호)에 바꾼 이승 돈과 그때 통장 */

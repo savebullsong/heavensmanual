@@ -74,6 +74,25 @@ export async function letterDelete(id: number): Promise<boolean> {
   try { const { data, error } = await sb.rpc('hm_letter_delete', { p_token: a.token, p_id: id }); return !error && !!data; } catch { return false; }
 }
 
+/** 52차 휴대전화 문자 (가입한 사람끼리 — 아이디나 게임 속 이름으로) */
+export interface Msg { id: number; dir: 'in' | 'out'; who: string; nick: string | null; body: string; at: string; seen: boolean }
+export async function sendMsg(to: string, body: string): Promise<'ok' | 'login' | 'nouser' | 'self' | 'bad' | 'wait' | 'net'> {
+  const a = account(); if (!a) return 'login';
+  try { const { data, error } = await sb.rpc('hm_msg_send', { p_token: a.token, p_to: to, p_body: body }); if (error) return 'net'; return data?.ok ? 'ok' : (data?.error ?? 'bad'); } catch { return 'net'; }
+}
+export async function msgInbox(): Promise<Msg[] | null> {
+  const a = account(); if (!a) return [];
+  try { const { data, error } = await sb.rpc('hm_msg_inbox', { p_token: a.token }); return error ? null : (data ?? []); } catch { return null; }
+}
+export async function msgUnread(): Promise<number> {
+  const a = account(); if (!a) return 0;
+  try { const { data, error } = await sb.rpc('hm_msg_unread', { p_token: a.token }); return error ? 0 : Number(data) || 0; } catch { return 0; }
+}
+export async function msgRead() {
+  const a = account(); if (!a) return;
+  try { await sb.rpc('hm_msg_read', { p_token: a.token }); } catch { /* 무시 */ }
+}
+
 type Err = 'bad_id' | 'bad_pw' | 'taken' | 'bad' | 'wait' | 'net' | 'session';
 async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T | { error: Err }> {
   try {

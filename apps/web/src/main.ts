@@ -1078,6 +1078,7 @@ const hooks: WorldHooks = {
     toast(t().ywLostToast);
   },
   hutDoor(which) { void hutDoor(which); },
+  palaceSpot(kind) { void palaceSpot(kind); }, // 52차 주민센터 번호표 · 창구 · 배식대
   airport() { void airportAsk(); },
   immig() { void immigration(); },
   promo(username) { promoTap(username); },
@@ -1759,6 +1760,54 @@ async function palaceTalk() {
   }
   endTalk();
 }
+/** 52차 천국 1층 주민센터: 번호표 뽑기 · 불린 번호로 창구에서 한 번 묻기 · 구내식당 배급 */
+const pad4 = (n: number) => String(n).padStart(4, '0');
+async function palaceSpot(kind: 'ticket' | 'counter' | 'buffet') {
+  if (busy || dlg.isOpen || scene !== 'world') return;
+  const L = t();
+  if (kind === 'ticket') {
+    const tk = state.hticket;
+    if (tk) { toast(L.palaceHaveTicket.replace('{n}', pad4(tk.n))); return; }
+    busy = true;
+    dlg.open({ name: L.palaceTicketMachine, exit: true });
+    const c = await dlg.choose([L.palaceTakeTicket, L.palaceLater]);
+    if (c === 0) {
+      const from = 400 + (Math.floor(Date.now() / 37000) % 500), n = from + 30 + Math.floor(Math.random() * 50);
+      state.hticket = { n, from, at: Date.now() + 300000 };
+      save(state);
+      world?.setPalaceTicket(state.hticket);
+      await dlg.say(L.palaceTicketGot.replace('{n}', pad4(n)));
+    }
+    endTalk();
+    return;
+  }
+  if (kind === 'counter') {
+    const tk = state.hticket;
+    busy = true;
+    dlg.open({ name: L.palaceTitles.counter, exit: true });
+    if (!tk) { await dlg.say(pick(L.palaceNoTicket)); endTalk(); return; }
+    if (Date.now() < tk.at) { await dlg.say(L.palaceNotYet.replace('{n}', pad4(tk.n))); endTalk(); return; }
+    await dlg.say(L.palaceAsk.replace('{n}', pad4(tk.n)));
+    const c = await dlg.choose([...L.palaceQ]);
+    if (c >= 0 && c < L.palaceA.length && !dlg.cancelled) {
+      state.hticket = undefined; save(state); world?.setPalaceTicket(null); // 번호표 하나에 한 번만 묻는다
+      await dlg.say(L.palaceA[c]);
+    }
+    endTalk();
+    return;
+  }
+  // 구내식당 배급: 판을 받아 빈 의자로 가서 앉아 먹는다 (5분에 한 번)
+  busy = true;
+  dlg.open({ name: L.palaceTitles.cook, exit: true });
+  if (Date.now() - (state.hmealAt ?? 0) < 300000) { await dlg.say(pick(L.palaceMealAgain)); endTalk(); return; }
+  await dlg.say(pick(L.palaceMealOffer));
+  const c = await dlg.choose([L.palaceMealTake, L.palaceLater]);
+  endTalk();
+  if (c !== 0) return;
+  state.hmealAt = Date.now(); save(state);
+  const fed = () => { world?.heal(maxHp()); state.hp = maxHp(); save(state); renderHud(); toast(L.palaceMealDone, 'good'); };
+  if (!world?.palaceEat(fed)) fed();
+}
 /** 방의 직원: 업종마다 할 수 있는 것 */
 function clerkTalk() {
   const info = world?.zone.interior;
@@ -2409,6 +2458,7 @@ let yunaeAlone = false, wombPending = false;
  *  30~40대: 나는 유내의 아들이었다 (진료실)
  */
 async function talkToYunae() {
+  if (!state.phone?.yunae) { (state.phone ??= {}).yunae = true; save(state); } // 52차: 휴대전화 목록에 유내 (걸면 '발신할 수 없는 번호')
   const L = t();
   if (busy) return;
   const age = (world?.zone.interior?.age ?? 0) as 0 | 1 | 2;
@@ -2442,6 +2492,7 @@ async function wombScene() {
 }
 /** 28차: 대문 앞의 20대 유내 — 머리 자르러 안 오냐고 타박하다가, 약속이 있다며 골목 아래로 내려간다 */
 async function talkToYunaeOut() {
+  if (!state.phone?.yunae) { (state.phone ??= {}).yunae = true; save(state); } // 52차: 휴대전화 목록에 유내 (걸면 '발신할 수 없는 번호')
   const L = t();
   if (busy || !world) return;
   const w = world;
@@ -3937,7 +3988,7 @@ function toggleBag() {
 }
 
 /** 가방의 두 칸: 소비(먹고 쓰는 것) · 장비(무기·방어구) */
-let bagTab: 'use' | 'gear' = 'use';
+let bagTab: 'use' | 'gear' | 'phone' = 'use';
 /** 25차: 장비 몸 그림에서 눌러 둔 칸 (자세한 효과를 아래에 보인다) */
 type DollSel = Slot | 'ammo';
 let dollSel: DollSel | null = null;
@@ -4031,7 +4082,7 @@ function renderBag() {
   head.className = 'menu-head';
   const tabs = document.createElement('div');
   tabs.className = 'menu-tabs';
-  for (const [k, label] of [['use', L.bagUse], ['gear', L.bagGear]] as const) {
+  for (const [k, label] of [['use', L.bagUse], ['gear', L.bagGear], ['phone', L.phoneTab]] as const) {
     const b = document.createElement('button');
     b.textContent = label;
     b.className = bagTab === k ? 'on' : '';
@@ -4043,6 +4094,16 @@ function renderBag() {
   close.textContent = '✕';
   close.onclick = () => el.remove();
   head.append(tabs, close);
+  // 52차: 세 번째 칸 — 휴대전화 (전화 · 문자)
+  if (bagTab === 'phone') {
+    const fresh = phoneUnread || (state.phone?.texts ?? []).some((x) => !x.seen);
+    el.append(head, phonePanel());
+    if (fresh) { phoneUnread = 0; for (const x of state.phone?.texts ?? []) x.seen = true; save(state); renderHud(); }
+    document.body.appendChild(el);
+    const hb = document.getElementById('hud')?.getBoundingClientRect().bottom ?? 56;
+    el.style.top = `${Math.round(hb + 6)}px`; el.style.maxHeight = `calc(100vh - ${Math.round(hb + 20)}px)`;
+    return;
+  }
   // 47차: 짐 무게 (들 수 있는 만큼 · 넘으면 붉게)
   { const e = loadEffect(); const wl = document.createElement('p'); wl.className = 'bag-weight' + (e.crawl ? ' crawl' : e.r > 1 ? ' over' : ''); wl.textContent = L.bagWeight.replace('{n}', String(loadNow())).replace('{m}', String(loadCap())) + (e.crawl ? ` · ${L.loadCrawlShort}` : e.r > 1 ? ` · ${L.loadHeavyShort}` : ''); head.after(wl); setTimeout(() => el.querySelector('.menu-head')?.after(wl), 0); }
   const info = document.createElement('div');
@@ -5076,7 +5137,7 @@ function svcTick() {
 window.setInterval(svcTick, 1000);
 // 47차 무게: 짐이 바뀌면 곧 반영 (1초마다 셈 — 가볍다)
 { const chip = document.createElement('button'); chip.className = 'load-chip'; chip.hidden = true; chip.addEventListener('click', () => toggleBag()); document.body.appendChild(chip); } // 48차: 누르면 가방 — 버리거나 맡길 것을 바로 고른다
-window.setInterval(() => { applyLoad(); applyPromo(); }, 1000); // 47차: 무게 · 홍보 말풍선 (새 장면에도 곧 붙는다)
+window.setInterval(() => { applyLoad(); applyPromo(); if (world?.zone.interior?.kind === 'hpalace') world.setPalaceTicket(state.hticket ?? null); }, 1000); // 47차: 무게 · 홍보 말풍선 (새 장면에도 곧 붙는다)
 const SANCT_ROOMS = ['hchurch', 'htemple', 'hmosque'];
 async function svcEscort() {
   if (!world || svcGoing) return;
@@ -5971,6 +6032,7 @@ function renderHud() {
     </div></div>
     ${scene === 'world' && world?.zone.attribution ? '<a class="attrib" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>' : ''}`;
   (hud.querySelector('.to-bag') as HTMLButtonElement).onclick = toggleBag;
+  hud.querySelector('.to-bag')?.classList.toggle('ph-new', phoneUnread > 0 || (state.phone?.texts ?? []).some((x) => !x.seen)); // 52차: 새 문자
   // 33차: 은행 단추 — 가장 가까운 은행으로 길 안내 (돈을 맡겨야 죽어도 남는다)
   const tb = hud.querySelector('.to-bank') as HTMLButtonElement | null;
   if (tb) tb.onclick = () => { if (!world?.guideBank()) toast(L.bankNone); };
@@ -7095,7 +7157,7 @@ setInterval(() => {
   state.contactSecs = (state.contactSecs ?? 0) + 1;
   if (state.contactSecs < CONTACT_EVERY || !contactOk()) return; // 한가해질 때까지 미룬다
   state.contactSecs = 0; save(state);
-  if (r === 'heaven') void ywDropIn(); else phoneCall(r === 'hell' ? 'hell' : 'real');
+  if (r === 'heaven') void ywDropIn(); else if (r === 'hell' && state.hell && Math.random() < 0.35) npcCall('goatking'); else phoneCall(r === 'hell' ? 'hell' : 'real'); // 52차: 지옥에선 가끔 염소대왕이
 }, 1000);
 function phoneCall(kind: 'first' | 'real' | 'hell' = 'first') {
   const L = t();
@@ -7134,6 +7196,172 @@ function phoneCall(kind: 'first' | 'real' | 'hell' = 'first') {
   };
   dec.onclick = () => { el.remove(); if (kind !== 'first' && Math.random() < 0.5) toast(pick(t().callMissed)); };
   document.body.appendChild(el);
+}
+
+// ───────────────────────── 52차 휴대전화: 천국 · 현실 · 지옥 모두 휴대전화가 있다 ─────────────────────────
+type PhoneWho = 'ujusae' | 'goatking' | 'noeul' | 'yellowwing' | 'yunae';
+let phoneUnread = 0;
+/** 목록: 처음엔 우주새 상점 하나 — 지옥에 다녀오면 염소대왕, 천국에 다녀오면 노을 · 황색날개, 유내를 만난 뒤에는 유내 */
+function phoneContacts(): PhoneWho[] {
+  const c: PhoneWho[] = ['ujusae'];
+  if (state.hell) c.push('goatking');
+  if (state.heaven) c.push('noeul', 'yellowwing');
+  if (state.phone?.yunae) c.push('yunae');
+  return c;
+}
+function phoneName(who: PhoneWho) { const L = t(); return who === 'ujusae' && inHell() ? L.phoneWho.yuhwang : L.phoneWho[who]; }
+/** 전화 화면 한 장 (이름 · 한 줄 · 끊기) */
+function phoneScreen(name: string, text: string, wait = 0): Promise<void> {
+  return new Promise((res) => {
+    const L = t();
+    const el = document.createElement('div');
+    el.className = 'phone';
+    el.innerHTML = `<div class="phone-box"><div class="ring">📱</div><b></b><span></span><div class="row"><button class="dec"></button></div></div>`;
+    el.querySelector('b')!.textContent = name;
+    const sp = el.querySelector('span')!;
+    const btn = el.querySelector('.dec') as HTMLButtonElement;
+    btn.textContent = L.phoneHang;
+    const done = () => { el.remove(); res(); };
+    btn.onclick = done;
+    document.body.appendChild(el);
+    if (wait) { sp.textContent = L.phoneRinging; btn.disabled = true; setTimeout(() => { sp.textContent = text; btn.disabled = false; }, wait); }
+    else sp.textContent = text;
+  });
+}
+const ringFor = () => new Promise<void>((r) => { const L = t(); const el = document.createElement('div'); el.className = 'phone'; el.innerHTML = `<div class="phone-box"><div class="ring">📱</div><span></span></div>`; el.querySelector('span')!.textContent = L.phoneRinging; document.body.appendChild(el); setTimeout(() => { el.remove(); r(); }, 1500); });
+/** 전화 걸기: 그 사람이 사는 세계에서만 닿는다 (우주새는 어디서나). 하루에 한 번만 받아 준다 */
+async function phoneCallOut(who: PhoneWho) {
+  if (busy || dlg.isOpen) return;
+  const L = t(), r = realm(), name = phoneName(who);
+  document.querySelector('.bag-panel')?.remove();
+  if (who === 'yunae') { await phoneScreen(name, L.phoneNoNumber, 1500); return; }
+  const here = who === 'ujusae' || (who === 'goatking' ? r === 'hell' : r === 'heaven');
+  if (!here) { await phoneScreen(name, L.phoneNoSignal, 1500); return; }
+  if ((who === 'noeul' || who === 'yellowwing') && world?.nearKind(who, 12)) { toast(L.phoneBeside.replace('{n}', name)); return; }
+  const ph = (state.phone ??= {});
+  const day = svcDayKey();
+  if (ph.day !== day) { ph.day = day; ph.answered = {}; }
+  if (ph.answered?.[who]) { await phoneScreen(name, pick(L.phoneNoAnswer), 2200); return; }
+  (ph.answered ??= {})[who] = 1; save(state);
+  if (who === 'noeul') { await phoneScreen(name, L.phoneNoeulNo, 2600); world?.noeulCome(); return; } // 받지 않는다 — 그런데 곁으로 내려앉는다
+  busy = true;
+  await ringFor();
+  const face = who === 'goatking' ? 'goat-king' : who === 'yellowwing' ? 'yellow-wing' : inHell() ? 'hwanghon' : 'miss-hwang';
+  dlg.open({ name, portrait: face });
+  if (who === 'ujusae') { await dlg.say(pick(inHell() ? L.phoneShopHell : L.phoneShop)); await dlg.say(L.phoneHungUp); }
+  else if (who === 'goatking') { await dlg.say(pick(L.phoneGoat)); if (Math.random() < 0.5) await dlg.say(pick(L.phoneGoat)); await dlg.say(L.phoneHungUp); }
+  else { await dlg.say(pick(L.phoneYw)); }
+  dlg.close(); busy = false;
+  if (who === 'yellowwing') world?.ywCome(); // 곧 갈게요 — 곁으로 날아온다
+}
+/** 인물이 거는 전화 (지옥: 염소대왕) */
+function npcCall(who: 'goatking') {
+  const L = t(), name = phoneName(who);
+  const el = document.createElement('div');
+  el.className = 'phone';
+  el.innerHTML = `<div class="phone-box"><div class="ring">📱</div><b></b><span></span><div class="row"><button class="ans primary"></button><button class="dec"></button></div></div>`;
+  el.querySelector('b')!.textContent = name;
+  el.querySelector('span')!.textContent = L.ring;
+  const ans = el.querySelector('.ans') as HTMLButtonElement, dec = el.querySelector('.dec') as HTMLButtonElement;
+  ans.textContent = L.answer; dec.textContent = L.decline;
+  try { navigator.vibrate?.([300, 200, 300]); } catch { /* 무시 */ }
+  ans.onclick = async () => {
+    el.remove(); busy = true;
+    dlg.open({ name, portrait: 'goat-king' });
+    await dlg.say(pick(L.phoneGoatIn));
+    await dlg.say(L.phoneHungUp);
+    dlg.close(); busy = false;
+  };
+  dec.onclick = () => { el.remove(); };
+  document.body.appendChild(el);
+}
+/** 인물이 보내는 문자 (가끔) */
+function npcText() {
+  const L = t();
+  const cs = phoneContacts().filter((c) => c !== 'yunae');
+  const who = pick(cs);
+  const pool = who === 'ujusae' && inHell() ? L.phoneTextShopHell : (L.phoneTexts as Record<string, string[]>)[who];
+  if (!pool?.length) return;
+  const ph = (state.phone ??= {});
+  const texts = (ph.texts ??= []);
+  texts.unshift({ from: who === 'ujusae' && inHell() ? 'yuhwang' : who, body: pick(pool), at: Date.now() });
+  texts.length = Math.min(texts.length, 30);
+  save(state);
+  toast(L.phoneNewText.replace('{n}', phoneName(who)));
+  renderHud();
+}
+setInterval(() => {
+  if (scene !== 'world' || document.hidden || busy || dlg.isOpen) return;
+  const ph = (state.phone ??= {});
+  if (!ph.nextText) { ph.nextText = Date.now() + (params.has('call') ? 30e3 : 20 * 60e3); save(state); return; }
+  if (Date.now() < ph.nextText) return;
+  ph.nextText = Date.now() + (params.has('call') ? 60e3 : (30 + Math.random() * 40) * 60e3);
+  npcText();
+}, 5000);
+// 가입한 사람: 받은 문자 수 (1분마다)
+setInterval(async () => { if (!net.account() || document.hidden) return; const n = await net.msgUnread(); if (n !== phoneUnread) { phoneUnread = n; renderHud(); } }, 60000);
+const phoneTime = (at: number) => { const d = new Date(at), now = Date.now(); return now - at < 864e5 ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` : `${d.getMonth() + 1}/${d.getDate()}`; };
+/** 소지품의 휴대전화 칸: 전화 목록 · 문자 쓰기 · 받은 문자 */
+function phonePanel(): HTMLElement {
+  const L = t(), r = realm();
+  const box = document.createElement('div');
+  box.className = 'phone-ui menu-list';
+  const h1 = document.createElement('h4'); h1.textContent = L.phoneCalls; box.appendChild(h1);
+  for (const who of phoneContacts()) {
+    const row = document.createElement('div'); row.className = 'ph-row';
+    const nm = document.createElement('b'); nm.textContent = phoneName(who);
+    const here = who === 'ujusae' || who === 'yunae' || (who === 'goatking' ? r === 'hell' : r === 'heaven');
+    const note = document.createElement('small'); note.textContent = who === 'ujusae' ? L.phoneAnywhere : who === 'yunae' ? '' : here ? '' : who === 'goatking' ? L.phoneOnlyHell : L.phoneOnlyHeaven;
+    const b = document.createElement('button'); b.textContent = '📞 ' + L.phoneCallBtn; b.onclick = () => void phoneCallOut(who);
+    row.append(nm, note, b); box.appendChild(row);
+  }
+  const h2 = document.createElement('h4'); h2.textContent = L.phoneMsgs; box.appendChild(h2);
+  const acc = net.account();
+  let toIn: HTMLInputElement | null = null;
+  if (acc) {
+    const form = document.createElement('div'); form.className = 'ph-form';
+    toIn = document.createElement('input'); toIn.placeholder = L.phoneTo; toIn.maxLength = 32; toIn.autocomplete = 'off';
+    const body = document.createElement('textarea'); body.placeholder = L.phoneBody; body.maxLength = 200; body.rows = 2;
+    const send = document.createElement('button'); send.className = 'primary'; send.textContent = L.phoneSend;
+    const msg = document.createElement('small'); msg.className = 'ph-err';
+    send.onclick = async () => {
+      const to = toIn!.value.trim(), tx = body.value.trim();
+      if (!to || !tx) { msg.textContent = L.phoneErr.bad; return; }
+      send.disabled = true;
+      const res = await net.sendMsg(to, tx);
+      send.disabled = false;
+      if (res === 'ok') { body.value = ''; msg.textContent = ''; toast(L.phoneSent, 'good'); void fillInbox(); }
+      else msg.textContent = (L.phoneErr as Record<string, string>)[res] ?? L.phoneErr.net;
+    };
+    form.append(toIn, body, send, msg); box.appendChild(form);
+  } else { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = L.phoneLoginOnly; box.appendChild(p); }
+  const inbox = document.createElement('div'); inbox.className = 'ph-inbox'; box.appendChild(inbox);
+  const npc = (state.phone?.texts ?? []).map((x) => ({ k: 'n' as const, at: x.at, who: L.phoneWho[x.from as keyof typeof L.phoneWho] ?? x.from, body: x.body, dir: 'in' as const, reply: '' }));
+  const draw = (srv: { at: number; who: string; body: string; dir: 'in' | 'out'; reply: string }[]) => {
+    inbox.innerHTML = '';
+    const all = [...npc, ...srv].sort((a, b) => b.at - a.at).slice(0, 40);
+    if (!all.length) { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = L.phoneEmpty; inbox.appendChild(p); return; }
+    for (const m of all) {
+      const it = document.createElement('div'); it.className = 'ph-msg' + (m.dir === 'out' ? ' out' : '');
+      const top = document.createElement('div'); top.className = 'ph-top';
+      const w = document.createElement('b'); w.textContent = m.dir === 'out' ? `→ ${m.who}` : m.who;
+      const tm = document.createElement('small'); tm.textContent = phoneTime(m.at);
+      top.append(w, tm);
+      const bd = document.createElement('p'); bd.textContent = m.body;
+      it.append(top, bd);
+      if (m.reply && toIn && m.dir === 'in') { const rb = document.createElement('button'); rb.className = 'ph-reply'; rb.textContent = L.phoneReply; rb.onclick = () => { toIn!.value = m.reply; (box.querySelector('textarea') as HTMLTextAreaElement | null)?.focus(); }; it.appendChild(rb); }
+      inbox.appendChild(it);
+    }
+  };
+  const fillInbox = async () => {
+    if (!acc) { draw([]); return; }
+    const ms = await net.msgInbox();
+    draw((ms ?? []).map((m) => ({ at: Date.parse(m.at), who: m.nick ? `${m.nick} (${m.who})` : m.who, body: m.body, dir: m.dir, reply: m.who })));
+    void net.msgRead();
+  };
+  draw([]);
+  if (acc) { const ld = document.createElement('p'); ld.className = 'bag-empty'; ld.textContent = L.phoneLoading; inbox.appendChild(ld); void fillInbox(); }
+  return box;
 }
 
 // ───────────────────────── 서버 저장 (회원) ─────────────────────────

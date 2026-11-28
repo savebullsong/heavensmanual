@@ -296,3 +296,90 @@ function mix(a: string, b: string, t: number) {
   const c = [16, 8, 0].map((s) => Math.round(((pa >> s) & 255) * (1 - t) + ((pb >> s) & 255) * t));
   return '#' + c.map((v) => v.toString(16).padStart(2, '0')).join('');
 }
+
+// ───────── 52차 천국의 지붕 빌딩 정문 현관 ─────────
+/** 탑(배경) 왼쪽 앞면 한가운데에 붙은 현관: 넓은 대리석 계단 · 금 기둥 여섯 · 박공 · 빛나는 큰 아치 문 · 금 현판 */
+export function drawPalaceGate(b: Building, name: string) {
+  const H = b.h;
+  const f = frame(b, H + 40);
+  const { box } = f;
+  const T = tools(f);
+  const { g, Q, poly, onY } = T;
+  const x0 = b.i0, y0 = b.j0, x1 = b.i0 + b.w, y1 = b.j0 + b.d;
+  const cx = (x0 + x1) / 2;
+  // 계단 다섯 단 (앞으로 나와 있다)
+  for (let k = 0; k < 5; k++) box(x0 + 0.2 + k * 0.08, y1 - 1.6 + k * 0.28, x1 - 0.2 - k * 0.08, y1 + 0.9 - k * 0.05, k * 3, k * 3 + 3, '#fdfbf6', '#e8e2d6', '#d4ccbc');
+  // 현관 몸체 (탑에 붙은 쪽은 뒤라 보이지 않는다)
+  box(x0 + 0.3, y0, x1 - 0.3, y1 - 1.6, 15, H - 26, '#fbf8f0', '#efe9dd', '#ddd5c6');
+  // 기둥 여섯 (앞)
+  for (let k = 0; k < 6; k++) {
+    const x = x0 + 0.75 + k * ((b.w - 1.5) / 5);
+    T.cyl(x, y1 - 1.25, 0.24, 15, H - 34, '#fffdf8', '#ddd6c8');
+    box(x - 0.34, y1 - 1.59, x + 0.34, y1 - 0.91, H - 34, H - 28, '#f6dc8a', '#e0bc5a', '#c49c3e');
+  }
+  // 엔타블러처 · 박공 (금 테)
+  box(x0 + 0.2, y0, x1 - 0.2, y1 - 0.8, H - 28, H - 16, '#f6f0e4', '#ece4d4', '#d6ccb8');
+  box(x0 + 0.15, y0, x1 - 0.15, y1 - 0.75, H - 16, H - 12, '#f6dc8a', '#e0bc5a', '#c49c3e');
+  const pa = onY(x0 + 0.15, y1 - 0.75, H - 12), pb = onY(x1 - 0.15, y1 - 0.75, H - 12), pt = onY(cx, y1 - 0.75, H + 28);
+  poly([pa, pb, pt], '#fbf8f0'); T.stroke([pa, pt, pb], '#e0b84e', 2);
+  poly([onY(x0 + 1, y1 - 0.74, H - 9), onY(x1 - 1, y1 - 0.74, H - 9), onY(cx, y1 - 0.74, H + 18)], '#f4ecd8');
+  const [hx, hy] = onY(cx, y1 - 0.73, H + 2);
+  const halo = g.createRadialGradient(hx, hy, 1, hx, hy, 12); halo.addColorStop(0, '#fff6c8'); halo.addColorStop(1, 'rgba(255,230,150,0)');
+  g.fillStyle = halo; g.beginPath(); g.arc(hx, hy, 12, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#e8c24e'; g.beginPath(); g.arc(hx, hy, 3.4, 0, Math.PI * 2); g.fill();
+  // 큰 아치 문: 금테 · 안쪽은 따뜻한 빛
+  T.glass(T.archY(cx - 1.45, cx + 1.45, y0 + 0.02 + (y1 - 1.6 - y0), 15, H - 40, false), '#f6e2a0', '#c99a36', '#b8862f');
+  T.glass(T.archY(cx - 1.15, cx + 1.15, y0 + 0.03 + (y1 - 1.6 - y0), 15, H - 50, false), '#fffbea', '#ffe9a8', '#e8c45a');
+  // 현판 (이름)
+  const zs = H - 22;
+  poly([onY(cx - 2.2, y1 - 0.72, zs - 6), onY(cx + 2.2, y1 - 0.72, zs - 6), onY(cx + 2.2, y1 - 0.72, zs + 5), onY(cx - 2.2, y1 - 0.72, zs + 5)], '#e8c45a');
+  poly([onY(cx - 2.1, y1 - 0.71, zs - 5), onY(cx + 2.1, y1 - 0.71, zs - 5), onY(cx + 2.1, y1 - 0.71, zs + 4), onY(cx - 2.1, y1 - 0.71, zs + 4)], '#fffaf0');
+  const [sx0, sy0] = onY(cx - 2.1, y1 - 0.7, zs), [sx1, sy1] = onY(cx + 2.1, y1 - 0.7, zs);
+  g.save(); g.translate((sx0 + sx1) / 2, (sy0 + sy1) / 2); g.transform(1, Math.tan(Math.atan2(sy1 - sy0, sx1 - sx0)), 0, 1, 0, 0);
+  g.fillStyle = '#6a4a1a'; g.font = 'bold 8px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  let label = name; const wmax = Math.hypot(sx1 - sx0, sy1 - sy0) - 6; while (label.length > 1 && g.measureText(label).width > wmax) label = label.slice(0, -1);
+  g.fillText(label, 0, 0); g.restore();
+  // 계단 양옆 금 등불
+  for (const x of [x0 + 0.4, x1 - 0.4]) { const [px, py] = onY(x, y1 + 0.6, 0); g.fillStyle = '#c9a23e'; g.fillRect(Math.round(px) - 1, Math.round(py) - 34, 3, 34); const gl = g.createRadialGradient(px, py - 38, 1, px, py - 38, 9); gl.addColorStop(0, '#fff6d0'); gl.addColorStop(1, 'rgba(255,236,170,0)'); g.fillStyle = gl; g.beginPath(); g.arc(px, py - 38, 9, 0, Math.PI * 2); g.fill(); g.fillStyle = '#fff2b8'; g.fillRect(Math.round(px) - 2, Math.round(py) - 41, 5, 6); }
+  void Q;
+  return { canvas: f.c, x: f.x, y: f.y };
+}
+
+// ───────── 52차 천국 우주센터 ─────────
+/** 흰 곡면 유리 건물 · 금 띠 · 옥상의 둥근 관제 돔과 안테나 · 정면 큰 유리문과 금 날개 표장 */
+export function drawShipCenter(b: Building, name: string) {
+  const H = b.h;
+  const f = frame(b, H + 70);
+  const { box } = f;
+  const T = tools(f);
+  const { g, Q, poly, onY, onX } = T;
+  const x0 = b.i0, y0 = b.j0, x1 = b.i0 + b.w, y1 = b.j0 + b.d;
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  box(x0, y0, x1, y1, 0, 5, '#e6e8ee', '#d4d8e0', '#c2c8d2');
+  box(x0 + 0.2, y0 + 0.2, x1 - 0.2, y1 - 0.2, 5, H, '#f8f9fc', '#eceff4', '#d6dbe4');
+  // 띠창 (층마다 길게 이어진 푸른 유리)
+  for (let z = 18; z < H - 14; z += 30) {
+    poly([onY(x0 + 0.5, y1 - 0.19, z), onY(x1 - 0.5, y1 - 0.19, z), onY(x1 - 0.5, y1 - 0.19, z + 14), onY(x0 + 0.5, y1 - 0.19, z + 14)], '#8ab0d8');
+    poly([onY(x0 + 0.5, y1 - 0.18, z + 9), onY(x1 - 0.5, y1 - 0.18, z + 9), onY(x1 - 0.5, y1 - 0.18, z + 14), onY(x0 + 0.5, y1 - 0.18, z + 14)], '#b8d4f0');
+    poly([onX(x1 - 0.19, y0 + 0.5, z), onX(x1 - 0.19, y1 - 0.5, z), onX(x1 - 0.19, y1 - 0.5, z + 14), onX(x1 - 0.19, y0 + 0.5, z + 14)], '#6a90b8');
+    poly([onY(x0 + 0.2, y1 - 0.18, z + 16), onY(x1 - 0.2, y1 - 0.18, z + 16), onY(x1 - 0.2, y1 - 0.18, z + 18), onY(x0 + 0.2, y1 - 0.18, z + 18)], '#e0b84e');
+  }
+  box(x0, y0, x1, y1, H, H + 6, '#f6dc8a', '#e0bc5a', '#c49c3e');
+  poly([Q(x0 + 0.3, y0 + 0.3, H + 6), Q(x1 - 0.3, y0 + 0.3, H + 6), Q(x1 - 0.3, y1 - 0.3, H + 6), Q(x0 + 0.3, y1 - 0.3, H + 6)], '#eef0f4');
+  // 관제 돔 · 안테나
+  T.cyl(cx + 1, cy - 0.6, 1.4, H + 6, H + 14, '#f8f9fc', '#d6dbe4');
+  T.dome(cx + 1, cy - 0.6, H + 14, H + 34, (t) => 1.5 * Math.sqrt(Math.max(0, 1 - t * t)), '#e8f2ff', '#8ab0d8');
+  { const [ax, ay] = Q(cx - 1.6, cy - 1.4, H + 6); g.strokeStyle = '#b8bcc6'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(ax, ay); g.lineTo(ax, ay - 52); g.stroke(); for (let k = 1; k < 4; k++) { g.beginPath(); g.moveTo(ax - 6 + k, ay - 14 * k); g.lineTo(ax + 6 - k, ay - 14 * k); g.stroke(); } g.fillStyle = '#e8322a'; g.beginPath(); g.arc(ax, ay - 54, 2.2, 0, Math.PI * 2); g.fill(); }
+  // 정문: 큰 유리문 + 금 날개 표장 + 이름
+  T.glass([onY(cx - 1.4, y1 - 0.18, 5), onY(cx + 1.4, y1 - 0.18, 5), onY(cx + 1.4, y1 - 0.18, 40), onY(cx - 1.4, y1 - 0.18, 40)], '#e8f4ff', '#9ac0e0', '#d9b44a');
+  T.stroke([onY(cx, y1 - 0.17, 5), onY(cx, y1 - 0.17, 40)], '#d9b44a', 1);
+  { const [wx, wy] = onY(cx, y1 - 0.16, H - 24); g.fillStyle = '#e8c24e'; for (const s of [-1, 1]) { g.beginPath(); g.moveTo(wx, wy); for (let q = 0; q < 5; q++) g.lineTo(wx + s * (6 + q * 3.2), wy - 6 + q * 2.6); g.lineTo(wx + s * 4, wy + 3); g.closePath(); g.fill(); } g.beginPath(); g.arc(wx, wy - 1, 3, 0, Math.PI * 2); g.fill(); }
+  const zs = 50;
+  poly([onY(cx - 2.6, y1 - 0.15, zs - 6), onY(cx + 2.6, y1 - 0.15, zs - 6), onY(cx + 2.6, y1 - 0.15, zs + 5), onY(cx - 2.6, y1 - 0.15, zs + 5)], '#2a3a5a');
+  const [sx0, sy0] = onY(cx - 2.5, y1 - 0.14, zs), [sx1, sy1] = onY(cx + 2.5, y1 - 0.14, zs);
+  g.save(); g.translate((sx0 + sx1) / 2, (sy0 + sy1) / 2); g.transform(1, Math.tan(Math.atan2(sy1 - sy0, sx1 - sx0)), 0, 1, 0, 0);
+  g.fillStyle = '#f6e2a0'; g.font = 'bold 8px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  let label = name; const wmax = Math.hypot(sx1 - sx0, sy1 - sy0) - 6; while (label.length > 1 && g.measureText(label).width > wmax) label = label.slice(0, -1);
+  g.fillText(label, 0, 0); g.restore();
+  return { canvas: f.c, x: f.x, y: f.y };
+}

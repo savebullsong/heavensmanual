@@ -780,3 +780,22 @@ body:has(.bag-panel) .load-chip { display: none; }
 @keyframes om-slash { 0% { opacity: 1; transform: rotate(-24deg) scaleX(0); } 60% { opacity: 1; transform: rotate(-24deg) scaleX(1); } 100% { opacity: 0; transform: rotate(-24deg) scaleX(1); } }
 @keyframes om-red { 0%, 30% { background-color: transparent; } 100% { background-color: rgba(120, 0, 0, 0.85); } }
 .bank-panel .bank-quick button { white-space: nowrap; font-size: 12px; padding: 7px 2px; min-width: 0; letter-spacing: -0.02em; }
+
+/* 52차 휴대전화 칸 (소지품 세 번째) */
+.phone-ui h4 { margin: 6px 2px 2px; font-size: 12px; color: #e0b437; letter-spacing: 0.04em; }
+.phone-ui .ph-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,0.05); }
+.phone-ui .ph-row b { flex: 0 0 auto; font-size: 14px; }
+.phone-ui .ph-row small { flex: 1 1 auto; opacity: 0.6; font-size: 11px; }
+.phone-ui .ph-row button { flex: 0 0 auto; white-space: nowrap; }
+.phone-ui .ph-form { display: flex; flex-direction: column; gap: 6px; padding: 6px 2px; }
+.phone-ui .ph-form input, .phone-ui .ph-form textarea { width: 100%; box-sizing: border-box; padding: 7px 9px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.25); color: inherit; font: inherit; font-size: 14px; resize: none; }
+.phone-ui .ph-err { color: #ff8a7a; min-height: 1em; font-size: 12px; }
+.phone-ui .ph-inbox { display: flex; flex-direction: column; gap: 6px; }
+.phone-ui .ph-msg { padding: 7px 9px; border-radius: 10px; background: rgba(255,255,255,0.07); }
+.phone-ui .ph-msg.out { background: rgba(224,180,55,0.12); margin-left: 24px; }
+.phone-ui .ph-msg .ph-top { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+.phone-ui .ph-msg .ph-top small { opacity: 0.55; }
+.phone-ui .ph-msg p { margin: 3px 0 0; font-size: 14px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+.phone-ui .ph-reply { margin-top: 4px; font-size: 12px; padding: 2px 10px; }
+.to-bag.ph-new { position: relative; }
+.to-bag.ph-new::after { content: ''; position: absolute; top: 2px; right: 2px; width: 8px; height: 8px; border-radius: 50%; background: #ff4a3a; box-shadow: 0 0 0 2px rgba(0,0,0,0.5); }
