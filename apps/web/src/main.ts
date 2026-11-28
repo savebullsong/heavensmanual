@@ -1739,7 +1739,7 @@ async function rideAsk(k: number, att: string) {
   world?.ride(k);
   toast(L.rideToast[ix]);
 }
-/** 46차 천국 본청 접수 천사: 생명책에서 내 장 찾기 · 본청이 하는 일 · 예배 시간 */
+/** 51차 천국의 지붕 빌딩 1층 주민센터장: 생명책에서 내 장 찾기 · 빌딩이 하는 일 · 위층 · 예배 시간 */
 async function palaceTalk() {
   if (busy || dlg.isOpen) return;
   busy = true;
@@ -1752,7 +1752,8 @@ async function palaceTalk() {
       const d = state.deeds ?? { good: 0, evil: 0 };
       await dlg.say(L.palaceFind.replace('{g}', String(Math.round(d.good * 10) / 10)).replace('{e}', String(Math.round(d.evil * 10) / 10)).replace('{r}', String(state.heaven?.rites ?? 0)));
     } else if (c === 1) { for (const line of L.palaceAbout) await dlg.say(line); }
-    else if (c === 2) await dlg.say(L.palaceSvc.replace('{t}', svcTime()));
+    else if (c === 2) { for (const line of L.palaceUp) await dlg.say(line); } // 51차: 위층은 미스터리
+    else if (c === 3) await dlg.say(L.palaceSvc.replace('{t}', svcTime()));
     else break;
     if (dlg.cancelled) break;
   }

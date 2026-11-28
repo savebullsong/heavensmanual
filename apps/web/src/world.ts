@@ -9,7 +9,8 @@ import { vendorGear, hasVendorGear, VGEAR_FOOT } from './vendorgear.ts';
 import { drawDalHouse } from './dalgfx.ts';
 import { snowGround, snowBuilding } from './snow.ts';
 import { drownedCanvas, monkLook, shoreF, shoreLine, shoreSkyCanvas, drawShoreChunk, capeRocks, drawCapeRock } from './border.ts';
-import { drawHeavenGround, drawHeavenPalace, drawAttraction, heavenMeta , ZOO_PENS } from './heavenworld.ts';
+import { animalFrames } from './zooart.ts';
+import { drawHeavenGround, drawHeavenPalace, drawAttraction, heavenMeta , ZOO_PENS, PALACE_TOP, palaceHalf } from './heavenworld.ts';
 import { drawSanctum, drawMarbleShop, SANCT_TOP } from './heavensanct.ts';
 import { wingTexture, cloudTexture, heavenVignette, cloudStairTexture, heavenTowerTexture, terraceSkyTexture, hellPortalTexture, bedTexture, BED_ANCHOR, sleepBedTexture, SLEEP_ANCHOR, batWingTexture, hornTexture, devilTailTexture, succWingTexture, spadeTailTexture, SPADE_ANCHOR, demonArmTexture, ARM_PIVOT } from './heavengfx.ts';
 import { hellDecor } from './hellprops.ts';
@@ -255,6 +256,8 @@ interface Walker {
   choir?: boolean; // 46차 예배 때 벽가에 선 천사
   worship?: boolean; // 46차 천국 성소에 앉은 영혼
   twin?: 'boy' | 'girl'; // 46차 구름 위 옆집 쌍둥이
+  /** 51차: 혼잣말 묶음 (t().mutter의 열쇠) — 지붕 빌딩의 센터장 · 직원 · 징벌국 · 민원인 · 승강기 경비 · 거니는 염소대왕 */
+  mut?: string;
   still?: 'sit' | 'lie' | 'lotus'; // 마을의 지친 영혼: 앉아 있거나 누워 있다 · 24차 가부좌 (경계의 완성자·카드 치는 천사)
   vend?: HellVendor | 'street' | 'massage' | 'bar' | 'heaven'; // 마을 장사꾼 · 19차 현실: 손수레 노점 · 마사지 호객 · 바 호객 · 21차 천국: 먹을 것을 파는 천사
   /** 19차: 호객원이 서 있는 가게 (건물 번호) */
@@ -605,6 +608,7 @@ function pingIcon(g: Graphics, kind: string) {
   }
 }
 const ZOO_KINDS = new Set(['giraffe', 'elephant', 'lion', 'zebra', 'flamingo', 'panda']);
+const GHOSTLESS = new Set<string>(['palace', 'attraction', 'sanct', 'hbank', 'atone', 'rebirth', 'loan', 'terrace', 'goatroom']);
 export class WorldScene {
   /** 46차: 다음에 여는 성소가 예배 중인지 · 비워 둘 내 자리 */
   static svcNext: { on: boolean; seat: [number, number] | null } | null = null;
@@ -881,7 +885,7 @@ export class WorldScene {
       s.position.set(x, y);
       s.zIndex = p.i + p.j + 0.99;
       this.objects.addChild(s);
-      if (this.zone.heavenGen && ZOO_KINDS.has(p.kind)) { const pen = ZOO_PENS.find(([a, b]) => p.i > a && p.i < a + 5 && p.j > b && p.j < b + 6); if (pen) this.zooAnimals.push({ s, x: p.i + 0.5, y: p.j + 0.5, tx: p.i + 0.5, ty: p.j + 0.5, wait: Math.random() * 4, pen: [pen[0], pen[1]], sp: p.kind === 'flamingo' ? 0.55 : p.kind === 'elephant' || p.kind === 'panda' ? 0.28 : 0.4, ph: Math.random() * 6 }); } // 46차 걷는 동물
+      if (this.zone.heavenGen && ZOO_KINDS.has(p.kind)) { const pen = ZOO_PENS.find(([a, b]) => p.i > a && p.i < a + 5 && p.j > b && p.j < b + 6); const fr = animalFrames(p.kind); if (fr) { s.texture = fr.frames[0]; s.anchor.set(fr.ax, fr.ay); } if (pen) this.zooAnimals.push({ s, x: p.i + 0.5, y: p.j + 0.5, tx: p.i + 0.5, ty: p.j + 0.5, wait: Math.random() * 4, pen: [pen[0], pen[1]], sp: p.kind === 'flamingo' ? 0.5 : p.kind === 'elephant' || p.kind === 'panda' ? 0.3 : p.kind === 'giraffe' ? 0.45 : 0.4, ph: Math.random() * 6, frames: fr?.frames, rest: false }); } // 46차 걷는 동물 · 51차 걷는 동작
       if (p.kind === 'pillar' || p.kind === 'lamp' || p.kind === 'tree') {
         const w = s.width, h = s.height, x0 = x - w * pt.ax, y0 = y - h * pt.ay;
         this.addTall(s, x0, y0, x0 + w, y0 + h);
@@ -1309,7 +1313,7 @@ export class WorldScene {
     const base = tex(art && k ? art : d.canvas);
     const W = d.canvas.width, H = d.canvas.height;
     const parts = this.strips(base, d.x, d.y, b.i0, b.j0, b.w, b.d, -0.2, k === 2 ? 2 : 1);
-    const top = lmk && this.realm === 'real' ? landmarkTop(b.h, lmk) + 40 : dal ? 34 + 16 + Math.min(b.w, b.d) * 3 : b.cat === 'palace' ? 1440 : b.cat === 'attraction' ? b.h + 30 : b.cat === 'sanct' ? (SANCT_TOP[(b as { att?: string }).att ?? 'church'] ?? 260) + 20 : this.realm === 'heaven' && b.cat === 'shop' ? b.h + 30 : b.cat === 'ujusae' ? COSMIC_TOP : b.cat === 'loan' ? LOAN_TOP : b.cat === 'hbank' ? b.h + 6 : b.cat === 'atone' ? b.h + 46 : b.cat === 'rebirth' ? b.h + 4 : hellTheme ? b.h : kitOk ? buildingTop(b, this.low) : buildingHeight(b.h);
+    const top = lmk && this.realm === 'real' ? landmarkTop(b.h, lmk) + 40 : dal ? 34 + 16 + Math.min(b.w, b.d) * 3 : b.cat === 'palace' ? PALACE_TOP + 120 : b.cat === 'attraction' ? b.h + 30 : b.cat === 'sanct' ? (SANCT_TOP[(b as { att?: string }).att ?? 'church'] ?? 260) + 20 : this.realm === 'heaven' && b.cat === 'shop' ? b.h + 30 : b.cat === 'ujusae' ? COSMIC_TOP : b.cat === 'loan' ? LOAN_TOP : b.cat === 'hbank' ? b.h + 6 : b.cat === 'atone' ? b.h + 46 : b.cat === 'rebirth' ? b.h + 4 : hellTheme ? b.h : kitOk ? buildingTop(b, this.low) : buildingHeight(b.h);
     const [lx] = iso(b.i0 + b.w / 2, b.j0 + b.d / 2);
     // 22차: 벽이 있는 자리(투명 여백 판정)는 처음 필요할 때 만든다 — 건물을 세울 때마다 픽셀 전체를 읽던 비용을 뺐다
     return { parts, base, x: d.x, y: d.y, w: W, h: H, top, lx, ly: (b.i0 + b.j0) * (TH / 2) - top + 4, cv: d.canvas, b };
@@ -1320,6 +1324,7 @@ export class WorldScene {
     v.base.destroy(true);
     this.dropGhost(v);
   }
+/** 51차: 제 그림이 따로 있는 건물은 '원래 높이' 겹침(일반 콘도 그림)을 쓰지 않는다 */
   private dropGhost(v: BView) {
     if (!v.ghost) return;
     for (const s of v.ghost.parts) s.destroy({ texture: true });
@@ -1332,7 +1337,7 @@ export class WorldScene {
    * (2.5칸 안 = 가장 진하게 30%, 5칸 밖 = 사라짐). 희미한 모습은 필요할 때만 그리고 멀어지면 버린다
    */
   private updateGhosts(px: number, py: number, dt: number) {
-    const on = this.low && !this.zone.hell && !this.zone.interior && kitOk;
+    const on = this.low && !this.zone.hell && !this.zone.interior && kitOk && !this.zone.heavenGen; // 51차: 천국 1층(탑 · 놀이공원 · 성소 · 대리석 가게)은 제 그림 그대로 — 가까이 가면 콘도 그림이 겹쳐 보이던 것
     const now = performance.now();
     // 29차: 높은 건물이 빽빽한 곳(소이 8–17 고층 단지)에서 걸을 때마다 원래 높이 그림을 새로 그리고 버리느라 버벅이던 것 —
     // 한 프레임에 하나만 새로 그리고(가장 가까운 건물부터), 흐려진 그림은 버리지 않고 남겨 두었다가 다시 다가가면 그대로 쓴다 (최대 8채)
@@ -1341,7 +1346,7 @@ export class WorldScene {
     for (const v of this.bViews.values()) {
       const b = v.b;
       let want = 0, dist = 99;
-      if (on && b.cat !== 'ujusae' && b.cat !== 'home' && !b.hut && upperFloors(b) > 0) {
+      if (on && b.cat !== 'ujusae' && b.cat !== 'home' && !b.hut && !GHOSTLESS.has(b.cat) && !(b as { lmk?: unknown }).lmk && !(this.realm === 'heaven' && b.cat === 'shop') && upperFloors(b) > 0) {
         const dx = Math.max(b.i0 - px, 0, px - (b.i0 + b.w)), dy = Math.max(b.j0 - py, 0, py - (b.j0 + b.d));
         dist = Math.hypot(dx, dy);
         want = dist < 1.5 ? 0.15 : dist < 3.5 ? (0.15 * (3.5 - dist)) / 2 : 0;
@@ -2746,7 +2751,7 @@ export class WorldScene {
     c.s.zIndex = c.x + c.y + 0.49;
   }
   // ───── 46차 천국 동물원: 우리 안을 천천히 걷다 서다 한다 (가는 쪽을 바라본다 · 걸을 때 살짝 들썩) ─────
-  private zooAnimals: { s: Sprite; x: number; y: number; tx: number; ty: number; wait: number; pen: [number, number]; sp: number; ph: number }[] = [];
+  private zooAnimals: { s: Sprite; x: number; y: number; tx: number; ty: number; wait: number; pen: [number, number]; sp: number; ph: number; frames?: Texture[]; rest: boolean }[] = [];
   private updateZoo(dt: number) {
     for (const a of this.zooAnimals) {
       if (a.s.destroyed) continue;
@@ -2754,15 +2759,16 @@ export class WorldScene {
       let walking = false;
       if (d < 0.05) {
         a.wait -= dt;
-        if (a.wait <= 0) { a.tx = a.pen[0] + 1.4 + Math.random() * 3.2; a.ty = a.pen[1] + 1.4 + Math.random() * 4.2; a.wait = 2 + Math.random() * 6; }
+        if (a.wait <= 0) { a.tx = a.pen[0] + 1.4 + Math.random() * 3.2; a.ty = a.pen[1] + 1.4 + Math.random() * 4.2; a.rest = Math.random() < 0.4; a.wait = a.rest ? 6 + Math.random() * 10 : 2 + Math.random() * 5; } // 51차: 가끔 쉬는 모습 (풀 뜯기 · 엎드리기 · 앉아 먹기)
       } else {
         const st = Math.min(d, a.sp * dt);
         a.x += (dx / d) * st; a.y += (dy / d) * st; walking = true;
         const sdx = dx - dy; if (Math.abs(sdx) > 0.02) a.s.scale.x = sdx > 0 ? 1 : -1; // 화면에서 오른쪽으로 가면 오른쪽을 본다
       }
       const [x, y] = iso(a.x, a.y);
-      a.ph += dt * (walking ? 9 : 0);
-      a.s.position.set(x, y - (walking ? Math.abs(Math.sin(a.ph)) * 1.5 : 0));
+      a.ph += dt * (walking ? 5.5 : 0);
+      if (a.frames) { const f = walking ? 1 + (Math.floor(a.ph / (Math.PI / 4)) % 8) : a.rest && a.wait > 0 ? 9 : 0; if (a.s.texture !== a.frames[f]) a.s.texture = a.frames[f]; }
+      a.s.position.set(x, y);
       a.s.zIndex = a.x + a.y + 0.49;
     }
   }
@@ -2891,6 +2897,7 @@ export class WorldScene {
     const to = randomWalkTileNear(this.zone, Math.floor(v.i), Math.floor(v.j), Math.max(2, Math.floor(v.r) - 1));
     if (!to) return;
     const w = this.makeWalker(GOAT_KING_WALK, to[0], to[1], 'gkwalk');
+    w.mut = 'gkwalk'; // 51차: 마을을 거닐며 혼잣말
     w.maxHp = w.hp = 99999;
     w.speed = 0.85; w.size = 1.3; w.wait = 3;
     w.home = [Math.floor(v.i), Math.floor(v.j)];
@@ -4044,20 +4051,24 @@ export class WorldScene {
       seats.length = 0;
     }
     if (info.kind === 'hpalace') {
-      // 46차 천국 본청: 접수 천사 셋(가운데 · 양쪽 창구) · 창구와 저울 앞에 줄 선 영혼 · 긴 의자에서 기다리는 영혼 · 서류를 들고 오가는 천사들
-      const W = this.zone.W, mid = Math.floor(W / 2);
-      if (this.clerkW) { this.giveWings(this.clerkW, 0xf6f2e6); this.clerkW.dir = 'sw'; }
-      const still = (wk: Walker, d: Dir) => { wk.dir = d; wk.wait = 1e9; wk.speed = 0; wk.maxHp = wk.hp = 99999; this.walkers.push(wk); return wk; };
-      for (const [i, j, d] of [[2, 6, 'e'], [W - 3, 6, 'n']] as [number, number, Dir][]) this.giveWings(still(this.makeWalker(this.npcLook('angel'), i, j, 'angel'), d), 0xf4efe4);
-      for (let q = 0; q < 3; q++) { still(this.makeWalker(this.congregantLook(), 4 + q, 6, 'soul'), 'w'); still(this.makeWalker(this.congregantLook(), W - 5 - q, 6, 'soul'), 'e'); }
-      for (let q = 0; q < 4; q++) still(this.makeWalker(this.congregantLook(), mid + (q % 2), 9 + q, 'soul'), 'ne');
+      // 51차 천국의 지붕 빌딩 1층: 창구 뒤 주민센터장(말을 거는 이)과 직원 둘 · 창구 앞 민원인 · 의자에서 기다리는 민원인들 ·
+      // 국마다 책상 뒤 천사들(징벌국은 따로 혼잣말) · 구내식당 배식 천사와 먹는 천사들 · 화장실 앞 · 승강기를 지키는 칼 든 천사 둘 · 서류를 들고 오가는 천사
+      if (this.clerkW) { this.giveWings(this.clerkW, 0xf6f2e6); this.clerkW.dir = 'sw'; this.clerkW.mut = 'hchief'; }
+      const still = (wk: Walker, d: Dir, mut?: string) => { wk.dir = d; wk.wait = 1e9; wk.speed = 0; wk.maxHp = wk.hp = 99999; if (mut) wk.mut = mut; this.walkers.push(wk); return wk; };
+      const angel = (i: number, j: number, d: Dir, mut: string, weapon: string | null = null) => this.giveWings(still(this.makeWalker(this.npcLook('angel'), i, j, 'angel', weapon), d, mut), 0xf4efe4);
+      for (const [i, j] of [[6, 19], [13, 19]]) angel(i, j, 'sw', 'hstaff');
+      for (const [i, j] of [[6, 21], [13, 21], [11, 22], [12, 23]]) still(this.makeWalker(this.congregantLook(), i, j, 'soul'), 'ne', 'hpetition');
       for (const [i, j] of seats) {
-        if (Math.random() > 0.6) continue;
+        if (Math.random() > 0.55) continue;
         const c = this.makeWalker(this.congregantLook(), i, j, 'soul');
-        c.x = i + 0.5; c.y = j + 0.38; c.still = 'sit'; c.worship = true;
-        still(c, 'ne');
+        c.x = i + 0.5; c.y = j + 0.38; c.still = 'sit';
+        still(c, 'ne', Math.random() < 0.7 ? 'hpetition' : undefined);
       }
-      for (let k = 0; k < 3; k++) { const a = this.makeWalker(this.npcLook('angel'), 6 + k * 5, 10, 'angel'); a.wait = 2 + Math.random() * 5; a.speed = 0.7; a.maxHp = a.hp = 99999; this.giveWings(a, 0xf4efe4); this.walkers.push(a); }
+      for (const [i, j] of [[2, 4], [6, 4], [3, 13], [6, 13], [26, 4], [30, 4], [34, 4], [37, 4], [30, 10], [11, 17]] as [number, number][]) angel(i, j, 'sw', 'hstaff');
+      for (const [i, j] of [[10, 4], [14, 4], [14, 2]] as [number, number][]) angel(i, j, 'sw', 'hpunish');
+      for (const [i, j] of [[26, 13], [31, 15], [34, 13], [27, 17]] as [number, number][]) { const a = this.makeWalker(this.npcLook('angel'), i, j, 'angel'); a.x = i + 0.5; a.y = j + 0.4; a.still = 'sit'; this.giveWings(still(a, 'ne', 'hstaff'), 0xf4efe4); }
+      for (const [i, j] of [[17, 6], [22, 6]] as [number, number][]) angel(i, j, 'sw', 'helev', 'sword');
+      for (let k = 0; k < 3; k++) { const a = this.makeWalker(this.npcLook('angel'), 19 + k, 10 + k * 3, 'angel'); a.wait = 2 + Math.random() * 5; a.speed = 0.7; a.maxHp = a.hp = 99999; a.mut = 'hstaff'; this.giveWings(a, 0xf4efe4); this.walkers.push(a); }
       seats.length = 0;
     }
     if (info.kind === 'shore') {
@@ -6115,8 +6126,10 @@ export class WorldScene {
       const b = this.zone.buildings[k];
       const h = v.top;
       let hitB = false;
+      const tower = b.cat === 'palace'; // 51차: 탑은 위로 갈수록 가늘다 — 탑 옆 하늘 아래의 광장을 눌러도 탑으로 들어가려 빙빙 돌던 것
       for (let z = 0; z <= h && !hitB; z += 4) {
         const fx = (wx / (TW / 2) + (wy + z) / (TH / 2)) / 2, fy = ((wy + z) / (TH / 2) - wx / (TW / 2)) / 2;
+        if (tower) { const a = palaceHalf(z, b.w / 2), cx = b.i0 + b.w / 2, cy = b.j0 + b.d / 2; if (Math.abs(fx - cx) <= a && Math.abs(fy - cy) <= a) hitB = true; continue; }
         if (fx >= b.i0 && fx <= b.i0 + b.w && fy >= b.j0 && fy <= b.j0 + b.d) hitB = true;
       }
       if (!hitB) continue;
@@ -6774,6 +6787,7 @@ export class WorldScene {
     if (w.bankGuard) { w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); const ls = t().bankGuardLines; this.hooks.say(L.bankGuard, pd.kind === 'look' ? L.bankGuardLook : ls[Math.floor(Math.random() * ls.length)]); return; } // 49차 은행 경비원
     if (w.kind === 'gkwalk') { w.path = []; w.wait = 12; w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); if (pd.kind === 'look') this.hooks.say(L.gkName, L.gkWalkLook); else this.hooks.goatKingWalk(); return; } // 48차: 층을 거니는 염소대왕
     if (w.dumpAngel) { const ls = pd.kind === 'look' ? [L.dumpLook] : L.dumpLines; this.hooks.say(this.npcName(w), ls[Math.floor(Math.random() * ls.length)]); return; } // 47차 쓰레기장 천사
+    if (w.mut && pd.kind === 'talk') { const pool = (t().mutter as Record<string, string[]>)[w.mut] ?? []; if (pool.length) { w.dir = dirFromTile(this.player.x - w.x, this.player.y - w.y, w.dir); this.hooks.say(this.npcName(w), pool[Math.floor(Math.random() * pool.length)]); return; } } // 51차
     if (w.kind === 'angel' || w.kind === 'officer' || w.kind === 'yellowwing' || w.kind === 'noeul') {
       if (pd.kind === 'look') { this.hooks.say(this.npcName(w), this.npcSub(w)); return; }
       this.hooks.say(this.npcName(w), L.angelLines[Math.floor(Math.random() * L.angelLines.length)]);
@@ -7108,6 +7122,11 @@ export class WorldScene {
   /** 간판 면 앞 (사람이 설 수 있는 칸) */
   private frontOf(b: Building): [number, number] | null {
     const near = (spot: [number, number]) => [[0, 0], [0, 1], [1, 0], [-1, 0], [0, -1], [1, 1]].map(([a, c]) => [spot[0] + a, spot[1] + c] as [number, number]).find(([a, c]) => walkable(this.zone, a, c)) ?? null;
+    if (b.cat === 'palace') { // 51차: 탑의 정문은 두 면(앞 왼쪽 · 앞 오른쪽) — 가까운 쪽으로
+      const p = this.player, gates = [near([b.i0 + Math.floor(b.w / 2), b.j0 + b.d]), near([b.i0 + b.w, b.j0 + Math.floor(b.d / 2)])].filter(Boolean) as [number, number][];
+      gates.sort((x, y) => Math.hypot(x[0] + 0.5 - p.x, x[1] + 0.5 - p.y) - Math.hypot(y[0] + 0.5 - p.x, y[1] + 0.5 - p.y));
+      if (gates.length) return gates[0];
+    }
     if (b.sign) return near(b.sign === 'right' ? [b.i0 + b.w, b.j0 + Math.floor(b.d / 2)] : [b.i0 + Math.floor(b.w / 2), b.j0 + b.d]);
     // 간판 없는 건물(사원 경내 등): 앞쪽 두 면 → 뒤쪽 두 면 순서로 걸을 수 있는 둘레 칸
     const ring: [number, number][] = [];
@@ -8001,15 +8020,15 @@ export class WorldScene {
    */
   private mutterT = 6;
   private mutter(w: Walker, dt: number) {
-    const key = w.kind === 'vendor' ? (w.vend === 'succubus' || w.vend === 'massage' || w.vend === 'bar' || w.vend === 'street' || w.vend === 'heaven' ? '' : w.vend ?? '') : w.kind === 'soul' || w.kind === 'guard' || w.kind === 'angel' || w.kind === 'sleeper' || w.kind === 'elder' || w.kind === 'officer' || w.kind === 'pashar' || w.kind === 'clerk' ? w.kind : '';
+    const key = w.mut ? w.mut : w.kind === 'vendor' ? (w.vend === 'succubus' || w.vend === 'massage' || w.vend === 'bar' || w.vend === 'street' || w.vend === 'heaven' ? '' : w.vend ?? '') : w.kind === 'soul' || w.kind === 'guard' || w.kind === 'angel' || w.kind === 'sleeper' || w.kind === 'elder' || w.kind === 'officer' || w.kind === 'pashar' || w.kind === 'clerk' ? w.kind : '';
     if (!key) return;
     const M = t().mutter as Record<string, string[]>;
-    const pool = M[w.kind === 'clerk' ? `clerk_${this.realm}` : w.kind === 'guard' && this.zone.hell ? 'hguard' : key];
+    const pool = M[w.mut ? w.mut : w.kind === 'clerk' ? `clerk_${this.realm}` : w.kind === 'guard' && this.zone.hell ? 'hguard' : key];
     if (!pool?.length) return;
     if (this.mutterT > 0) return;
     if (Math.random() > dt * 0.25) return;
     if (Math.hypot(this.player.x - w.x, this.player.y - w.y) > 10) return;
-    this.mutterT = 15 + Math.random() * 20;
+    this.mutterT = this.zone.interior?.kind === 'hpalace' ? 6 + Math.random() * 8 : 15 + Math.random() * 20; // 51차: 지붕 빌딩 안은 일하는 천사가 많아 자주
     this.bubble(w, pool[Math.floor(Math.random() * pool.length)]);
   }
   private bubble(w: Walker, text: string) {
@@ -8019,7 +8038,7 @@ export class WorldScene {
     w.bubble.anchor.set(0.5, 1);
     w.bubble.zIndex = 1e6 - 2;
     this.objects.addChild(w.bubble);
-    w.bubbleT = 1.6;
+    w.bubbleT = Math.min(4.2, 1.6 + Math.max(0, text.length - 12) * 0.07); // 51차: 긴 말은 조금 더 오래
   }
 
   private float(w: Walker, text: string, color: string) {

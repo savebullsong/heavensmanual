@@ -9,6 +9,7 @@ import { BESK_LOOK, YELLOW_WING_LOOK } from './sprites.ts';
 import { drawShore, drawShoreFurn, BULDA_LOOK } from './border.ts';
 import { menuFor, itemByKey } from './items.ts';
 import { furnishHome, furnishShowroom } from './home.ts';
+import { lang } from './i18n.ts';
 export { BESK_LOOK };
 
 const TI = Object.fromEntries(TYPES.map((t, k) => [t, k])) as Record<(typeof TYPES)[number], number>;
@@ -82,7 +83,8 @@ export const REST_ROOMS = new Set(['hhome', 'hpalace', 'hchurch', 'htemple', 'hm
 
 const SIZE: Record<string, [number, number]> = {
   hchurch: [19, 16], htemple: [19, 16], hmosque: [19, 16], cloudisle: [20, 15], // 46차
-  hpalace: [24, 18], hhome: [14, 11], airport: [22, 14],
+  hpalace: [40, 30], // 51차 천국의 지붕 빌딩 1층 (주민센터 · 긴 복도 · 하늘 승강기 · 국 다섯 · 화장실 · 구내식당)
+   hhome: [14, 11], airport: [22, 14],
   temple: [13, 11], church: [13, 11], mosque: [12, 11], gurdwara: [12, 11], bank: [14, 11], clinic: [12, 10], pharmacy: [9, 8],
   mart: [11, 9], food: [12, 10], cafe: [10, 9], bar: [10, 9], salon: [9, 8], ysalon: [10, 9], massage: [10, 9], laundry: [9, 8], lobby: [11, 9], shop: [9, 8], loan: [10, 8],
   hbank: [10, 8], atone: [11, 10], myhome: [14, 11], furnshop: [12, 10], hardware: [12, 10], arcade: [13, 10], rebirth: [31, 17], terrace: [23, 16], home: [11, 9], gym: [13, 11], dojo: [13, 11], condo: [13, 10], dept: [26, 20], goatroom: [17, 17],
@@ -193,14 +195,44 @@ export function interiorZone(b: Building, k: number, out: { i: number; j: number
       break;
     }
     case 'hpalace': {
-      // 46차 천국 본청: 맨 안쪽 단 위의 생명책(영혼마다 한 장) · 한가운데 금 저울 · 양쪽 접수 창구 · 대리석 기둥 · 기다리는 영혼들의 긴 의자
-      F(mid - 1, 3, 3, y1 - 2, 1, 'rug', 0); // 생명책까지 이어진 붉은 금테 깔개
-      F(mid - 2, 1, 5, 2, 46, 'lifebook'); clerk = { i: mid + 3, j: 2 }; counter = { i: mid + 3, j: 4 };
-      for (const ii of [mid - 5, mid + 6]) F(ii, 1, 1, 1, 34, 'lampstand');
-      for (let jj = 3; jj < y1; jj += 3) { F(1, jj, 1, 1, 120, 'pillar'); F(x1, jj, 1, 1, 120, 'pillar'); }
-      F(mid - 1, 7, 3, 2, 44, 'hscale');
-      F(3, 5, 1, 4, 24, 'counter'); F(x1 - 2, 5, 1, 4, 24, 'counter');
-      for (const jj of [12, 14, 16]) if (jj < y1) { F(4, jj, 5, 1, 12, 'cbench'); F(W - 9, jj, 5, 1, 12, 'cbench'); for (let ii = 4; ii < 9; ii++) seats.push([ii, jj]); for (let ii = W - 9; ii < W - 4; ii++) seats.push([ii, jj]); }
+      // 51차 천국의 지붕 빌딩 1층 — 문을 들어서면 주민센터(창구 · 번호표 · 기다리는 민원인), 가운데 긴 복도 끝에 하늘 승강기(천사가 지켜 지나갈 수 없다).
+      // 복도 왼쪽: 사무국(생명책) · 징벌국(저울) · 신앙국 · 화장실 / 오른쪽: 통행국(출발 안내판) · 청원국 · 구내식당. 유리 칸막이로 나뉘고 국마다 금 명패
+      const wallJ = (i: number, j0: number, j1: number, gaps: number[]) => { for (let j = j0; j <= j1; j++) if (!gaps.includes(j)) F(i, j, 1, 1, 44, 'partition'); }; // j 방향 칸막이
+      const wallI = (j: number, i0: number, i1: number, gaps: number[]) => { for (let i = i0; i <= i1; i++) if (!gaps.includes(i)) F(i, j, 1, 1, 44, 'partition', 1); }; // i 방향 칸막이
+      // 복도 양쪽 벽 (국으로 드나드는 틈)
+      wallJ(16, 1, 18, [4, 5, 13, 14]); wallJ(24, 1, 18, [4, 5, 13, 14]);
+      // 왼쪽: 사무국 | 징벌국 (뒤) · 신앙국 | 화장실 (앞)
+      wallJ(8, 1, 17, [4, 5]); wallI(9, 1, 15, [4, 5]); wallI(18, 1, 15, [3, 4]);
+      // 오른쪽: 통행국 | 청원국 (뒤) · 구내식당 (앞)
+      wallJ(32, 1, 8, [4, 5]); wallI(9, 25, 38, [35, 36]); wallI(18, 25, 38, [30, 31]);
+      // 명패 (칸막이 위에 걸린다)
+      for (const [ii, jj, v] of [[16, 3, 1], [8, 3, 0], [16, 12, 5], [8, 12, 2], [24, 3, 3], [32, 3, 4], [24, 12, 6]] as const) F(ii, jj, 1, 1, 60, 'hsign', v);
+      // 하늘 승강기 · 복도 기둥 · 깔개
+      F(17, 1, 6, 5, 110, 'skyelev');
+      for (const jj of [8, 12, 16]) { F(17, jj, 1, 1, 120, 'pillar'); F(23, jj, 1, 1, 120, 'pillar'); }
+      F(19, 6, 3, 21, 1, 'rug', 0);
+      // 사무국: 생명책 · 책상
+      F(2, 1, 4, 2, 46, 'lifebook'); F(1, 5, 2, 1, 22, 'cdesk'); F(5, 5, 2, 1, 22, 'cdesk'); F(1, 7, 1, 1, 50, 'shelf', 3);
+      // 징벌국: 금 저울 · 책상 · 장부
+      F(11, 1, 3, 2, 44, 'hscale'); F(9, 5, 2, 1, 22, 'cdesk'); F(13, 5, 2, 1, 22, 'cdesk'); F(9, 7, 1, 1, 30, 'ledgers');
+      // 신앙국: 등잔대 · 책상
+      F(2, 11, 1, 1, 34, 'lampstand'); F(6, 11, 1, 1, 34, 'lampstand'); F(2, 14, 2, 1, 22, 'cdesk'); F(5, 14, 2, 1, 22, 'cdesk');
+      // 화장실: 칸 다섯 · 세면대
+      F(9, 10, 5, 1, 52, 'stalls'); F(10, 16, 3, 1, 24, 'sinks');
+      // 통행국: 출발 안내판 · 책상
+      F(26, 1, 4, 1, 40, 'fboard'); F(25, 5, 2, 1, 22, 'cdesk'); F(29, 5, 2, 1, 22, 'cdesk');
+      // 청원국: 서류 더미 · 책상
+      F(33, 1, 2, 1, 30, 'ledgers'); F(36, 1, 2, 1, 30, 'ledgers'); F(33, 5, 2, 1, 22, 'cdesk'); F(36, 5, 2, 1, 22, 'cdesk');
+      // 구내식당: 배식대 · 식탁과 의자
+      F(26, 11, 9, 1, 26, 'buffet');
+      for (const [ti, tj] of [[26, 14], [30, 14], [34, 14], [26, 16], [30, 16], [34, 16]] as const) { F(ti, tj, 2, 1, 22, 'mtable'); F(ti, tj - 1, 1, 1, 16, 'chair'); F(ti + 1, tj + 1, 1, 1, 16, 'chair', 1); }
+      // 주민센터: 창구 · 명패 · 번호표 기계 · 기다리는 의자 (민원인 자리)
+      F(5, 20, 10, 1, 26, 'teller'); F(9, 20, 1, 1, 64, 'hsign', 7);
+      clerk = { i: 10, j: 19 }; counter = { i: 10, j: 21 };
+      F(16, 25, 1, 1, 30, 'qticket');
+      for (const jj of [23, 25, 27]) { F(3, jj, 5, 1, 12, 'cbench'); F(9, jj, 5, 1, 12, 'cbench'); for (let ii = 3; ii < 8; ii++) seats.push([ii, jj]); for (let ii = 9; ii < 14; ii++) seats.push([ii, jj]); }
+      for (const jj of [21, 23, 25]) { F(26, jj, 5, 1, 12, 'cbench'); F(32, jj, 5, 1, 12, 'cbench'); for (let ii = 26; ii < 31; ii++) seats.push([ii, jj]); for (let ii = 32; ii < 37; ii++) seats.push([ii, jj]); }
+      for (const [ii, jj] of [[1, 20], [x1, 20], [1, y1], [x1, y1]] as const) F(ii, jj, 1, 1, 30, 'plant');
       break;
     }
     // ── 46차 천국 성소: 하루 한 번 예배. 자리(seats)는 앉는 곳 — 많은 영혼이 채운다 ──
@@ -1081,7 +1113,7 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
   }
   const { i, j, w, d, h } = f;
   const i1 = i + w, j1 = j + d;
-  const extra = f.kind === 'hut' || f.kind === 'hut2' ? 44 : f.kind === 'hcross' ? 30 : f.kind === 'lampstand' ? 12 : f.kind === 'kbed' ? 34 : f.kind === 'flattv' ? 14 : f.kind === 'homesofa' ? 14 : f.kind === 'vbed' ? 24 : f.kind === 'plamp' ? 30 : f.kind === 'salonchair' && f.v === 9 ? 30 : f.kind === 'ivstand' || f.kind === 'hooddryer' ? 16 : f.kind === 'gkbrazier' ? 40 : f.kind === 'gkdesk' ? 20 : f.kind === 'xchdesk' ? 30 : f.kind === 'altar' ? 64 : f.kind === 'rgate' ? 46 : f.kind === 'cpillar' ? 30 : f.kind === 'salonchair' || f.kind === 'candle' || f.kind === 'fan' || f.kind === 'lamp' || f.kind === 'cooler' ? 18 : 14;
+  const extra = f.kind === 'hut' || f.kind === 'hut2' ? 44 : f.kind === 'hcross' ? 30 : f.kind === 'lampstand' ? 12 : f.kind === 'kbed' ? 34 : f.kind === 'flattv' ? 14 : f.kind === 'homesofa' ? 14 : f.kind === 'vbed' ? 24 : f.kind === 'plamp' ? 30 : f.kind === 'salonchair' && f.v === 9 ? 30 : f.kind === 'ivstand' || f.kind === 'hooddryer' ? 16 : f.kind === 'gkbrazier' ? 40 : f.kind === 'gkdesk' ? 20 : f.kind === 'xchdesk' ? 30 : f.kind === 'altar' ? 64 : f.kind === 'skyelev' ? 250 : f.kind === 'hsign' ? 40 : f.kind === 'sinks' ? 40 : f.kind === 'rgate' ? 46 : f.kind === 'cpillar' ? 30 : f.kind === 'salonchair' || f.kind === 'candle' || f.kind === 'fan' || f.kind === 'lamp' || f.kind === 'cooler' ? 18 : 14;
   const minX = (i - j1) * (TW / 2) - 4, maxX = (i1 - j) * (TW / 2) + 4;
   const minY = (i + j) * (TH / 2) - h - extra, maxY = (i1 + j1) * (TH / 2) + 4;
   const { c, g, P, poly } = painter(minX, minY, maxX - minX, maxY - minY);
@@ -1675,7 +1707,82 @@ export function drawFurn(f: Furn, info: InteriorInfo, night: boolean): { canvas:
       B3(i + 2.2, j + 0.7, i + 2.7, j + 0.85, h, h + 4, '#c9a23e'); // 명패
       break;
     }
-    case 'partition': B3(i + 0.4, j, i + 0.6, j1, 0, h, '#9aa4ac'); poly([P(i + 0.6, j, 8), P(i + 0.6, j1, 8), P(i + 0.6, j1, h - 4), P(i + 0.6, j, h - 4)], '#cfe0ea', 0.55); break;
+    case 'partition':
+      if (f.v === 1) { B3(i, j + 0.4, i1, j + 0.6, 0, 8, info.kind === 'hpalace' ? '#e8e2d4' : '#9aa4ac'); poly([P(i, j + 0.6, 8), P(i1, j + 0.6, 8), P(i1, j + 0.6, h - 4), P(i, j + 0.6, h - 4)], '#d8eaf2', 0.5); B3(i, j + 0.4, i1, j + 0.6, h - 4, h, info.kind === 'hpalace' ? '#d8b44a' : '#9aa4ac'); break; } // 51차 i 방향 칸막이
+      if (info.kind === 'hpalace') { B3(i + 0.4, j, i + 0.6, j1, 0, 8, '#e8e2d4'); poly([P(i + 0.6, j, 8), P(i + 0.6, j1, 8), P(i + 0.6, j1, h - 4), P(i + 0.6, j, h - 4)], '#d8eaf2', 0.5); B3(i + 0.4, j, i + 0.6, j1, h - 4, h, '#d8b44a'); break; }
+      B3(i + 0.4, j, i + 0.6, j1, 0, h, '#9aa4ac'); poly([P(i + 0.6, j, 8), P(i + 0.6, j1, 8), P(i + 0.6, j1, h - 4), P(i + 0.6, j, h - 4)], '#cfe0ea', 0.55); break;
+    case 'hsign': { // 51차 국 이름 명패: 칸막이 위 금테 판 (늘 화면을 바라본다)
+      const names: Record<string, string[]> = { ko: ['사무국', '징벌국', '신앙국', '통행국', '청원국', '화장실', '구내식당', '주민센터'], th: ['สำนักเลขาธิการ', 'สำนักลงทัณฑ์', 'สำนักศรัทธา', 'สำนักผ่านแดน', 'สำนักคำร้อง', 'ห้องน้ำ', 'โรงอาหาร', 'ศูนย์บริการชาวบ้าน'], en: ['Secretariat', 'Punishment', 'Faith', 'Passage', 'Petitions', 'Restrooms', 'Cafeteria', "Residents' Center"] };
+      const txt = (names[lang()] ?? names.en)[f.v ?? 0] ?? '';
+      const [x, y] = P(i + 0.5, j + 0.5, h + 10);
+      g.font = 'bold 10px system-ui, sans-serif';
+      const tw = Math.max(40, g.measureText(txt).width + 14), th2 = 16;
+      g.strokeStyle = '#b8922e'; g.lineWidth = 1; g.beginPath(); g.moveTo(x - tw / 2 + 6, y - th2 / 2); g.lineTo(x - tw / 2 + 10, y - th2 / 2 - 10); g.moveTo(x + tw / 2 - 6, y - th2 / 2); g.lineTo(x + tw / 2 - 10, y - th2 / 2 - 10); g.stroke();
+      g.fillStyle = '#8a6a22'; g.fillRect(Math.round(x - tw / 2) - 1, Math.round(y - th2 / 2) - 1, Math.round(tw) + 2, th2 + 2);
+      g.fillStyle = f.v === 1 ? '#5a1e22' : '#fbf6e6'; g.fillRect(Math.round(x - tw / 2), Math.round(y - th2 / 2), Math.round(tw), th2);
+      g.fillStyle = '#e0b84e'; g.fillRect(Math.round(x - tw / 2), Math.round(y - th2 / 2), Math.round(tw), 2);
+      g.fillStyle = f.v === 1 ? '#f2d27a' : '#4a3a1a'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, x, y + 1);
+      break;
+    }
+    case 'skyelev': { // 51차 하늘 승강기: 두 단 둥근 받침 · 금 고리 · 위로 끝없이 이어지는 유리 통 · 안에서 오르내리는 빛 · 둘레를 도는 떠 있는 고리
+      const cx = i + w / 2, cy = j + d / 2, R = Math.min(w, d) / 2 - 0.2;
+      const ring = (r: number, z: number, n = 28) => Array.from({ length: n }, (_, k) => { const a = (k / n) * Math.PI * 2; return P(cx + Math.cos(a) * r, cy + Math.sin(a) * r, z); });
+      const fill = (pts: Pt[], col: string | CanvasGradient, al = 1) => { g.globalAlpha = al; g.fillStyle = col; g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill(); g.globalAlpha = 1; };
+      const drum = (r: number, z0: number, z1: number, top: string, side: string) => { const a = ring(r, z0), b = ring(r, z1); for (let k = 0; k < a.length; k++) { const k2 = (k + 1) % a.length; if (a[k][1] + a[k2][1] < (P(cx, cy, z0)[1]) * 2) continue; fill([a[k], a[k2], b[k2], b[k]], side); } fill(b, top); };
+      drum(R + 0.2, 0, 6, '#fbf8f0', '#e6dfcf'); drum(R - 0.1, 6, 11, '#fffdf6', '#efe8d8');
+      g.strokeStyle = '#d8b44a'; g.lineWidth = 1.5; for (const [r, z] of [[R + 0.2, 6], [R - 0.1, 11]] as const) { const pts = ring(r, z, 40); g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.stroke(); }
+      const rg = R - 0.6, top = h + 230;
+      const [bx, by] = P(cx, cy, 11), [, ty] = P(cx, cy, top);
+      const rx = rg * 32 * 1.41, ry = rg * 16 * 1.41;
+      // 안쪽 빛 기둥
+      const core = g.createLinearGradient(bx - rx, 0, bx + rx, 0); core.addColorStop(0, 'rgba(180,220,255,0.15)'); core.addColorStop(0.5, 'rgba(255,252,232,0.95)'); core.addColorStop(1, 'rgba(180,220,255,0.15)');
+      g.fillStyle = core; g.fillRect(bx - rx * 0.55, ty, rx * 1.1, by - ty);
+      // 유리 통 (위로 갈수록 빛에 녹는다)
+      const glass = g.createLinearGradient(0, ty, 0, by); glass.addColorStop(0, 'rgba(220,240,255,0)'); glass.addColorStop(0.35, 'rgba(206,232,250,0.35)'); glass.addColorStop(1, 'rgba(196,226,248,0.5)');
+      g.fillStyle = glass; g.fillRect(bx - rx, ty, rx * 2, by - ty);
+      g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = 1; for (const u of [-0.92, -0.5, 0, 0.5, 0.92]) { g.beginPath(); g.moveTo(bx + rx * u, by - Math.sqrt(Math.max(0, 1 - u * u)) * ry * 0); g.lineTo(bx + rx * u, ty); g.stroke(); }
+      // 오르내리는 승강 판 (빛 고리)
+      for (const zc of [46, 132]) { const [ex, ey] = P(cx, cy, zc); g.fillStyle = 'rgba(255,246,206,0.9)'; g.beginPath(); g.ellipse(ex, ey, rx * 0.8, ry * 0.8, 0, 0, Math.PI * 2); g.fill(); g.strokeStyle = '#e0b84e'; g.lineWidth = 2; g.stroke(); }
+      // 금 테두리 고리 (유리 통을 묶는다) · 떠 있는 고리
+      for (let zc = 30; zc < top - 40; zc += 48) { const [ex, ey] = P(cx, cy, zc); g.strokeStyle = zc > h ? 'rgba(224,184,78,0.45)' : '#d8b44a'; g.lineWidth = 2; g.beginPath(); g.ellipse(ex, ey, rx, ry, 0, 0, Math.PI); g.stroke(); }
+      for (const [zc, k] of [[72, 1.5], [150, 1.75]] as const) { const [ex, ey] = P(cx, cy, zc); g.strokeStyle = 'rgba(240,210,120,0.8)'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(ex, ey, rx * k, ry * k, 0, 0, Math.PI * 2); g.stroke(); for (let q = 0; q < 6; q++) { const a = (q / 6) * Math.PI * 2 + zc; g.fillStyle = '#fff2b8'; g.fillRect(Math.round(ex + Math.cos(a) * rx * k) - 1, Math.round(ey + Math.sin(a) * ry * k) - 1, 3, 3); } }
+      // 문: 앞쪽 금빛 틀 (닫혀 있다)
+      { const [dx2, dy2] = P(cx + 0.1, cy + rg + 0.05, 12); g.fillStyle = '#c9a23e'; g.fillRect(dx2 - 13, dy2 - 46, 26, 46); g.fillStyle = '#f6efd8'; g.fillRect(dx2 - 11, dy2 - 44, 10, 44); g.fillRect(dx2 + 1, dy2 - 44, 10, 44); g.fillStyle = '#e0b84e'; g.fillRect(dx2 - 1, dy2 - 44, 2, 44); g.fillStyle = '#7ad8ff'; g.fillRect(dx2 - 4, dy2 - 52, 8, 4); }
+      break;
+    }
+    case 'stalls': { // 51차 화장실 칸: 흰 칸막이 · 문마다 손잡이와 '사용 중' 등 (발밑은 틈)
+      B3(i, j + 0.1, i1, j + 0.25, 0, h, '#e8eef2');
+      for (let k = 0; k < w; k++) {
+        const x0 = i + k + 0.06, x2 = i + k + 0.94;
+        poly([P(x0, j1 - 0.05, 4), P(x2, j1 - 0.05, 4), P(x2, j1 - 0.05, h - 6), P(x0, j1 - 0.05, h - 6)], k % 2 ? '#d6e2ea' : '#dfe8ee');
+        B3(i + k, j + 0.25, i + k + 0.06, j1, 0, h - 2, '#c4ced6');
+        const [hx2, hy2] = P(x2 - 0.15, j1 - 0.05, h / 2); g.fillStyle = '#9aa4ac'; g.fillRect(Math.round(hx2) - 1, Math.round(hy2) - 2, 2, 4);
+        const [lx, ly] = P(x0 + 0.4, j1 - 0.05, h - 12); g.fillStyle = (k * 7) % 3 ? '#5ac87a' : '#e85a5a'; g.fillRect(Math.round(lx), Math.round(ly), 4, 2);
+      }
+      B3(i1 - 0.06, j + 0.25, i1, j1, 0, h - 2, '#c4ced6');
+      break;
+    }
+    case 'sinks': { // 51차 세면대: 흰 대리석 상판 · 둥근 대야 · 금 수도꼭지 · 뒤 벽의 거울
+      B3(i, j + 0.15, i1, j1 - 0.1, 0, h - 4, '#d8d2c6');
+      box(i - 0.02, j + 0.1, i1 + 0.02, j1 - 0.05, h - 4, h, '#fbf9f4', '#e6e0d4', '#d2ccbe');
+      for (let k = 0; k < w; k++) { const [x, y] = P(i + k + 0.5, j + 0.55, h); g.fillStyle = '#e2e8ec'; g.beginPath(); g.ellipse(x, y, 9, 4, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#c8d8e0'; g.beginPath(); g.ellipse(x, y + 0.5, 6, 2.6, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#d8b44a'; g.fillRect(Math.round(x) - 1, Math.round(y) - 8, 2, 6); g.fillRect(Math.round(x) - 1, Math.round(y) - 8, 5, 2); }
+      poly([P(i + 0.1, j + 0.12, h + 8), P(i1 - 0.1, j + 0.12, h + 8), P(i1 - 0.1, j + 0.12, h + 34), P(i + 0.1, j + 0.12, h + 34)], '#cfe6f2');
+      poly([P(i + 0.3, j + 0.12, h + 14), P(i + 0.7, j + 0.12, h + 14), P(i + 0.9, j + 0.12, h + 30), P(i + 0.5, j + 0.12, h + 30)], '#ffffff', 0.5);
+      break;
+    }
+    case 'buffet': { // 51차 구내식당 배식대: 스테인리스 몸 · 유리 가림막 · 김이 오르는 통 · 만나 빵 바구니 · 쟁반 더미
+      B3(i, j + 0.1, i1, j1 - 0.1, 0, h - 4, '#b8c0c8');
+      box(i - 0.03, j + 0.05, i1 + 0.03, j1 - 0.05, h - 4, h, '#e8ecef', '#c8d0d6', '#aab4bc');
+      const foods = ['#f2e2b0', '#e8a04a', '#a8d08a', '#f4f2ea', '#d86a4a', '#c8a07a'];
+      for (let k = 0; k < w; k++) {
+        const [x, y] = P(i + k + 0.5, j + 0.5, h);
+        g.fillStyle = '#8a929a'; g.fillRect(Math.round(x) - 9, Math.round(y) - 3, 18, 6); g.fillStyle = foods[k % foods.length]; g.fillRect(Math.round(x) - 8, Math.round(y) - 2, 16, 4);
+        if (k % 2 === 0) { g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x - 3, y - 5); g.quadraticCurveTo(x - 6, y - 12, x - 2, y - 18); g.moveTo(x + 3, y - 5); g.quadraticCurveTo(x + 6, y - 13, x + 2, y - 20); g.stroke(); }
+      }
+      poly([P(i, j1 - 0.12, h + 2), P(i1, j1 - 0.12, h + 2), P(i1, j1 - 0.12, h + 18), P(i, j1 - 0.12, h + 18)], '#d8eef6', 0.35);
+      { const [x, y] = P(i1 - 0.4, j + 0.5, h); for (let q = 0; q < 6; q++) { g.fillStyle = q % 2 ? '#c8c0b0' : '#d8d0c0'; g.fillRect(Math.round(x) - 8, Math.round(y) - 2 - q * 2, 16, 2); } }
+      break;
+    }
     case 'rope': {
       // 줄 세우는 기둥: 은빛 기둥 사이 붉은 줄
       for (let n = 0; n <= d; n++) { const y = j + Math.min(d - 0.15, n) + 0.15; B3(i + 0.42, y - 0.06, i + 0.58, y + 0.06, 0, h + 6, '#b8bcc0'); B3(i + 0.38, y - 0.1, i + 0.62, y + 0.1, 0, 2, '#8a8e92'); }
