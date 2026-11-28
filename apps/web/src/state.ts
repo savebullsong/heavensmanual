@@ -61,6 +61,8 @@ export interface Save {
   heaven?: { met?: boolean; admin?: boolean; adapted?: boolean; ywLost?: boolean; rites?: number; noeulMet?: boolean; acc?: 'lover' | 'friend' | 'family' | 'alone'; svcDay?: string; homeSeen?: boolean; praise?: number; gifts?: number; dates?: { day: string; keys: string[]; n: number } }; // 35차 acc = 아큐버스와 정한 사이 // 21차: 행사에 다녀와 익숙해졌나 · 안내천사를 따돌렸나 · 다녀온 행사 수
   /** 52차 천국 1층 주민센터 번호표 (n = 내 번호 · from = 뽑을 때 창구 번호 · at = 불리는 때, 실제 시간 5분 뒤) · 구내식당 배급 받은 때 */
   hticket?: { n: number; from: number; at: number; called?: boolean };
+  /** 53차 천국의 폭력: 이번 기회에서 몇 번 쳤나 · 마지막 기회를 받았나 · 지하 감옥(풀려나는 때) · 환생 로비로 쫓겨났나 · 황색날개가 징벌로 자리를 비우는 때 · 돌아와 징벌 얘기를 할 차례 */
+  hstrike?: { n: number; last?: boolean; prison?: number; exiled?: boolean; ywAway?: number; ywTell?: boolean };
   hmealAt?: number;
   /** 52차 먹이 주기: 그날 준 횟수 (선행은 하루 세 번까지) */
   feedDay?: string; feedN?: number;

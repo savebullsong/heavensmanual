@@ -12,6 +12,7 @@ export type Category =
   | 'goatroom' // 31차 지옥 142층: 염소대왕의 방 (떨어진 자가 맨 먼저 오는 곳)
   | 'home' // 24차 서울 달동네 골목 끝의 내 집 (유내)
   | 'palace' | 'attraction' // 35차 천국 1층: 천국 본청 · 놀이공원 탈것
+  | 'hdept' | 'hprison' // 53차: 지붕 빌딩의 국 방 · 지하 감옥 (방 안의 방)
   | 'estate' // 35차 사서 들어가 사는 집: 방콕 아속의 콘도 · 서울 역삼의 아파트
   | 'shipctr' | 'post' // 52차 천국 우주센터(안으로 들어가면 환생 로비) · 우체국(현실 · 천국 — 기원 편지의 답장)
   | 'sanct' | 'cottage' | 'hhome' | 'airport'; // 46차 천국: 성소(교회 · 불당 · 모스크) · 구름 위의 오두막 · 47차 오두막 안
@@ -85,6 +86,9 @@ export interface InteriorInfo {
   from: { b: number; out: { i: number; j: number }; bd?: Building }; // 거리의 건물 번호와 나왔을 때 설 자리 (bd = 그 건물, 21차 직종 판단용)
   store?: string; cuisine?: string; // 가게 창 (mart · pharmacy · food · cafe) / bank
   seats: [number, number][]; // 손님이 서 있을 자리
+  dept?: number; // 53차 천국의 지붕 빌딩의 국 방 (hdept): 몇 번 국
+  doors?: { i: number; j: number; dept: number }[]; // 53차 지붕 빌딩 복도 왼쪽 벽의 문 (i, j = 문 앞에 서는 칸)
+  wallI?: number; // 53차: 뒤(j=1) 벽이 어디까지 서는지 (빈 하늘 위로 벽이 떠 있지 않게)
 }
 export interface HellInfo {
   floor: number;

@@ -157,6 +157,7 @@ export function heavenZone(): Zone {
   prop(100, 28, 'balloons'); prop(118, 28, 'balloons'); // 52차 후속: 장사꾼 없던 납작한 아이스크림 수레는 걷고, 천사가 끄는 솜구름 사탕 수레가 그 자리를 맡는다
   // 52차 후속: 길 아무 데나 흩어져 있던 손수레(장사꾼도 없이 들판 길에 덩그러니)를 걷어 내고, 사람이 모이는 다섯 자리에만 천사가 끄는 흰 수레를 둔다
   //   o = 종류 × 2 + 방향 (종류 0 만나 빵 · 1 솜구름 사탕 · 2 생명 과일 / 방향 0 = 길과 나란히 i)
+  for (const st of TAXI_STOPS) prop(st.i + 1, st.j - 1, 'taxistand'); // 53차 택시 천사 정류장 표지
   for (const [i, j, kind, ax] of [[91, 57, 0, 0], [131, 57, 2, 0], [104, 87, 1, 0], [58, 89, 0, 0], [110, 30, 1, 1]] as const) prop(i, j, 'hcart', kind * 2 + ax);
   for (let i = 8; i < W - 8; i += 6) { if ((i > 88 && i < 130) || i > 180) continue; prop(i, 55, 'tree'); prop(i + 3, 62, 'tree'); }
   // 우주선 기지: 발사대 (계단 대신) · 52차 우주센터 건물(문은 큰길 쪽) · 발사 지원탑 · 연료 탱크 · 레이더 · 유도등
@@ -548,10 +549,12 @@ export function drawAttraction(b: Building & { att?: string }) {
 }
 
 // ───────────────────────── 소품 ─────────────────────────
+/** 53차 천국 택시 천사 정류장: 시작 지점 · 천국의 지붕 빌딩 앞 · 종교시설 구역 · 쓰레기장 (서로 오간다) */
+export const TAXI_STOPS: { key: 'start' | 'palace' | 'sanct' | 'dump'; i: number; j: number }[] = [{ key: 'start', i: 22, j: 57 }, { key: 'palace', i: 103, j: 12 }, { key: 'sanct', i: 44, j: 89 }, { key: 'dump', i: 178, j: 99 }];
 /** 52차 후속: 천국 수레 종류 (prop o >> 1) */
 export const HCART_KINDS = ['manna', 'cotton', 'fruit'] as const;
 const HCART_GOODS = ['manna', 'cotton', 'lifefruit'] as const;
-export const HEAVEN_PROPS = new Set(['sunbed', 'parasol', 'giraffe', 'elephant', 'lion', 'zebra', 'flamingo', 'panda', 'fountain', 'balloons', 'icecream', 'junkpile', 'chicken', 'zoobar', 'zoogate', 'bagpile', 'jewelpile', 'appliance', 'fblock', 'angelstatue', 'flowerbed', 'gantry', 'fueltank', 'radar', 'padlight', 'flag', 'garbagetruck', 'grabber', 'litter', 'hcafe', 'hcart']);
+export const HEAVEN_PROPS = new Set(['sunbed', 'parasol', 'giraffe', 'elephant', 'lion', 'zebra', 'flamingo', 'panda', 'fountain', 'balloons', 'icecream', 'junkpile', 'chicken', 'zoobar', 'zoogate', 'bagpile', 'jewelpile', 'appliance', 'fblock', 'angelstatue', 'flowerbed', 'gantry', 'fueltank', 'radar', 'padlight', 'flag', 'garbagetruck', 'grabber', 'litter', 'hcafe', 'hcart', 'taxistand']);
 function pic(w: number, h: number, ax: number, ay: number, draw: (R: (x: number, y: number, w: number, h: number, c: string) => void, g: CanvasRenderingContext2D) => void): PropPic {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
@@ -1017,6 +1020,20 @@ export function heavenProp(kind: string, v: number, o = 0): PropPic {
     case 'hcafe': return pic(72, 52, 36, 38, (_R, g) => drawTableSet(g, 36, 38, 'heaven', v));
     // 52차 후속: 천사가 끄는 흰 수레 (o = 종류 × 2 + 방향 · 종류 0 만나 빵 · 1 솜구름 사탕 · 2 생명 과일)
     case 'hcart': return pic(72, 80, 36, 62, (_R, g) => drawCart(g, 36, 62, (o & 1) as 0 | 1, 'heaven', HCART_GOODS[(o >> 1) % 3], v));
+    // 53차 택시 천사 정류장: 금빛 기둥(둥근 그늘) · 흰 둥근 표지판(날개 · 금테 · 기울어진 두께) · 받침
+    case 'taxistand': return pic(40, 96, 20, 90, (_R, g) => {
+      E(g, 20, 90, 11, 4, 'rgba(0,0,0,0.14)');
+      E(g, 20, 89, 7, 3, '#b8902e'); E(g, 20, 88, 6, 2.5, '#d9b04a');
+      const pole = g.createLinearGradient(17, 0, 23, 0); pole.addColorStop(0, '#f6dc8a'); pole.addColorStop(0.5, '#d9b04a'); pole.addColorStop(1, '#8a661c');
+      g.fillStyle = pole; g.fillRect(18, 28, 4, 60);
+      g.fillStyle = '#c9a23e'; g.beginPath(); g.ellipse(21.5, 20, 15, 14, 0, 0, Math.PI * 2); g.fill(); // 두께 (뒤로 비껴 보이는 테)
+      g.fillStyle = '#e8c86a'; g.beginPath(); g.ellipse(20, 20, 15, 14, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#fffcf2'; g.beginPath(); g.ellipse(20, 20, 12.5, 11.5, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#34445e'; g.beginPath(); g.moveTo(8.5, 23); g.quadraticCurveTo(10, 11, 20, 10); g.quadraticCurveTo(15, 15, 17, 16); g.quadraticCurveTo(12, 18, 15, 20); g.quadraticCurveTo(11, 21, 8.5, 23); g.fill();
+      g.beginPath(); g.moveTo(31.5, 23); g.quadraticCurveTo(30, 11, 20, 10); g.quadraticCurveTo(25, 15, 23, 16); g.quadraticCurveTo(28, 18, 25, 20); g.quadraticCurveTo(29, 21, 31.5, 23); g.fill();
+      g.fillStyle = '#d9b04a'; g.beginPath(); g.arc(20, 25, 2.5, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.55)'; g.beginPath(); g.ellipse(15, 15, 4, 2, -0.6, 0, Math.PI * 2); g.fill();
+    });
     case 'icecream': return pic(44, 56, 22, 50, (R, g) => {
       E(g, 22, 50, 16, 4, 'rgba(0,0,0,0.12)');
       R(8, 30, 28, 18, '#fbfaf6'); R(8, 30, 28, 4, '#8ac8f2'); R(10, 48, 4, 3, '#4a4a4e'); R(30, 48, 4, 3, '#4a4a4e');

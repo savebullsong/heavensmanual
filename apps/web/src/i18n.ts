@@ -206,7 +206,7 @@ const dict = {
 const extra = {
   ko: {
     obolFmt: '{n}닢', obolEx: '노자돈 (노전)', obolExSub: '죽어서 지옥에 떨어지면 들고 가는 돈 · ฿{r} = 1닢 · 되돌릴 수 없음', obolExBtn: '฿{b} → {n}닢', obolDone: '노자돈 {n}닢을 챙겼다',
-    hwFirst: '처음 뵙네요. 미스 황이요? 모르는 이름이에요. 저는 황혼, 유황새를 지켜요.', fallingHell: '아래로, 아래로…',
+    hwFirst: '처음 뵙네요. 저는 황혼, 유황새를 지켜요.', fallingHell: '아래로, 아래로…',
     besk: '베스크', beskSub: '피의 시장 · 대부업자', beskHouse: '베스크 대부소', beskHouseSub: '지옥 3층 · 노전을 빌려주는 곳', beskGreet: '빈손이군. 장부에 이름만 적으면 돼.', beskTerms: '최대 1000닢. 갚을 땐 두 배. 다 갚을 때까지 내 미납귀가 따라다닌다. 떨어지는 돈은 그놈이 먼저 문다.',
     beskBorrow: '{n}닢 빌리기', beskRepay: '갚기 (남은 빚 {n}닢)', beskNo: '됐어요', beskLent: '자, {n}닢. 갚을 돈은 {m}닢. 미납귀야, 따라가라.', beskOwe: '아직 {n}닢 남았어. 미납귀가 잘 지켜보고 있지.',
     beskPaid: '깨끗이 갚았군. 미납귀야, 돌아와.', beskPart: '{n}닢 받았다. 남은 건 {m}닢.', beskEmpty: '갚을 노전이 없잖아. 나가서 벌어 와.',
@@ -221,7 +221,7 @@ const extra = {
     forgot: '비밀번호를 잊었어요', forgotSub: '아이디를 적으면 인증된 이메일로 비밀번호를 다시 정하는 링크를 보내요.', forgotBtn: '링크 받기', forgotSent: '인증된 이메일이 있는 아이디라면 링크를 보냈어요. 메일함을 확인해 주세요.', forgotWait: '방금 보냈어요. 2분 뒤에 다시 요청해 주세요.',
     resetTitle: '새 비밀번호 정하기', resetBtn: '정하기', resetDone: '새 비밀번호로 정했어요. 로그인해 주세요.', resetBad: '링크가 맞지 않거나 시간이 지났어요. 다시 요청해 주세요.',
     toHeaven: '천국으로 올라가기', risingHeaven: '위로, 위로…', heavenPlace: '천국 · {zone}', heavenHint: '구름 위의 거리. 무기도 범죄도 없다.',
-    yellowWing: '황색날개', yellowWingSub: '천국을 거니는 천사', ywFirst: '처음 뵙네요. 미스 황이요? 황혼이요? 모르는 이름이에요. 저는 황색날개예요.', ywGreet: '여기선 다 공짜예요. 무엇이 필요하세요?', ywNo: '괜찮아요', ywGot: '{item}, 가져가세요. 값은 이미 치르셨어요. 살아 있을 때요.', ywLines: ['날개가 무거워 보여요? 노란 건 원래 그래요.', '가게는 비워 두었어요. 여기선 가게가 걸어 다녀요.', '아래에서 누가 당신을 찾던데요. 기억나세요?'],
+    yellowWing: '황색날개', yellowWingSub: '천국을 거니는 천사', ywFirst: '처음 뵙네요. 저는 황색날개예요.', ywGreet: '여기선 다 공짜예요. 무엇이 필요하세요?', ywNo: '괜찮아요', ywGot: '{item}, 가져가세요. 값은 이미 치르셨어요. 살아 있을 때요.', ywLines: ['날개가 무거워 보여요? 노란 건 원래 그래요.', '가게는 비워 두었어요. 여기선 가게가 걸어 다녀요.', '아래에서 누가 당신을 찾던데요. 기억나세요?'],
     officer: '루엔', officerSub: '천국의 환생관', offGreet: '어서 오게. 여기서는 언제든 다시 태어날 수 있지.', offStay: '서두를 것 없네. 구름은 어디 가지 않아.',
     angel: '천사', angelSub: '천국의 문지기', angelLines: ['평안하시길.', '여기서 칼을 뽑는 자는 아래로 떨어집니다.', '하늘이 늘 이렇게 맑지는 않아요. 오늘은 운이 좋네요.'],
     soulPasser: '구원받은 영혼', soulPasserSub: '천국을 거니는 영혼',
@@ -283,7 +283,7 @@ const extra = {
   },
   th: {
     obolFmt: '{n} โอบอล', obolEx: 'ค่าเดินทาง (โอบอล)', obolExSub: 'เงินที่ติดตัวไปเมื่อตกนรก · ฿{r} = 1 โอบอล · แลกคืนไม่ได้', obolExBtn: '฿{b} → {n}', obolDone: 'เก็บค่าเดินทาง {n} โอบอลแล้ว',
-    hwFirst: 'ยินดีที่ได้รู้จักค่ะ มิสฮวังเหรอคะ? ไม่รู้จักชื่อนี้เลย ฉันคือฮวังฮน ผู้ดูแลนกกำมะถัน', fallingHell: 'ลงไป… ลงไป…',
+    hwFirst: 'ยินดีที่ได้รู้จักค่ะ ฉันคือฮวังฮน ผู้ดูแลนกกำมะถัน', fallingHell: 'ลงไป… ลงไป…',
     besk: 'เบสก์', beskSub: 'ตลาดโลหิต · เจ้าหนี้', beskHouse: 'สำนักเงินกู้ของเบสก์', beskHouseSub: 'นรกชั้น 3 · ที่ให้กู้โอบอล', beskGreet: 'มือเปล่าสินะ แค่เขียนชื่อลงสมุดบัญชีก็พอ', beskTerms: 'สูงสุด 1000 โอบอล คืนสองเท่า จนกว่าจะคืนหมด หมาทวงหนี้ของข้าจะตามเจ้าไป เงินที่ตกมันจะงับก่อน',
     beskBorrow: 'ยืม {n} โอบอล', beskRepay: 'คืนเงิน (เหลือ {n})', beskNo: 'ไม่เป็นไร', beskLent: 'เอาไป {n} โอบอล ต้องคืน {m} หมาทวงหนี้ ตามไป', beskOwe: 'ยังเหลืออีก {n} หมาทวงหนี้ของข้าจับตาดูอยู่',
     beskPaid: 'คืนครบแล้ว หมาทวงหนี้ กลับมา', beskPart: 'รับ {n} แล้ว เหลือ {m}', beskEmpty: 'ไม่มีโอบอลจะคืนนี่ ออกไปหามาก่อน',
@@ -298,7 +298,7 @@ const extra = {
     forgot: 'ลืมรหัสผ่าน', forgotSub: 'ใส่ไอดี แล้วเราจะส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่อีเมลที่ยืนยันไว้', forgotBtn: 'รับลิงก์', forgotSent: 'หากไอดีนี้มีอีเมลที่ยืนยันแล้ว เราได้ส่งลิงก์ไปแล้ว กรุณาเช็กกล่องจดหมาย', forgotWait: 'เพิ่งส่งไป ลองใหม่อีก 2 นาที',
     resetTitle: 'ตั้งรหัสผ่านใหม่', resetBtn: 'ตั้งรหัส', resetDone: 'ตั้งรหัสผ่านใหม่แล้ว กรุณาเข้าสู่ระบบ', resetBad: 'ลิงก์ไม่ถูกต้องหรือหมดเวลา กรุณาขอใหม่',
     toHeaven: 'ขึ้นสวรรค์', risingHeaven: 'สูงขึ้น สูงขึ้น…', heavenPlace: 'สวรรค์ · {zone}', heavenHint: 'ถนนบนเมฆ ไม่มีอาวุธ ไม่มีอาชญากรรม',
-    yellowWing: 'ปีกเหลือง', yellowWingSub: 'เทวดาที่เดินเล่นในสวรรค์', ywFirst: 'ยินดีที่ได้รู้จักค่ะ มิสฮวังเหรอ? ฮวังฮนเหรอ? ไม่รู้จักค่ะ ฉันชื่อปีกเหลือง', ywGreet: 'ที่นี่ทุกอย่างฟรีค่ะ ต้องการอะไรคะ?', ywNo: 'ไม่เป็นไรค่ะ', ywGot: 'รับ{item}ไปเลยค่ะ จ่ายไปแล้วตั้งแต่ตอนยังมีชีวิต', ywLines: ['ปีกดูหนักเหรอคะ สีเหลืองก็แบบนี้แหละ', 'ร้านปล่อยว่างไว้ค่ะ ที่นี่ร้านเดินได้', 'ข้างล่างมีคนตามหาคุณอยู่นะ จำได้ไหม?'],
+    yellowWing: 'ปีกเหลือง', yellowWingSub: 'เทวดาที่เดินเล่นในสวรรค์', ywFirst: 'ยินดีที่ได้รู้จักค่ะ ฉันชื่อปีกเหลือง', ywGreet: 'ที่นี่ทุกอย่างฟรีค่ะ ต้องการอะไรคะ?', ywNo: 'ไม่เป็นไรค่ะ', ywGot: 'รับ{item}ไปเลยค่ะ จ่ายไปแล้วตั้งแต่ตอนยังมีชีวิต', ywLines: ['ปีกดูหนักเหรอคะ สีเหลืองก็แบบนี้แหละ', 'ร้านปล่อยว่างไว้ค่ะ ที่นี่ร้านเดินได้', 'ข้างล่างมีคนตามหาคุณอยู่นะ จำได้ไหม?'],
     officer: 'ลูเอน', officerSub: 'เจ้าหน้าที่เกิดใหม่แห่งสวรรค์', offGreet: 'มาเถอะ ที่นี่จะเกิดใหม่เมื่อไรก็ได้', offStay: 'ไม่ต้องรีบ เมฆไม่หนีไปไหน',
     angel: 'เทวดา', angelSub: 'ผู้เฝ้าประตูสวรรค์', angelLines: ['ขอให้สงบสุข', 'ผู้ที่ชักดาบที่นี่จะตกลงไปข้างล่าง', 'ฟ้าไม่ได้ใสแบบนี้ทุกวันหรอก วันนี้โชคดีนะ'],
     soulPasser: 'วิญญาณที่ได้รับการไถ่', soulPasserSub: 'วิญญาณที่เดินเล่นในสวรรค์',
@@ -360,7 +360,7 @@ const extra = {
   },
   en: {
     obolFmt: '{n} obol', obolEx: 'Fare for the dead (Obol)', obolExSub: 'Money you carry if you fall into hell · ฿{r} = 1 obol · no refunds', obolExBtn: '฿{b} → {n}', obolDone: 'Packed {n} obols for the road',
-    hwFirst: 'First time, isn\'t it? Miss Hwang? Never heard of her. I am Hwanghon, keeper of the Sulphur Bird.', fallingHell: 'Down, down…',
+    hwFirst: 'First time, isn\'t it? I am Hwanghon, keeper of the Sulphur Bird.', fallingHell: 'Down, down…',
     besk: 'Besk', beskSub: 'Market of Blood · Moneylender', beskHouse: 'Besk’s Loan House', beskHouseSub: 'Hell floor 3 · Where obols are lent', beskGreet: 'Empty-handed, are we? Just sign the ledger.', beskTerms: 'Up to 1,000 obols. You pay back double. Until you do, my Arrears Hound follows you — and it bites first at any coin that drops.',
     beskBorrow: 'Borrow {n}', beskRepay: 'Repay ({n} left)', beskNo: 'No thanks', beskLent: 'Here, {n} obols. You owe {m}. Hound — follow.', beskOwe: 'Still {n} to go. My hound is watching.',
     beskPaid: 'Paid in full. Hound, come home.', beskPart: 'Got {n}. {m} left.', beskEmpty: 'You have no obols to pay with. Go earn some.',
@@ -375,7 +375,7 @@ const extra = {
     forgot: 'I forgot my password', forgotSub: 'Enter your ID and we will send a reset link to its verified email.', forgotBtn: 'Get link', forgotSent: 'If this ID has a verified email, a link is on its way. Check your inbox.', forgotWait: 'Just sent. Try again in 2 minutes.',
     resetTitle: 'Set a new password', resetBtn: 'Set', resetDone: 'New password set. Please log in.', resetBad: 'The link is wrong or expired. Please request a new one.',
     toHeaven: 'Rise to heaven', risingHeaven: 'Up, and up…', heavenPlace: 'Heaven · {zone}', heavenHint: 'A street above the clouds. No weapons, no crime.',
-    yellowWing: 'Yellow Wing', yellowWingSub: 'An angel strolling heaven', ywFirst: 'Nice to meet you. Miss Hwang? Hwanghon? Never heard of them. I am Yellow Wing.', ywGreet: 'Everything here is free. What do you need?', ywNo: 'No, thanks', ywGot: 'Take the {item}. You already paid — back when you were alive.', ywLines: ['Do my wings look heavy? Yellow ones always do.', 'I left the shop empty. Up here, the shop walks around.', 'Someone down below is looking for you. Do you remember?'],
+    yellowWing: 'Yellow Wing', yellowWingSub: 'An angel strolling heaven', ywFirst: 'Nice to meet you. I am Yellow Wing.', ywGreet: 'Everything here is free. What do you need?', ywNo: 'No, thanks', ywGot: 'Take the {item}. You already paid — back when you were alive.', ywLines: ['Do my wings look heavy? Yellow ones always do.', 'I left the shop empty. Up here, the shop walks around.', 'Someone down below is looking for you. Do you remember?'],
     officer: 'Luen', officerSub: 'Rebirth Officer of heaven', offGreet: 'Welcome. Here you may be reborn whenever you wish.', offStay: 'No hurry. The clouds are not going anywhere.',
     angel: 'Angel', angelSub: 'A gatekeeper of heaven', angelLines: ['Be at peace.', 'Whoever draws a blade here falls below.', 'The sky is not always this clear. You are lucky today.'],
     soulPasser: 'Saved soul', soulPasserSub: 'A soul strolling heaven',

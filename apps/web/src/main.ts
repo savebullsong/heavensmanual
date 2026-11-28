@@ -18,8 +18,8 @@ import { t, lang, setLang, LANGS, type Lang } from './i18n.ts';
 import { load, save, type Slot, type Stash } from './state.ts';
 import { hellZone, OPEN_FLOORS, floorDef, MONSTERS, GUARDS, TOLL, ATONE_GOAL, GURMA_FULL, setRaidForce, FLOORS, FIELD_BOSS } from './hell.ts';
 import type { HellVendor } from './zone.ts';
-import { interiorZone, roomKind as roomKindOf, canEnter, voidZone, drawFurn, setAdminVisit, streetSeller, MALL_FLOORS, setMallFloor, isMall } from './interior.ts';
-import { heavenZone, HEAVEN_ID, heavenPriceMul, heavenMeta } from './heavenworld.ts';
+import { interiorZone, roomKind as roomKindOf, canEnter, voidZone, drawFurn, setAdminVisit, streetSeller, MALL_FLOORS, setMallFloor, isMall, deptName } from './interior.ts';
+import { heavenZone, HEAVEN_ID, heavenPriceMul, heavenMeta, TAXI_STOPS } from './heavenworld.ts';
 import { designateHomes, HOME_PRICE, FURN, furnByKey, type FurnDef } from './home.ts';
 import { borderZone } from './border.ts';
 import { TWO, DOT3, setDot3 } from './sprites.ts';
@@ -1080,12 +1080,14 @@ const hooks: WorldHooks = {
   },
   hutDoor(which) { void hutDoor(which); },
   palaceSpot(kind) { void palaceSpot(kind); }, // 52차 주민센터 번호표 · 창구 · 배식대
+  deptDoor(dept) { void enterDept(dept); }, // 53차 지붕 빌딩 복도의 문
+  discard(name) { openDiscard(name); }, // 53차 쓰레기장 천사
+  heavenTaxi(stop) { void heavenTaxi(stop); }, // 53차 천국 택시 천사
   mallSpot(kind) { void mallSpot(kind); }, // 52차 실내 몰
   airport() { void airportAsk(); },
   immig() { void immigration(); },
   promo(username) { promoTap(username); },
   bed(room) { void bedAsk(room); },
-  ride(k, att) { void rideAsk(k, att); },
   accDate(key) { accDate(key); },
   twinsTalk() { void twinsTalk(); },
   heavenAct(what) {
@@ -1434,7 +1436,8 @@ async function talkToAccubus(name: string) {
   } else {
     await dlg.say(pick(L.accAgain[['lover', 'friend', 'family', 'alone'].indexOf(mode)]));
   }
-  const c = await dlg.choose([L.accLover, L.accFriend, L.accFamily, L.accAlone, ...(mode ? [L.accTruth] : [])]);
+  const c = await dlg.choose([L.accLover, L.accFriend, L.accFamily, L.accAlone, ...(mode ? [L.accTruth, L.askDirBtn] : [])]);
+  if (mode && c === 5 && !dlg.cancelled) { await heavenDirections('acc'); dropped() || endTalk(); return; } // 53차: 길 묻기 (놀이공원 · 동물원 · 광장)
   if (c >= 0 && c <= 3 && !dlg.cancelled) {
     const m = (['lover', 'friend', 'family', 'alone'] as const)[c];
     state.heaven = { ...(state.heaven ?? {}), acc: m };
@@ -1597,6 +1600,9 @@ function leaveInterior(force = false) {
   if (!world?.zone.interior || !street) return;
   if (!force && world.zone.interior.kind === 'cloudisle') { void flyBack(); return; } // 46차: 구름 위 섬은 황색날개가 안고 내려간다
   if (!force && world.zone.interior.kind === 'hhome') { void roomSwap(isleZone, { i: 4, j: 6 }); return; } // 47차: 오두막을 나서면 섬의 문 앞
+  if (!force && world.zone.interior.kind === 'hdept') { void roomSwap(palaceZone, deptBack ?? undefined); return; } // 53차: 국 방을 나서면 지붕 빌딩 복도의 그 문 앞
+  if (!force && world.zone.interior.kind === 'hprison') { toast(t().prisonLocked); return; } // 53차: 감옥 문은 잠겨 있다
+  if (!force && world.zone.interior.kind === 'terrace' && state.hstrike?.exiled) { toast(t().exiledStay); return; } // 53차: 쫓겨난 영혼은 내려가거나 빌거나
   if (!force && svc) { toast(t().svcStay); return; } // 46차 예배 중
   // 31차: 염소대왕의 방은 나가는 매트로 그냥 나가지 않는다 — 상담 전이면 염소대왕이 부르고, 끝났으면 아래로 떨어진다
   if (!force && world.zone.interior.kind === 'goatroom') { if (gkPending) world.gkBlock(); else leaveGoatRoom(); return; } // 42차: 이야기 전에는 못 나간다
@@ -1735,20 +1741,6 @@ function accDate(key: string) {
   toast(L.accDateToast.replace('{place}', L.accDatePlace[key as keyof typeof L.accDatePlace] ?? ''), 'good');
 }
 /** 46차 천국 놀이공원: 안내 천사에게 묻고 탄다 (천국에선 값을 받지 않는다) */
-async function rideAsk(k: number, att: string) {
-  if (!world || world.isRiding || busy || dlg.isOpen) return;
-  busy = true;
-  const L = t();
-  const ix = att === 'ferris' ? 0 : att === 'carousel' ? 1 : 2;
-  dlg.open({ name: L.rideAngel, exit: true });
-  await dlg.say(L.rideAsk[ix]);
-  const c = await dlg.choose([L.rideYes, L.rideNo]);
-  const go = c === 0 && !dlg.cancelled;
-  endTalk();
-  if (!go) return;
-  world?.ride(k);
-  toast(L.rideToast[ix]);
-}
 /** 51차 천국의 지붕 빌딩 1층 주민센터장: 생명책에서 내 장 찾기 · 빌딩이 하는 일 · 위층 · 예배 시간 */
 async function palaceTalk() {
   if (busy || dlg.isOpen) return;
@@ -1946,6 +1938,8 @@ function clerkTalk() {
   if (info.kind === 'home') { talkToYunae(); return; }
   if (info.kind === 'ysalon') { void talkToSalon(); return; } // 40차 유내 미용실
   if (info.kind === 'hpalace') { void palaceTalk(); return; } // 46차 천국 본청 접수 천사
+  if (info.kind === 'hdept') { void deptTalk(info.dept ?? 0); return; } // 53차 국 방의 창구 천사
+  if (info.kind === 'hprison') { void jailerTalk(); return; } // 53차 지하 감옥의 간수
   if (info.kind === 'post') { void postTalk(); return; } // 52차 우체국 (답장 찾기)
   if (info.kind === 'mall') { void mallGuide(info.mallFloor ?? 1); return; } // 52차 몰 안내원
   if (info.kind === 'airport') { void airportCounter(); return; } // 47차 항공사 카운터
@@ -2774,7 +2768,7 @@ async function talkToHwang() {
     await dlg.say(hell ? L.hwGrudge : L.hwangGrudge);
   } else if (!talkedThisVisit) {
     if (hell) {
-      // 황혼은 미스 황도 황색날개도 모른다 (스스로 다른 사람이라 여긴다)
+      // 53차: 세 가게 주인이 닮았다는 암시는 모두 지웠다 (서로를 묻는 말도 하지 않는다)
       if (!hellState().met) { hellState().met = true; save(state); await dlg.say(L.hwFirst); }
       await dlg.say(L.hwGreet);
     }
@@ -3452,7 +3446,7 @@ function pickItem(hell: boolean, start: ShopTab, heaven = false): Promise<{ it: 
 }
 
 /** 몇 개: − 숫자 + 와 1·5·10·최대, 사기/팔기 단추에 모두 얼마인지. 뒤로 = 0 */
-function askQty(it: ItemDef, unit: number, max: number, verb: 'buy' | 'sell' | 'store' | 'take'): Promise<number> {
+function askQty(it: ItemDef, unit: number, max: number, verb: 'buy' | 'sell' | 'store' | 'take' | 'discard'): Promise<number> {
   const L = t();
   const hell = inHell();
   return new Promise((resolve) => {
@@ -3464,16 +3458,16 @@ function askQty(it: ItemDef, unit: number, max: number, verb: 'buy' | 'sell' | '
         <div class="qty-row"><button class="q-m" aria-label="-">−</button><output class="q-n">1</output><button class="q-p" aria-label="+">+</button></div>
         <div class="qty-quick"></div>
         <button class="primary q-go"></button></div>`;
-    el.querySelector('.menu-head b')!.textContent = verb === 'buy' ? L.qtyBuyTitle : verb === 'sell' ? L.qtySellTitle : verb === 'store' ? L.qtyStoreTitle : L.qtyTakeTitle;
+    el.querySelector('.menu-head b')!.textContent = verb === 'buy' ? L.qtyBuyTitle : verb === 'sell' ? L.qtySellTitle : verb === 'store' ? L.qtyStoreTitle : verb === 'discard' ? L.qtyDiscardTitle : L.qtyTakeTitle;
     const back = el.querySelector('.q-back') as HTMLButtonElement;
     back.textContent = L.qtyBack;
-    const row = itemRow(it, verb === 'store' ? '' : verb === 'take' ? L.cageFeeEach.replace('{p}', priceText(unit, hell)) : priceText(unit, hell), () => undefined);
+    const row = itemRow(it, verb === 'store' || verb === 'discard' ? '' : verb === 'take' ? L.cageFeeEach.replace('{p}', priceText(unit, hell)) : priceText(unit, hell), () => undefined);
     row.disabled = true;
     el.querySelector('.qty-item')!.appendChild(row);
     const out = el.querySelector('.q-n') as HTMLOutputElement, go = el.querySelector('.q-go') as HTMLButtonElement;
     const draw = () => {
       out.textContent = String(n);
-      go.textContent = (verb === 'buy' ? L.qtyBuy : verb === 'sell' ? L.qtySell : verb === 'store' ? L.qtyStore : L.qtyTake).replace('{n}', String(n)).replace('{p}', priceText(unit * n, hell));
+      go.textContent = (verb === 'buy' ? L.qtyBuy : verb === 'sell' ? L.qtySell : verb === 'store' ? L.qtyStore : verb === 'discard' ? L.qtyDiscard : L.qtyTake).replace('{n}', String(n)).replace('{p}', priceText(unit * n, hell));
     };
     const set = (v: number) => { n = Math.max(1, Math.min(max, v)); draw(); };
     // 38차: 빠른 단추는 처음엔 그 수로, 다음부터는 더한다 (×10을 한 번 더 누르면 20) — 한 번 누른 뒤엔 '+10'으로 보인다
@@ -3550,6 +3544,65 @@ function sellList(list: Element, hell: boolean, redraw: () => void) {
   }
 }
 
+/** 53차 쓰레기장 천사: 가방의 물건을 버린다 (파는 창과 같지만 돈은 받지 않는다) · 천국 돈도 버릴 수 있다 */
+function openDiscard(name: string) {
+  closeMenus();
+  document.querySelector('.store-panel')?.remove();
+  const L = t();
+  const el = document.createElement('div');
+  el.className = 'store-panel shop-menu';
+  el.innerHTML = `<div class="menu-head"><b></b><button class="menu-close">✕</button></div><p class="store-line"></p><div class="menu-list"></div>`;
+  el.querySelector('.menu-head b')!.textContent = name;
+  el.querySelector('.store-line')!.textContent = L.discardLine;
+  (el.querySelector('.menu-close') as HTMLButtonElement).onclick = () => el.remove();
+  const list = el.querySelector('.menu-list')!;
+  const draw = () => {
+    list.innerHTML = '';
+    // 천국 돈 (지갑)
+    const cash = state.wallet ?? 0;
+    if (cash > 0) {
+      const b = document.createElement('button'); b.className = 'menu-item w-heaven';
+      b.innerHTML = '<span class="name"></span><span class="effect"></span>';
+      b.querySelector('.name')!.textContent = L.discardMoney; b.querySelector('.effect')!.textContent = priceText(cash, false);
+      b.onclick = async () => {
+        const amts = [100, 1000, 10000].filter((a) => a < cash);
+        const c = await quickPick([...amts.map((a) => priceText(a, false)), L.discardAll]);
+        if (c < 0) return;
+        const n = c < amts.length ? amts[c] : cash;
+        state.wallet = Math.max(0, (state.wallet ?? 0) - n); save(state); updateHud();
+        toast(L.discardedMoney.replace('{p}', priceText(n, false))); draw();
+      };
+      list.appendChild(b);
+    }
+    const bag = state.bag ?? {};
+    const keys = [...Object.keys(bag).filter((k) => bag[k] > 0 && sellFree(k) > 0), ...ammoKinds().map((it) => it.key).filter((k) => sellFree(k) > 0 && !(bag[k] > 0))];
+    if (!keys.length && cash <= 0) { const p = document.createElement('p'); p.className = 'bag-empty'; p.textContent = L.discardNothing; list.appendChild(p); return; }
+    for (const k of keys) {
+      const it = itemByKey(k); if (!it) continue;
+      list.appendChild(itemRow(it, `×${sellFree(k)}`, async () => {
+        const have = sellFree(k);
+        const n = await askQty(it, 0, have, 'discard');
+        if (n <= 0 || sellFree(k) < n) return;
+        sellTake(k, n); save(state); updateHud(); renderQuick();
+        toast(L.discarded.replace('{item}', it.name[lang()]).replace('{n}', String(n)));
+        draw();
+      }));
+    }
+  };
+  draw();
+  document.body.appendChild(el);
+}
+/** 짧은 고르기 (단추 몇 개) — 고르지 않으면 -1 */
+function quickPick(opts: string[]): Promise<number> {
+  return new Promise((resolve) => {
+    const el = document.createElement('div'); el.className = 'shop-menu qty-panel';
+    el.innerHTML = '<div class="qty-body"><div class="qty-quick"></div></div>';
+    const box = el.querySelector('.qty-quick')!;
+    opts.forEach((o, i) => { const b = document.createElement('button'); b.textContent = o; b.onclick = () => { el.remove(); resolve(i); }; box.appendChild(b); });
+    const x = document.createElement('button'); x.textContent = t().qtyBack; x.onclick = () => { el.remove(); resolve(-1); }; box.appendChild(x);
+    document.body.appendChild(el);
+  });
+}
 /** 48차: 세계 색 — 현실(쇳빛 파랑) · 천국(옅은 금) · 지옥(검붉음) · 세 세계 공용(보라) */
 function worldTone(it: ItemDef) { return it.cross ? 'w-cross' : 'w-' + worldOf(it); }
 /** 48차: 무게 글씨 (거의 없으면 ≈0) */
@@ -4791,7 +4844,9 @@ async function talkToOfficer() {
   dlg.open({ name: L.officer, portrait: 'luen', exit: true });
   await dlg.say(L.offGreet);
   for (;;) {
-    const c0 = await dlg.choose([L.offAskRebirth, L.carryAsk, L.offJustLook]);
+    const exiled = !!state.hstrike?.exiled;
+    const c0 = await dlg.choose(exiled ? [L.offAskRebirth, L.carryAsk, L.begBtn] : [L.offAskRebirth, L.carryAsk, L.offJustLook]);
+    if (exiled && c0 === 2) { for (const line of L.begLines) await dlg.say(line); const hs = hstrike(); hs.exiled = false; hs.last = true; hs.n = 0; save(state); endTalk(); return; } // 53차: 용서를 빌면 천국에 남는다 (마지막 기회)
     if (c0 === 1) { await dlg.say(carryText(false)); continue; } // 44차
     if (c0 !== 0) { await dlg.say(L.offStay); dropped() || endTalk(); return; }
     break;
@@ -4956,16 +5011,19 @@ async function talkToYellowWing() {
     save(state);
     await dlg.say(L.ywFirst);
     for (const line of L.ywAssigned) await dlg.say(line);
-  } else await dlg.say(pick(L.ywLines));
+  } else if (state.hstrike?.ywTell && !ywAwayNow()) { for (const line of L.ywPunished) await dlg.say(line); state.hstrike.ywTell = false; save(state); } // 53차: 하루 자리를 비운 까닭 (쓰레기장 청소 징벌)
+  else await dlg.say(pick(L.ywLines));
   for (;;) {
     const M = L.ywMenu;
     const M2 = L.ywMenu2;
     const isle = world?.zone.interior?.kind === 'cloudisle';
     const opts: [string, string][] = isle ? [['shop', L.ywShopOpen], ['back', M2.back], ['praise', M2.praise], ['present', M2.present], ['angels', M2.angels]] : [['shop', L.ywShopOpen], ['home', M2.home], ['praise', M2.praise], ['present', M2.present], ['rebirth', M.rebirth], ['luen', M.luen], ['rules', M.rules], ['angels', M2.angels], ['gift', M.gift]]; // 48차: 황색날개는 어디서든 가게를 연다
+    if (!isle) opts.push(['dir', L.askDirBtn]); // 53차: 길 묻기 (가게 · 은행 · 우체국 · 호텔 · 오락실)
     if (!isle) opts.push(state.heaven?.ywLost ? ['follow', M.follow] : ['alone', M.alone]);
     opts.push(['bye', M.bye]);
     const c = opts[await dlg.choose(opts.map((o) => o[1]))]?.[0] ?? 'bye';
     if (c === 'bye') break;
+    if (c === 'dir') { await heavenDirections('yw'); continue; }
     // 46차: 칭찬 · 선물 (그러면 어디선가 노을이 칼을 뽑는다) · 천사의 품계 · 구름 위의 집
     if (c === 'praise') {
       const k = await dlg.choose([...L.ywPraise, L.ywNo]);
@@ -5083,8 +5141,9 @@ async function talkToNoeul() {
   // 45차: 지옥 정벌 — 노을에게 묻는다. 천국의 무기고도 노을이 지킨다
   for (;;) {
     if (dropped()) return;
-    const c = await dlg.choose([L.crusadeAskBtn, L.noeulArmoryBtn, L.noeulBye]);
+    const c = await dlg.choose([L.crusadeAskBtn, L.noeulArmoryBtn, L.askDirBtn, L.noeulBye]);
     if (c === 1) { dlg.close(); busy = false; openHeavenArmory(); return; }
+    if (c === 2) { await heavenDirections('noeul'); continue; } // 53차: 길 묻기 (지붕 빌딩 · 성소 · 우주센터 · 쓰레기장)
     if (c !== 0) break;
     await dlg.say(L.crusadeOffer);
     const c2 = await dlg.choose([L.crusadeJoin, L.crusadeRulesBtn, L.crusadeLater]);
@@ -5284,7 +5343,7 @@ function svcTick() {
 window.setInterval(svcTick, 1000);
 // 47차 무게: 짐이 바뀌면 곧 반영 (1초마다 셈 — 가볍다)
 { const chip = document.createElement('button'); chip.className = 'load-chip'; chip.hidden = true; chip.addEventListener('click', () => toggleBag()); document.body.appendChild(chip); } // 48차: 누르면 가방 — 버리거나 맡길 것을 바로 고른다
-window.setInterval(() => { applyLoad(); applyPromo(); if (world?.zone.interior?.kind === 'hpalace') world.setPalaceTicket(state.hticket ?? null); }, 1000); // 47차: 무게 · 홍보 말풍선 (새 장면에도 곧 붙는다)
+window.setInterval(() => { applyLoad(); applyPromo(); if (world?.zone.interior?.kind === 'hpalace') world.setPalaceTicket(state.hticket ?? null); if (realm() === 'heaven' && world) { world.setYwAway(ywAwayNow()); prisonTick(); } }, 1000); // 53차: 황색날개 징벌 · 감옥 // 47차: 무게 · 홍보 말풍선 (새 장면에도 곧 붙는다)
 const SANCT_ROOMS = ['hchurch', 'htemple', 'hmosque'];
 async function svcEscort() {
   if (!world || svcGoing) return;
@@ -5400,6 +5459,80 @@ async function flyHome() {
   if (!state.heaven?.homeSeen) { state.heaven = { ...state.heaven, homeSeen: true }; save(state); }
   toast(L.cottageArrive);
   fx.done();
+}
+/** 53차 천국의 지붕 빌딩: 복도의 문 → 그 국의 방 (방 안의 방 — 나오면 복도의 그 문 앞) */
+let palaceFrom: { b: number; out: { i: number; j: number }; bd?: Building } | null = null;
+let deptBack: { i: number; j: number } | null = null;
+function palaceZone() {
+  const pf = palaceFrom!;
+  const b = pf.bd ?? street!.zone.buildings[pf.b];
+  return interiorZone(b, pf.b, pf.out, buildingName(b, lang()));
+}
+function deptZone(dept: number) {
+  const pf = palaceFrom!;
+  const b = { i0: pf.out.i, j0: pf.out.j, w: 1, d: 1, h: 0, cat: 'hdept', dept, color: '#ffffff' } as unknown as Building;
+  return interiorZone(b, pf.b, pf.out, deptName(dept));
+}
+async function enterDept(dept: number) {
+  const info = world?.zone.interior;
+  if (!info || info.kind !== 'hpalace' || busy || dlg.isOpen) return;
+  palaceFrom = { ...info.from };
+  const door = info.doors?.find((d) => d.dept === dept);
+  deptBack = door ? { i: 2, j: door.j } : null;
+  await roomSwap(() => deptZone(dept));
+}
+/** 53차 국 방의 창구 천사: 여기가 어디냐고 물으면 그 국이 하는 일을 말해 준다 */
+async function deptTalk(dept: number) {
+  if (busy || dlg.isOpen) return;
+  busy = true;
+  const L = t();
+  dlg.open({ name: deptName(dept), exit: true });
+  const c = await dlg.choose([L.deptAsk, L.deptBye]);
+  if (c === 0 && !dlg.cancelled) await dlg.say((L.deptWhere as Record<string, string>)[String(dept)] ?? '');
+  endTalk();
+}
+/** 53차 천국 택시 천사: 정류장 넷(시작 지점 · 천국의 지붕 빌딩 앞 · 종교시설 구역 · 쓰레기장) 사이를 안고 난다 — 값은 없다 */
+async function heavenTaxi(stop: number) {
+  if (busy || dlg.isOpen || !world) return;
+  busy = true;
+  const L = t();
+  dlg.open({ name: L.taxiAngel, exit: true });
+  await dlg.say(pick(L.htaxiGreet));
+  const others = TAXI_STOPS.map((s, n) => ({ s, n })).filter((x) => x.n !== stop);
+  const c = await dlg.choose([...others.map((x) => L.taxiStopName[x.s.key]), L.taxiTo.no]);
+  if (c < 0 || c >= others.length || dlg.cancelled) { endTalk(); return; }
+  await dlg.say(pick(L.htaxiFly));
+  dlg.close();
+  const to = others[c].s;
+  const fx = worldFade('heaven', true);
+  await fx.covered;
+  world?.flyTo(to.i, to.j);
+  fx.done();
+  snapPos(); save(state);
+  toast(L.htaxiArrive.replace('{place}', L.taxiStopName[to.key]));
+  busy = false;
+}
+/** 53차 천국 1층 길 묻기 — 셋이 나눠 안다: 황색날개(가게 · 은행 · 우체국 · 호텔 · 오락실) · 노을(지붕 빌딩 · 성소 · 우주센터 · 쓰레기장) · 아큐버스(놀이공원 · 동물원 · 광장) */
+async function heavenDirections(who: 'yw' | 'noeul' | 'acc') {
+  const L = t(), w = world, hm = heavenMeta();
+  if (!w || w.zone.interior || !w.zone.heavenGen || !hm) { await dlg.say(L.dirOutside[who]); return; }
+  const z = w.zone, bs = z.buildings;
+  const poi = (b: Building) => (b as Building & { pois?: { t: string }[] }).pois?.[0]?.t;
+  const att = (b: Building) => (b as Building & { att?: string }).att;
+  const spots: { name: string; k?: number; at?: [number, number] }[] = [];
+  const add = (k: number) => { if (k >= 0 && bs[k]) spots.push({ name: buildingName(bs[k], lang()), k }); };
+  if (who === 'yw') { for (const tt of ['department_store', 'furniture']) add(bs.findIndex((b) => poi(b) === tt)); add(bs.findIndex((b) => poi(b) === 'bank')); add(hm.post); add(bs.findIndex((b) => b.cat === 'hotel')); add(bs.findIndex((b) => poi(b) === 'amusement_arcade')); }
+  else if (who === 'noeul') { add(hm.palace); add(hm.sancts.church); add(hm.sancts.temple); add(hm.sancts.mosque); add(hm.ctr); spots.push({ name: L.placeDump, at: [Math.floor((hm.dump.i0 + hm.dump.i1) / 2), hm.dump.j1 + 1] }); }
+  else { for (const a of ['ferris', 'carousel', 'coaster']) add(bs.findIndex((b) => b.cat === 'attraction' && att(b) === a)); spots.push({ name: L.placeZoo, at: [110, 88] }, { name: L.placePlaza, at: [110, 55] }); }
+  const c = await dlg.choose([...spots.map((p) => p.name), L.askNever]);
+  if (c < 0 || c >= spots.length || dlg.cancelled) return;
+  const sp = spots[c], me = w.playerTile();
+  const [ti, tj] = sp.k !== undefined ? [bs[sp.k].i0 + bs[sp.k].w / 2, bs[sp.k].j0 + bs[sp.k].d / 2] : [sp.at![0], sp.at![1]];
+  const di = ti - me.i, dj = tj - me.j, D = L.hdirs;
+  const ew = Math.abs(di) > 5 ? (di > 0 ? D.e : D.w) : '', ns = Math.abs(dj) > 5 ? (dj > 0 ? D.s : D.n) : '';
+  const dir = [ns, ew].filter(Boolean).join(D.and) || D.here, m = Math.max(10, Math.round((Math.hypot(di, dj) * 3) / 10) * 10);
+  await dlg.say(pick(L.dirLine[who]).replace('{name}', sp.name).replace('{dir}', dir).replace('{m}', String(m)));
+  if (sp.k !== undefined) w.setGuide(sp.k); else w.guideAt(sp.name, sp.at![0], sp.at![1]);
 }
 /** 47차: 구름 위 섬과 내 오두막 안 (방 안의 방이라 섬을 닫고 새 방을 연다 — 나오면 다시 섬의 오두막 문 앞) */
 let isleOut: { i: number; j: number } = { i: 0, j: 0 };
@@ -5584,17 +5717,108 @@ async function talkToTaxi() {
   busy = false;
 }
 /** 천국에서 손을 들면: 악행이 기록되고 현실로 떨어진다 (선행 보너스는 받지 못한다) */
+/**
+ * 53차 천국의 폭력 (천국에서도 손을 올릴 수 있다): 한 기회에 세 번까지.
+ * 1 치안 천사 둘이 하늘에서 내려와 경고 · 2 때려서 반피 · 3 쓰러뜨려 천국의 지붕 빌딩 지하 감옥 (실제 시간 한 시간 뒤 징벌 천사의 심문).
+ * 심문에서 1~3이면 마지막 기회를 받고 풀려난다(황색날개는 하루 동안 징벌로 자리를 비운다) · 4~5면 환생 로비로 — 루엔에게 빌면 남는다.
+ * 마지막 기회를 받은 뒤 다시 세 번이면: 하늘에서 내려온 빛에 몸이 타고, 지옥 1층에서 눈을 뜬다 (염소대왕을 지나쳐 떨어진다)
+ */
+const hstrike = () => (state.hstrike ??= { n: 0 });
+const ywAwayNow = () => (state.hstrike?.ywAway ?? 0) > Date.now();
 async function heavenAssault() {
-  const L = t();
-  busy = true;
+  if (busy || !world) return;
+  const L = t(), hs = hstrike(), w = world;
   recordDeed('angelAssault');
-  dlg.open({ name: L.officer, portrait: 'luen' });
-  await dlg.say(L.heavenAssault);
-  await dlg.say(L.heavenFall);
+  const n = Math.min(3, hs.n + 1);
+  hs.n = n; save(state);
+  busy = true;
+  await w.heavenStrike(w.strikeTarget, n); w.strikeTarget = null;
+  dlg.open({ name: L.deptTitles.guard });
+  for (const line of L.strikeWarn[n - 1]) await dlg.say(line);
   dlg.close();
   busy = false;
-  const fx = worldFade('hell', false);
-  fx.covered.then(() => { rebirthFrom('heaven'); fx.done(); });
+  if (n < 3) { void w.guardsLeave(); return; }
+  hs.n = 0;
+  if (hs.last) { hs.last = false; save(state); await burnToHell(); return; }
+  hs.prison = Date.now() + 3600_000; save(state);
+  await toPrison();
+}
+function prisonZone() {
+  const outer = street ?? world!;
+  const k = heavenMeta()?.palace ?? 0, pb = outer.zone.buildings[k];
+  const out = pb ? { i: pb.i0 + Math.floor(pb.w / 2), j: pb.j0 + pb.d } : { i: outer.zone.door.i, j: outer.zone.door.j + 1 };
+  const b = { i0: out.i, j0: out.j, w: 1, d: 1, h: 0, cat: 'hprison', color: '#ffffff' } as unknown as Building;
+  return interiorZone(b, k, out, t().prisonName);
+}
+async function toPrison() {
+  const L = t();
+  busy = true;
+  state.hp = Math.max(1, Math.round(maxHp() * 0.3)); save(state);
+  const fx = worldFade('heaven', false);
+  await fx.covered;
+  if (world?.zone.interior) swapRoom(prisonZone(), { i: 2, j: 3 });
+  else { openRoom(prisonZone(), null, false, true); world?.placeNear(2, 3, state.hp); }
+  fx.done();
+  dlg.open({ name: '', monologue: true }); await dlg.say(L.prisonWake); dlg.close();
+  busy = false;
+}
+/** 1초마다: 감옥에 있어야 하는데 밖이면 데려가고 · 한 시간이 지나면 징벌 천사가 온다 */
+let judging = false;
+function prisonTick() {
+  const hs = state.hstrike;
+  if (!hs?.prison || !world || realm() !== 'heaven' || busy || dlg.isOpen || judging) return;
+  if (world.zone.interior?.kind !== 'hprison') { void toPrison(); return; }
+  if (Date.now() >= hs.prison) void prisonJudge();
+}
+async function jailerTalk() {
+  if (busy || dlg.isOpen) return;
+  busy = true;
+  const L = t(), left = Math.max(1, Math.ceil(((state.hstrike?.prison ?? Date.now()) - Date.now()) / 60000));
+  dlg.open({ name: L.deptTitles.jailer, exit: true });
+  await dlg.say(state.hstrike?.prison ? L.prisonWait.replace('{m}', String(left)) : pick((L.mutter53 as Record<string, string[]>).hjailer));
+  endTalk();
+}
+async function prisonJudge() {
+  if (!world) return;
+  judging = true; busy = true;
+  const L = t(), hs = hstrike();
+  world.spawnJudge();
+  dlg.open({ name: '', monologue: true }); await dlg.say(L.prisonJudgeCome); dlg.close();
+  dlg.open({ name: L.deptTitles.judge });
+  let c = -1;
+  while (c < 0) { await dlg.say(L.judgeAsk); c = await dlg.choose([...L.judgeAns]); if (dlg.cancelled) c = -1; }
+  hs.prison = undefined;
+  if (c <= 2) {
+    for (const line of L.judgeMercy) await dlg.say(line);
+    dlg.close();
+    hs.last = true; hs.n = 0; hs.ywAway = Date.now() + 86400_000; hs.ywTell = true; save(state);
+    const fx = worldFade('heaven', false); await fx.covered;
+    leaveInterior(true);
+    fx.done();
+  } else {
+    for (const line of L.judgeDown) await dlg.say(line);
+    dlg.close();
+    hs.exiled = true; hs.n = 0; save(state);
+    const st = street?.heavenStair;
+    const fx = worldFade('heaven', false); await fx.covered;
+    if (st) { const b: Building = { i0: st.i, j0: st.j, w: 1, d: 1, h: 0, cat: 'terrace', color: '#ffffff' }; swapRoom(interiorZone(b, -4, { i: st.i, j: st.j + 1 }, L.terraceName)); }
+    fx.done();
+    toast(L.exiledStay);
+  }
+  busy = false; judging = false;
+}
+/** 마지막 기회까지 쓰고 또: 빛에 타서 지옥 1층 (염소대왕을 지나쳐 떨어진다) */
+async function burnToHell() {
+  if (!world) return;
+  busy = true;
+  const L = t();
+  void world.guardsLeave();
+  await world.burnInLight();
+  dlg.open({ name: '', monologue: true }); for (const line of L.burnLines) await dlg.say(line); dlg.close();
+  busy = false;
+  const hs = hstrike(); hs.exiled = false; hs.prison = undefined; save(state);
+  if (world?.zone.interior && street) { world.destroy(); world = street; street = null; }
+  await enterHell(1, 'fall');
 }
 /** 천국에서 쓰러지면: 잃는 것 없이 환생관 곁에서 깨어난다 */
 function heavenFaint() {
