@@ -33,7 +33,7 @@ export interface Building {
 /** 지옥: 초가집 · 감옥 · 뼈집 · 대형 짐승 시체 · 뼈 무더기 · 내장 더미 */
 export type HellBuildKind = 'thatch' | 'prison' | 'bonehouse' | 'carcass' | 'bonepile' | 'guts' | 'butcher' | 'stall' | 'burnt' | 'idol' | 'smithy' | 'maskhouse' | 'puppetshop' | 'mineshaft' | 'puppetidol'; // 34차 smithy = 4층 칼드렉의 대장간 · 43차 5층: 안과 밖이 다른 집 · 인형술사 마리의 공방
 /** fence o: 0 = i 방향, 1 = j 방향, 2 = 모서리 기둥 */
-export interface Prop { i: number; j: number; kind: 'tree' | 'lamp' | 'pillar' | 'cart' | 'fence' | 'pole' | 'spirit' | 'moto' | 'plant' | 'bin' | 'stools' | 'pushcart' | HellDecorKind | 'sunbed' | 'parasol' | 'giraffe' | 'elephant' | 'lion' | 'zebra' | 'flamingo' | 'panda' | 'fountain' | 'balloons' | 'icecream' | 'zoobar' | 'zoogate' | 'hcafe' | 'hcart'; o?: number }
+export interface Prop { i: number; j: number; kind: 'tree' | 'lamp' | 'pillar' | 'cart' | 'fence' | 'pole' | 'spirit' | 'moto' | 'plant' | 'bin' | 'stools' | 'pushcart' | HellDecorKind | 'sunbed' | 'parasol' | 'giraffe' | 'elephant' | 'lion' | 'zebra' | 'flamingo' | 'panda' | 'fountain' | 'balloons' | 'icecream' | 'zoobar' | 'zoogate' | 'hcafe' | 'hcart' | 'swimmer'; o?: number }
 /** 지옥 소품: 경계 바위·성벽, 뼈, 해골 더미, 꼬챙이, 가마솥, 철창, 마을 불빛, 고문 장면(움직임) */
 export type HellDecorKind = 'wall' | 'crag' | 'bones' | 'skulls' | 'stake' | 'cauldron' | 'cage' | 'lantern' | 'bonfire' | 'torture' | 'htree' | 'rock' | 'crack' | 'dicetable' | 'campfire' | 'junk' | 'reeds' | 'mattress' | 'anvil' | 'forge' | 'maskpost' | 'tent'; // 46차: 서큐버스의 작은 천막 // 43차: 가면을 줄줄이 건 나무 기둥 (5층)
 /** 차가 달리는 구간: j 행의 i0~i1, dir = +1 이면 +i 방향 */

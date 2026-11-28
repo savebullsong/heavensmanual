@@ -270,6 +270,7 @@ function layerKeys0(look: Look, weapon: string | null, armorIn: string[] = []): 
   if (D42[o as string]) return { base: D42[o as string], hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
   if (o === 'succubus') return { base: 'b-q-succubus-w', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
   if (o === 'accubus') return { base: `b-${look.sex === 'm' ? 'i' : 'j'}-accubus-w`, hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode };
+  if (o === 'swim') return { base: `b-${look.sex}1-swim-w`, hair: `h-${look.sex}-${HAIR_STYLES[look.hair] ?? 'short'}`, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'w' as Mode }; // 53차 천국 수영장: 비키니 · 수영 반바지 (서기·걷기)
   if (o === 'cockatoo') return { base: 'b-b-cockatoo-u', hair: null, weapon: null, armor: [] as { key: string; piece: string }[], mode: 'u' as Mode };
   // 휴식 마을 경비병: 재문지기(뼈 곤봉) · 빈그릇귀(맨손·사발) · 봉랍귀(인장 지팡이)
   if (o === 'warden1') return { base: 'b-g-warden1-m', hair: null, weapon: 'w-g-knocker', armor: [] as { key: string; piece: string }[], mode: 'm' as Mode };

@@ -213,7 +213,7 @@ class Doll:
                 limb(P, c + Vector((-sx * .012, -.02, .02)), c + Vector((-sx * .02, -.04, -.01)), [(0, .012 * am, .012 * am), (1, .008 * am, .008 * am)], skin, None, segs=6)
             ob = finish(P); bind(ob, self.arm, rigid(f'hand.{k}')); self.add(group, ob)
 
-    def legs(self, group, mat, shoe_mat, bare_below=None, boot=False, foot=1.0):
+    def legs(self, group, mat, shoe_mat, bare_below=None, boot=False, foot=1.0, sole=True):
         # 사람 몸은 허벅지·종아리에 살집(legmass)이 있고, 신발은 두툼한 밑창의 큰 신 (하체가 단단해 보이게)
         lm = self.p.get('legmass', 1.0)
         lg = self.p['leg'] * self.bw * lm; s = self.s
@@ -231,7 +231,7 @@ class Doll:
             P = Part(f'{group}.shoe.{k}')
             c = Vector((an.x, -.035 * s, .045 * s))
             blob(P, c, (.05 * s * (1.1 if boot else 1) * foot * fm, .122 * s * foot * fm, .052 * s * (1.25 if boot else 1) * foot * fm), shoe_mat, None, segs=12, rings=8, cut=lambda co: co.z < .0)
-            if lm > 1:   # 두툼한 밑창 (어두운 판)
+            if lm > 1 and sole:   # 두툼한 밑창 (어두운 판) — 맨발(수영복)은 없다
                 limb(P, c + Vector((0, .1 * s * fm, .012 * s)), c + Vector((0, -.13 * s * fm, .012 * s)), [(0, .056 * s * fm, .018 * s), (1, .05 * s * fm, .016 * s)], rmat('dark', .8, .1), None, segs=8)
             if boot:
                 limb(P, an + Vector((0, 0, -.06)), an + Vector((0, 0, .16 * s)), [(0, .058 * s, .06 * s), (1, .055 * s, .057 * s)], shoe_mat, None)
@@ -253,6 +253,30 @@ class Doll:
                 rings = [ring(1.30, .12, .03, -.118), ring(1.16, .128, .03, -.11), ring(1.06, .16, .035, -.112), ring(.90, .19, .04, -.125), ring(.62, .2, .04, -.13)]
                 loft(P, rings, ap, None, segs=12)
                 ob = finish(P); bind(ob, self.arm, lambda co: {'spine': smooth(co.z, .98 * s, 1.12 * s), 'hips': 1 - smooth(co.z, .98 * s, 1.12 * s)}); self.add(g, ob)
+        elif name == 'swim':
+            # 53차 천국 수영장: 여자는 비키니(가슴 띠 · 목 끈 · 아랫도리), 남자는 무릎 위 수영 반바지. 맨발.
+            #   수영복 = 구역 3(위) · 4(아래) — 게임이 밝은 색을 입힌다
+            skin = rmat('skin', .6, .3); top = rmat('top', .45, .4); bot = rmat('bottom', .5, .35)
+            s = self.s; w = self.bw; f = self.torso_key == 'f'
+            T = list(TORSO[self.torso_key])
+            if f:   # 비키니 띠의 아래 선을 또렷하게: 1.16 ~ 1.24 사이에 고리 하나 더
+                a, b = T[4], T[5]
+                T.insert(5, tuple((a[k] + b[k]) / 2 for k in range(4)))
+            rings = [(self.V(0, cy, z), Vector((0, -1, 0)), Vector((1, 0, 0)), rx * s * w, ry * s * (w * .5 + .5)) for z, rx, ry, cy in T]
+            P = Part(g)
+            if f: mf = lambda z: bot if z < .955 * s else (top if 1.195 * s < z < 1.335 * s else skin)
+            else: mf = lambda z: bot if z < 1.0 * s else skin
+            loft(P, rings, skin, None, segs=14, matfn=mf)
+            ob = finish(P); bind(ob, self.arm, lambda co: {'spine': smooth(co.z, .98 * s, 1.12 * s), 'hips': 1 - smooth(co.z, .98 * s, 1.12 * s)}); self.add(g, ob)
+            self.head(g); self.arms(g, None); self.hands(g)
+            if f:
+                self.legs(g, skin, skin, foot=.8, sole=False)
+                P = Part(g + '.strap')   # 목 뒤로 묶는 끈 둘
+                for sx in (1, -1):
+                    limb(P, self.V(sx * .055, -.1, 1.3), self.V(sx * .03, .01, 1.45), [(0, .009 * s, .006 * s), (1, .007 * s, .005 * s)], top, None, segs=5)
+                ob = finish(P); bind(ob, self.arm, lambda co: {'spine': 1.0}); self.add(g, ob)
+            else:
+                self.legs(g, bot, skin, bare_below=skin, foot=.85, sole=False)
         elif name == 'casualL':
             # 39차 서울 봄·가을: 긴소매 윗옷(손목까지) · 긴 바지 · 운동화
             top = rmat('top', .85, .15); bot = rmat('bottom', .8, .15); shoe = rmat('shoe', .5, .4)

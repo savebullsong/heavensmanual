@@ -99,9 +99,11 @@ export function heavenZone(): Zone {
   buildings.push({ i0: PALACE_GATE.i0, j0: PALACE_GATE.j0, w: PALACE_GATE.w, d: PALACE_GATE.d, h: 170, cat: 'palace', sign: 'left', color: '#ffffff', pois: [P('palace', '천국의 지붕 빌딩', 'ตึกหลังคาสวรรค์', 'Roof of Heaven Building')] });
   rect(PALACE_GATE.i0 + 1, PALACE_GATE.j0 + PALACE_GATE.d, PALACE_GATE.i0 + PALACE_GATE.w - 2, 12, 'walk');
   // 놀이공원 · 오락실
-  buildings.push({ i0: 94, j0: 13, w: 8, d: 8, h: 300, cat: 'attraction', att: 'ferris', color: '#ffffff', pois: [P('attraction', '구름 대관람차', 'ชิงช้าสวรรค์เมฆ', 'Cloud Ferris Wheel')] });
-  buildings.push({ i0: 105, j0: 15, w: 6, d: 6, h: 90, cat: 'attraction', att: 'carousel', color: '#ffffff', pois: [P('attraction', '날개 회전목마', 'ม้าหมุนปีก', 'Winged Carousel')] });
-  buildings.push({ i0: 113, j0: 12, w: 12, d: 9, h: 160, cat: 'attraction', att: 'coaster', color: '#ffffff', pois: [P('attraction', '은하 롤러코스터', 'รถไฟเหาะกาแล็กซี่', 'Galaxy Coaster')] });
+  // 53차 하늘 전망 놀이공원: 섬 북쪽 가장자리를 따라 — 북동쪽 끝에 아시아티크만 한 대관람차(바퀴 너머가 하늘) · 북서쪽에 허공으로 나갔다가 돌아와 땅속 굴로 들어가는 롤러코스터 ·
+  //   가장자리 산책길(망원경 · 하늘을 보는 벤치 · 유리 전망대). 타는 기능은 없다 — 보고 감상하는 곳
+  buildings.push({ i0: 116, j0: 7, w: 14, d: 6, h: 500, cat: 'attraction', att: 'ferris', color: '#ffffff', pois: [P('attraction', '하늘 대관람차', 'ชิงช้าสวรรค์ฟ้า', 'Sky Ferris Wheel')] });
+  buildings.push({ i0: 105, j0: 16, w: 6, d: 6, h: 90, cat: 'attraction', att: 'carousel', color: '#ffffff', pois: [P('attraction', '날개 회전목마', 'ม้าหมุนปีก', 'Winged Carousel')] });
+  buildings.push({ i0: 58, j0: 1, w: 30, d: 15, h: 300, cat: 'attraction', att: 'coaster', color: '#ffffff', pois: [P('attraction', '구름 롤러코스터', 'รถไฟเหาะเมฆ', 'Cloud Coaster')] });
   buildings.push({ i0: 84, j0: 18, w: 7, d: 6, h: 96, cat: 'shop', sign: 'left', color: '#2a2440', pois: [P('amusement_arcade', '스타라이트 오락실', 'อาเขตสตาร์ไลท์', 'Starlight Arcade')] });
   // 휴양지 호텔 (큰길 북쪽)
   buildings.push({ i0: 134, j0: 50, w: 12, d: 6, h: 260, cat: 'hotel', sign: 'left', color: '#fbf6ea', pois: [P('hotel', '그랜드 헤븐 호텔', 'แกรนด์เฮเว่นโฮเต็ล', 'Grand Heaven Hotel')] });
@@ -123,8 +125,14 @@ export function heavenZone(): Zone {
   const prop = (i: number, j: number, kind: string, o = 0) => { if (tiles[j * W + i] !== TI.water && tiles[j * W + i] !== TI.void) props.push({ i, j, kind: kind as Prop['kind'], o }); };
   // 수영장 가의 썬베드와 파라솔
   for (const [a, b, c, d] of pools) {
-    for (let i = a; i <= c; i += 2) { prop(i, b - 2, i % 4 ? 'sunbed' : 'parasol'); prop(i, d + 2, (i + 1) % 4 ? 'sunbed' : 'parasol'); }
+    // 53차: 썬베드 셋에 하나꼴로 비키니 · 수영복 차림이 누워 볕을 쬔다 (o = 1)
+    for (let i = a; i <= c; i += 2) { prop(i, b - 2, i % 4 ? 'sunbed' : 'parasol', (i + b) % 3 === 1 ? 1 : 0); prop(i, d + 2, (i + 1) % 4 ? 'sunbed' : 'parasol', (i + d) % 3 === 0 ? 1 : 0); }
   }
+  // 53차: 물속의 사람들 — 자유형 · 튜브 · 에어매트 · 물가에서 수다 (물 위에 바로 놓는다)
+  pools.forEach(([a, b, c, d], pk) => {
+    const spots: [number, number, number][] = [[a + 2 + (pk % 3), b + 2, 0], [c - 2, d - 2 - (pk % 2), 1], [Math.floor((a + c) / 2), Math.floor((b + d) / 2), 2], [a + 1, d - 1, 3], [c - 4, b + 1, pk % 2 ? 0 : 1]];
+    for (const [i, j, v] of spots) if (tiles[j * W + i] === TI.water) props.push({ i, j, kind: 'swimmer' as Prop['kind'], o: v + (pk % 4) * 4 });
+  });
   // 동물원: 울타리 친 우리 여섯, 우리마다 동물
   const zoo = ZOO_PENS;
   // 50차: 나무 울타리 → 끝이 뾰족한 높은 쇠창살 (감옥처럼) · 동물원 둘레도 창살로 막고 북쪽 큰길에 정문 하나
@@ -154,7 +162,10 @@ export function heavenZone(): Zone {
   // 52차: 탑이 떠난 광장 한가운데 — 날개 편 천사상과 둥근 꽃밭 (사진 찍는 자리)
   { const [i, j] = [110, 52]; prop(i, j, 'angelstatue'); for (let a2 = -2; a2 <= 2; a2++) for (let b2 = -2; b2 <= 2; b2++) if (a2 || b2) prop(i + a2, j + b2, 'fblock'); }
   for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; prop(Math.round(110 + Math.cos(a) * 6.5), Math.round(52 + Math.sin(a) * 6.5), 'flowerbed', k); }
-  prop(100, 28, 'balloons'); prop(118, 28, 'balloons'); // 52차 후속: 장사꾼 없던 납작한 아이스크림 수레는 걷고, 천사가 끄는 솜구름 사탕 수레가 그 자리를 맡는다
+  prop(100, 28, 'balloons'); prop(118, 28, 'balloons');
+  // 가장자리 산책길: 하늘과 맞닿은 칸(바로 위가 빈 하늘)마다 번갈아 망원경 · 하늘을 보는 벤치 — 유리 전망대는 가장자리 너머로 튀어나온다
+  { let n = 0; for (let i = 90; i <= 150; i++) for (let j = 4; j <= 14; j++) { if (tiles[j * W + i] === TI.void || tiles[(j - 1) * W + i] !== TI.void) continue; if (i >= PALACE_GATE.i0 - 1 && i <= PALACE_GATE.i0 + PALACE_GATE.w) continue; if (i >= 116 && i < 130 && j < 13) continue; if (i % 5 === 0) { prop(i, j, n % 2 ? 'skybench' : 'telescope'); n++; } break; } }
+  for (const [i, j, o] of [[110, 3, 0], [140, 6, 1]] as const) props.push({ i, j, kind: 'skydeck' as Prop['kind'], o }); // 유리 전망대는 빈 하늘 위에 // 52차 후속: 장사꾼 없던 납작한 아이스크림 수레는 걷고, 천사가 끄는 솜구름 사탕 수레가 그 자리를 맡는다
   // 52차 후속: 길 아무 데나 흩어져 있던 손수레(장사꾼도 없이 들판 길에 덩그러니)를 걷어 내고, 사람이 모이는 다섯 자리에만 천사가 끄는 흰 수레를 둔다
   //   o = 종류 × 2 + 방향 (종류 0 만나 빵 · 1 솜구름 사탕 · 2 생명 과일 / 방향 0 = 길과 나란히 i)
   for (const st of TAXI_STOPS) prop(st.i + 1, st.j - 1, 'taxistand'); // 53차 택시 천사 정류장 표지
@@ -498,21 +509,42 @@ export function drawAttraction(b: Building & { att?: string }) {
   const cx = b.i0 + b.w / 2, cy = b.j0 + b.d / 2;
   const line = (a: [number, number], c2: [number, number], col: string, w = 2) => { g.strokeStyle = col; g.lineWidth = w; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(c2[0], c2[1]); g.stroke(); };
   if (b.att === 'ferris') {
-    box(cx - 1.5, cy - 1.5, cx + 1.5, cy + 1.5, 0, 10, '#f6efe0', '#e6dcc8', '#d6ccb6');
-    const [hx, hy] = Q(cx, cy, 160);
-    const R = 130;
-    for (const s of [-1, 1]) { const [fx, fy] = Q(cx - 1.2 * s, cy + 1.2 * s, 8); line([fx, fy], [hx, hy], '#d8d0c0', 5); }
-    g.strokeStyle = '#f2d27a'; g.lineWidth = 4; g.beginPath(); g.arc(hx, hy, R, 0, Math.PI * 2); g.stroke();
-    g.strokeStyle = '#ffffff'; g.lineWidth = 2; g.beginPath(); g.arc(hx, hy, R - 8, 0, Math.PI * 2); g.stroke();
+    // 53차 하늘 대관람차 (아시아티크만 하게): 바퀴는 i 방향 세로 면 — 앞뒤 두 테 · 살 · 매달린 칸 스물넷 · 양쪽 A자 다리 · 금빛 축 · 테의 전구 · 아래 승강장
+    const hubZ = 270, R = 220, Rt = R / 32, cj0 = cy, gap = 0.42;
+    const W3 = (t: number, jj: number, r = R): [number, number] => Q(cx + Math.cos(t) * (r / 32), jj, hubZ + Math.sin(t) * r);
+    // 승강장 (계단 · 지붕)
+    box(cx - 2.2, b.j0 + b.d - 1.6, cx + 2.2, b.j0 + b.d - 0.2, 0, 14, '#fbf8f0', '#ece6da', '#d8d0c0');
+    for (let k = 0; k < 4; k++) box(cx - 1.2, b.j0 + b.d - 0.2 + k * 0.0, cx + 1.2, b.j0 + b.d - 0.2 + 0.18, 0, 12 - k * 3, '#fbf8f0', '#e6dfcf', '#d0c8b6');
+    const leg = (s: number) => { // s = -1 뒤 · 1 앞
+      const jj = cj0 + s * 1.6, top = Q(cx, cj0 + s * gap * 0.9, hubZ);
+      for (const di of [-3.4, 3.4]) { const foot = Q(cx + di, jj, 0); line(foot, top, s < 0 ? '#d6cfbf' : '#f4efe4', 9); line(foot, top, s < 0 ? '#c4bca8' : '#ffffff', 3); }
+      const [ax, ay] = Q(cx - 1.7, jj - s * 0.8, hubZ * 0.5), [bx2, by2] = Q(cx + 1.7, jj - s * 0.8, hubZ * 0.5); line([ax, ay], [bx2, by2], s < 0 ? '#d6cfbf' : '#f4efe4', 5);
+    };
+    const rim = (jj: number, col: string, w2: number) => { g.strokeStyle = col; g.lineWidth = w2; g.beginPath(); for (let k = 0; k <= 96; k++) { const p = W3((k / 96) * Math.PI * 2, jj); k ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); } g.stroke(); };
+    leg(-1);
+    rim(cj0 - gap, '#e2c46e', 5); rim(cj0 - gap, '#fff2c0', 1.5);
+    const hb = Q(cx, cj0 - gap, hubZ), hf = Q(cx, cj0 + gap, hubZ);
+    for (let k = 0; k < 24; k++) { const t = (k / 24) * Math.PI * 2; line(hb, W3(t, cj0 - gap), 'rgba(230,214,170,0.85)', 1.2); }
+    // 칸 (뒤쪽 반 먼저 · 앞쪽 반 나중 — 바퀴가 칸을 가린다)
     const cols = ['#f28aa8', '#8ac8f2', '#f2d27a', '#a8e0a0', '#c8a8f2', '#f2a87a'];
-    for (let k = 0; k < 16; k++) {
-      const a = (k / 16) * Math.PI * 2, x = hx + Math.cos(a) * R, y = hy + Math.sin(a) * R;
-      line([hx, hy], [x, y], 'rgba(255,255,255,0.9)', 1.5);
-      g.fillStyle = cols[k % cols.length]; g.fillRect(Math.round(x) - 6, Math.round(y) + 2, 12, 10);
-      g.fillStyle = 'rgba(255,255,255,0.7)'; g.fillRect(Math.round(x) - 4, Math.round(y) + 4, 8, 3);
-      g.fillStyle = '#c9a23e'; g.fillRect(Math.round(x) - 1, Math.round(y) - 1, 2, 4);
-    }
-    g.fillStyle = '#c9a23e'; g.beginPath(); g.arc(hx, hy, 9, 0, Math.PI * 2); g.fill();
+    const gond = (k: number) => {
+      const t = (k / 24) * Math.PI * 2, [x, y] = W3(t, cj0), gx = Math.round(x), gy = Math.round(y) + 4;
+      line([gx, gy - 6], [gx, gy], '#c9a23e', 2);
+      g.fillStyle = cols[k % cols.length]; g.beginPath(); g.roundRect(gx - 9, gy, 18, 17, 5); g.fill();
+      g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(gx + 4, gy + 2, 4, 14);
+      g.fillStyle = 'rgba(235,248,255,0.92)'; g.fillRect(gx - 6, gy + 4, 12, 6);
+      g.fillStyle = '#ffffff'; g.fillRect(gx - 7, gy - 1, 14, 2);
+    };
+    for (let k = 0; k < 24; k++) if (Math.sin((k / 24) * Math.PI * 2) > 0) gond(k);
+    for (let k = 0; k < 24; k++) if (Math.sin((k / 24) * Math.PI * 2) <= 0) gond(k);
+    rim(cj0 + gap, '#f2d27a', 6); rim(cj0 + gap, '#fff6d0', 2);
+    for (let k = 0; k < 24; k++) { const t = (k / 24) * Math.PI * 2; line(hf, W3(t, cj0 + gap), 'rgba(255,250,232,0.95)', 1.4); }
+    for (let k = 0; k < 48; k++) { const [x, y] = W3((k / 48) * Math.PI * 2, cj0 + gap); g.fillStyle = k % 2 ? '#fff6c8' : '#ffd8f0'; g.beginPath(); g.arc(x, y, 1.6, 0, Math.PI * 2); g.fill(); } // 테의 전구
+    // 축 (앞뒤를 꿴 금빛 통)
+    line(hb, hf, '#b8902e', 10); line(hb, hf, '#f2d27a', 4);
+    g.fillStyle = '#c9a23e'; g.beginPath(); g.ellipse(hf[0], hf[1], 13, 13, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#fff2c0'; g.beginPath(); g.ellipse(hf[0] - 3, hf[1] - 3, 5, 5, 0, 0, Math.PI * 2); g.fill();
+    leg(1);
+    void Rt;
   } else if (b.att === 'carousel') {
     box(cx - 2.8, cy - 2.8, cx + 2.8, cy + 2.8, 0, 8, '#f6e8d0', '#e8d4b4', '#d8c09a');
     const [tx, ty] = Q(cx, cy, 70);
@@ -533,17 +565,52 @@ export function drawAttraction(b: Building & { att?: string }) {
       g.fillStyle = '#f2d27a'; g.fillRect(Math.round(x) - 4, Math.round(y) - 3, 6, 3);
     }
   } else if (b.att === 'coaster') {
-    // 흰 기둥 위로 굽이치는 금빛 레일, 앞쪽에 빨간 열차
-    const pts: [number, number][] = [];
-    for (let k = 0; k <= 40; k++) {
-      const t = k / 40, x = b.i0 + 0.6 + t * (b.w - 1.2), y = b.j0 + b.d / 2 + Math.sin(t * Math.PI * 3) * (b.d / 2 - 1), z = 30 + Math.abs(Math.sin(t * Math.PI * 2.2)) * (b.h - 50);
-      pts.push(Q(x, y, z));
-      if (k % 3 === 0) { const base = Q(x, y, 0); line(base, pts[pts.length - 1], '#ece6da', 2); }
+    // 53차 구름 롤러코스터: 승강장 → 높은 언덕 → 섬 가장자리 너머 허공으로 떨어져 → 공중 고리 → 나선 → 다시 섬 위로 낙타 등 → 땅속 굴로 들어간다.
+    //   땅 위 구간은 흰 격자 기둥이 받치고, 허공 구간의 기둥은 아래 구름 속으로 사라진다. 레일 두 줄 · 침목 · 앞에서 뒤로(먼 것부터) 그린다
+    const i0 = b.i0, j0 = b.j0;
+    const C: [number, number, number][] = [
+      [i0 + 21, j0 + 13, 8], [i0 + 15, j0 + 13, 8], [i0 + 10, j0 + 12, 30], [i0 + 6, j0 + 10, 150], [i0 + 4, j0 + 8, 255], [i0 + 4.6, j0 + 6, 262],
+      [i0 + 7, j0 + 3.5, 120], [i0 + 10, j0 + 1.5, 70], [i0 + 13, j0 + 1, 95],
+      [i0 + 15.5, j0 + 1.2, 175], [i0 + 17, j0 + 1.6, 230], [i0 + 16, j0 + 2.0, 200], [i0 + 15.2, j0 + 2.4, 140], [i0 + 17.5, j0 + 2.8, 92],
+      [i0 + 21, j0 + 2.2, 120], [i0 + 24, j0 + 3.2, 160], [i0 + 26.5, j0 + 5.5, 140], [i0 + 25, j0 + 8, 105], [i0 + 22, j0 + 7.4, 85], [i0 + 23, j0 + 5.2, 70], [i0 + 26, j0 + 7, 60],
+      [i0 + 27, j0 + 10, 110], [i0 + 28.6, j0 + 11, 70], [i0 + 29, j0 + 8.6, 30], [i0 + 28.2, j0 + 6.8, 6], [i0 + 27.6, j0 + 6.2, -18],
+    ];
+    const cr = (p0: number, p1: number, p2: number, p3: number, t: number) => 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t * t * t);
+    const P3: [number, number, number][] = [];
+    for (let k = 0; k < C.length - 1; k++) for (let s2 = 0; s2 < 10; s2++) { const t = s2 / 10, a0 = C[Math.max(0, k - 1)], a1 = C[k], a2 = C[k + 1], a3 = C[Math.min(C.length - 1, k + 2)]; P3.push([cr(a0[0], a1[0], a2[0], a3[0], t), cr(a0[1], a1[1], a2[1], a3[1], t), cr(a0[2], a1[2], a2[2], a3[2], t)]); }
+    P3.push(C[C.length - 1]);
+    const isl = (i: number, j: number) => { const W0 = 216, H0 = 124, ccx = W0 / 2, ccy = H0 / 2; return ((i - ccx) / (ccx - 3)) ** 2 + ((j - ccy) / (ccy - 3)) ** 2 < 0.97; };
+    // 승강장 (흰 지붕 · 금 테) · 굴 입구(땅속으로)
+    box(i0 + 14.6, j0 + 12.4, i0 + 21.6, j0 + 14.2, 0, 10, '#ece6da', '#ddd6c8', '#cfc8b8');
+    for (const pi of [15, 18, 21]) box(pi, j0 + 12.5, pi + 0.25, j0 + 12.75, 10, 40, '#fbf8f0', '#ece6da', '#d8d0c0');
+    box(i0 + 14.4, j0 + 12.2, i0 + 21.8, j0 + 14.4, 40, 46, '#fbf8f0', '#d9b04a', '#b8902e');
+    // 레일 그리기: 마디마다 깊이(i+j) 순서로 · 받침 기둥 · 침목 · 레일 둘
+    type Seg = { a: [number, number, number]; c: [number, number, number]; d: number };
+    const segs: Seg[] = [];
+    for (let k = 0; k + 1 < P3.length; k++) segs.push({ a: P3[k], c: P3[k + 1], d: (P3[k][0] + P3[k][1] + P3[k + 1][0] + P3[k + 1][1]) / 2 });
+    segs.sort((x, y) => x.d - y.d);
+    for (const sg of segs) {
+      const [ai, aj, az] = sg.a, [ci, cj, cz] = sg.c;
+      if (az < 0 && cz < 0) continue; // 땅속
+      const k0 = Math.round((ai + aj) * 3);
+      // 받침: 땅 위는 흰 격자 기둥, 허공은 구름 속으로 흐려지는 은빛 기둥
+      if (k0 % 3 === 0 && az > 20) {
+        const top = Q(ai, aj, az - 3), on = isl(ai, aj);
+        if (on) { const foot = Q(ai, aj, 0); line(foot, top, '#ece6da', 3); line([foot[0] + 3, foot[1]], [top[0] + 3, top[1]], '#d8d0c0', 1.5); for (let z = 20; z < az - 10; z += 26) { const p = Q(ai, aj, z), q2 = Q(ai, aj, z + 13); line([p[0], p[1]], [q2[0] + 3, q2[1]], '#e2dccf', 1); } }
+        else { const foot = Q(ai, aj, -120); const gr = g.createLinearGradient(0, top[1], 0, foot[1]); gr.addColorStop(0, 'rgba(220,226,236,0.95)'); gr.addColorStop(1, 'rgba(220,226,236,0)'); g.strokeStyle = gr; g.lineWidth = 3; g.beginPath(); g.moveTo(top[0], top[1]); g.lineTo(foot[0], foot[1]); g.stroke(); }
+      }
+      // 레일 (좌우로 0.13칸 벌린 두 줄) · 침목
+      const di = ci - ai, dj = cj - aj, L0 = Math.hypot(di, dj) || 1, ni = -dj / L0 * 0.13, nj = di / L0 * 0.13;
+      const za = Math.max(az, 0), zc = Math.max(cz, 0);
+      const r1a = Q(ai + ni, aj + nj, za), r1c = Q(ci + ni, cj + nj, zc), r2a = Q(ai - ni, aj - nj, za), r2c = Q(ci - ni, cj - nj, zc);
+      g.strokeStyle = '#8a7a5a'; g.lineWidth = 2; g.beginPath(); g.moveTo(r1a[0], r1a[1]); g.lineTo(r2a[0], r2a[1]); g.stroke();
+      line([(r1a[0] + r2a[0]) / 2, (r1a[1] + r2a[1]) / 2 + 3], [(r1c[0] + r2c[0]) / 2, (r1c[1] + r2c[1]) / 2 + 3], '#c9b98e', 3);
+      line(r1a, r1c, '#d9b04a', 2.6); line(r2a, r2c, '#f2d27a', 2.6);
     }
-    g.strokeStyle = '#d9b44a'; g.lineWidth = 4; g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (const p of pts) g.lineTo(p[0], p[1]); g.stroke();
-    g.strokeStyle = '#fff4c8'; g.lineWidth = 1; g.beginPath(); g.moveTo(pts[0][0], pts[0][1] - 2); for (const p of pts) g.lineTo(p[0], p[1] - 2); g.stroke();
-    for (let k = 0; k < 4; k++) { const p = pts[12 + k]; g.fillStyle = '#e83a4a'; g.fillRect(Math.round(p[0]) - 5, Math.round(p[1]) - 8, 10, 6); g.fillStyle = '#ffd8a8'; g.fillRect(Math.round(p[0]) - 2, Math.round(p[1]) - 11, 3, 3); }
-    poly([Q(b.i0, b.j0 + b.d, 0), Q(b.i0 + b.w, b.j0 + b.d, 0), Q(b.i0 + b.w, b.j0 + b.d, 0.1), Q(b.i0, b.j0 + b.d, 0.1)], '#ffffff');
+    // 굴 입구: 땅에 묻힌 돌 아치 · 안은 어둡다 (레일이 그 속으로 사라진다)
+    { const tc = Q(i0 + 27.9, j0 + 6.5, 0); /* 굴은 동쪽 끝 — 가게 지붕 뒤에 가리지 않는 자리 */ g.fillStyle = '#7a7266'; g.beginPath(); g.ellipse(tc[0], tc[1] - 8, 22, 22, 0, Math.PI, 0); g.lineTo(tc[0] + 22, tc[1] + 4); g.lineTo(tc[0] - 22, tc[1] + 4); g.fill(); g.fillStyle = '#1e1a16'; g.beginPath(); g.ellipse(tc[0], tc[1] - 6, 15, 15, 0, Math.PI, 0); g.lineTo(tc[0] + 15, tc[1] + 4); g.lineTo(tc[0] - 15, tc[1] + 4); g.fill(); g.fillStyle = '#a8a094'; for (let k = 0; k < 7; k++) { const a = Math.PI + (k / 6) * Math.PI; g.fillRect(Math.round(tc[0] + Math.cos(a) * 19) - 3, Math.round(tc[1] - 8 + Math.sin(a) * 19) - 2, 6, 4); } }
+    // 열차: 높은 언덕 꼭대기에 막 걸린 빨간 칸 다섯
+    for (let k = 0; k < 5; k++) { const p = P3[38 + k * 2]; if (!p) break; const [x, y] = Q(p[0], p[1], p[2] + 2); g.fillStyle = '#e83a4a'; g.beginPath(); g.roundRect(Math.round(x) - 8, Math.round(y) - 9, 16, 9, 3); g.fill(); g.fillStyle = '#ffd8a8'; g.fillRect(Math.round(x) - 5, Math.round(y) - 13, 3, 4); g.fillRect(Math.round(x) + 1, Math.round(y) - 13, 3, 4); g.fillStyle = '#ffffff'; g.fillRect(Math.round(x) - 7, Math.round(y) - 8, 14, 2); }
   }
   return { canvas: f.c, x: f.x, y: f.y };
 }
@@ -554,7 +621,7 @@ export const TAXI_STOPS: { key: 'start' | 'palace' | 'sanct' | 'dump'; i: number
 /** 52차 후속: 천국 수레 종류 (prop o >> 1) */
 export const HCART_KINDS = ['manna', 'cotton', 'fruit'] as const;
 const HCART_GOODS = ['manna', 'cotton', 'lifefruit'] as const;
-export const HEAVEN_PROPS = new Set(['sunbed', 'parasol', 'giraffe', 'elephant', 'lion', 'zebra', 'flamingo', 'panda', 'fountain', 'balloons', 'icecream', 'junkpile', 'chicken', 'zoobar', 'zoogate', 'bagpile', 'jewelpile', 'appliance', 'fblock', 'angelstatue', 'flowerbed', 'gantry', 'fueltank', 'radar', 'padlight', 'flag', 'garbagetruck', 'grabber', 'litter', 'hcafe', 'hcart', 'taxistand']);
+export const HEAVEN_PROPS = new Set(['sunbed', 'parasol', 'giraffe', 'elephant', 'lion', 'zebra', 'flamingo', 'panda', 'fountain', 'balloons', 'icecream', 'junkpile', 'chicken', 'zoobar', 'zoogate', 'bagpile', 'jewelpile', 'appliance', 'fblock', 'angelstatue', 'flowerbed', 'gantry', 'fueltank', 'radar', 'padlight', 'flag', 'garbagetruck', 'grabber', 'litter', 'hcafe', 'hcart', 'taxistand', 'telescope', 'skybench', 'skydeck', 'swimmer']);
 function pic(w: number, h: number, ax: number, ay: number, draw: (R: (x: number, y: number, w: number, h: number, c: string) => void, g: CanvasRenderingContext2D) => void): PropPic {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
@@ -577,6 +644,30 @@ function patch(g: CanvasRenderingContext2D, x: number, y: number, r: number, col
   for (let k = 0; k < 7; k++) { const a = (k / 7) * Math.PI * 2, rr = r * (0.75 + ((Math.sin(x * 3.1 + y * 1.7 + k * 2.3) + 1) / 2) * 0.45); g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr * 0.85); }
   g.closePath(); g.fill();
 }
+function footShadow(g: CanvasRenderingContext2D, pts: [number, number][], a = 0.26, dx = 3, dy = 1.5) {
+  g.save(); g.filter = 'blur(1.4px)'; g.fillStyle = `rgba(60,48,30,${a})`;
+  g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x + dx, y + dy) : g.moveTo(x + dx, y + dy))); g.closePath(); g.fill();
+  g.filter = 'blur(0.6px)'; g.fillStyle = `rgba(40,30,20,${a * 1.1})`; g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill();
+  g.restore();
+}
+/** 53차 썬베드에 누운 사람 (발은 왼쪽 아래 · 머리는 등받이) — 살은 둥근 명암, 비키니/수영 반바지 */
+function sunbather(g: CanvasRenderingContext2D, v: number) {
+  const sk = ['#f0cfb4', '#d8a882', '#a8744e'][v % 3], skd = ['#d8b094', '#b88a66', '#865a3a'][v % 3];
+  const suit = ['#e8325a', '#2ab0c8', '#f2c230', '#1e2a4a', '#ff7a3a'][(v * 3 + 1) % 5], fem = v % 2 === 0;
+  const st = (pts: [number, number][], w: number, c: string) => { g.strokeStyle = c; g.lineWidth = w; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke(); };
+  g.fillStyle = 'rgba(80,60,40,0.14)'; g.beginPath(); g.ellipse(27, 22, 15, 3, -0.3, 0, Math.PI * 2); g.fill(); // 몸이 썬베드에 드리운 그림자
+  st([[10, 20.5], [20, 21.5], [27, 20.5]], 3.4, skd); st([[10, 19.5], [20, 20.5], [27, 19.6]], 2.6, sk); // 다리 둘 (겹쳐 뻗음)
+  st([[12, 22], [21, 22.6], [27, 21.4]], 3, skd); st([[12, 21.3], [21, 21.8], [27, 20.8]], 2.2, sk);
+  const tg = g.createLinearGradient(27, 16, 31, 24); tg.addColorStop(0, sk); tg.addColorStop(1, skd);
+  g.fillStyle = tg; g.beginPath(); g.moveTo(26, 18.6); g.quadraticCurveTo(33, 14.4, 40, 12.6); g.lineTo(41.5, 16.6); g.quadraticCurveTo(34, 19.6, 27, 22.4); g.closePath(); g.fill(); // 몸통 (등받이로 비스듬히)
+  g.fillStyle = suit; g.beginPath(); g.moveTo(26, 18.6); g.lineTo(30, 17); g.lineTo(31, 20.6); g.lineTo(27, 22.4); g.closePath(); g.fill(); // 아랫도리 · 반바지
+  if (fem) { g.beginPath(); g.moveTo(35.4, 14.4); g.lineTo(38.4, 13.2); g.lineTo(39.4, 16.6); g.lineTo(36.4, 17.6); g.closePath(); g.fill(); g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(36, 14, 2, 1); } // 비키니 윗도리
+  st([[33, 19.4], [29, 22.6], [25, 23.4]], 1.8, skd); // 팔 (몸 옆에 내려놓음)
+  const hg = g.createRadialGradient(42.3, 9.6, 0.6, 43, 10.6, 4); hg.addColorStop(0, sk); hg.addColorStop(1, skd);
+  g.fillStyle = hg; g.beginPath(); g.arc(43, 10.6, 3.4, 0, Math.PI * 2); g.fill(); // 머리
+  g.fillStyle = ['#2a1e16', '#6a4a2a', '#e8d098', '#141012'][v % 4]; g.beginPath(); g.arc(43.6, 9.8, 3.6, Math.PI * 1.05, Math.PI * 2.1); g.fill(); if (fem) { g.beginPath(); g.ellipse(46, 12, 1.8, 3.6, -0.3, 0, Math.PI * 2); g.fill(); } // 머리카락
+  g.fillStyle = '#141414'; g.fillRect(40.6, 10.4, 4, 1.2); // 선글라스
+}
 export function heavenProp(kind: string, v: number, o = 0): PropPic {
   const E = (g: CanvasRenderingContext2D, x: number, y: number, rx: number, ry: number, col: string) => { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); g.fill(); };
   switch (kind) {
@@ -586,6 +677,7 @@ export function heavenProp(kind: string, v: number, o = 0): PropPic {
       g.fillStyle = ['#7ac8e8', '#f2a8b8', '#f2d27a'][v % 3]; g.beginPath(); g.moveTo(9, 20); g.lineTo(30, 23.5); g.lineTo(40, 18); g.lineTo(19, 15); g.closePath(); g.fill();
       g.fillStyle = '#f6f2ea'; g.beginPath(); g.moveTo(32, 26); g.lineTo(46, 19); g.lineTo(46, 9); g.lineTo(36, 14); g.closePath(); g.fill();
       R(8, 22, 2, 4, '#d8d0c0'); R(30, 25, 2, 4, '#d8d0c0'); R(44, 19, 2, 4, '#d8d0c0');
+      if (o === 1) sunbather(g, v);
     });
     case 'parasol': return pic(56, 70, 28, 64, (R, g) => {
       E(g, 28, 64, 18, 5, 'rgba(0,0,0,0.12)');
@@ -833,6 +925,73 @@ export function heavenProp(kind: string, v: number, o = 0): PropPic {
       for (let k = 0; k < 9; k++) { const c = cols[Math.floor(r(k) * cols.length)]; bag(8 + r(k + 10) * 56, 14 + r(k + 20) * 28, 12 + r(k + 30) * 8, 9 + r(k + 40) * 6, c[0], c[1], c[2]); }
       for (let k = 0; k < 3; k++) { const x = 10 + r(k + 50) * 60, y = 40 + r(k + 55) * 8; g.fillStyle = ['#f6f2ea', '#1e1e1e', '#e8d6b0'][k]; g.fillRect(x, y, 10, 9); g.fillStyle = '#c9a23e'; g.fillRect(x + 4, y + 3, 2, 2); } // 상자
     });
+    // 53차 수영장 안의 사람들 (o % 4): 0 자유형 · 1 튜브 · 2 에어매트 · 3 물가에서 수다. 몸은 물에 잠겨 물빛 너머로 비친다
+    case 'swimmer': return pic(64, 46, 32, 30, (_R, g) => {
+      const k = o % 4, q = Math.floor(o / 4) + v;
+      const sk = ['#f0cfb4', '#d8a882', '#a8744e', '#e8bf9c'][q % 4], skd = ['#d0a888', '#b08060', '#7a4e30', '#c89a78'][q % 4];
+      const hair = ['#2a1e16', '#6a4a2a', '#e8d098', '#141012', '#8a3a1e'][q % 5], suit = ['#e8325a', '#2ab0c8', '#f2c230', '#ff7a3a', '#7a4ae8'][q % 5];
+      const ring = (cx: number, cy: number, rx: number, ry: number, a: number) => { g.strokeStyle = `rgba(255,255,255,${a})`; g.lineWidth = 1.1; g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); g.stroke(); };
+      const head = (x: number, y: number, r: number, cap?: string) => {
+        const hg = g.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.2, x, y, r); hg.addColorStop(0, sk); hg.addColorStop(1, skd);
+        g.fillStyle = hg; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+        g.fillStyle = cap ?? hair; g.beginPath(); g.arc(x, y - r * 0.12, r * 1.04, Math.PI * 1.02, Math.PI * 1.98); g.fill();
+        if (cap) { g.fillStyle = 'rgba(255,255,255,0.45)'; g.fillRect(Math.round(x - r * 0.5), Math.round(y - r * 0.85), Math.round(r * 0.5), 1); }
+      };
+      const under = (x: number, y: number, rx: number, ry: number) => { g.fillStyle = 'rgba(220,170,140,0.32)'; g.beginPath(); g.ellipse(x, y, rx, ry, -0.35, 0, Math.PI * 2); g.fill(); }; // 물 밑으로 비치는 몸
+      const surf = (x: number, y: number, rx: number, ry: number) => { g.fillStyle = 'rgba(122,200,232,0.5)'; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); g.fill(); ring(x, y, rx, ry, 0.7); }; // 몸을 자르는 물낯
+      const torus = (cx: number, cy: number, rx: number, ry: number, c0: string, c1: string, front: boolean) => {
+        const tg = g.createLinearGradient(cx, cy - ry, cx, cy + ry); tg.addColorStop(0, c0); tg.addColorStop(1, c1);
+        g.fillStyle = tg; g.beginPath();
+        if (front) { g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI); g.ellipse(cx, cy - 1, rx * 0.5, ry * 0.45, 0, Math.PI, 0, true); }
+        else { g.ellipse(cx, cy, rx, ry, 0, Math.PI, Math.PI * 2); g.ellipse(cx, cy - 1, rx * 0.5, ry * 0.45, 0, 0, Math.PI, true); }
+        g.closePath(); g.fill();
+        g.strokeStyle = 'rgba(255,255,255,0.6)'; g.lineWidth = 1.2; g.beginPath(); g.ellipse(cx, cy - 1.5, rx * 0.78, ry * 0.62, 0, front ? 0.3 : Math.PI + 0.3, front ? 1.2 : Math.PI + 1.1); g.stroke();
+      };
+      if (k === 0) { // 자유형: 물보라 · 물 밑 몸 · 수영모 · 물 밖으로 휘두른 팔
+        ring(32, 31, 22, 6.5, 0.35); ring(32, 31, 14, 4, 0.55);
+        under(39, 33, 13, 3.6);
+        head(26, 27, 5, ['#e8325a', '#ffffff', '#2ab0c8', '#f2c230'][q % 4]);
+        g.fillStyle = '#1e2a3a'; g.fillRect(22, 26, 8, 1.6); // 물안경
+        surf(27, 31, 9, 2.6);
+        g.strokeStyle = skd; g.lineWidth = 3.4; g.lineCap = 'round'; g.beginPath(); g.moveTo(31, 30); g.quadraticCurveTo(38, 12, 47, 20); g.stroke();
+        g.strokeStyle = sk; g.lineWidth = 2.4; g.beginPath(); g.moveTo(31, 29.4); g.quadraticCurveTo(38, 11.4, 47, 19.4); g.stroke();
+        g.fillStyle = 'rgba(255,255,255,0.85)'; for (const [x, y] of [[49, 22], [51, 18], [46, 24], [52, 25], [44, 27]]) g.fillRect(x, y, 1.5, 1.5); // 물방울
+      } else if (k === 1) { // 튜브: 뒤 반쪽 → 몸 → 앞 반쪽
+        ring(32, 32, 20, 6, 0.35);
+        const tc = [['#f28aa8', '#c8506e'], ['#f2d27a', '#c89a2a'], ['#8ad8f2', '#3a9ac8']][q % 3];
+        torus(32, 30, 14, 6.5, tc[0], tc[1], false);
+        const bg = g.createLinearGradient(27, 20, 37, 28); bg.addColorStop(0, sk); bg.addColorStop(1, skd);
+        g.fillStyle = bg; g.beginPath(); g.ellipse(32, 25, 6.2, 4.4, 0, 0, Math.PI * 2); g.fill(); // 어깨 · 가슴
+        if (q % 2 === 0) { g.fillStyle = suit; g.fillRect(27.6, 25.2, 8.8, 2.4); } // 비키니 윗도리
+        g.strokeStyle = skd; g.lineWidth = 2.4; g.lineCap = 'round'; g.beginPath(); g.moveTo(27, 24); g.lineTo(21, 29); g.moveTo(37, 24); g.lineTo(43, 29); g.stroke(); // 튜브에 걸친 팔
+        head(32, 17.6, 4.4);
+        g.fillStyle = '#141414'; g.fillRect(29.4, 17.4, 5.4, 1.3);
+        torus(32, 30, 14, 6.5, tc[0], tc[1], true);
+      } else if (k === 2) { // 에어매트에 누워 둥둥
+        ring(32, 32, 24, 7.5, 0.3);
+        const M = (x: number, y: number) => [x, y] as [number, number];
+        const top = [M(10, 30), M(36, 39), M(54, 30), M(28, 21)], side = [M(10, 30), M(36, 39), M(36, 42), M(10, 33)], side2 = [M(36, 39), M(54, 30), M(54, 33), M(36, 42)];
+        const poly = (pts: [number, number][], c: string) => { g.fillStyle = c; g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill(); };
+        const mc = [['#f2d27a', '#d8b040', '#c09a30'], ['#8ad8f2', '#5ab4d8', '#3a9ac8'], ['#f28aa8', '#d86a88', '#b8506e']][q % 3];
+        poly(side, mc[1]); poly(side2, mc[2]); poly(top, mc[0]);
+        g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 1; for (let t2 = 0.25; t2 < 1; t2 += 0.25) { g.beginPath(); g.moveTo(10 + 18 * t2, 30 - 9 * t2); g.lineTo(36 + 18 * t2, 39 - 9 * t2); g.stroke(); } // 매트 골
+        g.lineCap = 'round';
+        g.strokeStyle = skd; g.lineWidth = 3; g.beginPath(); g.moveTo(16, 31); g.lineTo(28, 33); g.moveTo(17, 33); g.lineTo(28, 34.4); g.stroke(); // 다리
+        g.strokeStyle = sk; g.lineWidth = 2.2; g.beginPath(); g.moveTo(16, 30.4); g.lineTo(28, 32.4); g.stroke();
+        const tg = g.createLinearGradient(30, 28, 34, 36); tg.addColorStop(0, sk); tg.addColorStop(1, skd);
+        g.fillStyle = tg; g.beginPath(); g.ellipse(36, 31.4, 8.4, 3.6, 0.2, 0, Math.PI * 2); g.fill(); // 몸통
+        g.fillStyle = suit; g.fillRect(28.6, 30.4, 4.4, 3.4); if (q % 2 === 0) g.fillRect(37.4, 29.6, 4.2, 3.2);
+        head(47, 28.6, 3.6); g.fillStyle = '#141414'; g.fillRect(45, 28.4, 4.4, 1.2);
+      } else { // 물가에 기대 수다 떠는 둘
+        ring(26, 31, 12, 3.6, 0.4); ring(40, 31, 12, 3.6, 0.4);
+        under(26, 34, 6, 2.4); under(40, 34, 6, 2.4);
+        const bod = (x: number, s2: string) => { const bg = g.createLinearGradient(x - 5, 24, x + 5, 32); bg.addColorStop(0, sk); bg.addColorStop(1, skd); g.fillStyle = bg; g.beginPath(); g.ellipse(x, 28.4, 5.2, 3.4, 0, Math.PI, Math.PI * 2); g.fill(); if (s2) { g.fillStyle = s2; g.fillRect(x - 4.2, 27.4, 8.4, 1.8); } };
+        bod(26, suit); bod(40, '');
+        head(26, 20.6, 4.2); head(40, 20.4, 4.4);
+        g.fillStyle = hair; g.beginPath(); g.ellipse(23, 24, 2, 4.6, 0.2, 0, Math.PI * 2); g.fill(); // 젖은 긴 머리
+        surf(26, 30.4, 7.4, 2); surf(40, 30.4, 7.4, 2);
+      }
+    });
     // 50차 귀금속 더미: 금빛 무더기 · 목걸이 사슬 · 진주 · 보석 반지 · 시계 · 왕관 (반짝임)
     case 'jewelpile': return pic(70, 52, 35, 44, (_R, g) => {
       E(g, 35, 44, 30, 6, 'rgba(0,0,0,0.13)');
@@ -849,8 +1008,12 @@ export function heavenProp(kind: string, v: number, o = 0): PropPic {
     });
     // 50차 멀쩡한 가전: v 0 = 겹쳐 세운 TV · 1 = 양문 냉장고 · 2 = 세탁기 두 대
     case 'appliance': return pic(72, 76, 36, 68, (_R, g) => {
-      E(g, 36, 68, 30, 6, 'rgba(0,0,0,0.13)');
+      // 53차: 바닥에 붙인다 — 둥근 그림자 원판 위에 떠 보이던 것 → 상자 바닥 그대로의 접지 그림자 (먼저 다 깔고 나서 상자)
       const k = v % 3;
+      const fp = (ox: number, oy: number, a: number, b: number) => { const S = (i: number, j: number): [number, number] => [ox + (i - a) - (j - b), oy + (i - a) * 0.5 + (j - b) * 0.5]; footShadow(g, [S(0, 0), S(a, 0), S(a, b), S(0, b)]); };
+      if (k === 0) { for (const [ox, oy] of [[30, 64], [50, 58], [22, 46]]) fp(ox - 11, oy - 2.5 + 2, 12, 9); }
+      else if (k === 1) fp(40, 66, 18, 16);
+      else for (const [ox, oy] of [[30, 66], [54, 58]]) fp(ox, oy, 16, 16);
       // 쿼터뷰 상자: (a, b) 바닥 · h 높이 · 바닥 앞 모서리가 (ox, oy). 윗면 · 왼쪽 앞면(+j) · 오른쪽 앞면(+i)
       const box = (ox: number, oy: number, a: number, b: number, h: number, top: string, left: string, right: string) => {
         const S = (i: number, j: number, z: number): [number, number] => [ox + (i - a) - (j - b), oy + (i - a) * 0.5 + (j - b) * 0.5 - z];
@@ -862,7 +1025,9 @@ export function heavenProp(kind: string, v: number, o = 0): PropPic {
       };
       if (k === 0) {
         for (const [ox, oy, tilt] of [[30, 64, 0], [50, 58, 1], [22, 46, 0]] as [number, number, number][]) {
-          const S = box(ox, oy, 26, 3, 17, '#2a2a30', '#141418', '#1e1e24');
+          box(ox - 11, oy - 0.5, 12, 9, 2, '#3a3a42', '#222228', '#2c2c32'); // TV 받침대 (발판)
+          box(ox - 13.5, oy - 4.5, 3, 2, 4, '#4a4a52', '#2a2a30', '#36363c'); // 목
+          const S = box(ox, oy - 6, 26, 3, 17, '#2a2a30', '#141418', '#1e1e24');
           const p0 = S(1.5, 3, 1.5), p1 = S(24.5, 3, 1.5), p2 = S(24.5, 3, 15.5), p3 = S(1.5, 3, 15.5);
           g.fillStyle = tilt ? '#2a3e5a' : '#1e2a40'; g.beginPath(); g.moveTo(...p0); g.lineTo(...p1); g.lineTo(...p2); g.lineTo(...p3); g.closePath(); g.fill();
           g.strokeStyle = 'rgba(180,210,255,0.4)'; g.lineWidth = 1; g.beginPath(); g.moveTo(...S(4, 3, 13)); g.lineTo(...S(10, 3, 9)); g.stroke(); // 화면 반사
@@ -969,14 +1134,16 @@ export function heavenProp(kind: string, v: number, o = 0): PropPic {
       else if (k === 4) { g.fillStyle = '#fbfaf6'; g.fillRect(6, 12, 30, 7); g.fillStyle = '#e8e4dc'; g.fillRect(6, 12, 30, 2); for (let x = 8; x < 34; x += 4) { g.fillStyle = '#d8d4cc'; g.fillRect(x, 14, 1, 4); } } // 매트리스
       else { g.fillStyle = '#7a4a2a'; g.fillRect(10, 12, 10, 8); g.fillStyle = '#c89a5a'; g.fillRect(11, 13, 8, 1); g.strokeStyle = '#e0b84e'; g.beginPath(); g.ellipse(15, 12, 3, 3, 0, Math.PI, 0); g.stroke(); g.fillStyle = '#ffe07a'; for (let q = 0; q < 6; q++) g.fillRect(24 + q * 2, 17 - (q % 2), 2, 1); } // 가방 · 금 사슬
     });
-    case 'garbagetruck': return pic(170, 120, 84, 102, (_R, g) => {
-      E(g, 84, 102, 70, 14, 'rgba(0,0,0,0.14)');
-      // 쿼터뷰 상자: 길이 방향 = +i (오른쪽 아래). 바닥 앞 모서리 (ox, oy)
-      const S = (i: number, j: number, z: number): [number, number] => [30 + i * 1.6 - j * 1.6, 70 + i * 0.8 + j * 0.8 - z];
+    case 'garbagetruck': return pic(170, 124, 82, 86, (_R, g) => {
+      // 53차: 그림자가 차 옆으로 비껴 떠 보이던 것 → 차 바닥 그대로 그림자 · 바퀴 밑 접지 · 기준점 = 차 바닥 가운데
+      // 쿼터뷰 상자: 길이 방향 = +i (오른쪽 아래)
+      const S = (i: number, j: number, z: number): [number, number] => [60 + i * 1.6 - j * 1.6, 60 + i * 0.8 + j * 0.8 - z];
+      footShadow(g, [S(-3, -1, 0), S(48, -1, 0), S(48, 19, 0), S(-3, 19, 0)], 0.3, 4, 2);
+      footShadow(g, [S(-24, 1, 0), S(-4, 1, 0), S(-4, 17, 0), S(-24, 17, 0)], 0.16, 2, 1); // 쏟아진 더미 밑
       const f = (pts: [number, number][], c: string) => { g.fillStyle = c; g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill(); g.strokeStyle = 'rgba(0,0,0,0.22)'; g.lineWidth = 0.8; g.stroke(); };
       const bx = (i0: number, j0: number, i1: number, j1: number, z0: number, z1: number, top: string, left: string, right: string) => { f([S(i0, j1, z0), S(i1, j1, z0), S(i1, j1, z1), S(i0, j1, z1)], left); f([S(i1, j0, z0), S(i1, j1, z0), S(i1, j1, z1), S(i1, j0, z1)], right); f([S(i0, j0, z1), S(i1, j0, z1), S(i1, j1, z1), S(i0, j1, z1)], top); };
       // 바퀴
-      for (const i of [8, 30, 40]) for (const j of [0, 18]) { const [x, y] = S(i, j + (j ? 0.5 : 0), 5); g.fillStyle = '#1e1e22'; g.beginPath(); g.ellipse(x, y, 5, 6, -0.5, 0, Math.PI * 2); g.fill(); g.fillStyle = '#c9c9c9'; g.beginPath(); g.ellipse(x, y, 2, 2.4, -0.5, 0, Math.PI * 2); g.fill(); }
+      for (const i of [8, 30, 40]) for (const j of [0, 18]) { const [x, y] = S(i, j + (j ? 0.5 : 0), 5); g.fillStyle = 'rgba(30,24,16,0.45)'; g.beginPath(); g.ellipse(x + 1, y + 6, 6, 2, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#1e1e22'; g.beginPath(); g.ellipse(x, y, 5, 6, -0.5, 0, Math.PI * 2); g.fill(); g.fillStyle = '#c9c9c9'; g.beginPath(); g.ellipse(x, y, 2, 2.4, -0.5, 0, Math.PI * 2); g.fill(); }
       bx(0, 0, 46, 18, 6, 9, '#4a4a50', '#3a3a40', '#2e2e34'); // 차대
       bx(0, 1, 32, 17, 9, 38, '#f4f5f8', '#e2e4ea', '#c8ccd6'); // 압축 적재함 (흰색 · 금 띠)
       f([S(0, 17, 22), S(32, 17, 22), S(32, 17, 25), S(0, 17, 25)], '#e0b84e');
@@ -989,7 +1156,9 @@ export function heavenProp(kind: string, v: number, o = 0): PropPic {
       { const [x, y] = S(20, 17, 30); g.fillStyle = '#c9a23e'; g.font = 'bold 7px system-ui'; g.fillText('♲', x - 3, y); }
     });
     case 'grabber': return pic(200, 210, 96, 186, (_R, g) => {
-      E(g, 96, 186, 70, 16, 'rgba(0,0,0,0.14)');
+      footShadow(g, [[38, 177], [138, 196], [160, 184], [60, 165]], 0.32, 5, 2); // 궤도 바닥
+      footShadow(g, [[60, 162], [126, 174], [142, 162], [78, 150]], 0.12, 10, 4); // 몸통이 드리운 그림자
+      E(g, 34, 150, 14, 4, 'rgba(60,48,30,0.14)'); // 공중의 집게 그림자 (땅에)
       // 무한궤도 · 몸통 · 운전석
       g.fillStyle = '#2a2a2e'; g.beginPath(); g.moveTo(40, 176); g.lineTo(136, 194); g.lineTo(156, 182); g.lineTo(60, 164); g.closePath(); g.fill();
       g.fillStyle = '#3a3a40'; g.beginPath(); g.moveTo(40, 176); g.lineTo(136, 194); g.lineTo(136, 186); g.lineTo(40, 168); g.closePath(); g.fill();
@@ -1020,6 +1189,36 @@ export function heavenProp(kind: string, v: number, o = 0): PropPic {
     case 'hcafe': return pic(72, 52, 36, 38, (_R, g) => drawTableSet(g, 36, 38, 'heaven', v));
     // 52차 후속: 천사가 끄는 흰 수레 (o = 종류 × 2 + 방향 · 종류 0 만나 빵 · 1 솜구름 사탕 · 2 생명 과일)
     case 'hcart': return pic(72, 80, 36, 62, (_R, g) => drawCart(g, 36, 62, (o & 1) as 0 | 1, 'heaven', HCART_GOODS[(o >> 1) % 3], v));
+    // 53차 하늘을 보는 망원경: 금빛 받침 기둥 · 둥근 몸통(하늘 쪽을 본다) · 접안경 · 동전 넣는 곳
+    case 'telescope': return pic(36, 60, 18, 54, (_R, g) => {
+      E(g, 18, 54, 9, 3.5, 'rgba(0,0,0,0.14)'); E(g, 18, 53, 6, 2.5, '#b8902e');
+      g.fillStyle = '#c9a23e'; g.fillRect(16, 26, 4, 27); g.fillStyle = '#f2d27a'; g.fillRect(16, 26, 1.5, 27);
+      g.fillStyle = '#d9b04a'; g.beginPath(); g.ellipse(18, 24, 6, 4, 0, 0, Math.PI * 2); g.fill();
+      g.save(); g.translate(18, 18); g.rotate(-0.45);
+      g.fillStyle = '#e8ecef'; g.beginPath(); g.roundRect(-11, -5, 22, 10, 4); g.fill(); g.fillStyle = '#c8d0d6'; g.fillRect(-11, 1, 22, 4);
+      g.fillStyle = '#34445e'; g.beginPath(); g.ellipse(11, 0, 3, 5, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#8ac8f2'; g.beginPath(); g.ellipse(11.5, -1, 1.5, 2.5, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#2a2a2e'; g.fillRect(-14, -3, 4, 6); g.restore();
+    });
+    // 53차 하늘을 보는 벤치: 흰 대리석 받침 · 나무 앉음판 · 등받이 (뒤쪽 — 북쪽 하늘을 본다)
+    case 'skybench': return pic(64, 40, 32, 30, (_R, g) => {
+      E(g, 32, 30, 26, 6, 'rgba(0,0,0,0.12)');
+      g.fillStyle = '#c8b08a'; g.beginPath(); g.moveTo(8, 14); g.lineTo(44, 2); g.lineTo(46, 8); g.lineTo(10, 20); g.closePath(); g.fill();
+      g.fillStyle = '#d9c29a'; g.beginPath(); g.moveTo(10, 22); g.lineTo(46, 10); g.lineTo(56, 15); g.lineTo(20, 27); g.closePath(); g.fill();
+      g.fillStyle = '#b89a72'; g.beginPath(); g.moveTo(20, 27); g.lineTo(56, 15); g.lineTo(56, 17); g.lineTo(20, 29); g.closePath(); g.fill();
+      for (const [x, y] of [[14, 24], [48, 13]]) { g.fillStyle = '#f4f0e8'; g.fillRect(x, y, 5, 9); g.fillStyle = '#d8d0c0'; g.fillRect(x + 3, y, 2, 9); }
+    });
+    // 53차 유리 전망대: 섬 가장자리 너머 빈 하늘 위로 튀어나온 유리 바닥 · 금빛 난간 (위에 서지는 못한다 — 보는 곳)
+    case 'skydeck': return pic(120, 70, 60, 40, (_R, g) => {
+      const P = (i: number, j: number, z = 0): [number, number] => [60 + (i - j) * 32, 40 + (i + j) * 16 - z];
+      const pl = (pts: [number, number][], col: string, a = 1) => { g.globalAlpha = a; g.fillStyle = col; g.beginPath(); pts.forEach(([x, y], n) => (n ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill(); g.globalAlpha = 1; };
+      pl([P(-0.9, -0.9), P(0.9, -0.9), P(0.9, 0.9), P(-0.9, 0.9)], '#cfe8f6', 0.45);
+      pl([P(-0.9, 0.9), P(0.9, 0.9), P(0.9, 0.9, -4), P(-0.9, 0.9, -4)], '#c9a23e');
+      pl([P(0.9, -0.9), P(0.9, 0.9), P(0.9, 0.9, -4), P(0.9, -0.9, -4)], '#a8862e');
+      for (const [a0, a1] of [[P(-0.9, -0.9, 18), P(0.9, -0.9, 18)], [P(0.9, -0.9, 18), P(0.9, 0.9, 18)], [P(-0.9, -0.9, 18), P(-0.9, 0.9, 18)]] as const) { g.strokeStyle = '#d9b04a'; g.lineWidth = 2; g.beginPath(); g.moveTo(a0[0], a0[1]); g.lineTo(a1[0], a1[1]); g.stroke(); }
+      for (const [i, j] of [[-0.9, -0.9], [0.9, -0.9], [0.9, 0.9], [-0.9, 0.9], [0, -0.9], [0.9, 0]]) { const a0 = P(i, j, 0), a1 = P(i, j, 18); g.strokeStyle = '#c9a23e'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(a0[0], a0[1]); g.lineTo(a1[0], a1[1]); g.stroke(); }
+      pl([P(-0.9, -0.9, 2), P(0.9, -0.9, 2), P(0.9, -0.9, 16), P(-0.9, -0.9, 16)], '#e6f4fc', 0.25);
+      pl([P(0.9, -0.9, 2), P(0.9, 0.9, 2), P(0.9, 0.9, 16), P(0.9, -0.9, 16)], '#e6f4fc', 0.3);
+    });
     // 53차 택시 천사 정류장: 금빛 기둥(둥근 그늘) · 흰 둥근 표지판(날개 · 금테 · 기울어진 두께) · 받침
     case 'taxistand': return pic(40, 96, 20, 90, (_R, g) => {
       E(g, 20, 90, 11, 4, 'rgba(0,0,0,0.14)');

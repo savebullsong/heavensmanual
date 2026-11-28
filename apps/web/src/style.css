@@ -805,8 +805,8 @@ body:has(.bag-panel) .load-chip { display: none; }
 .inv-kinds button { flex: 1 1 0; padding: 5px 6px; border-radius: 8px; font-size: 13px; white-space: nowrap; }
 .inv-kinds button.on { background: #e0b437; color: #2a1e08; border-color: #e0b437; }
 /* 52차 오르멧이 지옥 하늘을 가로지른다 */
-.oremet-fly { position: fixed; left: 0; width: 240px; height: 252px; pointer-events: none; z-index: 12; opacity: 0; animation: oremetfly 6.8s linear forwards; filter: drop-shadow(0 0 6px rgba(255, 70, 40, 0.75)) drop-shadow(0 0 18px rgba(140, 60, 255, 0.45)) drop-shadow(0 14px 16px rgba(0,0,0,0.55)); }
-.oremet-fly.rev { animation-direction: reverse; }
-.oremet-fly.rev svg { transform: scaleX(-1); }
-.oremet-fly svg { width: 100%; height: 100%; }
-@keyframes oremetfly { 0% { transform: translate(-40vw, 2vh) scale(0.55) rotate(-4deg); opacity: 0; } 12% { opacity: 0.9; } 50% { transform: translate(45vw, -5vh) scale(0.62) rotate(2deg); } 88% { opacity: 0.88; } 100% { transform: translate(115vw, 1vh) scale(0.55) rotate(-2deg); opacity: 0; } }
+.oremet-fly { position: fixed; left: 0; top: 0; pointer-events: none; z-index: 12; opacity: 0; will-change: transform, opacity; filter: drop-shadow(0 0 6px rgba(255, 70, 40, 0.7)) drop-shadow(0 0 18px rgba(140, 60, 255, 0.4)); }
+.oremet-fly svg { width: 100%; height: 100%; overflow: visible; }
+.oremet-shadow { position: fixed; left: 0; top: 0; pointer-events: none; z-index: 11; opacity: 0; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,0.85), rgba(0,0,0,0.35) 60%, rgba(0,0,0,0)); filter: blur(3px); will-change: transform, opacity; }
+.oremet-feather { position: fixed; pointer-events: none; z-index: 12; border-radius: 50% 50% 50% 50% / 100% 100% 0 0; background: linear-gradient(90deg, #07060b, #2a2238 70%, #6a2a1a); animation: omfeather 2.5s ease-in forwards; }
+@keyframes omfeather { 0% { transform: translate(0, 0) rotate(0deg); opacity: 0.9; } 35% { transform: translate(calc(var(--dx) * 0.4), calc(var(--dy) * 0.3)) rotate(140deg) scaleY(-1); } 70% { transform: translate(calc(var(--dx) * 0.8), calc(var(--dy) * 0.7)) rotate(250deg); opacity: 0.7; } 100% { transform: translate(var(--dx), var(--dy)) rotate(360deg) scaleY(-1); opacity: 0; } }

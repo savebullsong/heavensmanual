@@ -312,6 +312,7 @@ interface Walker {
   feigned?: boolean; rumored?: boolean; revived?: boolean; reviveUp?: boolean; // 43차 5층: 상냥한 척 다가오는 중 · 소문을 냈다 · 실에 끌려 한 번 일어섰다 · 일어서는 중
   /** 43차: 천국 동물원 우리에 갇힌 악마·괴물·죄인 (우리 안쪽 칸 범위와 종류) */
   cage?: { i0: number; j0: number; i1: number; j1: number; kind: 'demon' | 'beast' | 'sinner' };
+  pool?: [number, number, number, number]; // 53차 수영장 가를 거니는 사람
   netActRef?: unknown; netActN?: number;
   barT: number;
   repathT: number;
@@ -914,6 +915,7 @@ export class WorldScene {
       s.position.set(x, y);
       s.zIndex = p.i + p.j + 0.99;
       this.objects.addChild(s);
+      if (p.kind === 'swimmer') this.bobbers.push({ s, y0: y, ph: (p.i * 1.7 + p.j * 0.9) % 6.28 }); // 53차 물에 뜬 사람 · 튜브 · 매트가 물결 따라 오르내린다
       if (this.zone.heavenGen && ZOO_KINDS.has(p.kind)) { const pen = ZOO_PENS.find(([a, b]) => p.i > a && p.i < a + 5 && p.j > b && p.j < b + 6); const fr = animalFrames(p.kind); if (fr) { s.texture = fr.frames[0]; s.anchor.set(fr.ax, fr.ay); } if (pen) this.zooAnimals.push({ s, x: p.i + 0.5, y: p.j + 0.5, tx: p.i + 0.5, ty: p.j + 0.5, wait: Math.random() * 4, pen: [pen[0], pen[1]], sp: p.kind === 'flamingo' ? 0.5 : p.kind === 'elephant' || p.kind === 'panda' ? 0.3 : p.kind === 'giraffe' ? 0.45 : 0.4, ph: Math.random() * 6, frames: fr?.frames, rest: false }); } // 46차 걷는 동물 · 51차 걷는 동작
       if (p.kind === 'pillar' || p.kind === 'lamp' || p.kind === 'tree') {
         const w = s.width, h = s.height, x0 = x - w * pt.ax, y0 = y - h * pt.ay;
@@ -1963,6 +1965,21 @@ export class WorldScene {
       }
     }
     if (hm?.chicken) this.makeChicken(hm.chicken.i, hm.chicken.j);
+    // 53차 수영장 가: 비키니 · 수영 반바지 차림이 물가를 거닐다 멈춰 서서 물을 본다 (물속 사람은 소품)
+    if (hm?.pools) {
+      const SUIT = ['#e8325a', '#2ab0c8', '#f2c230', '#1e2a4a', '#ff7a3a', '#7a4ae8', '#f6f4f0', '#2a8a5a'];
+      hm.pools.forEach(([a, b, c, d], pk) => {
+        for (let k = 0; k < 3; k++) {
+          const ring = this.poolDeck([a, b, c, d]);
+          if (!ring) continue;
+          const lk = randomSoulLook(true), col = SUIT[(pk * 3 + k * 5) % SUIT.length];
+          lk.outfit = 'swim'; lk.build = 1; lk.cols = { ...lk.cols, 3: col, 4: k === 2 ? SUIT[(pk + 4) % SUIT.length] : col };
+          const w = this.makeWalker(lk, ring[0], ring[1], 'soul');
+          w.pool = [a, b, c, d]; w.mut = 'swimmer'; w.job = 'swimmer'; w.speed = 0.5; w.wait = 1 + Math.random() * 5; w.maxHp = w.hp = 99999;
+          this.walkers.push(w);
+        }
+      });
+    }
     const cages = this.zone.heavenGen ? heavenMeta()?.cages ?? [] : [];
     const R = (a: number) => Math.floor(Math.random() * a);
     for (const c of cages) {
@@ -1986,6 +2003,27 @@ export class WorldScene {
         this.walkers.push(w);
       }
     }
+  }
+  /** 53차: 수영장 둘레(물 바깥 두 칸 띠)에서 걸을 수 있는 칸 하나 */
+  private poolDeck([a, b, c, d]: [number, number, number, number]): [number, number] | null {
+    for (let n = 0; n < 40; n++) {
+      const i = a - 2 + Math.floor(Math.random() * (c - a + 5)), j = b - 2 + Math.floor(Math.random() * (d - b + 5));
+      if (i >= a && i <= c && j >= b && j <= d) continue;
+      if (walkable(this.zone, i, j)) return [i, j];
+    }
+    return null;
+  }
+  /** 53차 수영장 가의 사람: 물가를 몇 걸음 걷고, 멈추면 물 쪽을 본다 */
+  private thinkPool(w: Walker, moving: boolean, dt: number) {
+    const [a, b, c, d] = w.pool!;
+    if (moving) return;
+    w.wait -= dt;
+    if (w.wait > 0) { if (w.wait < 3) w.dir = dirFromTile((a + c) / 2 - w.x, (b + d) / 2 - w.y, w.dir); return; }
+    w.wait = 4 + Math.random() * 8;
+    const to = this.poolDeck([a, b, c, d]);
+    if (!to) return;
+    const path = findPath(this.zone, Math.floor(w.x), Math.floor(w.y), to[0], to[1]);
+    if (path && path.length < 14 && path.every(([i, j]) => i >= a - 2 && i <= c + 2 && j >= b - 2 && j <= d + 2)) w.path = path;
   }
   private thinkCaged(w: Walker, moving: boolean, dt: number) {
     const c = w.cage!, p = this.player, d = Math.hypot(p.x - w.x, p.y - w.y);
@@ -2976,6 +3014,7 @@ export class WorldScene {
     for (const a of this.zooAnimals) { if (a.s.destroyed) continue; const b = a.s.getBounds(); const lx = (gx - b.x), ly = (gy - b.y); if (lx >= 0 && ly >= 0 && lx <= b.width && ly <= b.height) return a; void wx; void wy; }
     return null;
   }
+  private bobbers: { s: Sprite; y0: number; ph: number }[] = [];
   private zooAnimals: { s: Sprite; x: number; y: number; tx: number; ty: number; wait: number; pen: [number, number]; sp: number; ph: number; frames?: Texture[]; rest: boolean }[] = [];
   private updateZoo(dt: number) {
     for (const a of this.zooAnimals) {
@@ -6679,7 +6718,7 @@ export class WorldScene {
     for (const [k, v] of this.bViews) {
       if (k < 0 || wx < v.x || wx > v.x + v.w || wy < v.y || wy > v.y + v.h) continue; // 지도 밖 건물은 고를 수 없다
       const b = this.zone.buildings[k];
-      const h = b.cat === 'attraction' ? 18 : v.top; // 53차: 놀이기구는 바닥 받침만 누를 수 있다 — 대관람차 바퀴 · 레일은 하늘이라 그 너머 땅(관람차 북쪽 길)을 누른 것
+      const h = b.cat === 'attraction' ? 0 : v.top; // 53차: 놀이기구는 바닥 받침만 누를 수 있다 — 대관람차 바퀴 · 레일은 하늘이라 그 너머 땅(관람차 북쪽 길)을 누른 것
       let hitB = false;
       for (let z = 0; z <= h && !hitB; z += 4) {
         const fx = (wx / (TW / 2) + (wy + z) / (TH / 2)) / 2, fy = ((wy + z) / (TH / 2) - wx / (TW / 2)) / 2;
@@ -9605,6 +9644,7 @@ export class WorldScene {
     this.updateChimney(dt); // 34차
     this.updateFires(dt); // 46차
     if (this.zooAnimals.length) this.updateZoo(dt); // 46차
+    if (this.bobbers.length) { const tt = performance.now() / 1000; for (const f of this.bobbers) if (!f.s.destroyed) f.s.y = f.y0 + Math.sin(tt * 1.7 + f.ph) * 1.3; }
     this.updateDates(dt); // 46차 아큐버스 데이트
     if (this.chicken) this.updateChicken(dt); // 47차 닭
     this.updateDollEyes(dt); // 43차
@@ -9666,6 +9706,7 @@ export class WorldScene {
     if (w.twin) { this.thinkTwin(w, moving, dt); return; } // 46차
     if (w.kind === 'noeul') { this.thinkNoeul(w, moving, dt); return; }
     if (w.kind === 'caged') { this.thinkCaged(w, moving, dt); return; }
+    if (w.pool) { this.thinkPool(w, moving, dt); return; } // 53차
     if (w.tail && this.realm === 'heaven' && this.thinkTail(w, moving, dt)) return;
     if (w.kind === 'yellowwing' && this.ywFollow) { this.thinkYellowWing(w, moving, dt); return; }
     if (w.dumpAngel) { if (!w.bubble && Math.random() < dt * 0.09 && Math.hypot(this.player.x - w.x, this.player.y - w.y) < 10) { const ls = t().dumpLines; this.bubble(w, ls[Math.floor(Math.random() * ls.length)]); } return; } // 47차: 한숨 쉬며 혼잣말
@@ -10239,6 +10280,7 @@ export class WorldScene {
     for (const v of this.bViews.values()) {
       if (v.x > X1 || v.x + v.w < X0 || v.y > Y1 || v.y + v.h < Y0) continue;
       if (!v.parts.some((s) => s.zIndex > depth + 1)) continue;
+      if (v.b.cat === 'attraction') continue; // 53차: 놀이기구(바퀴 · 레일)는 길을 가리지 않는다 — 대관람차가 곁에만 가도 통째로 비치던 것
       // 건물 바닥 앞 모서리가 내 발보다 화면 아래쪽(가까운 쪽)이고, 지붕이 내 둘레를 덮을 때만
       if (v.parts.some((s) => s.zIndex > depth + 1 && s.x < X1 && s.x + s.width > X0 && s.y < Y1 && s.y + s.height > Y0 && this.opaqueAt(v, Math.min(Math.max(px, s.x + 2), s.x + s.width - 2) - v.x, py - 30 - v.y))) for (const s of v.parts) now.add(s);
     }

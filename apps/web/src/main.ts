@@ -5978,14 +5978,70 @@ async function hbankProtest() {
 /** 52차: 오르멧이 드물게 지옥 하늘을 가로지른다 (어느 층이든 — 복선). 지옥의 열두 사도 중 하나 · 서열 10위 · 빚진 것을 돌려받는 자 */
 let oremetNext = Date.now() + (params.has('oremet') ? 5e3 : (6 + Math.random() * 8) * 60e3);
 function oremetFlyBy() {
+  // 53차: 종이 그림이 미끄러지던 것 → 원근 있는 비행. 화면 = 카메라, 깊이 Z(멀수록 작고 흐리고 높다), 고도 Y, 좌우 X.
+  //   먼 왼쪽 하늘에서 내려와 카메라 가까이 스치고, 몸을 틀어 오른쪽 위로 멀어진다 (절반은 반대 방향).
+  //   날개는 어깨를 축으로 위아래로 접혔다 펴지고(아래로 꺾일 때 날개 아랫면이 보인다), 몸은 날갯짓에 맞춰 오르내리며,
+  //   도는 쪽으로 기울고 가까운 날개가 더 크다. 땅에는 고도만큼 흐려지는 그림자가 따라가고, 검은 깃털이 떨어진다.
+  const vw = innerWidth, vh = innerHeight, sd = Math.random() < 0.5 ? 1 : -1;
+  const fo = vh * 0.9, hz = vh * 0.05, size = Math.min(300, vh * 0.42);
+  const C: [number, number, number][] = [[-7, 0.95, 6.5], [-4.2, 0.85, 4.6], [-1.6, 0.6, 2.6], [0.4, 0.5, 1.55], [1.3, 0.62, 2.0], [1.7, 0.85, 3.4], [2.3, 1.05, 5.5], [3.6, 1.2, 8], [6.2, 1.3, 11]]; // 스친 뒤엔 깊이 쪽으로 멀어진다 (화면에 오래 남는다)
+  const cr = (a: number, b: number, c: number, d: number, u: number) => 0.5 * (2 * b + (-a + c) * u + (2 * a - 5 * b + 4 * c - d) * u * u + (-a + 3 * b - 3 * c + d) * u * u * u);
+  const at = (t: number): [number, number, number] => {
+    const n = C.length - 1, x = Math.min(n - 1e-6, Math.max(0, t * n)), k = Math.floor(x), u = x - k;
+    const a = C[Math.max(0, k - 1)], b = C[k], c = C[k + 1], d = C[Math.min(n, k + 2)];
+    return [cr(a[0], b[0], c[0], d[0], u) * sd, cr(a[1], b[1], c[1], d[1], u), cr(a[2], b[2], c[2], d[2], u)];
+  };
+  const proj = (X: number, Y: number, Z: number) => [vw / 2 + (X * fo) / Z, hz + ((1 - Y) * fo) / Z] as const;
   const el = document.createElement('div');
-  el.className = 'oremet-fly' + (Math.random() < 0.5 ? ' rev' : '');
-  el.style.top = `${8 + Math.random() * 22}%`;
+  el.className = 'oremet-fly';
+  el.style.width = `${size}px`; el.style.height = `${size * 1.05}px`;
   el.innerHTML = `<svg viewBox="0 0 400 420">${oremetSvg()}</svg>`;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 7200);
+  const sh = document.createElement('div'); sh.className = 'oremet-shadow';
+  document.body.append(sh, el);
+  const wl = el.querySelector<SVGGElement>('.om-wl'), wr = el.querySelector<SVGGElement>('.om-wr'), fig = el.querySelector('svg')!;
+  const T = 7600, t0 = performance.now();
+  let lastX = proj(...at(0))[0], bank = 0, nextFeather = 900, alive = true;
+  const step = (now: number) => {
+    if (!alive) return;
+    const ms = now - t0, t = ms / T;
+    if (t >= 1 || !document.body.contains(el)) { alive = false; el.remove(); sh.remove(); return; }
+    const [X, Y, Z] = at(t), [x, y] = proj(X, Y, Z), sc = 1.25 / Z;
+    // 날갯짓: 정면에서 보는 날개는 어깨를 축으로 위아래로 돈다 (내려칠 땐 빠르게, 올릴 땐 느리게).
+    //   내려칠 때 날개가 앞으로 쓸려 와 가로로 살짝 짧아지고, 멀 때는 느긋하게 미끄러진다
+    const ph = (ms / 1000) * Math.PI * 2 * (0.7 + 0.8 / Z), c = Math.cos(ph), down = c < 0 ? -Math.pow(-c, 0.7) : Math.pow(c, 1.4);
+    const ang = -8 + 40 * down, fore = 0.86 + 0.14 * Math.abs(down);
+    const vx = (x - lastX) / Math.max(1, size * sc); lastX = x;
+    bank += (Math.max(-0.5, Math.min(0.5, vx * 6)) - bank) * 0.08; // 도는 쪽으로 서서히 기운다
+    const near = 1 + bank * 0.5; // 기울면 안쪽 날개는 멀어지고 바깥 날개는 다가온다
+    if (wl && wr) {
+      wl.setAttribute('transform', `translate(178 128) rotate(${ang.toFixed(1)}) scale(${(fore * near).toFixed(3)} 1) translate(-178 -128)`);
+      wr.setAttribute('transform', `translate(222 128) rotate(${(-ang).toFixed(1)}) scale(${(fore * (2 - near)).toFixed(3)} 1) translate(-222 -128)`);
+    }
+    const bob = Math.sin(ph) * 10 * sc; // 아래로 칠 때 몸이 뜬다
+    const w = size * sc, haze = Math.min(1, Math.max(0, (Z - 1.5) / 5)); // 멀수록 하늘빛에 묻힌다
+    el.style.transform = `translate(${(x - size / 2).toFixed(1)}px, ${(y - size * 0.525 + bob).toFixed(1)}px) scale(${sc.toFixed(3)}) perspective(900px) rotateY(${(bank * 70).toFixed(1)}deg) rotateX(${(Z < 2.4 ? 14 : 6).toFixed(0)}deg) rotate(${(-bank * 30).toFixed(1)}deg)`; // 가운데를 축으로 줄이고, 도는 쪽으로 몸을 틀고(Y축) 기울인다 · 가까울수록 아래에서 올려다본다
+    el.style.opacity = String(Math.min(1, t * 8, (1 - t) * 8) * (1 - haze * 0.45));
+    fig.style.filter = `brightness(${(1 + haze * 0.9).toFixed(2)}) saturate(${(1 - haze * 0.7).toFixed(2)}) blur(${(haze * 1.6).toFixed(1)}px)`;
+    // 땅 그림자: 같은 깊이의 땅(Y=0) 자리 · 높이 뜰수록 크고 옅다
+    const [gx, gy] = proj(X, 0, Z), sw = size * sc * (0.9 + Y * 0.3);
+    sh.style.transform = `translate(${(gx - sw / 2).toFixed(1)}px, ${(gy - sw * 0.09).toFixed(1)}px)`;
+    sh.style.width = `${sw.toFixed(0)}px`; sh.style.height = `${(sw * 0.18).toFixed(0)}px`;
+    sh.style.opacity = String(Math.min(1, t * 8, (1 - t) * 8) * Math.max(0.12, 0.5 - Y * 0.3) * (1 - haze * 0.6));
+    // 떨어지는 깃털 (가까이 지날 때 더 자주)
+    if (ms > nextFeather) {
+      nextFeather = ms + 260 + Z * 160;
+      const fe = document.createElement('div'); fe.className = 'oremet-feather';
+      const fs = Math.max(6, 22 * sc); fe.style.width = `${fs}px`; fe.style.height = `${fs * 0.34}px`;
+      fe.style.left = `${(x + (Math.random() - 0.5) * w * 0.5).toFixed(0)}px`; fe.style.top = `${(y + w * 0.1).toFixed(0)}px`;
+      fe.style.setProperty('--dx', `${((Math.random() - 0.5) * 80 - sd * 30).toFixed(0)}px`); fe.style.setProperty('--dy', `${(80 + 160 * sc).toFixed(0)}px`);
+      document.body.appendChild(fe); setTimeout(() => fe.remove(), 2600);
+    }
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+  setTimeout(() => { if (alive) { alive = false; el.remove(); sh.remove(); } }, T + 1500);
   const L = t();
-  setTimeout(() => { toast(L.oremetFly); world?.nearbySay(pick(L.oremetFlySay)); }, 1600);
+  setTimeout(() => { toast(L.oremetFly); world?.nearbySay(pick(L.oremetFlySay)); }, 2400);
   try { sfx.thud(sfx.spot(0, -200)); } catch { /* 무시 */ }
 }
 setInterval(() => {
@@ -6004,6 +6060,7 @@ function oremetSvg() {
   let wing = '';
   for (const sd of [-1, 1]) {
     const sx = 200 + sd * 22, sy = 128, ex = 200 + sd * 170, ey = 52;
+    wing += `<g class="${sd < 0 ? 'om-wl' : 'om-wr'}">`;
     // 날개뼈를 따라 바깥에서 안쪽으로: 긴 첫째 깃 → 둘째 깃 → 덮깃
     for (const [layer, n, len0, w] of [[0, 13, 170, 17], [1, 10, 118, 19], [2, 8, 64, 17]] as const) {
       for (let k = 0; k < n; k++) {
@@ -6014,14 +6071,19 @@ function oremetSvg() {
       }
     }
     wing += `<path d="M${P(sx, sy)} Q${P(200 + sd * 95, 60)} ${P(ex, ey)}" stroke="#14111c" stroke-width="9" fill="none" stroke-linecap="round"/>`;
+    // 날개 아랫면에 비친 지옥 불빛 (깃 끝 쪽이 붉게 · 날개가 아래로 꺾이면 이 면이 보인다)
+    wing += `<path d="M${P(sx, sy)} Q${P(200 + sd * 95, 60)} ${P(ex, ey)}" stroke="url(#omRim)" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.7"/></g>`;
   }
-  const body = `<g fill="#060509">
+  const body = `<g fill="url(#omBody)">
     <path d="M186 104 Q200 126 214 104 L216 116 Q246 120 252 136 L246 176 L236 200 L240 300 L226 420 L206 420 L201 312 L196 420 L176 420 L162 300 L166 200 L154 176 L148 136 Q154 120 184 116 Z"/>
     <ellipse cx="200" cy="86" rx="15" ry="19"/><path d="M184 78 Q186 58 200 60 Q216 58 218 80 L222 100 L212 86 L200 92 L188 86 L178 100 Z"/>
     <path d="M246 140 L272 118 L282 126 L258 152 Z"/><path d="M152 140 L136 196 L146 200 L162 152 Z"/>
     <path d="M268 126 L282 116 L356 18 L350 14 Z"/><path d="M262 120 L290 126 L288 132 L260 128 Z"/>
   </g>`;
-  return `${wing}${body}<path d="M350 14 L356 18 L282 116" stroke="#5a5070" stroke-width="1.2" fill="none"/><circle cx="194" cy="85" r="2.2" fill="#ff3a2a"/><circle cx="206" cy="85" r="2.2" fill="#ff3a2a"/>`;
+  // 몸의 입체: 아래에서 올라오는 붉은 빛이 다리 · 옆구리 가장자리를 훑고, 위쪽 어깨엔 차가운 보랏빛
+  const rim = `<g fill="none" stroke-linejoin="round"><path d="M216 116 Q246 120 252 136 L246 176 L236 200 L240 300 L226 420" stroke="url(#omRim)" stroke-width="3.2" opacity="0.85"/><path d="M184 116 Q154 120 148 136 L154 176 L166 200 L162 300 L176 420" stroke="url(#omRim)" stroke-width="2.2" opacity="0.55"/><path d="M188 104 Q200 122 212 104" stroke="#6a5a8a" stroke-width="1.6" opacity="0.6"/></g>`;
+  const defs = `<defs><linearGradient id="omRim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7a6aa8"/><stop offset=".45" stop-color="#c0402a"/><stop offset="1" stop-color="#ff6a2a"/></linearGradient><radialGradient id="omBody" cx="0.42" cy="0.3" r="0.75"><stop offset="0" stop-color="#2a2236"/><stop offset=".45" stop-color="#0c0a12"/><stop offset="1" stop-color="#030205"/></radialGradient></defs>`; // 몸통도 둥글게 (가슴 쪽이 조금 밝고 가장자리로 갈수록 어둡다)
+  return `${defs}${wing}${body}${rim}<path d="M350 14 L356 18 L282 116" stroke="#5a5070" stroke-width="1.2" fill="none"/><circle cx="194" cy="85" r="2.2" fill="#ff3a2a"/><circle cx="206" cy="85" r="2.2" fill="#ff3a2a"/>`;
 }
 /** 오르멧: 남성형 타천사 · 검은 날개 · 검은 검. 공간이 찢어지고 걸어 나와 한 번 휘두른다 */
 function oremetScene(): Promise<void> {
